@@ -44,10 +44,10 @@ PassRefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(PassRefPtr<R
 MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& other)
     : RefCounted()
     , m_client(nullptr)
+    , m_id(createCanonicalUUIDString())
+    , m_enabled(other.enabled())
 {
-    m_id = createCanonicalUUIDString();
     setSource(other.source());
-    m_enabled = other.enabled();
 }
 
 MediaStreamTrackPrivate::MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource> source)
