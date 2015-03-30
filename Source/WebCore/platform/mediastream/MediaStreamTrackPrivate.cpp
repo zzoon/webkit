@@ -51,7 +51,6 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& 
     m_readyState = other.readyState();
     m_muted = other.muted();
     m_enabled = other.enabled();
-    m_stopped = other.stopped();
     m_ignoreMutations = false;
 }
 
@@ -61,7 +60,6 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource>
     , m_readyState(RealtimeMediaSource::Live)
     , m_muted(false)
     , m_enabled(true)
-    , m_stopped(false)
 {
     m_ignoreMutations = true;
     setSource(source);
@@ -116,12 +114,12 @@ const String& MediaStreamTrackPrivate::label() const
 
 bool MediaStreamTrackPrivate::ended() const
 {
-    return m_stopped || (m_source && m_source->readyState() == RealtimeMediaSource::Ended);
+    return m_source && m_source->readyState() == RealtimeMediaSource::Ended;
 }
 
 bool MediaStreamTrackPrivate::muted() const
 {
-    if (m_stopped || !m_source)
+    if (!m_source)
         return false;
 
     return m_source->muted();
@@ -142,7 +140,7 @@ void MediaStreamTrackPrivate::setMuted(bool muted)
 
 bool MediaStreamTrackPrivate::readonly() const
 {
-    if (m_stopped || !m_source)
+    if (!m_source)
         return true;
 
     return m_source->readonly();
@@ -158,7 +156,7 @@ bool MediaStreamTrackPrivate::remote() const
 
 void MediaStreamTrackPrivate::setEnabled(bool enabled)
 {
-    if (m_stopped || m_enabled == enabled)
+    if (m_enabled == enabled)
         return;
 
     // 4.3.3.1
@@ -169,14 +167,12 @@ void MediaStreamTrackPrivate::setEnabled(bool enabled)
 
 void MediaStreamTrackPrivate::detachSource()
 {
-    if (m_stopped)
+    if (!m_source)
         return;
 
     // The source will stop itself when out of consumers (observers in this case).
     m_source->removeObserver(this);
     m_source = nullptr;
-
-    m_stopped = true;
 
     m_ignoreMutations = true;
     setReadyState(RealtimeMediaSource::Ended);
@@ -185,9 +181,6 @@ void MediaStreamTrackPrivate::detachSource()
 
 RealtimeMediaSource::ReadyState MediaStreamTrackPrivate::readyState() const
 {
-    if (m_stopped)
-        return RealtimeMediaSource::Ended;
-
     return m_readyState;
 }
 
@@ -248,17 +241,11 @@ void MediaStreamTrackPrivate::applyConstraints(PassRefPtr<MediaConstraints>)
 
 void MediaStreamTrackPrivate::sourceReadyStateChanged()
 {
-    if (stopped())
-        return;
-    
     setReadyState(m_source->readyState());
 }
 
 void MediaStreamTrackPrivate::sourceMutedChanged()
 {
-    if (stopped())
-        return;
-    
     setMuted(m_source->muted());
 }
 

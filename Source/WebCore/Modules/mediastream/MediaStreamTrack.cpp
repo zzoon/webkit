@@ -121,11 +121,6 @@ void MediaStreamTrack::setEnabled(bool enabled)
     m_privateTrack->setEnabled(enabled);
 }
 
-bool MediaStreamTrack::stopped() const
-{
-    return m_privateTrack->stopped();
-}
-
 bool MediaStreamTrack::muted() const
 {
     return m_privateTrack->muted();
@@ -232,9 +227,6 @@ void MediaStreamTrack::removeObserver(MediaStreamTrack::Observer* observer)
 
 void MediaStreamTrack::trackEnded()
 {
-    if (stopped())
-        return;
-
     if (!m_stoppingTrack)
         scheduleEventDispatch(Event::create(eventNames().endedEvent, false, false));
 
@@ -246,9 +238,6 @@ void MediaStreamTrack::trackEnded()
     
 void MediaStreamTrack::trackMutedChanged()
 {
-    if (stopped())
-        return;
-
     if (muted())
         scheduleEventDispatch(Event::create(eventNames().muteEvent, false, false));
     else
@@ -259,9 +248,6 @@ void MediaStreamTrack::trackMutedChanged()
 
 void MediaStreamTrack::configureTrackRendering()
 {
-    if (stopped())
-        return;
-
     // 4.3.1
     // ... media from the source only flows when a MediaStreamTrack object is both unmuted and enabled
 }

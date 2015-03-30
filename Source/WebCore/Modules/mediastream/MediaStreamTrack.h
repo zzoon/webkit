@@ -70,7 +70,6 @@ public:
     bool muted() const;
     bool readonly() const;
     bool remote() const;
-    bool stopped() const;
 
     const AtomicString& readyState() const;
 

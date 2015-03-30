@@ -74,7 +74,6 @@ public:
     void setSource(PassRefPtr<RealtimeMediaSource>);
 
     void detachSource();
-    bool stopped() const { return m_stopped; }
     
     void setClient(MediaStreamTrackPrivateClient* client) { m_client = client; }
 
@@ -111,7 +110,6 @@ private:
 
     bool m_muted;
     bool m_enabled;
-    bool m_stopped;
     bool m_ignoreMutations;
 };
 
