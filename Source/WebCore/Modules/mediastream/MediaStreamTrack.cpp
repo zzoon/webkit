@@ -205,11 +205,12 @@ void MediaStreamTrack::stopProducingData()
     // the "ImplementedAs" IDL attribute. This is done because ActiveDOMObject requires
     // a "stop" method.
     
-    // The stop method should "Permanently stop the generation of data for track's source", but it
-    // should not post an 'ended' event. 
-    m_stoppingTrack = true;
-    m_privateTrack->stop(MediaStreamTrackPrivate::StopTrackAndStopSource);
-    m_stoppingTrack = false;
+    if (remote())
+        return;
+
+    // FIXME: This object needs its own ended member.
+
+    m_privateTrack->detachSource();
 }
 
 bool MediaStreamTrack::ended() const
@@ -276,7 +277,7 @@ void MediaStreamTrack::configureTrackRendering()
 
 void MediaStreamTrack::stop()
 {
-    m_privateTrack->stop(MediaStreamTrackPrivate::StopTrackOnly);
+    stopProducingData();
 }
 
 const char* MediaStreamTrack::activeDOMObjectName() const

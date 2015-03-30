@@ -74,8 +74,7 @@ public:
     RealtimeMediaSource* source() const { return m_source.get(); }
     void setSource(PassRefPtr<RealtimeMediaSource>);
 
-    enum StopBehavior { StopTrackAndStopSource, StopTrackOnly };
-    void stop(StopBehavior);
+    void detachSource();
     bool stopped() const { return m_stopped; }
     
     void setClient(MediaStreamTrackPrivateClient* client) { m_client = client; }

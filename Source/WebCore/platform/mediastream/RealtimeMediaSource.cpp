@@ -116,9 +116,6 @@ bool RealtimeMediaSource::readonly() const
 
 void RealtimeMediaSource::stop()
 {
-    // This is called from the track.stop() method, which should "Permanently stop the generation of data
-    // for track's source", so go straight to ended. This will notify any other tracks using this source
-    // that it is no longer available.
     setReadyState(Ended);
 }
 

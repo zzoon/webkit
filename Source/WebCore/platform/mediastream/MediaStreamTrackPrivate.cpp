@@ -172,16 +172,20 @@ void MediaStreamTrackPrivate::setEnabled(bool enabled)
     m_client->trackEnabledChanged();
 }
 
-void MediaStreamTrackPrivate::stop(StopBehavior stopSource)
+void MediaStreamTrackPrivate::detachSource()
 {
     if (m_stopped)
         return;
 
-    if (stopSource == StopTrackAndStopSource && m_source)
-        m_source->stop();
+    // The source will stop itself when out of consumers (observers in this case).
+    m_source->removeObserver(this);
+    m_source = nullptr;
 
-    setReadyState(RealtimeMediaSource::Ended);
     m_stopped = true;
+
+    m_ignoreMutations = true;
+    setReadyState(RealtimeMediaSource::Ended);
+    m_ignoreMutations = false;
 }
 
 RealtimeMediaSource::ReadyState MediaStreamTrackPrivate::readyState() const
