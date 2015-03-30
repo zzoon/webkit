@@ -120,7 +120,7 @@ bool MediaStreamTrackPrivate::ended() const
 bool MediaStreamTrackPrivate::muted() const
 {
     if (!m_source)
-        return false;
+        return true;
 
     return m_source->muted();
 }
