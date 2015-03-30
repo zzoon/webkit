@@ -165,11 +165,6 @@ void MediaStreamTrackPrivate::setEnabled(bool enabled)
     // ... after a MediaStreamTrack is disassociated from its track, its enabled attribute still
     // changes value when set; it just doesn't do anything with that new value.
     m_enabled = enabled;
-
-    if (!m_client || m_ignoreMutations)
-        return;
-
-    m_client->trackEnabledChanged();
 }
 
 void MediaStreamTrackPrivate::detachSource()

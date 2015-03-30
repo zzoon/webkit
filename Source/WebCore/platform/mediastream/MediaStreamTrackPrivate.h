@@ -44,7 +44,6 @@ public:
 
     virtual void trackEnded() = 0;
     virtual void trackMutedChanged() = 0;
-    virtual void trackEnabledChanged() = 0;
 };
 
 class MediaStreamTrackPrivate : public RefCounted<MediaStreamTrackPrivate>, public RealtimeMediaSource::Observer {

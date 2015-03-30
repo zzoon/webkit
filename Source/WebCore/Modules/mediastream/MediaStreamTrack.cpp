@@ -257,15 +257,6 @@ void MediaStreamTrack::trackMutedChanged()
     configureTrackRendering();
 }
 
-void MediaStreamTrack::trackEnabledChanged()
-{
-    if (stopped())
-        return;
-
-    setEnabled(m_privateTrack->enabled());
-    configureTrackRendering();
-}
-
 void MediaStreamTrack::configureTrackRendering()
 {
     if (stopped())

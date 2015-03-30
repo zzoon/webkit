@@ -119,7 +119,6 @@ private:
     // MediaStreamTrackPrivateClient
     void trackEnded();
     void trackMutedChanged();
-    void trackEnabledChanged();
 
     Vector<RefPtr<Event>> m_scheduledEvents;
 
