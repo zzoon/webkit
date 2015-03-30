@@ -45,23 +45,17 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& 
     : RefCounted()
     , m_client(nullptr)
 {
-    m_ignoreMutations = true;
     m_id = createCanonicalUUIDString();
     setSource(other.source());
-    m_readyState = other.readyState();
     m_enabled = other.enabled();
-    m_ignoreMutations = false;
 }
 
 MediaStreamTrackPrivate::MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource> source)
     : m_source(nullptr)
     , m_client(nullptr)
-    , m_readyState(RealtimeMediaSource::Live)
     , m_enabled(true)
 {
-    m_ignoreMutations = true;
     setSource(source);
-    m_ignoreMutations = false;
 }
 
 MediaStreamTrackPrivate::~MediaStreamTrackPrivate()
@@ -77,10 +71,6 @@ void MediaStreamTrackPrivate::setSource(PassRefPtr<RealtimeMediaSource> source)
 
     m_source = source;
 
-    if (!m_source)
-        return;
-
-    setReadyState(m_source->readyState());
     if (m_source)
         m_source->addObserver(this);
 }
@@ -157,27 +147,14 @@ void MediaStreamTrackPrivate::detachSource()
     // The source will stop itself when out of consumers (observers in this case).
     m_source->removeObserver(this);
     m_source = nullptr;
-
-    m_ignoreMutations = true;
-    setReadyState(RealtimeMediaSource::Ended);
-    m_ignoreMutations = false;
 }
 
 RealtimeMediaSource::ReadyState MediaStreamTrackPrivate::readyState() const
 {
-    return m_readyState;
-}
+    if (!m_source)
+        return RealtimeMediaSource::Ended;
 
-void MediaStreamTrackPrivate::setReadyState(RealtimeMediaSource::ReadyState state)
-{
-    if (m_readyState == RealtimeMediaSource::Ended || m_readyState == state)
-        return;
-
-    // We only have two states so it's Ended here.
-    m_readyState = RealtimeMediaSource::Ended;
-
-    if (m_client && !m_ignoreMutations)
-        m_client->trackEnded();
+    return m_source->readyState();
 }
 
 RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
@@ -225,7 +202,8 @@ void MediaStreamTrackPrivate::applyConstraints(PassRefPtr<MediaConstraints>)
 
 void MediaStreamTrackPrivate::sourceReadyStateChanged()
 {
-    setReadyState(m_source->readyState());
+    if (m_client)
+        m_client->trackEnded();
 }
 
 void MediaStreamTrackPrivate::sourceMutedChanged()

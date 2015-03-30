@@ -93,8 +93,6 @@ protected:
 private:
     MediaStreamTrackPrivateClient* client() const { return m_client; }
 
-    void setReadyState(RealtimeMediaSource::ReadyState);
-
     // RealtimeMediaSourceObserver
     virtual void sourceReadyStateChanged() override final;
     virtual void sourceMutedChanged() override final;
@@ -104,11 +102,9 @@ private:
     RefPtr<RealtimeMediaSource> m_source;
     MediaStreamTrackPrivateClient* m_client;
     RefPtr<MediaConstraints> m_constraints;
-    RealtimeMediaSource::ReadyState m_readyState;
     mutable String m_id;
 
     bool m_enabled;
-    bool m_ignoreMutations;
 };
 
 } // namespace WebCore
