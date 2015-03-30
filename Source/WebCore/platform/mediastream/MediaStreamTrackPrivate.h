@@ -58,7 +58,6 @@ public:
     bool ended() const;
 
     bool muted() const;
-    void setMuted(bool);
 
     bool readonly() const;
     bool remote() const;
@@ -108,7 +107,6 @@ private:
     RealtimeMediaSource::ReadyState m_readyState;
     mutable String m_id;
 
-    bool m_muted;
     bool m_enabled;
     bool m_ignoreMutations;
 };

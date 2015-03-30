@@ -49,7 +49,6 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& 
     m_id = createCanonicalUUIDString();
     setSource(other.source());
     m_readyState = other.readyState();
-    m_muted = other.muted();
     m_enabled = other.enabled();
     m_ignoreMutations = false;
 }
@@ -58,7 +57,6 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource>
     : m_source(nullptr)
     , m_client(nullptr)
     , m_readyState(RealtimeMediaSource::Live)
-    , m_muted(false)
     , m_enabled(true)
 {
     m_ignoreMutations = true;
@@ -82,7 +80,6 @@ void MediaStreamTrackPrivate::setSource(PassRefPtr<RealtimeMediaSource> source)
     if (!m_source)
         return;
 
-    setMuted(m_source->muted());
     setReadyState(m_source->readyState());
     if (m_source)
         m_source->addObserver(this);
@@ -123,19 +120,6 @@ bool MediaStreamTrackPrivate::muted() const
         return true;
 
     return m_source->muted();
-}
-
-void MediaStreamTrackPrivate::setMuted(bool muted)
-{
-    if (m_muted == muted)
-        return;
-
-    m_muted = muted;
-
-    if (!m_client || m_ignoreMutations)
-        return;
-
-    m_client->trackMutedChanged();
 }
 
 bool MediaStreamTrackPrivate::readonly() const
@@ -246,7 +230,8 @@ void MediaStreamTrackPrivate::sourceReadyStateChanged()
 
 void MediaStreamTrackPrivate::sourceMutedChanged()
 {
-    setMuted(m_source->muted());
+    if (m_client)
+        m_client->trackMutedChanged();
 }
 
 void MediaStreamTrackPrivate::sourceEnabledChanged()
