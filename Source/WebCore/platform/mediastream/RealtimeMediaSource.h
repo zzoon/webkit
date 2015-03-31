@@ -68,7 +68,6 @@ public:
     virtual ~RealtimeMediaSource() { }
 
     bool isAudioStreamSource() const { return type() == Audio; }
-    virtual bool useIDForTrackID() const { return false; }
 
     const String& id() const { return m_id; }
 

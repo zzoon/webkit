@@ -38,7 +38,12 @@ namespace WebCore {
 
 PassRefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(PassRefPtr<RealtimeMediaSource> source)
 {
-    return adoptRef(new MediaStreamTrackPrivate(source));
+    return adoptRef(new MediaStreamTrackPrivate(source, createCanonicalUUIDString()));
+}
+
+PassRefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(PassRefPtr<RealtimeMediaSource> source, const String& id)
+{
+    return adoptRef(new MediaStreamTrackPrivate(source, id));
 }
 
 MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& other)
@@ -50,9 +55,10 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& 
     setSource(other.source());
 }
 
-MediaStreamTrackPrivate::MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource> source)
+MediaStreamTrackPrivate::MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource> source, const String& id)
     : m_source(nullptr)
     , m_client(nullptr)
+    , m_id(id)
     , m_enabled(true)
 {
     setSource(source);
@@ -73,22 +79,6 @@ void MediaStreamTrackPrivate::setSource(PassRefPtr<RealtimeMediaSource> source)
 
     if (m_source)
         m_source->addObserver(this);
-}
-
-const String& MediaStreamTrackPrivate::id() const
-{
-    if (!m_id.isEmpty())
-        return m_id;
-
-    // The spec says:
-    //   Unless a MediaStreamTrack object is created as a part a of special purpose algorithm that
-    //   specifies how the track id must be initialized, the user agent must generate a globally
-    //   unique identifier string and initialize the object's id attribute to that string.
-    if (m_source && m_source->useIDForTrackID())
-        return m_source->id();
-
-    m_id = createCanonicalUUIDString();
-    return m_id;
 }
 
 const String& MediaStreamTrackPrivate::label() const

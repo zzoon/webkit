@@ -49,10 +49,11 @@ public:
 class MediaStreamTrackPrivate : public RefCounted<MediaStreamTrackPrivate>, public RealtimeMediaSource::Observer {
 public:
     static PassRefPtr<MediaStreamTrackPrivate> create(PassRefPtr<RealtimeMediaSource>);
+    static PassRefPtr<MediaStreamTrackPrivate> create(PassRefPtr<RealtimeMediaSource>, const String& id);
 
     virtual ~MediaStreamTrackPrivate();
 
-    const String& id() const;
+    const String& id() const { return m_id; }
     const String& label() const;
 
     bool ended() const;
@@ -88,7 +89,7 @@ public:
 
 protected:
     explicit MediaStreamTrackPrivate(const MediaStreamTrackPrivate&);
-    MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource>);
+    MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource>, const String& id);
 
 private:
     MediaStreamTrackPrivateClient* client() const { return m_client; }
