@@ -82,6 +82,8 @@ void MediaStreamTrackPrivate::setSource(PassRefPtr<RealtimeMediaSource> source)
 
     m_type = m_source->type();
     m_label = m_source->name();
+    m_isReadonly = m_source->readonly();
+    m_isRemote = m_source->remote();
 
     m_source->addObserver(this);
 }
@@ -97,22 +99,6 @@ bool MediaStreamTrackPrivate::muted() const
         return true;
 
     return m_source->muted();
-}
-
-bool MediaStreamTrackPrivate::readonly() const
-{
-    if (!m_source)
-        return true;
-
-    return m_source->readonly();
-}
-
-bool MediaStreamTrackPrivate::remote() const
-{
-    if (!m_source)
-        return false;
-
-    return m_source->remote();
 }
 
 void MediaStreamTrackPrivate::setEnabled(bool enabled)

@@ -60,8 +60,8 @@ public:
 
     bool muted() const;
 
-    bool readonly() const;
-    bool remote() const;
+    bool readonly() const { return m_isReadonly; }
+    bool remote() const { return m_isRemote; }
 
     bool enabled() const { return m_enabled; }
     void setEnabled(bool);
@@ -108,6 +108,8 @@ private:
     mutable String m_id;
     String m_label;
     bool m_enabled;
+    bool m_isReadonly;
+    bool m_isRemote;
 };
 
 } // namespace WebCore
