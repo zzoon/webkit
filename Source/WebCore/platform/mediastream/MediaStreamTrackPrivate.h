@@ -54,7 +54,7 @@ public:
     virtual ~MediaStreamTrackPrivate();
 
     const String& id() const { return m_id; }
-    const String& label() const;
+    const String& label() const { return m_label; }
 
     bool ended() const;
 
@@ -106,7 +106,7 @@ private:
 
     RealtimeMediaSource::Type m_type;
     mutable String m_id;
-
+    String m_label;
     bool m_enabled;
 };
 
