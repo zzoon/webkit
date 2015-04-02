@@ -131,6 +131,7 @@ private:
 
     bool m_stoppingTrack;
 
+    bool m_isMuted;
     bool m_isEnded;
 };
 

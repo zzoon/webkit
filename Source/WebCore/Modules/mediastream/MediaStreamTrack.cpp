@@ -63,6 +63,7 @@ MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext& context, MediaStreamT
     , m_privateTrack(privateTrack)
     , m_eventDispatchScheduled(false)
     , m_stoppingTrack(false)
+    , m_isMuted(m_privateTrack->muted())
     , m_isEnded(m_privateTrack->ended())
 {
     suspendIfNeeded();
@@ -76,6 +77,7 @@ MediaStreamTrack::MediaStreamTrack(MediaStreamTrack& other)
     , m_privateTrack(*other.privateTrack().clone())
     , m_eventDispatchScheduled(false)
     , m_stoppingTrack(false)
+    , m_isMuted(m_privateTrack->muted())
     , m_isEnded(m_privateTrack->ended())
 {
     suspendIfNeeded();
@@ -125,7 +127,7 @@ void MediaStreamTrack::setEnabled(bool enabled)
 
 bool MediaStreamTrack::muted() const
 {
-    return m_privateTrack->muted();
+    return m_isMuted;
 }
 
 bool MediaStreamTrack::readonly() const
@@ -239,10 +241,13 @@ void MediaStreamTrack::trackEnded()
     
 void MediaStreamTrack::trackMutedChanged()
 {
-    if (muted())
-        scheduleEventDispatch(Event::create(eventNames().muteEvent, false, false));
-    else
-        scheduleEventDispatch(Event::create(eventNames().unmuteEvent, false, false));
+    if (muted()) {
+        m_isMuted = false;
+        dispatchEvent(Event::create(eventNames().unmuteEvent, false, false));
+    } else {
+        m_isMuted = true;
+        dispatchEvent(Event::create(eventNames().muteEvent, false, false));
+    }
 
     configureTrackRendering();
 }
