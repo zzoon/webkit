@@ -192,6 +192,9 @@ void MediaStreamTrackPrivate::applyConstraints(PassRefPtr<MediaConstraints>)
 
 void MediaStreamTrackPrivate::sourceReadyStateChanged()
 {
+    // Don't depend on the client to detach the source.
+    detachSource();
+
     if (m_client)
         m_client->trackEnded();
 }

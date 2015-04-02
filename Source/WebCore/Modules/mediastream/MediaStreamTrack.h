@@ -130,6 +130,8 @@ private:
     bool m_eventDispatchScheduled;
 
     bool m_stoppingTrack;
+
+    bool m_isEnded;
 };
 
 } // namespace WebCore

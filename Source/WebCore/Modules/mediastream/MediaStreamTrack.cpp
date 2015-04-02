@@ -63,6 +63,7 @@ MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext& context, MediaStreamT
     , m_privateTrack(privateTrack)
     , m_eventDispatchScheduled(false)
     , m_stoppingTrack(false)
+    , m_isEnded(m_privateTrack->ended())
 {
     suspendIfNeeded();
 
@@ -75,6 +76,7 @@ MediaStreamTrack::MediaStreamTrack(MediaStreamTrack& other)
     , m_privateTrack(*other.privateTrack().clone())
     , m_eventDispatchScheduled(false)
     , m_stoppingTrack(false)
+    , m_isEnded(m_privateTrack->ended())
 {
     suspendIfNeeded();
 
@@ -138,18 +140,10 @@ bool MediaStreamTrack::remote() const
 
 const AtomicString& MediaStreamTrack::readyState() const
 {
-    static NeverDestroyed<AtomicString> ended("ended", AtomicString::ConstructFromLiteral);
-    static NeverDestroyed<AtomicString> live("live", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> endedState("ended", AtomicString::ConstructFromLiteral);
+    static NeverDestroyed<AtomicString> liveState("live", AtomicString::ConstructFromLiteral);
 
-    switch (m_privateTrack->readyState()) {
-    case RealtimeMediaSource::Live:
-        return live;
-    case RealtimeMediaSource::Ended:
-        return ended;
-    }
-
-    ASSERT_NOT_REACHED();
-    return emptyAtom;
+    return ended() ? endedState : liveState;
 }
 
 RefPtr<MediaTrackConstraints> MediaStreamTrack::getConstraints() const
@@ -203,14 +197,14 @@ void MediaStreamTrack::stopProducingData()
     if (remote())
         return;
 
-    // FIXME: This object needs its own ended member.
+    m_isEnded = true;
 
     m_privateTrack->detachSource();
 }
 
 bool MediaStreamTrack::ended() const
 {
-    return m_privateTrack->ended();
+    return m_isEnded;
 }
 
 void MediaStreamTrack::addObserver(MediaStreamTrack::Observer* observer)
@@ -227,8 +221,15 @@ void MediaStreamTrack::removeObserver(MediaStreamTrack::Observer* observer)
 
 void MediaStreamTrack::trackEnded()
 {
-    if (!m_stoppingTrack)
-        scheduleEventDispatch(Event::create(eventNames().endedEvent, false, false));
+    if (ended())
+        return;
+
+    m_isEnded = true;
+
+    // The spec says "detach source" here, but the source is already detached by the
+    // platform object at this point.
+
+    dispatchEvent(Event::create(eventNames().endedEvent, false, false));
 
     for (auto& observer : m_observers)
         observer->trackDidEnd();
