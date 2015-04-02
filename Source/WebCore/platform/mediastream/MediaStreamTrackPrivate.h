@@ -77,7 +77,7 @@ public:
     
     void setClient(MediaStreamTrackPrivateClient* client) { m_client = client; }
 
-    RealtimeMediaSource::Type type() const;
+    RealtimeMediaSource::Type type() const { return m_type; }
 
     const RealtimeMediaSourceStates& states() const;
     RefPtr<RealtimeMediaSourceCapabilities> capabilities() const;
@@ -103,6 +103,8 @@ private:
     RefPtr<RealtimeMediaSource> m_source;
     MediaStreamTrackPrivateClient* m_client;
     RefPtr<MediaConstraints> m_constraints;
+
+    RealtimeMediaSource::Type m_type;
     mutable String m_id;
 
     bool m_enabled;

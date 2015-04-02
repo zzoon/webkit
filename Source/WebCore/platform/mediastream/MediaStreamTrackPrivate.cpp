@@ -78,7 +78,11 @@ void MediaStreamTrackPrivate::setSource(PassRefPtr<RealtimeMediaSource> source)
     m_source = source;
 
     if (m_source)
-        m_source->addObserver(this);
+        return;
+
+    m_type = m_source->type();
+
+    m_source->addObserver(this);
 }
 
 const String& MediaStreamTrackPrivate::label() const
@@ -166,14 +170,6 @@ const RealtimeMediaSourceStates& MediaStreamTrackPrivate::states() const
     }
     
     return m_source->states();
-}
-
-RealtimeMediaSource::Type MediaStreamTrackPrivate::type() const
-{
-    if (!m_source)
-        return RealtimeMediaSource::None;
-
-    return m_source->type();
 }
 
 RefPtr<RealtimeMediaSourceCapabilities> MediaStreamTrackPrivate::capabilities() const
