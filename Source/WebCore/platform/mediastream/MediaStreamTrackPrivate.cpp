@@ -95,10 +95,7 @@ bool MediaStreamTrackPrivate::ended() const
 
 bool MediaStreamTrackPrivate::muted() const
 {
-    if (!m_source)
-        return true;
-
-    return m_source->muted();
+    return m_source ? m_source->muted() : true;
 }
 
 void MediaStreamTrackPrivate::setEnabled(bool enabled)
