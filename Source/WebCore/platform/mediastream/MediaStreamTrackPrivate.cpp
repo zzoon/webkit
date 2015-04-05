@@ -103,12 +103,7 @@ bool MediaStreamTrackPrivate::muted() const
 
 void MediaStreamTrackPrivate::setEnabled(bool enabled)
 {
-    if (m_enabled == enabled)
-        return;
-
-    // 4.3.3.1
-    // ... after a MediaStreamTrack is disassociated from its track, its enabled attribute still
-    // changes value when set; it just doesn't do anything with that new value.
+    // Always update the enabled state regardless of the track being ended.
     m_enabled = enabled;
 }
 
