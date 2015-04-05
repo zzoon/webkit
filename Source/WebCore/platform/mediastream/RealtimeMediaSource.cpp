@@ -44,7 +44,7 @@ RealtimeMediaSource::RealtimeMediaSource(const String& id, Type type, const Stri
     : m_id(id)
     , m_type(type)
     , m_name(name)
-    , m_readyState(Live)
+    , m_stopped(false)
     , m_muted(false)
     , m_readonly(false)
     , m_remote(false)
@@ -59,25 +59,10 @@ RealtimeMediaSource::RealtimeMediaSource(const String& id, Type type, const Stri
 
 void RealtimeMediaSource::reset()
 {
-    m_readyState = Live;
+    m_stopped = false;
     m_muted = false;
     m_readonly = false;
     m_remote = false;
-}
-
-void RealtimeMediaSource::setReadyState(ReadyState readyState)
-{
-    if (m_readyState == Ended || m_readyState == readyState)
-        return;
-
-    // We only have two states so it's Ended here.
-    m_readyState = Ended;
-
-    for (auto observer = m_observers.begin(); observer != m_observers.end(); ++observer)
-        (*observer)->sourceReadyStateChanged();
-
-    // There are no more consumers of this source's data, shut it down as appropriate.
-    stopProducingData();
 }
 
 void RealtimeMediaSource::addObserver(RealtimeMediaSource::Observer* observer)
@@ -102,7 +87,7 @@ void RealtimeMediaSource::setMuted(bool muted)
 
     m_muted = muted;
 
-    if (m_readyState == Ended)
+    if (stopped())
         return;
 
     for (auto observer = m_observers.begin(); observer != m_observers.end(); ++observer)
@@ -116,7 +101,16 @@ bool RealtimeMediaSource::readonly() const
 
 void RealtimeMediaSource::stop()
 {
-    setReadyState(Ended);
+    if (stopped())
+        return;
+
+    m_stopped = true;
+
+    for (auto& observer : m_observers)
+        observer->sourceReadyStateChanged();
+
+    // There are no more consumers of this source's data, shut it down as appropriate.
+    stopProducingData();
 }
 
 } // namespace WebCore

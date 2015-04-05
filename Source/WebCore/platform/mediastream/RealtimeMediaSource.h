@@ -56,6 +56,7 @@ public:
         virtual ~Observer() { }
         
         // Source state changes.
+        // FIXME: rename the below callback to sourceStopped()
         virtual void sourceReadyStateChanged() = 0;
         virtual void sourceMutedChanged() = 0;
         // FIMXE: remove the below callback
@@ -80,9 +81,7 @@ public:
     virtual RefPtr<RealtimeMediaSourceCapabilities> capabilities() const = 0;
     virtual const RealtimeMediaSourceStates& states() = 0;
     
-    enum ReadyState { Live = 0, Ended = 1 };
-    virtual ReadyState readyState() const { return m_readyState; }
-    virtual void setReadyState(ReadyState);
+    bool stopped() const { return m_stopped; }
 
     virtual bool muted() const { return m_muted; }
     virtual void setMuted(bool);
@@ -110,7 +109,7 @@ private:
     String m_id;
     Type m_type;
     String m_name;
-    ReadyState m_readyState;
+    bool m_stopped;
     Vector<Observer*> m_observers;
 
     bool m_enabled;
