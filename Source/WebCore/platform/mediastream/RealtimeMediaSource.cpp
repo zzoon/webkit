@@ -90,8 +90,8 @@ void RealtimeMediaSource::setMuted(bool muted)
     if (stopped())
         return;
 
-    for (auto observer = m_observers.begin(); observer != m_observers.end(); ++observer)
-        (*observer)->sourceMutedChanged();
+    for (auto& observer : m_observers)
+        observer->sourceMutedChanged();
 }
 
 bool RealtimeMediaSource::readonly() const
