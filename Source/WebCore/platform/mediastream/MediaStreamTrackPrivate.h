@@ -69,7 +69,6 @@ public:
     RefPtr<MediaStreamTrackPrivate> clone();
 
     RealtimeMediaSource* source() const { return m_source.get(); }
-    void setSource(PassRefPtr<RealtimeMediaSource>);
 
     void detachSource();
     
@@ -91,6 +90,8 @@ protected:
 
 private:
     MediaStreamTrackPrivateClient* client() const { return m_client; }
+
+    void setSource(PassRefPtr<RealtimeMediaSource>);
 
     // RealtimeMediaSourceObserver
     virtual void sourceReadyStateChanged() override final;

@@ -72,13 +72,8 @@ MediaStreamTrackPrivate::~MediaStreamTrackPrivate()
 
 void MediaStreamTrackPrivate::setSource(PassRefPtr<RealtimeMediaSource> source)
 {
-    if (m_source)
-        m_source->removeObserver(this);
-
     m_source = source;
-
-    if (m_source)
-        return;
+    ASSERT(m_source);
 
     m_type = m_source->type();
     m_label = m_source->name();

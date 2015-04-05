@@ -101,8 +101,6 @@ private:
     MediaStreamTrack(ScriptExecutionContext&, MediaStreamTrackPrivate&);
     explicit MediaStreamTrack(MediaStreamTrack&);
 
-    void setSource(PassRefPtr<RealtimeMediaSource>);
-
     void configureTrackRendering();
     void scheduleEventDispatch(PassRefPtr<Event>);
 

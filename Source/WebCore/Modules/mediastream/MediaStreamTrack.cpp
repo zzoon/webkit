@@ -90,11 +90,6 @@ MediaStreamTrack::~MediaStreamTrack()
     m_privateTrack->setClient(nullptr);
 }
 
-void MediaStreamTrack::setSource(PassRefPtr<RealtimeMediaSource> newSource)
-{
-    m_privateTrack->setSource(newSource);
-}
-
 const AtomicString& MediaStreamTrack::kind() const
 {
     static NeverDestroyed<AtomicString> audioKind("audio", AtomicString::ConstructFromLiteral);
