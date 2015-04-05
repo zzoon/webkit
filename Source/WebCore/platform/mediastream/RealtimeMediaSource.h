@@ -112,7 +112,6 @@ private:
     bool m_stopped;
     Vector<Observer*> m_observers;
 
-    bool m_enabled;
     bool m_muted;
     bool m_readonly;
     bool m_remote;
