@@ -90,7 +90,7 @@ void MediaStreamTrackPrivate::setSource(PassRefPtr<RealtimeMediaSource> source)
 
 bool MediaStreamTrackPrivate::ended() const
 {
-    return m_source && m_source->readyState() == RealtimeMediaSource::Ended;
+    return m_source ? m_source->readyState() == RealtimeMediaSource::Ended : true;
 }
 
 bool MediaStreamTrackPrivate::muted() const
