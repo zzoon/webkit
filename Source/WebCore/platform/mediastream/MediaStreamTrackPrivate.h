@@ -66,8 +66,6 @@ public:
     bool enabled() const { return m_enabled; }
     void setEnabled(bool);
 
-    RealtimeMediaSource::ReadyState readyState() const;
-
     RefPtr<MediaStreamTrackPrivate> clone();
 
     RealtimeMediaSource* source() const { return m_source.get(); }

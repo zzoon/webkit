@@ -166,8 +166,7 @@ RefPtr<MediaStreamCapabilities> MediaStreamTrack::getCapabilities() const
     // in sync with the track state. A track that has ended always has a source
     // type of "none".
     RefPtr<RealtimeMediaSourceCapabilities> sourceCapabilities = m_privateTrack->capabilities();
-    RealtimeMediaSource::ReadyState readyState = m_privateTrack->readyState();
-    if (readyState == RealtimeMediaSource::Ended)
+    if (ended())
         sourceCapabilities->setSourceType(RealtimeMediaSourceStates::None);
     
     return MediaStreamCapabilities::create(sourceCapabilities.release());

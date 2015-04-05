@@ -122,14 +122,6 @@ void MediaStreamTrackPrivate::detachSource()
     m_source = nullptr;
 }
 
-RealtimeMediaSource::ReadyState MediaStreamTrackPrivate::readyState() const
-{
-    if (!m_source)
-        return RealtimeMediaSource::Ended;
-
-    return m_source->readyState();
-}
-
 RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
 {
     return adoptRef(new MediaStreamTrackPrivate(*this));
