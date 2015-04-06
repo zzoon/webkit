@@ -58,7 +58,7 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& 
 MediaStreamTrackPrivate::MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource> source)
     : m_source(nullptr)
     , m_client(nullptr)
-    , m_readyState(RealtimeMediaSource::New)
+    , m_readyState(RealtimeMediaSource::Live)
     , m_muted(false)
     , m_enabled(true)
     , m_stopped(false)
@@ -166,9 +166,6 @@ void MediaStreamTrackPrivate::setEnabled(bool enabled)
     // changes value when set; it just doesn't do anything with that new value.
     m_enabled = enabled;
 
-    if (m_source)
-        m_source->setEnabled(enabled);
-
     if (!m_client || m_ignoreMutations)
         return;
 
@@ -200,14 +197,11 @@ void MediaStreamTrackPrivate::setReadyState(RealtimeMediaSource::ReadyState stat
     if (m_readyState == RealtimeMediaSource::Ended || m_readyState == state)
         return;
 
-    RealtimeMediaSource::ReadyState oldState = m_readyState;
-    m_readyState = state;
+    // We only have two states so it's Ended here.
+    m_readyState = RealtimeMediaSource::Ended;
 
-    if (!m_client || m_ignoreMutations)
-        return;
-
-    if ((m_readyState == RealtimeMediaSource::Live && oldState == RealtimeMediaSource::New) || m_readyState == RealtimeMediaSource::Ended)
-        m_client->trackReadyStateChanged();
+    if (m_client && !m_ignoreMutations)
+        m_client->trackEnded();
 }
 
 RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
@@ -271,10 +265,7 @@ void MediaStreamTrackPrivate::sourceMutedChanged()
 
 void MediaStreamTrackPrivate::sourceEnabledChanged()
 {
-    if (stopped())
-        return;
-    
-    setEnabled(m_source->enabled());
+    // FIXME: remove this function
 }
 
 bool MediaStreamTrackPrivate::observerIsEnabled()

@@ -58,6 +58,7 @@ public:
         // Source state changes.
         virtual void sourceReadyStateChanged() = 0;
         virtual void sourceMutedChanged() = 0;
+        // FIMXE: remove the below callback
         virtual void sourceEnabledChanged() = 0;
 
         // Observer state queries.
@@ -80,12 +81,9 @@ public:
     virtual RefPtr<RealtimeMediaSourceCapabilities> capabilities() const = 0;
     virtual const RealtimeMediaSourceStates& states() = 0;
     
-    enum ReadyState { New = 0, Live = 1, Ended = 2 };
+    enum ReadyState { Live = 0, Ended = 1 };
     virtual ReadyState readyState() const { return m_readyState; }
     virtual void setReadyState(ReadyState);
-
-    virtual bool enabled() const { return m_enabled; }
-    virtual void setEnabled(bool);
 
     virtual bool muted() const { return m_muted; }
     virtual void setMuted(bool);

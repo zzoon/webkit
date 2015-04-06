@@ -40,11 +40,8 @@
 #include "MediaSourceStates.h"
 #include "MediaStream.h"
 #include "MediaStreamPrivate.h"
-#include "MediaStreamTrackSourcesCallback.h"
-#include "MediaStreamTrackSourcesRequest.h"
 #include "MediaTrackConstraints.h"
 #include "NotImplemented.h"
-#include "RealtimeMediaSourceCenter.h"
 #include <wtf/Functional.h>
 #include <wtf/NeverDestroyed.h>
 
@@ -148,26 +145,16 @@ const AtomicString& MediaStreamTrack::readyState() const
 {
     static NeverDestroyed<AtomicString> ended("ended", AtomicString::ConstructFromLiteral);
     static NeverDestroyed<AtomicString> live("live", AtomicString::ConstructFromLiteral);
-    static NeverDestroyed<AtomicString> newState("new", AtomicString::ConstructFromLiteral);
 
     switch (m_privateTrack->readyState()) {
     case RealtimeMediaSource::Live:
         return live;
-    case RealtimeMediaSource::New:
-        return newState;
     case RealtimeMediaSource::Ended:
         return ended;
     }
 
     ASSERT_NOT_REACHED();
     return emptyAtom;
-}
-
-void MediaStreamTrack::getSources(ScriptExecutionContext* context, PassRefPtr<MediaStreamTrackSourcesCallback> callback, ExceptionCode& ec)
-{
-    RefPtr<MediaStreamTrackSourcesRequest> request = MediaStreamTrackSourcesRequest::create(context, callback);
-    if (!RealtimeMediaSourceCenter::singleton().getMediaStreamTrackSources(request.release()))
-        ec = NOT_SUPPORTED_ERR;
 }
 
 RefPtr<MediaTrackConstraints> MediaStreamTrack::getConstraints() const
@@ -185,11 +172,11 @@ RefPtr<MediaSourceStates> MediaStreamTrack::states() const
 RefPtr<MediaStreamCapabilities> MediaStreamTrack::getCapabilities() const
 {
     // The source may be shared by multiple tracks, so its states is not necessarily
-    // in sync with the track state. A track that is new or has ended always has a source
+    // in sync with the track state. A track that has ended always has a source
     // type of "none".
     RefPtr<RealtimeMediaSourceCapabilities> sourceCapabilities = m_privateTrack->capabilities();
     RealtimeMediaSource::ReadyState readyState = m_privateTrack->readyState();
-    if (readyState == RealtimeMediaSource::New || readyState == RealtimeMediaSource::Ended)
+    if (readyState == RealtimeMediaSource::Ended)
         sourceCapabilities->setSourceType(RealtimeMediaSourceStates::None);
     
     return MediaStreamCapabilities::create(sourceCapabilities.release());
@@ -242,16 +229,16 @@ void MediaStreamTrack::removeObserver(MediaStreamTrack::Observer* observer)
         m_observers.remove(pos);
 }
 
-void MediaStreamTrack::trackReadyStateChanged()
+void MediaStreamTrack::trackEnded()
 {
     if (stopped())
         return;
 
-    RealtimeMediaSource::ReadyState readyState = m_privateTrack->readyState();
-    if (readyState == RealtimeMediaSource::Live)
-        scheduleEventDispatch(Event::create(eventNames().startedEvent, false, false));
-    else if (readyState == RealtimeMediaSource::Ended && !m_stoppingTrack)
+    if (!m_stoppingTrack)
         scheduleEventDispatch(Event::create(eventNames().endedEvent, false, false));
+
+    for (auto& observer : m_observers)
+        observer->trackDidEnd();
 
     configureTrackRendering();
 }
@@ -285,14 +272,6 @@ void MediaStreamTrack::configureTrackRendering()
 
     // 4.3.1
     // ... media from the source only flows when a MediaStreamTrack object is both unmuted and enabled
-}
-
-void MediaStreamTrack::trackDidEnd()
-{
-    m_privateTrack->setReadyState(RealtimeMediaSource::Ended);
-
-    for (Vector<Observer*>::iterator i = m_observers.begin(); i != m_observers.end(); ++i)
-        (*i)->trackDidEnd();
 }
 
 void MediaStreamTrack::stop()

@@ -41,10 +41,7 @@ enum MediaStreamTrackState { "new", "live", "ended" };
     readonly attribute boolean _readonly;
     readonly attribute boolean remote;
     readonly attribute MediaStreamTrackState readyState;
-    attribute EventHandler onstarted;
     attribute EventHandler onended;
-
-    [CallWith=ScriptExecutionContext, RaisesException] static void getSources(MediaStreamTrackSourcesCallback callback);
 
     MediaTrackConstraints getConstraints();
 

@@ -45,7 +45,6 @@ namespace WebCore {
 class Dictionary;
 class MediaConstraintsImpl;
 class MediaSourceStates;
-class MediaStreamTrackSourcesCallback;
 class MediaStreamCapabilities;
 class MediaTrackConstraints;
 
@@ -74,8 +73,6 @@ public:
     bool stopped() const;
 
     const AtomicString& readyState() const;
-
-    static void getSources(ScriptExecutionContext*, PassRefPtr<MediaStreamTrackSourcesCallback>, ExceptionCode&);
 
     RefPtr<MediaTrackConstraints> getConstraints() const;
     RefPtr<MediaSourceStates> states() const;
@@ -108,7 +105,6 @@ private:
     void setSource(PassRefPtr<RealtimeMediaSource>);
 
     void configureTrackRendering();
-    void trackDidEnd();
     void scheduleEventDispatch(PassRefPtr<Event>);
 
     // ActiveDOMObject API.
@@ -121,7 +117,7 @@ private:
     virtual void derefEventTarget() override final { deref(); }
 
     // MediaStreamTrackPrivateClient
-    void trackReadyStateChanged();
+    void trackEnded();
     void trackMutedChanged();
     void trackEnabledChanged();
 

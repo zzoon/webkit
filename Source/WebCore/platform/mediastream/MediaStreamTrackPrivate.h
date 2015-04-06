@@ -42,7 +42,7 @@ class MediaStreamTrackPrivateClient {
 public:
     virtual ~MediaStreamTrackPrivateClient() { }
 
-    virtual void trackReadyStateChanged() = 0;
+    virtual void trackEnded() = 0;
     virtual void trackMutedChanged() = 0;
     virtual void trackEnabledChanged() = 0;
 };
@@ -67,7 +67,6 @@ public:
     bool enabled() const { return m_enabled; }
     void setEnabled(bool);
 
-    void setReadyState(RealtimeMediaSource::ReadyState);
     RealtimeMediaSource::ReadyState readyState() const;
 
     RefPtr<MediaStreamTrackPrivate> clone();
@@ -97,6 +96,8 @@ protected:
 
 private:
     MediaStreamTrackPrivateClient* client() const { return m_client; }
+
+    void setReadyState(RealtimeMediaSource::ReadyState);
 
     // RealtimeMediaSourceObserver
     virtual void sourceReadyStateChanged() override final;
