@@ -95,6 +95,9 @@ public:
     void addRemoteTrack(MediaStreamTrackPrivate*);
     void removeRemoteTrack(MediaStreamTrackPrivate*);
 
+    // FIXME: implement this.
+    Vector<RefPtr<MediaStreamTrackPrivate>> tracks() const { return Vector<RefPtr<MediaStreamTrackPrivate>>(); }
+
 private:
     MediaStreamPrivate(const String& id, const Vector<RefPtr<RealtimeMediaSource>>& audioSources, const Vector<RefPtr<RealtimeMediaSource>>& videoSources);
     MediaStreamPrivate(const String& id, const Vector<RefPtr<MediaStreamTrackPrivate>>& audioPrivateTracks, const Vector<RefPtr<MediaStreamTrackPrivate>>& videoPrivateTracks);
