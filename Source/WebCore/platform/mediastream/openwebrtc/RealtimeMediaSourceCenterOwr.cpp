@@ -164,7 +164,6 @@ void RealtimeMediaSourceCenterOwr::mediaSourcesAvailable(GList* sources)
         RealtimeMediaSourceOwrMap::iterator sourceIterator = m_sourceMap.find(id);
         if (sourceIterator == m_sourceMap.end())
             m_sourceMap.add(id, mediaSource);
-
     }
 
     // TODO: Make sure contraints are actually validated by checking source types.

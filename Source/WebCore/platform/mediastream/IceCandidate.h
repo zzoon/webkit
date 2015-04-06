@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,7 +11,7 @@
  *    notice, this list of conditions and the following disclaimer
  *    in the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name of Google Inc. nor the names of its contributors
+ * 3. Neither the name of Ericsson nor the names of its contributors
  *    may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
  *
@@ -28,42 +28,48 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RTCIceCandidate_h
-#define RTCIceCandidate_h
+#ifndef IceCandidate_h
+#define IceCandidate_h
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "ExceptionBase.h"
-#include "ScriptWrappable.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-class Dictionary;
-class RTCIceCandidateDescriptor;
-
-class RTCIceCandidate : public RefCounted<RTCIceCandidate>, public ScriptWrappable {
+class IceCandidate : public RefCounted<IceCandidate> {
 public:
-    static RefPtr<RTCIceCandidate> create(const Dictionary&, ExceptionCode&);
-    static RefPtr<RTCIceCandidate> create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
-    virtual ~RTCIceCandidate();
+    static RefPtr<IceCandidate> create()
+    {
+        return adoptRef(new IceCandidate());
+    }
+    virtual ~IceCandidate() { }
 
-    const String& candidate() const;
-    const String& sdpMid() const;
-    unsigned short sdpMLineIndex() const;
+    const String& type() const { return m_type; }
+    void setType(const String& type) { m_type = type; }
+
+    const String& foundation() const { return m_foundation; }
+    void setFoundation(const String& foundation) { m_foundation = foundation; }
+
+    unsigned componentId() const { return m_componentId; }
+    void setComponentId(unsigned componentId) { m_componentId = componentId; }
+
+    const String& transport() const { return m_transport; }
+    void setTransport(const String& transport) { m_transport = transport; }
 
 private:
-    explicit RTCIceCandidate(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
+    IceCandidate() { }
 
-    String m_candidate;
-    String m_sdpMid;
-    unsigned short m_sdpMLineIndex;
+    String m_type;
+    String m_foundation;
+    unsigned m_componentId;
+    String m_transport;
 };
 
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
 
-#endif // RTCIceCandidate_h
+#endif // IceCandidate_h

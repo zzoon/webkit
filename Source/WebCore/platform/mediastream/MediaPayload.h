@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,7 +11,7 @@
  *    notice, this list of conditions and the following disclaimer
  *    in the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name of Google Inc. nor the names of its contributors
+ * 3. Neither the name of Ericsson nor the names of its contributors
  *    may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
  *
@@ -28,42 +28,42 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RTCIceCandidate_h
-#define RTCIceCandidate_h
+#ifndef MediaPayload_h
+#define MediaPayload_h
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "ExceptionBase.h"
-#include "ScriptWrappable.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
-#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-class Dictionary;
-class RTCIceCandidateDescriptor;
-
-class RTCIceCandidate : public RefCounted<RTCIceCandidate>, public ScriptWrappable {
+class MediaPayload : public RefCounted<MediaPayload> {
 public:
-    static RefPtr<RTCIceCandidate> create(const Dictionary&, ExceptionCode&);
-    static RefPtr<RTCIceCandidate> create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
-    virtual ~RTCIceCandidate();
+    static RefPtr<MediaPayload> create()
+    {
+        return adoptRef(new MediaPayload());
+    }
+    virtual ~MediaPayload() { }
 
-    const String& candidate() const;
-    const String& sdpMid() const;
-    unsigned short sdpMLineIndex() const;
+    unsigned type() const { return m_type; }
+    void setType(unsigned type) { m_type = type; }
+
+    const String& encodingName() const { return m_encodingName; }
+    void setEncodingName(const String & encodingName) { m_encodingName = encodingName; }
+
+    unsigned clockRate() const { return m_clockRate; }
 
 private:
-    explicit RTCIceCandidate(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
+    MediaPayload() { }
 
-    String m_candidate;
-    String m_sdpMid;
-    unsigned short m_sdpMLineIndex;
+    unsigned m_type;
+    String m_encodingName;
+    unsigned m_clockRate;
 };
 
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
 
-#endif // RTCIceCandidate_h
+#endif // MediaPayload_h

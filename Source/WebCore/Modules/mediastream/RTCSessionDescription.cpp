@@ -32,12 +32,10 @@
 #include "config.h"
 
 #if ENABLE(MEDIA_STREAM)
-
 #include "RTCSessionDescription.h"
 
 #include "Dictionary.h"
 #include "ExceptionCode.h"
-#include "RTCSessionDescriptionDescriptor.h"
 
 namespace WebCore {
 
@@ -46,7 +44,7 @@ static bool verifyType(const String& type)
     return type == "offer" || type == "pranswer" || type == "answer";
 }
 
-PassRefPtr<RTCSessionDescription> RTCSessionDescription::create(const Dictionary& dictionary, ExceptionCode& ec)
+RefPtr<RTCSessionDescription> RTCSessionDescription::create(const Dictionary& dictionary, ExceptionCode& ec)
 {
     String type;
     bool ok = dictionary.get("type", type);
@@ -62,17 +60,22 @@ PassRefPtr<RTCSessionDescription> RTCSessionDescription::create(const Dictionary
         return nullptr;
     }
 
-    return adoptRef(new RTCSessionDescription(RTCSessionDescriptionDescriptor::create(type, sdp)));
+    return adoptRef(new RTCSessionDescription(type, sdp));
 }
 
-PassRefPtr<RTCSessionDescription> RTCSessionDescription::create(PassRefPtr<RTCSessionDescriptionDescriptor> descriptor)
+RefPtr<RTCSessionDescription> RTCSessionDescription::create(const RTCSessionDescription* description)
 {
-    ASSERT(descriptor);
-    return adoptRef(new RTCSessionDescription(descriptor));
+    return adoptRef(new RTCSessionDescription(description->type(), description->sdp()));
 }
 
-RTCSessionDescription::RTCSessionDescription(PassRefPtr<RTCSessionDescriptionDescriptor> descriptor)
-    : m_descriptor(descriptor)
+RefPtr<RTCSessionDescription> RTCSessionDescription::create(const String& type, const String& sdp)
+{
+    return adoptRef(new RTCSessionDescription(type, sdp));
+}
+
+RTCSessionDescription::RTCSessionDescription(const String& type, const String& sdp)
+    : m_type(type)
+    , m_sdp(sdp)
 {
 }
 
@@ -82,30 +85,25 @@ RTCSessionDescription::~RTCSessionDescription()
 
 const String& RTCSessionDescription::type() const
 {
-    return m_descriptor->type();
+    return m_type;
 }
 
 void RTCSessionDescription::setType(const String& type, ExceptionCode& ec)
 {
     if (verifyType(type))
-        m_descriptor->setType(type);
+        m_type = type;
     else
         ec = TYPE_MISMATCH_ERR;
 }
 
 const String& RTCSessionDescription::sdp() const
 {
-    return m_descriptor->sdp();
+    return m_sdp;
 }
 
 void RTCSessionDescription::setSdp(const String& sdp)
 {
-    m_descriptor->setSdp(sdp);
-}
-
-RTCSessionDescriptionDescriptor* RTCSessionDescription::descriptor()
-{
-    return m_descriptor.get();
+    m_sdp = sdp;
 }
 
 } // namespace WebCore

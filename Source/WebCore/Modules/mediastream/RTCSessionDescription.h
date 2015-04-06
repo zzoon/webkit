@@ -35,19 +35,19 @@
 
 #include "ExceptionBase.h"
 #include "ScriptWrappable.h"
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class Dictionary;
-class RTCSessionDescriptionDescriptor;
 
 class RTCSessionDescription : public RefCounted<RTCSessionDescription>, public ScriptWrappable {
 public:
-    static PassRefPtr<RTCSessionDescription> create(const Dictionary&, ExceptionCode&);
-    static PassRefPtr<RTCSessionDescription> create(PassRefPtr<RTCSessionDescriptionDescriptor>);
+    static RefPtr<RTCSessionDescription> create(const Dictionary&, ExceptionCode&);
+    static RefPtr<RTCSessionDescription> create(const RTCSessionDescription*);
+    static RefPtr<RTCSessionDescription> create(const String& type, const String& sdp);
     virtual ~RTCSessionDescription();
 
     const String& type() const;
@@ -56,12 +56,11 @@ public:
     const String& sdp() const;
     void setSdp(const String&);
 
-    RTCSessionDescriptionDescriptor* descriptor();
-
 private:
-    explicit RTCSessionDescription(PassRefPtr<RTCSessionDescriptionDescriptor>);
+    explicit RTCSessionDescription(const String& type, const String& sdp);
 
-    RefPtr<RTCSessionDescriptionDescriptor> m_descriptor;
+    String m_type;
+    String m_sdp;
 };
 
 } // namespace WebCore

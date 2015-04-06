@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,7 +11,7 @@
  *    notice, this list of conditions and the following disclaimer
  *    in the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name of Google Inc. nor the names of its contributors
+ * 3. Neither the name of Ericsson nor the names of its contributors
  *    may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
  *
@@ -28,42 +28,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RTCIceCandidate_h
-#define RTCIceCandidate_h
+#ifndef MediaEndpointConfigurationConversions_h
+#define MediaEndpointConfigurationConversions_h
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "ExceptionBase.h"
-#include "ScriptWrappable.h"
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
-#include <wtf/text/WTFString.h>
+#include "MediaEndpointConfiguration.h"
 
 namespace WebCore {
 
-class Dictionary;
-class RTCIceCandidateDescriptor;
+namespace MediaEndpointConfigurationConversions {
 
-class RTCIceCandidate : public RefCounted<RTCIceCandidate>, public ScriptWrappable {
-public:
-    static RefPtr<RTCIceCandidate> create(const Dictionary&, ExceptionCode&);
-    static RefPtr<RTCIceCandidate> create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
-    virtual ~RTCIceCandidate();
+RefPtr<MediaEndpointConfiguration> fromJSON(const String&);
+String toJSON(MediaEndpointConfiguration*);
 
-    const String& candidate() const;
-    const String& sdpMid() const;
-    unsigned short sdpMLineIndex() const;
+RefPtr<IceCandidate> iceCandidateFromJSON(const String&);
+String iceCandidateToJSON(IceCandidate*);
 
-private:
-    explicit RTCIceCandidate(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
-
-    String m_candidate;
-    String m_sdpMid;
-    unsigned short m_sdpMLineIndex;
-};
+}
 
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
 
-#endif // RTCIceCandidate_h
+#endif // MediaEndpointConfigurationConversions_h

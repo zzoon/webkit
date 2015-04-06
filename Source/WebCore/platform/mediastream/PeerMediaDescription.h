@@ -1,0 +1,105 @@
+/*
+ * Copyright (C) 2015 Ericsson AB. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer
+ *    in the documentation and/or other materials provided with the
+ *    distribution.
+ * 3. Neither the name of Ericsson nor the names of its contributors
+ *    may be used to endorse or promote products derived from this
+ *    software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#ifndef PeerMediaDescription_h
+#define PeerMediaDescription_h
+
+#if ENABLE(MEDIA_STREAM)
+
+#include "IceCandidate.h"
+#include "MediaPayload.h"
+#include <wtf/RefCounted.h>
+#include <wtf/Vector.h>
+
+namespace WebCore {
+
+class PeerMediaDescription : public RefCounted<PeerMediaDescription> {
+public:
+    static RefPtr<PeerMediaDescription> create()
+    {
+        return adoptRef(new PeerMediaDescription());
+    }
+    virtual ~PeerMediaDescription() { }
+
+    const String& type() const { return m_type; }
+    void setType(const String& type) { m_type = type; }
+
+    unsigned short port() const { return m_port; }
+    void setPort(unsigned short port) { m_port = port; }
+
+    const Vector<RefPtr<MediaPayload>>& payloads() const { return m_payloads; }
+    void addPayload(RefPtr<MediaPayload>&& payload) { m_payloads.append(WTF::move(payload)); }
+
+    bool rtcpMux() const { return m_rtcpMux; }
+    void setRtcpMux(bool rtcpMux) { m_rtcpMux = rtcpMux; }
+
+    const String& mediaStreamId() const { return m_mediaStreamId; }
+    void setMediaStreamId(const String& mediaStreamId) { m_mediaStreamId = mediaStreamId; }
+
+    const String& mediaStreamTrackId() const { return m_mediaStreamTrackId; }
+    void setMediaStreamTrackId(const String& mediaStreamTrackId) { m_mediaStreamTrackId = mediaStreamTrackId; }
+
+    const String& dtlsSetup() const { return m_dtlsSetup; }
+    void setDtlsSetup(const String& dtlsSetup) { m_dtlsSetup = dtlsSetup; }
+
+    const String& iceUfrag() const { return m_iceUfrag; }
+    void setIceUfrag(const String& iceUfrag) { m_iceUfrag = iceUfrag; }
+
+    const String& icePassword() const { return m_icePassword; }
+    void setIcePassword(const String& icePassword) { m_icePassword = icePassword; }
+
+    const Vector<RefPtr<IceCandidate>>& iceCandidates() const { return m_iceCandidates; }
+    void addIceCandidate(RefPtr<IceCandidate>&& candidate) { m_iceCandidates.append(WTF::move(candidate)); }
+
+private:
+    PeerMediaDescription() { }
+
+    String m_type;
+    unsigned short m_port;
+
+    Vector<RefPtr<MediaPayload>> m_payloads;
+
+    bool m_rtcpMux;
+
+    String m_mediaStreamId;
+    String m_mediaStreamTrackId;
+
+    String m_dtlsSetup;
+
+    String m_iceUfrag;
+    String m_icePassword;
+    Vector<RefPtr<IceCandidate>> m_iceCandidates;
+};
+
+} // namespace WebCore
+
+#endif // ENABLE(MEDIA_STREAM)
+
+#endif // PeerMediaDescription_h

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,7 +11,7 @@
  *    notice, this list of conditions and the following disclaimer
  *    in the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name of Google Inc. nor the names of its contributors
+ * 3. Neither the name of Ericsson nor the names of its contributors
  *    may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
  *
@@ -28,42 +28,51 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RTCIceCandidate_h
-#define RTCIceCandidate_h
+#ifndef MediaEndpoint_h
+#define MediaEndpoint_h
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "ExceptionBase.h"
-#include "ScriptWrappable.h"
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
+#include "RTCConfigurationPrivate.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-class Dictionary;
-class RTCIceCandidateDescriptor;
+class IceCandidate;
+class MediaEndpoint;
+class MediaEndpointConfiguration;
+class RealTimeMediaSource; // not implemented
 
-class RTCIceCandidate : public RefCounted<RTCIceCandidate>, public ScriptWrappable {
+class MediaEndpointClient {
 public:
-    static RefPtr<RTCIceCandidate> create(const Dictionary&, ExceptionCode&);
-    static RefPtr<RTCIceCandidate> create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
-    virtual ~RTCIceCandidate();
+    virtual void gotSendSSRC(unsigned mdescIndex, const String& ssrc, const String& cname) = 0;
+    virtual void gotDtlsFingerprint(unsigned mdescIndex, const String& fingerprint, const String& hashFunction) = 0;
+    virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) = 0;
+    virtual void doneGatheringCandidates(unsigned mdescIndex) = 0;
+    virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealTimeMediaSource>&&) = 0;
 
-    const String& candidate() const;
-    const String& sdpMid() const;
-    unsigned short sdpMLineIndex() const;
+    virtual ~MediaEndpointClient() { }
+};
 
-private:
-    explicit RTCIceCandidate(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
+typedef std::unique_ptr<MediaEndpoint> (*CreateMediaEndpoint)(MediaEndpointClient*);
 
-    String m_candidate;
-    String m_sdpMid;
-    unsigned short m_sdpMLineIndex;
+class MediaEndpoint {
+public:
+    WEBCORE_EXPORT static CreateMediaEndpoint create;
+    virtual ~MediaEndpoint() { }
+
+    virtual void setConfiguration(RefPtr<RTCConfigurationPrivate>&&) = 0;
+
+    virtual void prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) = 0;
+    virtual void prepareToSend(MediaEndpointConfiguration*, bool isInitiator) = 0;
+
+    virtual void addRemoteCandidate(IceCandidate *) = 0;
+
+    virtual void stop() = 0;
 };
 
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
 
-#endif // RTCIceCandidate_h
+#endif // MediaEndpoint_h
