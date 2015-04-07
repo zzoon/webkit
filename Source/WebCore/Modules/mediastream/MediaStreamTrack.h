@@ -57,7 +57,6 @@ public:
     };
 
     static RefPtr<MediaStreamTrack> create(ScriptExecutionContext&, MediaStreamTrackPrivate&);
-    static RefPtr<MediaStreamTrack> create(MediaStreamTrack&);
     virtual ~MediaStreamTrack();
 
     const AtomicString& kind() const;

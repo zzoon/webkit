@@ -52,28 +52,10 @@ RefPtr<MediaStreamTrack> MediaStreamTrack::create(ScriptExecutionContext& contex
     return adoptRef(new MediaStreamTrack(context, privateTrack));
 }
 
-RefPtr<MediaStreamTrack> MediaStreamTrack::create(MediaStreamTrack& track)
-{
-    return adoptRef(new MediaStreamTrack(track));
-}
-
 MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext& context, MediaStreamTrackPrivate& privateTrack)
     : RefCounted()
     , ActiveDOMObject(&context)
     , m_privateTrack(privateTrack)
-    , m_eventDispatchScheduled(false)
-    , m_isMuted(m_privateTrack->muted())
-    , m_isEnded(m_privateTrack->ended())
-{
-    suspendIfNeeded();
-
-    m_privateTrack->setClient(this);
-}
-
-MediaStreamTrack::MediaStreamTrack(MediaStreamTrack& other)
-    : RefCounted()
-    , ActiveDOMObject(other.scriptExecutionContext())
-    , m_privateTrack(*other.privateTrack().clone())
     , m_eventDispatchScheduled(false)
     , m_isMuted(m_privateTrack->muted())
     , m_isEnded(m_privateTrack->ended())
@@ -179,7 +161,7 @@ void MediaStreamTrack::applyConstraints(PassRefPtr<MediaConstraints>)
 
 RefPtr<MediaStreamTrack> MediaStreamTrack::clone()
 {
-    return MediaStreamTrack::create(*this);
+    return MediaStreamTrack::create(*scriptExecutionContext(), *m_privateTrack->clone());
 }
 
 void MediaStreamTrack::stopProducingData()
