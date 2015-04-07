@@ -104,7 +104,6 @@ private:
     RefPtr<MediaConstraints> m_constraints;
 
     RealtimeMediaSource::Type m_type;
-    mutable String m_id;
     String m_label;
     bool m_enabled;
     bool m_isReadonly;

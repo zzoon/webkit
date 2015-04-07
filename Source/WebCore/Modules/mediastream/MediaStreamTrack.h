@@ -127,8 +127,6 @@ private:
     Ref<MediaStreamTrackPrivate> m_privateTrack;
     bool m_eventDispatchScheduled;
 
-    bool m_stoppingTrack;
-
     bool m_isMuted;
     bool m_isEnded;
 };

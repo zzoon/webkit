@@ -62,7 +62,6 @@ MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext& context, MediaStreamT
     , ActiveDOMObject(&context)
     , m_privateTrack(privateTrack)
     , m_eventDispatchScheduled(false)
-    , m_stoppingTrack(false)
     , m_isMuted(m_privateTrack->muted())
     , m_isEnded(m_privateTrack->ended())
 {
@@ -76,7 +75,6 @@ MediaStreamTrack::MediaStreamTrack(MediaStreamTrack& other)
     , ActiveDOMObject(other.scriptExecutionContext())
     , m_privateTrack(*other.privateTrack().clone())
     , m_eventDispatchScheduled(false)
-    , m_stoppingTrack(false)
     , m_isMuted(m_privateTrack->muted())
     , m_isEnded(m_privateTrack->ended())
 {
