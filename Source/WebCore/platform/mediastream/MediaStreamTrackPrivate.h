@@ -84,14 +84,11 @@ public:
 
     void configureTrackRendering();
 
-protected:
+private:
     explicit MediaStreamTrackPrivate(const MediaStreamTrackPrivate&);
     MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource>, const String& id);
 
-private:
     MediaStreamTrackPrivateClient* client() const { return m_client; }
-
-    void setSource(PassRefPtr<RealtimeMediaSource>);
 
     // RealtimeMediaSourceObserver
     virtual void sourceReadyStateChanged() override final;

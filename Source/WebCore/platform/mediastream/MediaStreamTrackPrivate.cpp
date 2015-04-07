@@ -48,39 +48,39 @@ PassRefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(PassRefPtr<R
 
 MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& other)
     : RefCounted()
+    , m_source(other.source())
     , m_client(nullptr)
+    , m_type(other.type())
     , m_id(createCanonicalUUIDString())
+    , m_label(other.label())
     , m_enabled(other.enabled())
+    , m_isReadonly(other.readonly())
+    , m_isRemote(other.remote())
 {
-    setSource(other.source());
+    // This constructor is only used by the clone() function and the cloned track (other) may have
+    // been detached from its source.
+    if (m_source)
+        m_source->addObserver(this);
 }
 
 MediaStreamTrackPrivate::MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource> source, const String& id)
-    : m_source(nullptr)
+    : RefCounted()
+    , m_source(source)
     , m_client(nullptr)
+    , m_type(m_source->type())
     , m_id(id)
+    , m_label(m_source->name())
     , m_enabled(true)
+    , m_isReadonly(m_source->readonly())
+    , m_isRemote(m_source->remote())
 {
-    setSource(source);
+    m_source->addObserver(this);
 }
 
 MediaStreamTrackPrivate::~MediaStreamTrackPrivate()
 {
     if (m_source)
         m_source->removeObserver(this);
-}
-
-void MediaStreamTrackPrivate::setSource(PassRefPtr<RealtimeMediaSource> source)
-{
-    m_source = source;
-    ASSERT(m_source);
-
-    m_type = m_source->type();
-    m_label = m_source->name();
-    m_isReadonly = m_source->readonly();
-    m_isRemote = m_source->remote();
-
-    m_source->addObserver(this);
 }
 
 bool MediaStreamTrackPrivate::ended() const
@@ -107,6 +107,8 @@ void MediaStreamTrackPrivate::detachSource()
     // The source will stop itself when out of consumers (observers in this case).
     m_source->removeObserver(this);
     m_source = nullptr;
+
+    printf("source evals to: %d\n", !!m_source);
 }
 
 RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
@@ -114,7 +116,6 @@ RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
     return adoptRef(new MediaStreamTrackPrivate(*this));
 }
 
-    
 RefPtr<MediaConstraints> MediaStreamTrackPrivate::constraints() const
 {
     return m_constraints;
