@@ -150,7 +150,7 @@ RefPtr<MediaStreamCapabilities> MediaStreamTrack::getCapabilities() const
 void MediaStreamTrack::applyConstraints(const Dictionary& constraints)
 {
     m_constraints->initialize(constraints);
-    m_privateTrack->applyConstraints(m_constraints);
+    m_privateTrack->applyConstraints(*m_constraints);
 }
 
 void MediaStreamTrack::applyConstraints(const MediaConstraints&)

@@ -36,14 +36,14 @@
 
 namespace WebCore {
 
-PassRefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(PassRefPtr<RealtimeMediaSource> source)
+RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(RefPtr<RealtimeMediaSource>&& source)
 {
-    return adoptRef(new MediaStreamTrackPrivate(source, createCanonicalUUIDString()));
+    return adoptRef(new MediaStreamTrackPrivate(WTF::move(source), createCanonicalUUIDString()));
 }
 
-PassRefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(PassRefPtr<RealtimeMediaSource> source, const String& id)
+RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::create(RefPtr<RealtimeMediaSource>&& source, const String& id)
 {
-    return adoptRef(new MediaStreamTrackPrivate(source, id));
+    return adoptRef(new MediaStreamTrackPrivate(WTF::move(source), id));
 }
 
 MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& other)
@@ -63,7 +63,7 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& 
         m_source->addObserver(this);
 }
 
-MediaStreamTrackPrivate::MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource> source, const String& id)
+MediaStreamTrackPrivate::MediaStreamTrackPrivate(RefPtr<RealtimeMediaSource>&& source, const String& id)
     : RefCounted()
     , m_source(source)
     , m_client(nullptr)
@@ -139,7 +139,7 @@ RefPtr<RealtimeMediaSourceCapabilities> MediaStreamTrackPrivate::capabilities() 
     return m_source->capabilities();
 }
 
-void MediaStreamTrackPrivate::applyConstraints(PassRefPtr<MediaConstraints>)
+void MediaStreamTrackPrivate::applyConstraints(const MediaConstraints&)
 {
     // FIXME: apply the new constraints to the track
     // https://bugs.webkit.org/show_bug.cgi?id=122428

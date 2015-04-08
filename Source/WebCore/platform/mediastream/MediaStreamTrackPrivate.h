@@ -29,7 +29,6 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "RealtimeMediaSource.h"
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/AtomicString.h>
 
@@ -48,8 +47,8 @@ public:
 
 class MediaStreamTrackPrivate : public RefCounted<MediaStreamTrackPrivate>, public RealtimeMediaSource::Observer {
 public:
-    static PassRefPtr<MediaStreamTrackPrivate> create(PassRefPtr<RealtimeMediaSource>);
-    static PassRefPtr<MediaStreamTrackPrivate> create(PassRefPtr<RealtimeMediaSource>, const String& id);
+    static RefPtr<MediaStreamTrackPrivate> create(RefPtr<RealtimeMediaSource>&&);
+    static RefPtr<MediaStreamTrackPrivate> create(RefPtr<RealtimeMediaSource>&&, const String& id);
 
     virtual ~MediaStreamTrackPrivate();
 
@@ -80,13 +79,13 @@ public:
     RefPtr<RealtimeMediaSourceCapabilities> capabilities() const;
 
     RefPtr<MediaConstraints> constraints() const;
-    void applyConstraints(PassRefPtr<MediaConstraints>);
+    void applyConstraints(const MediaConstraints&);
 
     void configureTrackRendering();
 
 private:
     explicit MediaStreamTrackPrivate(const MediaStreamTrackPrivate&);
-    MediaStreamTrackPrivate(PassRefPtr<RealtimeMediaSource>, const String& id);
+    MediaStreamTrackPrivate(RefPtr<RealtimeMediaSource>&&, const String& id);
 
     MediaStreamTrackPrivateClient* client() const { return m_client; }
 
