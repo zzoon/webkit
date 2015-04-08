@@ -107,8 +107,6 @@ void MediaStreamTrackPrivate::detachSource()
     // The source will stop itself when out of consumers (observers in this case).
     m_source->removeObserver(this);
     m_source = nullptr;
-
-    printf("source evals to: %d\n", !!m_source);
 }
 
 RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
