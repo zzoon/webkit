@@ -55,8 +55,8 @@ RefPtr<MediaStreamTrack> MediaStreamTrack::create(ScriptExecutionContext& contex
 MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext& context, MediaStreamTrackPrivate& privateTrack)
     : RefCounted()
     , ActiveDOMObject(&context)
-    , m_private(privateTrack)
     , m_eventDispatchScheduled(false)
+    , m_private(privateTrack)
     , m_isMuted(m_private->muted())
     , m_isEnded(m_private->ended())
 {
@@ -123,6 +123,25 @@ const AtomicString& MediaStreamTrack::readyState() const
     return ended() ? endedState : liveState;
 }
 
+RefPtr<MediaStreamTrack> MediaStreamTrack::clone()
+{
+    return MediaStreamTrack::create(*scriptExecutionContext(), *m_private->clone());
+}
+
+void MediaStreamTrack::stopProducingData()
+{
+    // NOTE: this method is called when the "stop" method is called from JS, using
+    // the "ImplementedAs" IDL attribute. This is done because ActiveDOMObject requires
+    // a "stop" method.
+
+    if (remote())
+        return;
+
+    m_isEnded = true;
+
+    m_private->detachSource();
+}
+
 RefPtr<MediaTrackConstraints> MediaStreamTrack::getConstraints() const
 {
     // FIXME: https://bugs.webkit.org/show_bug.cgi?id=122428
@@ -157,25 +176,6 @@ void MediaStreamTrack::applyConstraints(const MediaConstraints&)
 {
     // FIXME: apply the new constraints to the track
     // https://bugs.webkit.org/show_bug.cgi?id=122428
-}
-
-RefPtr<MediaStreamTrack> MediaStreamTrack::clone()
-{
-    return MediaStreamTrack::create(*scriptExecutionContext(), *m_private->clone());
-}
-
-void MediaStreamTrack::stopProducingData()
-{
-    // NOTE: this method is called when the "stop" method is called from JS, using
-    // the "ImplementedAs" IDL attribute. This is done because ActiveDOMObject requires
-    // a "stop" method.
-    
-    if (remote())
-        return;
-
-    m_isEnded = true;
-
-    m_private->detachSource();
 }
 
 bool MediaStreamTrack::ended() const

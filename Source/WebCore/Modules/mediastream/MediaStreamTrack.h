@@ -72,14 +72,14 @@ public:
 
     const AtomicString& readyState() const;
 
+    RefPtr<MediaStreamTrack> clone();
+    void stopProducingData();
+
     RefPtr<MediaTrackConstraints> getConstraints() const;
     RefPtr<MediaSourceStates> states() const;
     RefPtr<MediaStreamCapabilities> getCapabilities() const;
     void applyConstraints(const Dictionary&);
     void applyConstraints(const MediaConstraints&);
-
-    RefPtr<MediaStreamTrack> clone();
-    void stopProducingData();
 
     RealtimeMediaSource* source() const { return m_private->source(); }
     MediaStreamTrackPrivate& privateTrack() { return m_private.get(); }
@@ -117,14 +117,13 @@ private:
     void trackMutedChanged();
 
     Vector<RefPtr<Event>> m_scheduledEvents;
-
-    RefPtr<MediaConstraintsImpl> m_constraints;
+    bool m_eventDispatchScheduled;
     Mutex m_mutex;
 
     Vector<Observer*> m_observers;
-
     Ref<MediaStreamTrackPrivate> m_private;
-    bool m_eventDispatchScheduled;
+
+    RefPtr<MediaConstraintsImpl> m_constraints;
 
     bool m_isMuted;
     bool m_isEnded;
