@@ -153,7 +153,7 @@ void MediaStreamTrack::applyConstraints(const Dictionary& constraints)
     m_privateTrack->applyConstraints(m_constraints);
 }
 
-void MediaStreamTrack::applyConstraints(PassRefPtr<MediaConstraints>)
+void MediaStreamTrack::applyConstraints(const MediaConstraints&)
 {
     // FIXME: apply the new constraints to the track
     // https://bugs.webkit.org/show_bug.cgi?id=122428
@@ -248,7 +248,7 @@ bool MediaStreamTrack::canSuspend() const
     return false;
 }
 
-void MediaStreamTrack::scheduleEventDispatch(PassRefPtr<Event> event)
+void MediaStreamTrack::scheduleEventDispatch(RefPtr<Event>&& event)
 {
     {
         MutexLocker locker(m_mutex);

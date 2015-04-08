@@ -76,7 +76,7 @@ public:
     RefPtr<MediaSourceStates> states() const;
     RefPtr<MediaStreamCapabilities> getCapabilities() const;
     void applyConstraints(const Dictionary&);
-    void applyConstraints(PassRefPtr<MediaConstraints>);
+    void applyConstraints(const MediaConstraints&);
 
     RefPtr<MediaStreamTrack> clone();
     void stopProducingData();
@@ -101,7 +101,7 @@ private:
     explicit MediaStreamTrack(MediaStreamTrack&);
 
     void configureTrackRendering();
-    void scheduleEventDispatch(PassRefPtr<Event>);
+    void scheduleEventDispatch(RefPtr<Event>&&);
 
     // ActiveDOMObject API.
     void stop() override final;
