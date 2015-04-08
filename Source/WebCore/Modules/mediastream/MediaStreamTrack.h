@@ -81,8 +81,8 @@ public:
     RefPtr<MediaStreamTrack> clone();
     void stopProducingData();
 
-    RealtimeMediaSource* source() const { return m_privateTrack->source(); }
-    MediaStreamTrackPrivate& privateTrack() { return m_privateTrack.get(); }
+    RealtimeMediaSource* source() const { return m_private->source(); }
+    MediaStreamTrackPrivate& privateTrack() { return m_private.get(); }
 
     bool ended() const;
 
@@ -123,7 +123,7 @@ private:
 
     Vector<Observer*> m_observers;
 
-    Ref<MediaStreamTrackPrivate> m_privateTrack;
+    Ref<MediaStreamTrackPrivate> m_private;
     bool m_eventDispatchScheduled;
 
     bool m_isMuted;
