@@ -28,27 +28,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "RTCRtpSender.h"
+#ifndef RTCRtpSenderReceiverBase_h
+#define RTCRtpSenderReceiverBase_h
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "ScriptWrappable.h"
+#include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
+
 namespace WebCore {
 
-RefPtr<RTCRtpSender> RTCRtpSender::create(RefPtr<MediaStreamTrack>&& track)
-{
-    return adoptRef(new RTCRtpSender(WTF::move(track)));
-}
+class MediaStreamTrack;
 
-RTCRtpSender::RTCRtpSender(RefPtr<MediaStreamTrack>&& track)
-    : RTCRtpSenderReceiverBase(WTF::move(track))
-{
-}
+class RTCRtpSenderReceiverBase : public RefCounted<RTCRtpSenderReceiverBase>, public ScriptWrappable {
+public:
+    virtual ~RTCRtpSenderReceiverBase();
 
-RTCRtpSender::~RTCRtpSender()
-{
-}
+    MediaStreamTrack* track() const;
+
+protected:
+    RTCRtpSenderReceiverBase(RefPtr<MediaStreamTrack>&&);
+
+    RefPtr<MediaStreamTrack> m_track;
+};
 
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
+
+#endif // RTCRtpSenderReceiverBase_h

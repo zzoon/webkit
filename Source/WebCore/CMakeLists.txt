@@ -250,6 +250,7 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/mediastream/RTCIceCandidateEvent.idl
     Modules/mediastream/RTCIceServer.idl
     Modules/mediastream/RTCPeerConnection.idl
+    Modules/mediastream/RTCRtpReceiver.idl
     Modules/mediastream/RTCRtpSender.idl
     Modules/mediastream/RTCSessionDescription.idl
     Modules/mediastream/RTCSessionDescriptionCallback.idl
@@ -897,7 +898,9 @@ set(WebCore_SOURCES
     Modules/mediastream/RTCIceCandidateEvent.cpp
     Modules/mediastream/RTCOfferAnswerOptions.cpp
     Modules/mediastream/RTCPeerConnection.cpp
+    Modules/mediastream/RTCRtpReceiver.cpp
     Modules/mediastream/RTCRtpSender.cpp
+    Modules/mediastream/RTCRtpSenderReceiverBase.cpp
     Modules/mediastream/RTCSessionDescription.cpp
     # Modules/mediastream/RTCSessionDescriptionRequestImpl.cpp
     Modules/mediastream/RTCStatsReport.cpp

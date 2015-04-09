@@ -29,24 +29,26 @@
  */
 
 #include "config.h"
-#include "RTCRtpSender.h"
+#include "RTCRtpSenderReceiverBase.h"
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "MediaStreamTrack.h"
+
 namespace WebCore {
 
-RefPtr<RTCRtpSender> RTCRtpSender::create(RefPtr<MediaStreamTrack>&& track)
-{
-    return adoptRef(new RTCRtpSender(WTF::move(track)));
-}
-
-RTCRtpSender::RTCRtpSender(RefPtr<MediaStreamTrack>&& track)
-    : RTCRtpSenderReceiverBase(WTF::move(track))
+RTCRtpSenderReceiverBase::RTCRtpSenderReceiverBase(RefPtr<MediaStreamTrack>&& track)
+    : m_track(track)
 {
 }
 
-RTCRtpSender::~RTCRtpSender()
+RTCRtpSenderReceiverBase::~RTCRtpSenderReceiverBase()
 {
+}
+
+MediaStreamTrack* RTCRtpSenderReceiverBase::track() const
+{
+    return m_track.get();
 }
 
 } // namespace WebCore

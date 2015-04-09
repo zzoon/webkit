@@ -33,25 +33,17 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "ScriptWrappable.h"
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
+#include "RTCRtpSenderReceiverBase.h"
 
 namespace WebCore {
 
-class MediaStreamTrack;
-
-class RTCRtpSender : public RefCounted<RTCRtpSender>, public ScriptWrappable {
+class RTCRtpSender : public RTCRtpSenderReceiverBase {
 public:
     static RefPtr<RTCRtpSender> create(RefPtr<MediaStreamTrack>&&);
     virtual ~RTCRtpSender();
 
-    MediaStreamTrack* track() const;
-
 private:
     RTCRtpSender(RefPtr<MediaStreamTrack>&&);
-
-    RefPtr<MediaStreamTrack> m_track;
 };
 
 } // namespace WebCore
