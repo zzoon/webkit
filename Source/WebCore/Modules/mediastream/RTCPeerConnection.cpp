@@ -215,6 +215,19 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
     return sender;
 }
 
+void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
+{
+    if (m_signalingState == SignalingStateClosed) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+
+    if (!m_senders.removeFirst(sender))
+        return;
+
+    // FIXME: Mark connection as needing negotiation.
+}
+
 void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingStateClosed) {

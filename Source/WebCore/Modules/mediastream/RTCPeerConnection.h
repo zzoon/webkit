@@ -67,6 +67,7 @@ public:
     Vector<RefPtr<RTCRtpSender>> getSenders() const;
 
     RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, ExceptionCode&);
+    void removeTrack(RTCRtpSender*, ExceptionCode&);
 
     void createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback, RejectCallback, ExceptionCode&);
     void createAnswer(const Dictionary& answerOptions, OfferAnswerResolveCallback, RejectCallback, ExceptionCode&);

@@ -46,6 +46,7 @@
     sequence<RTCRtpSender> getSenders();
 
     [StrictTypeChecking, RaisesException] RTCRtpSender addTrack(MediaStreamTrack track);
+    [StrictTypeChecking, RaisesException] void removeTrack(RTCRtpSender sender);
 
     [Custom, RaisesException] Promise setLocalDescription(RTCSessionDescription description);
     readonly attribute RTCSessionDescription localDescription;
