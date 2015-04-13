@@ -51,6 +51,7 @@
 #include "RTCIceCandidate.h"
 #include "RTCIceCandidateEvent.h"
 #include "RTCOfferAnswerOptions.h"
+#include "RTCRtpReceiver.h"
 #include "RTCRtpSender.h"
 #include "RTCSessionDescription.h"
 #include <wtf/MainThread.h>
@@ -204,6 +205,15 @@ Vector<RefPtr<RTCRtpSender>> RTCPeerConnection::getSenders() const
         senders.append(sender);
 
     return senders;
+}
+
+Vector<RefPtr<RTCRtpReceiver>> RTCPeerConnection::getReceivers() const
+{
+    Vector<RefPtr<RTCRtpReceiver>> receivers;
+    for (auto& receiver : m_receiverSet.values())
+        receivers.append(receiver);
+
+    return receivers;
 }
 
 RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, ExceptionCode& ec)

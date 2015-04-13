@@ -52,6 +52,7 @@ class RTCConfiguration;
 class RTCDataChannel;
 class RTCIceCandidate;
 class RTCPeerConnectionErrorCallback;
+class RTCRtpReceiver;
 class RTCRtpSender;
 class RTCSessionDescription;
 class RTCStatsCallback;
@@ -66,6 +67,7 @@ public:
     typedef std::function<void(RefPtr<DOMError>)> RejectCallback;
 
     Vector<RefPtr<RTCRtpSender>> getSenders() const;
+    Vector<RefPtr<RTCRtpReceiver>> getReceivers() const;
 
     RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, ExceptionCode&);
     void removeTrack(RTCRtpSender*, ExceptionCode&);
@@ -174,7 +176,7 @@ private:
     IceConnectionState m_iceConnectionState;
 
     HashMap<String, RefPtr<RTCRtpSender>> m_senderSet;
-    // TODO m_receivers
+    HashMap<String, RefPtr<RTCRtpReceiver>> m_receiverSet;
 
     RefPtr<MediaEndpointConfiguration> m_localConfiguration;
     RefPtr<MediaEndpointConfiguration> m_remoteConfiguration;
