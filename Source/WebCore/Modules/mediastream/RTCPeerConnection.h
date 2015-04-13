@@ -41,6 +41,7 @@
 #include "MediaEndpoint.h"
 #include "ScriptWrappable.h"
 #include "Timer.h"
+#include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
@@ -172,7 +173,7 @@ private:
     IceGatheringState m_iceGatheringState;
     IceConnectionState m_iceConnectionState;
 
-    Vector<RefPtr<RTCRtpSender>> m_senders;
+    HashMap<String, RefPtr<RTCRtpSender>> m_senderSet;
     // TODO m_receivers
 
     RefPtr<MediaEndpointConfiguration> m_localConfiguration;

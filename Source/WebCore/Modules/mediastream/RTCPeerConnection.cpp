@@ -199,7 +199,11 @@ RTCPeerConnection::~RTCPeerConnection()
 
 Vector<RefPtr<RTCRtpSender>> RTCPeerConnection::getSenders() const
 {
-    return m_senders;
+    Vector<RefPtr<RTCRtpSender>> senders;
+    for (auto& sender : m_senderSet.values())
+        senders.append(sender);
+
+    return senders;
 }
 
 RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, ExceptionCode& ec)
@@ -209,8 +213,14 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
         return nullptr;
     }
 
+    if (m_senderSet.contains(track->id())) {
+        // FIXME: Spec says InvalidParameter
+        ec = INVALID_MODIFICATION_ERR;
+        return nullptr;
+    }
+
     RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track));
-    m_senders.append(sender);
+    m_senderSet.add(track->id(), sender);
 
     return sender;
 }
@@ -222,7 +232,7 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
         return;
     }
 
-    if (!m_senders.removeFirst(sender))
+    if (!m_senderSet.remove(sender->track()->id()))
         return;
 
     // FIXME: Mark connection as needing negotiation.
@@ -248,7 +258,7 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
         MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get())) : MediaEndpointConfiguration::create();
 
     Vector<MediaStreamTrack*> localTracks;
-    for (auto sender : m_senders)
+    for (auto sender : m_senderSet.values())
         localTracks.append(sender->track());
 
     // FIXME: update existing media descriptions with tracks
