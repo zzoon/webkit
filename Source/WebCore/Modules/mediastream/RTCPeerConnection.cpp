@@ -297,7 +297,7 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswe
         return;
     }
 
-    RefPtr<RTCOfferAnswerOptions> options = RTCOfferAnswerOptions::create(answerOptions, ec);
+    RefPtr<RTCAnswerOptions> options = RTCAnswerOptions::create(answerOptions, ec);
     if (ec) {
         callOnMainThread([rejectCallback] {
             RefPtr<DOMError> error = DOMError::create("Invalid createAnswer argument.");

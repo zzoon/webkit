@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,34 +33,21 @@
 
 namespace WebCore {
 
-PassRefPtr<RTCOfferAnswerOptions> RTCOfferAnswerOptions::create(const Dictionary& options, ExceptionCode& ec)
+RTCOfferAnswerOptions::RTCOfferAnswerOptions()
+    : m_voiceActivityDetection(true)
 {
-    RefPtr<RTCOfferAnswerOptions> offerAnswerOptions = adoptRef(new RTCOfferAnswerOptions());
-    String requestIdentity;
-    if (!offerAnswerOptions->initialize(options)) {
-        // FIXME: https://webkit.org/b/129800
-        // According to the spec, the error is going to be defined yet, so let's use TYPE_MISMATCH_ERR for now.
-        ec = TYPE_MISMATCH_ERR;
-        return nullptr;
-    }
-
-    return offerAnswerOptions.release();
 }
 
 bool RTCOfferAnswerOptions::initialize(const Dictionary& options)
 {
-    if (!m_private)
-        m_private = RTCOfferAnswerOptionsPrivate::create();
+    bool voiceActivityDetection;
+    if (options.get("voiceActivityDetection", voiceActivityDetection))
+        m_voiceActivityDetection = voiceActivityDetection;
 
-    String requestIdentity;
-    if (!options.isUndefinedOrNull() && (!options.get("requestIdentity", requestIdentity) || requestIdentity.isEmpty()))
-        return false;
-
-    m_private->setRequestIdentity(requestIdentity);
     return true;
 }
 
-PassRefPtr<RTCOfferOptions> RTCOfferOptions::create(const Dictionary& options, ExceptionCode& ec)
+RefPtr<RTCOfferOptions> RTCOfferOptions::create(const Dictionary& options, ExceptionCode& ec)
 {
     RefPtr<RTCOfferOptions> offerOptions = adoptRef(new RTCOfferOptions());
     if (!offerOptions->initialize(options)) {
@@ -69,19 +57,20 @@ PassRefPtr<RTCOfferOptions> RTCOfferOptions::create(const Dictionary& options, E
         return nullptr;
     }
 
-    return offerOptions.release();
+    return offerOptions;
+}
+
+RTCOfferOptions::RTCOfferOptions()
+    : m_offerToReceiveVideo(0)
+    , m_offerToReceiveAudio(0)
+    , m_iceRestart(false)
+{
 }
 
 bool RTCOfferOptions::initialize(const Dictionary& options)
 {
-    RefPtr<RTCOfferOptionsPrivate> optionsPrivate = RTCOfferOptionsPrivate::create();
-    m_private = optionsPrivate;
-
     if (options.isUndefinedOrNull())
         return true;
-
-    if (!RTCOfferAnswerOptions::initialize(options))
-        return false;
 
     String offerToReceiveVideoStr;
     bool numberConversionSuccess;
@@ -92,7 +81,7 @@ bool RTCOfferOptions::initialize(const Dictionary& options)
     if (!numberConversionSuccess)
         return false;
 
-    optionsPrivate->setOfferToReceiveVideo(intConversionResult);
+    m_offerToReceiveVideo = intConversionResult;
 
     String offerToReceiveAudioStr;
     if (!options.get("offerToReceiveAudio", offerToReceiveAudioStr))
@@ -102,17 +91,34 @@ bool RTCOfferOptions::initialize(const Dictionary& options)
     if (!numberConversionSuccess)
         return false;
 
-    optionsPrivate->setOfferToReceiveAudio(intConversionResult);
-
-    bool voiceActivityDetection;
-    if (options.get("voiceActivityDetection", voiceActivityDetection))
-        optionsPrivate->setVoiceActivityDetection(voiceActivityDetection);
+    m_offerToReceiveAudio = intConversionResult;
 
     bool iceRestart;
     if (options.get("iceRestart", iceRestart))
-        optionsPrivate->setIceRestart(iceRestart);
+        m_iceRestart = iceRestart;
 
-    return true;
+    return RTCOfferAnswerOptions::initialize(options);
+}
+
+RefPtr<RTCAnswerOptions> RTCAnswerOptions::create(const Dictionary& options, ExceptionCode& ec)
+{
+    RefPtr<RTCAnswerOptions> offerOptions = adoptRef(new RTCAnswerOptions());
+    if (!offerOptions->initialize(options)) {
+        // FIXME: https://webkit.org/b/129800
+        // According to the spec, the error is going to be defined yet, so let's use TYPE_MISMATCH_ERR for now.
+        ec = TYPE_MISMATCH_ERR;
+        return nullptr;
+    }
+
+    return offerOptions;
+}
+
+bool RTCAnswerOptions::initialize(const Dictionary& options)
+{
+    if (options.isUndefinedOrNull())
+        return true;
+
+    return RTCOfferAnswerOptions::initialize(options);
 }
 
 } // namespace WebCore
