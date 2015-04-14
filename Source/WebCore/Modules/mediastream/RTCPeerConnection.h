@@ -151,7 +151,6 @@ private:
 
     RTCPeerConnection(ScriptExecutionContext&, PassRefPtr<RTCConfiguration>, ExceptionCode&);
 
-    static PassRefPtr<RTCConfiguration> parseConfiguration(const Dictionary& configuration, ExceptionCode&);
     SignalingState targetSignalingState(SetterType, DescriptionType) const;
     DescriptionType parseDescriptionType(const String& typeName) const;
 

@@ -42,9 +42,13 @@
 
 namespace WebCore {
 
+class Dictionary;
+
+typedef int ExceptionCode;
+
 class RTCConfiguration : public RefCounted<RTCConfiguration> {
 public:
-    static PassRefPtr<RTCConfiguration> create();
+    static PassRefPtr<RTCConfiguration> create(const Dictionary& configuration, ExceptionCode&);
     virtual ~RTCConfiguration() { }
 
     void appendServer(PassRefPtr<RTCIceServer>);

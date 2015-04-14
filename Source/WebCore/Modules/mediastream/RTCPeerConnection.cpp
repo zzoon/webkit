@@ -36,7 +36,6 @@
 
 #include "RTCPeerConnection.h"
 
-#include "ArrayValue.h"
 #include "DOMError.h"
 #include "Document.h"
 #include "Event.h"
@@ -58,100 +57,11 @@
 
 namespace WebCore {
 
-static bool validateIceServerURL(const String& iceURL)
-{
-    URL url(URL(), iceURL);
-    if (url.isEmpty() || !url.isValid() || !(url.protocolIs("turn") || url.protocolIs("stun")))
-        return false;
-
-    return true;
-}
-
-static ExceptionCode processIceServer(const Dictionary& iceServer, RTCConfiguration* rtcConfiguration)
-{
-    String credential, username;
-    iceServer.get("credential", credential);
-    iceServer.get("username", username);
-
-    // Spec says that "urls" can be either a string or a sequence, so we must check for both.
-    Vector<String> urlsList;
-    String urlString;
-    iceServer.get("urls", urlString);
-    // This is the only way to check if "urls" is a sequence or a string. If we try to convert
-    // to a sequence and it fails (in case it is a string), an exception will be set and the
-    // RTCPeerConnection will fail.
-    // So we convert to a string always, which converts a sequence to a string in the format: "foo, bar, ..",
-    // then checking for a comma in the string assures that a string was a sequence and then we convert
-    // it to a sequence safely.
-    if (urlString.isEmpty())
-        return INVALID_ACCESS_ERR;
-
-    if (urlString.find(',') != notFound && iceServer.get("urls", urlsList) && urlsList.size()) {
-        for (auto iter = urlsList.begin(); iter != urlsList.end(); ++iter) {
-            if (!validateIceServerURL(*iter))
-                return INVALID_ACCESS_ERR;
-        }
-    } else {
-        if (!validateIceServerURL(urlString))
-            return INVALID_ACCESS_ERR;
-
-        urlsList.append(urlString);
-    }
-
-    rtcConfiguration->appendServer(RTCIceServer::create(urlsList, credential, username));
-    return 0;
-}
-
-PassRefPtr<RTCConfiguration> RTCPeerConnection::parseConfiguration(const Dictionary& configuration, ExceptionCode& ec)
-{
-    if (configuration.isUndefinedOrNull())
-        return nullptr;
-
-    ArrayValue iceServers;
-    bool ok = configuration.get("iceServers", iceServers);
-    if (!ok || iceServers.isUndefinedOrNull()) {
-        ec = TYPE_MISMATCH_ERR;
-        return nullptr;
-    }
-
-    size_t numberOfServers;
-    ok = iceServers.length(numberOfServers);
-    if (!ok || !numberOfServers) {
-        ec = !ok ? TYPE_MISMATCH_ERR : INVALID_ACCESS_ERR;
-        return nullptr;
-    }
-
-    String iceTransports;
-    String requestIdentity;
-    configuration.get("iceTransports", iceTransports);
-    configuration.get("requestIdentity", requestIdentity);
-
-    RefPtr<RTCConfiguration> rtcConfiguration = RTCConfiguration::create();
-
-    rtcConfiguration->setIceTransports(iceTransports);
-    rtcConfiguration->setRequestIdentity(requestIdentity);
-
-    for (size_t i = 0; i < numberOfServers; ++i) {
-        Dictionary iceServer;
-        ok = iceServers.get(i, iceServer);
-        if (!ok) {
-            ec = TYPE_MISMATCH_ERR;
-            return nullptr;
-        }
-
-        ec = processIceServer(iceServer, rtcConfiguration.get());
-        if (ec)
-            return nullptr;
-    }
-
-    return rtcConfiguration.release();
-}
-
 PassRefPtr<RTCPeerConnection> RTCPeerConnection::create(ScriptExecutionContext& context, const Dictionary& rtcConfiguration, ExceptionCode& ec)
 {
     printf("-> RTCConfiguration::create\n");
 
-    RefPtr<RTCConfiguration> configuration = parseConfiguration(rtcConfiguration, ec);
+    RefPtr<RTCConfiguration> configuration = RTCConfiguration::create(rtcConfiguration, ec);
     if (ec)
         return nullptr;
 
@@ -382,7 +292,7 @@ void RTCPeerConnection::updateIce(const Dictionary& rtcConfiguration, ExceptionC
         return;
     }
 
-    m_configuration = parseConfiguration(rtcConfiguration, ec);
+    m_configuration = RTCConfiguration::create(rtcConfiguration, ec);
     if (ec)
         return;
 
