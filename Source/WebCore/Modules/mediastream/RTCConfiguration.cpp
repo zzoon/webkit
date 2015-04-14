@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,7 +11,7 @@
  *    notice, this list of conditions and the following disclaimer
  *    in the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name of Google Inc. nor the names of its contributors
+ * 3. Neither the name of Ericsson nor the names of its contributors
  *    may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
  *
@@ -28,47 +28,51 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RTCConfiguration_h
-#define RTCConfiguration_h
+#include "config.h"
+#include "RTCConfiguration.h"
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "RTCConfigurationPrivate.h"
-#include "RTCIceServer.h"
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/Vector.h>
-#include <wtf/text/WTFString.h>
+// #include "Dictionary.h"
+// #include "ExceptionCode.h"
 
 namespace WebCore {
 
-class RTCConfiguration : public RefCounted<RTCConfiguration> {
-public:
-    static PassRefPtr<RTCConfiguration> create();
-    virtual ~RTCConfiguration() { }
+PassRefPtr<RTCConfiguration> RTCConfiguration::create()
+{
+    return adoptRef(new RTCConfiguration());
+}
 
-    void appendServer(PassRefPtr<RTCIceServer>);
-    size_t numberOfServers() { return m_private->numberOfServers(); }
-    PassRefPtr<RTCIceServer> server(size_t index);
+RTCConfiguration::RTCConfiguration()
+    : m_private(RTCConfigurationPrivate::create())
+{
+}
 
-    const String& iceTransports() const { return m_private->iceTransports(); }
-    void setIceTransports(const String& iceTransports) { m_private->setIceTransports(iceTransports); }
+void RTCConfiguration::appendServer(PassRefPtr<RTCIceServer> server)
+{
+    m_private->appendServer(server->privateServer());
+}
 
-    const String& requestIdentity() const { return m_private->requestIdentity(); }
-    void setRequestIdentity(const String& requestIdentity) { m_private->setRequestIdentity(requestIdentity); }
+PassRefPtr<RTCIceServer> RTCConfiguration::server(size_t index)
+{
+    RTCIceServerPrivate* server = m_private->server(index);
+    if (!server)
+        return nullptr;
 
-    Vector<RefPtr<RTCIceServer>> iceServers() const;
+    return RTCIceServer::create(server);
+}
 
-    RTCConfigurationPrivate* privateConfiguration() { return m_private.get(); }
+Vector<RefPtr<RTCIceServer>> RTCConfiguration::iceServers() const
+{
+    Vector<RefPtr<RTCIceServer>> servers;
+    Vector<RefPtr<RTCIceServerPrivate>> privateServers = m_private->iceServers();
 
-private:
-    RTCConfiguration();
+    for (auto iter = privateServers.begin(); iter != privateServers.end(); ++iter)
+        servers.append(RTCIceServer::create(*iter));
 
-    RefPtr<RTCConfigurationPrivate> m_private;
-};
+    return servers;
+}
 
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
-
-#endif // RTCConfiguration_h
