@@ -43,6 +43,7 @@
 #include "Frame.h"
 #include "MediaEndpointConfiguration.h"
 #include "MediaEndpointConfigurationConversions.h"
+#include "MediaEndpointInit.h"
 #include "MediaStreamTrack.h"
 #include "PeerMediaDescription.h"
 #include "RTCConfiguration.h"
@@ -56,6 +57,15 @@
 #include <wtf/MainThread.h>
 
 namespace WebCore {
+
+static RefPtr<MediaEndpointInit> createMediaEndpointInit(RTCConfiguration& rtcConfig)
+{
+    Vector<RefPtr<IceServerInfo>> iceServers;
+    for (auto& server : rtcConfig.iceServers())
+        iceServers.append(IceServerInfo::create(server->urls(), server->credential(), server->username()));
+
+    return MediaEndpointInit::create(iceServers, rtcConfig.iceTransportPolicy(), rtcConfig.bundlePolicy());
+}
 
 PassRefPtr<RTCPeerConnection> RTCPeerConnection::create(ScriptExecutionContext& context, const Dictionary& rtcConfiguration, ExceptionCode& ec)
 {
@@ -100,7 +110,7 @@ RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, PassRefPtr
         return;
     }
 
-    m_mediaEndpoint->setConfiguration(m_configuration->privateConfiguration());
+    m_mediaEndpoint->setConfiguration(createMediaEndpointInit(*m_configuration));
 }
 
 RTCPeerConnection::~RTCPeerConnection()
@@ -296,7 +306,9 @@ void RTCPeerConnection::updateIce(const Dictionary& rtcConfiguration, ExceptionC
     if (ec)
         return;
 
-    // FIXME: use configuration
+    // FIXME: updateIce() might be renamed to setConfiguration(). It's also possible
+    // that its current behavior with update deltas will change.
+    m_mediaEndpoint->setConfiguration(createMediaEndpointInit(*m_configuration));
 }
 
 void RTCPeerConnection::addIceCandidate(RTCIceCandidate* iceCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)

@@ -51,7 +51,7 @@ static bool validateIceServerURL(const String& iceURL)
     return true;
 }
 
-static ExceptionCode processIceServer(const Dictionary& iceServer, RTCConfiguration* rtcConfiguration)
+static RefPtr<RTCIceServer> parseIceServer(const Dictionary& iceServer, ExceptionCode& ec)
 {
     String credential, username;
     iceServer.get("credential", credential);
@@ -67,98 +67,89 @@ static ExceptionCode processIceServer(const Dictionary& iceServer, RTCConfigurat
     // So we convert to a string always, which converts a sequence to a string in the format: "foo, bar, ..",
     // then checking for a comma in the string assures that a string was a sequence and then we convert
     // it to a sequence safely.
-    if (urlString.isEmpty())
-        return INVALID_ACCESS_ERR;
+    if (urlString.isEmpty()) {
+        ec = INVALID_ACCESS_ERR;
+        return nullptr;
+    }
 
     if (urlString.find(',') != notFound && iceServer.get("urls", urlsList) && urlsList.size()) {
         for (auto iter = urlsList.begin(); iter != urlsList.end(); ++iter) {
-            if (!validateIceServerURL(*iter))
-                return INVALID_ACCESS_ERR;
+            if (!validateIceServerURL(*iter)) {
+                ec = INVALID_ACCESS_ERR;
+                return nullptr;
+            }
         }
     } else {
-        if (!validateIceServerURL(urlString))
-            return INVALID_ACCESS_ERR;
+        if (!validateIceServerURL(urlString)) {
+            ec = INVALID_ACCESS_ERR;
+            return nullptr;
+        }
 
         urlsList.append(urlString);
     }
 
-    rtcConfiguration->appendServer(RTCIceServer::create(urlsList, credential, username));
-    return 0;
+    return RTCIceServer::create(urlsList, credential, username);
 }
 
-PassRefPtr<RTCConfiguration> RTCConfiguration::create(const Dictionary& configuration, ExceptionCode& ec)
+RefPtr<RTCConfiguration> RTCConfiguration::create(const Dictionary& configuration, ExceptionCode& ec)
 {
     if (configuration.isUndefinedOrNull())
         return nullptr;
 
+    RefPtr<RTCConfiguration> rtcConfiguration = adoptRef(new RTCConfiguration());
+    rtcConfiguration->initialize(configuration, ec);
+    if (ec)
+        return nullptr;
+
+    return rtcConfiguration;
+}
+
+RTCConfiguration::RTCConfiguration()
+    : m_iceTransportPolicy("all")
+    , m_bundlePolicy("balanced")
+{
+}
+
+void RTCConfiguration::initialize(const Dictionary& configuration, ExceptionCode& ec)
+{
     ArrayValue iceServers;
     bool ok = configuration.get("iceServers", iceServers);
     if (!ok || iceServers.isUndefinedOrNull()) {
         ec = TYPE_MISMATCH_ERR;
-        return nullptr;
+        return;
     }
 
     size_t numberOfServers;
     ok = iceServers.length(numberOfServers);
     if (!ok || !numberOfServers) {
         ec = !ok ? TYPE_MISMATCH_ERR : INVALID_ACCESS_ERR;
-        return nullptr;
+        return;
     }
-
-    String iceTransports;
-    String requestIdentity;
-    configuration.get("iceTransports", iceTransports);
-    configuration.get("requestIdentity", requestIdentity);
-
-    RefPtr<RTCConfiguration> rtcConfiguration = adoptRef(new RTCConfiguration());
-
-    rtcConfiguration->setIceTransports(iceTransports);
-    rtcConfiguration->setRequestIdentity(requestIdentity);
 
     for (size_t i = 0; i < numberOfServers; ++i) {
-        Dictionary iceServer;
-        ok = iceServers.get(i, iceServer);
+        Dictionary iceServerDict;
+        ok = iceServers.get(i, iceServerDict);
         if (!ok) {
             ec = TYPE_MISMATCH_ERR;
-            return nullptr;
+            return;
         }
 
-        ec = processIceServer(iceServer, rtcConfiguration.get());
-        if (ec)
-            return nullptr;
+        RefPtr<RTCIceServer> iceServer = parseIceServer(iceServerDict, ec);
+        if (!iceServer)
+            return;
+
+        m_iceServers.append(WTF::move(iceServer));
     }
 
-    return rtcConfiguration.release();
-}
+    String iceTransportPolicy;
+    configuration.get("iceTransportPolicy", iceTransportPolicy);
+    if (iceTransportPolicy == "none" || iceTransportPolicy == "relay" || iceTransportPolicy == "all")
+        m_iceTransportPolicy = iceTransportPolicy;
 
-RTCConfiguration::RTCConfiguration()
-    : m_private(RTCConfigurationPrivate::create())
-{
-}
-
-void RTCConfiguration::appendServer(PassRefPtr<RTCIceServer> server)
-{
-    m_private->appendServer(server->privateServer());
-}
-
-PassRefPtr<RTCIceServer> RTCConfiguration::server(size_t index)
-{
-    RTCIceServerPrivate* server = m_private->server(index);
-    if (!server)
-        return nullptr;
-
-    return RTCIceServer::create(server);
-}
-
-Vector<RefPtr<RTCIceServer>> RTCConfiguration::iceServers() const
-{
-    Vector<RefPtr<RTCIceServer>> servers;
-    Vector<RefPtr<RTCIceServerPrivate>> privateServers = m_private->iceServers();
-
-    for (auto iter = privateServers.begin(); iter != privateServers.end(); ++iter)
-        servers.append(RTCIceServer::create(*iter));
-
-    return servers;
+    String bundlePolicy;
+    configuration.get("bundlePolicy", bundlePolicy);
+    if (bundlePolicy == "balanced" || bundlePolicy == "max-compat" || bundlePolicy == "max-bundle")
+        m_bundlePolicy = bundlePolicy;
 }
 
 } // namespace WebCore

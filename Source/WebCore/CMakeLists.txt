@@ -2195,6 +2195,7 @@ set(WebCore_SOURCES
     platform/graphics/transforms/TranslateTransformOperation.cpp
 
     platform/mediastream/MediaEndpointConfigurationConversions.cpp
+    platform/mediastream/MediaEndpointInit.cpp
     platform/mediastream/MediaStreamPrivate.cpp
     platform/mediastream/MediaStreamTrackPrivate.cpp
     platform/mediastream/RealtimeMediaSource.cpp

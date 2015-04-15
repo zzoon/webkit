@@ -47,7 +47,7 @@ public:
     MediaEndpointOwr(MediaEndpointClient*);
     ~MediaEndpointOwr();
 
-    virtual void setConfiguration(RefPtr<RTCConfigurationPrivate>&&) override;
+    virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) override;
 
     virtual void prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) override;
     virtual void prepareToSend(MediaEndpointConfiguration*, bool isInitiator) override;
@@ -65,7 +65,7 @@ private:
     void prepareMediaSession(unsigned mdescIndex, OwrMediaSession*, PeerMediaDescription*);
     void ensureTransportAgentAndMediaSessions(bool isInitiator, const Vector<String>& newMediaSessionDtlsRoles);
 
-    RefPtr<RTCConfigurationPrivate> m_configuration;
+    RefPtr<MediaEndpointInit> m_configuration;
 
     OwrTransportAgent* m_transportAgent;
     Vector<OwrMediaSession*> m_mediaSessions;

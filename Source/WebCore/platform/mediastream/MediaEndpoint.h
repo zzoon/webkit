@@ -33,7 +33,8 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "RTCConfigurationPrivate.h"
+// #include "RTCConfigurationPrivate.h"
+#include "MediaEndpointInit.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -61,7 +62,8 @@ public:
     WEBCORE_EXPORT static CreateMediaEndpoint create;
     virtual ~MediaEndpoint() { }
 
-    virtual void setConfiguration(RefPtr<RTCConfigurationPrivate>&&) = 0;
+    // FIMXE: look over naming
+    virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) = 0;
 
     virtual void prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) = 0;
     virtual void prepareToSend(MediaEndpointConfiguration*, bool isInitiator) = 0;

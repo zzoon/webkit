@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,7 +11,7 @@
  *    notice, this list of conditions and the following disclaimer
  *    in the documentation and/or other materials provided with the
  *    distribution.
- * 3. Neither the name of Google Inc. nor the names of its contributors
+ * 3. Neither the name of Ericsson nor the names of its contributors
  *    may be used to endorse or promote products derived from this
  *    software without specific prior written permission.
  *
@@ -28,44 +28,35 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RTCConfiguration_h
-#define RTCConfiguration_h
+#include "config.h"
+#include "MediaEndpointInit.h"
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "RTCIceServer.h"
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
-#include <wtf/text/WTFString.h>
-
 namespace WebCore {
 
-class Dictionary;
+MediaEndpointInit::MediaEndpointInit(Vector<RefPtr<IceServerInfo>>& iceServers, const String& iceTransportPolicy, const String& bundlePolicy)
+    : m_iceServers(iceServers)
+{
+    if (iceTransportPolicy == "none")
+        m_iceTransportPolicy = IceTransportPolicyNone;
+    else if (iceTransportPolicy == "relay")
+        m_iceTransportPolicy = IceTransportPolicyRelay;
+    else if (iceTransportPolicy == "all")
+        m_iceTransportPolicy = IceTransportPolicyAll;
+    else
+        ASSERT_NOT_REACHED();
 
-typedef int ExceptionCode;
-
-class RTCConfiguration : public RefCounted<RTCConfiguration> {
-public:
-    static RefPtr<RTCConfiguration> create(const Dictionary& configuration, ExceptionCode&);
-    virtual ~RTCConfiguration() { }
-
-    const String& iceTransportPolicy() const { return m_iceTransportPolicy; }
-    const String& bundlePolicy() const { return m_bundlePolicy; }
-    Vector<RefPtr<RTCIceServer>> iceServers() const { return m_iceServers; }
-
-private:
-    RTCConfiguration();
-
-    void initialize(const Dictionary& configuration, ExceptionCode&);
-
-    Vector<RefPtr<RTCIceServer>> m_iceServers;
-    String m_iceTransportPolicy;
-    String m_bundlePolicy;
-};
+    if (bundlePolicy == "balanced")
+        m_bundlePolicy = BundlePolicyBalanced;
+    else if (bundlePolicy == "max-compat")
+        m_bundlePolicy = BundlePolicyMaxCompat;
+    else if (bundlePolicy == "max-bundle")
+        m_bundlePolicy = BundlePolicyMaxBundle;
+    else
+        ASSERT_NOT_REACHED();
+}
 
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
-
-#endif // RTCConfiguration_h

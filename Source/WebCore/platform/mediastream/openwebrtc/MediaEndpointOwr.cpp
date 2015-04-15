@@ -67,7 +67,7 @@ MediaEndpointOwr::~MediaEndpointOwr()
         g_object_unref(m_transportAgent);
 }
 
-void MediaEndpointOwr::setConfiguration(RefPtr<RTCConfigurationPrivate>&& configuration)
+void MediaEndpointOwr::setConfiguration(RefPtr<MediaEndpointInit>&& configuration)
 {
     m_configuration = configuration;
 }
@@ -144,9 +144,7 @@ void MediaEndpointOwr::ensureTransportAgentAndMediaSessions(bool isInitiator, co
     if (!m_transportAgent) {
         m_transportAgent = owr_transport_agent_new(false);
 
-        for (unsigned i = 0; i < m_configuration->numberOfServers(); ++i) {
-            RTCIceServerPrivate* server = m_configuration->server(i);
-
+        for (auto& server : m_configuration->iceServers()) {
             // FIXME: parse url type and port
             owr_transport_agent_add_helper_server(m_transportAgent, OWR_HELPER_SERVER_TYPE_STUN,
                 server->urls()[0].ascii().data(), 3478, nullptr, nullptr);
