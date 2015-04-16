@@ -72,26 +72,25 @@ bool RTCOfferOptions::initialize(const Dictionary& options)
     if (options.isUndefinedOrNull())
         return true;
 
-    String offerToReceiveVideoStr;
+    String stringValue;
+    int64_t intConversionResult;
     bool numberConversionSuccess;
-    if (!options.get("offerToReceiveVideo", offerToReceiveVideoStr))
-        return false;
 
-    int64_t intConversionResult = offerToReceiveVideoStr.toInt64Strict(&numberConversionSuccess);
-    if (!numberConversionSuccess)
-        return false;
+    if (options.get("offerToReceiveVideo", stringValue)) {
+        intConversionResult = stringValue.toInt64Strict(&numberConversionSuccess);
+        if (!numberConversionSuccess)
+            return false;
 
-    m_offerToReceiveVideo = intConversionResult;
+        m_offerToReceiveVideo = intConversionResult;
+    }
 
-    String offerToReceiveAudioStr;
-    if (!options.get("offerToReceiveAudio", offerToReceiveAudioStr))
-        return false;
+    if (options.get("offerToReceiveAudio", stringValue)) {
+        intConversionResult = stringValue.toInt64Strict(&numberConversionSuccess);
+        if (!numberConversionSuccess)
+            return false;
 
-    intConversionResult = offerToReceiveAudioStr.toInt64Strict(&numberConversionSuccess);
-    if (!numberConversionSuccess)
-        return false;
-
-    m_offerToReceiveAudio = intConversionResult;
+        m_offerToReceiveAudio = intConversionResult;
+    }
 
     bool iceRestart;
     if (options.get("iceRestart", iceRestart))
