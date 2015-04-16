@@ -199,6 +199,21 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
         mediaDescription->setMediaStreamId("fix me");
         mediaDescription->setMediaStreamTrackId(track->id());
         mediaDescription->setType(track->kind());
+        mediaDescription->setMode("sendrcv");
+        // FIXME: payloads
+        mediaDescription->setRtcpMux(true);
+        mediaDescription->setDtlsSetup("actpass");
+
+        configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
+    }
+
+    int extraMediaDescriptionCount = options->offerToReceiveAudio() + options->offerToReceiveVideo();
+    for (int i = 0; i < extraMediaDescriptionCount; ++i) {
+        bool audioType = i < options->offerToReceiveAudio();
+        RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
+
+        mediaDescription->setType(audioType ? "audio" : "video");
+        mediaDescription->setMode("recvonly");
         // FIXME: payloads
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
