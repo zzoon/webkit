@@ -117,6 +117,9 @@ RefPtr<MediaEndpointConfiguration> fromJSON(const String& json)
         if (mdescObject->getInteger(ASCIILiteral("port"), intValue))
             mdesc->setPort(intValue);
 
+        if (mdescObject->getString(ASCIILiteral("mode"), stringValue))
+            mdesc->setMode(stringValue);
+
         RefPtr<InspectorArray> payloadsArray = InspectorArray::create();
         mdescObject->getArray(ASCIILiteral("payloads"), payloadsArray);
 
@@ -206,6 +209,7 @@ String toJSON(MediaEndpointConfiguration* configuration)
 
         mdescObject->setString(ASCIILiteral("type"), mdesc->type());
         mdescObject->setInteger(ASCIILiteral("port"), mdesc->port());
+        mdescObject->setString(ASCIILiteral("mode"), mdesc->mode());
 
         RefPtr<InspectorArray> payloadsArray = InspectorArray::create();
 

@@ -54,6 +54,9 @@ public:
     unsigned short port() const { return m_port; }
     void setPort(unsigned short port) { m_port = port; }
 
+    const String& mode() const { return m_mode; }
+    void setMode(const String& mode) { m_mode = mode; }
+
     const Vector<RefPtr<MediaPayload>>& payloads() const { return m_payloads; }
     void addPayload(RefPtr<MediaPayload>&& payload) { m_payloads.append(WTF::move(payload)); }
 
@@ -83,6 +86,7 @@ private:
 
     String m_type;
     unsigned short m_port;
+    String m_mode;
 
     Vector<RefPtr<MediaPayload>> m_payloads;
 
