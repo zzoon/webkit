@@ -142,14 +142,22 @@ void RTCConfiguration::initialize(const Dictionary& configuration, ExceptionCode
     }
 
     String iceTransportPolicy;
-    configuration.get("iceTransportPolicy", iceTransportPolicy);
-    if (iceTransportPolicy == "none" || iceTransportPolicy == "relay" || iceTransportPolicy == "all")
-        m_iceTransportPolicy = iceTransportPolicy;
+    if (configuration.get("iceTransportPolicy", iceTransportPolicy)) {
+        if (iceTransportPolicy == "none" || iceTransportPolicy == "relay" || iceTransportPolicy == "all")
+            m_iceTransportPolicy = iceTransportPolicy;
+        else {
+            ec = TypeError;
+            return;
+        }
+    }
 
     String bundlePolicy;
-    configuration.get("bundlePolicy", bundlePolicy);
-    if (bundlePolicy == "balanced" || bundlePolicy == "max-compat" || bundlePolicy == "max-bundle")
-        m_bundlePolicy = bundlePolicy;
+    if (configuration.get("bundlePolicy", bundlePolicy)) {
+        if (bundlePolicy == "balanced" || bundlePolicy == "max-compat" || bundlePolicy == "max-bundle")
+            m_bundlePolicy = bundlePolicy;
+        else
+            ec = TypeError;
+    }
 }
 
 } // namespace WebCore
