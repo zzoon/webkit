@@ -282,6 +282,9 @@ void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, 
 
     if (m_remoteConfiguration)
         m_mediaEndpoint->prepareToSend(m_remoteConfiguration.get(), isInitiator);
+
+    // FIXME: Temporary solution
+    callOnMainThread(m_completeSetLocalDescription);
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
@@ -312,10 +315,10 @@ void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description,
     }
 
     RefPtr<RTCPeerConnection> protectedThis(this);
-    m_completeSetLocalDescription = [targetState, resolveCallback, protectedThis]() mutable {
+    callOnMainThread([targetState, resolveCallback, protectedThis]() mutable {
         protectedThis->m_signalingState = targetState;
         resolveCallback();
-    };
+    });
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::remoteDescription() const
