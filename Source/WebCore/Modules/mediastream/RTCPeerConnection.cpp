@@ -244,7 +244,7 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswe
     // TODO
 }
 
-void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback, ExceptionCode& ec)
+void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingStateClosed) {
         ec = INVALID_STATE_ERR;
@@ -252,14 +252,14 @@ void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, 
     }
 
     DescriptionType descriptionType = parseDescriptionType(description->type());
-    if (descriptionType == DescriptionTypeInvalid) {
-        // FIXME: rejectCallback
-        return;
-    }
 
     SignalingState targetState = targetSignalingState(SetterTypeLocal, descriptionType);
     if (targetState == SignalingStateInvalid) {
-        // FIXME: rejectCallback
+        callOnMainThread([rejectCallback] {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError");
+            rejectCallback(error.get());
+        });
         return;
     }
 
@@ -292,14 +292,30 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
     return RTCSessionDescription::create(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get()), m_localConfigurationType);
 }
 
-void RTCPeerConnection::setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback, ExceptionCode& ec)
+void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingStateClosed) {
         ec = INVALID_STATE_ERR;
         return;
     }
 
-    // TODO
+    DescriptionType descriptionType = parseDescriptionType(description->type());
+
+    SignalingState targetState = targetSignalingState(SetterTypeRemote, descriptionType);
+    if (targetState == SignalingStateInvalid) {
+        callOnMainThread([rejectCallback] {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError");
+            rejectCallback(error.get());
+        });
+        return;
+    }
+
+    RefPtr<RTCPeerConnection> protectedThis(this);
+    m_completeSetLocalDescription = [targetState, resolveCallback, protectedThis]() mutable {
+        protectedThis->m_signalingState = targetState;
+        resolveCallback();
+    };
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::remoteDescription() const
@@ -513,10 +529,11 @@ RTCPeerConnection::DescriptionType RTCPeerConnection::parseDescriptionType(const
 {
     if (typeName == "offer")
         return DescriptionTypeOffer;
-    if (typeName == "answer")
-        return DescriptionTypeAnswer;
+    if (typeName == "pranswer")
+        return DescriptionTypePranswer;
 
-    return DescriptionTypeInvalid;
+    ASSERT(typeName == "answer");
+    return DescriptionTypeAnswer;
 }
 
 const char* RTCPeerConnection::activeDOMObjectName() const

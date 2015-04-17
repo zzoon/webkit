@@ -119,8 +119,8 @@ private:
 
     enum DescriptionType {
         DescriptionTypeOffer = 1,
-        DescriptionTypeAnswer = 2,
-        DescriptionTypeInvalid = 3
+        DescriptionTypePranswer = 2,
+        DescriptionTypeAnswer = 3
     };
 
     enum SignalingState {
