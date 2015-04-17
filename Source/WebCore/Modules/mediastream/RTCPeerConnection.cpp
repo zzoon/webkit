@@ -168,6 +168,45 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
     // FIXME: Mark connection as needing negotiation.
 }
 
+static void updateMediaDescriptionsWithTracks(const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions, Vector<MediaStreamTrack*>& tracks)
+{
+    // Remove any track elements from tracks that are already represented by a media description
+    // and mark media descriptions that don't have a track (anymore) as "available".
+    for (auto& mdesc : mediaDescriptions) {
+        const String& mdescTrackId = mdesc->mediaStreamTrackId();
+        bool foundTrack = tracks.removeFirstMatching([mdescTrackId](const MediaStreamTrack* track) -> bool {
+            return track->id() == mdescTrackId;
+        });
+        if (!foundTrack) {
+            mdesc->setMediaStreamId(emptyString());
+            mdesc->setMediaStreamTrackId(emptyString());
+        }
+    }
+
+    // Remove any track elements from tracks that can be matched (by type) to an available media
+    // description. Media descriptions that don't get a local (sending) track is marked receive only.
+    for (auto& mdesc : mediaDescriptions) {
+        if (mdesc->mediaStreamTrackId() != emptyString())
+            continue;
+
+        MediaStreamTrack* track = nullptr;
+        for (auto t : tracks) {
+            if (t->kind() == mdesc->type()) {
+                track = t;
+                break;
+            }
+        }
+
+        if (track) {
+            mdesc->setMediaStreamId("fix me");
+            mdesc->setMediaStreamTrackId(track->id());
+            mdesc->setMode("sendrecv");
+            tracks.removeFirst(track);
+        } else
+            mdesc->setMode("recvonly");
+    }
+}
+
 void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingStateClosed) {
@@ -191,8 +230,9 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
     for (auto sender : m_senderSet.values())
         localTracks.append(sender->track());
 
-    // FIXME: update existing media descriptions with tracks
+    updateMediaDescriptionsWithTracks(configurationSnapshot->mediaDescriptions(), localTracks);
 
+    // Add media descriptions for remaining tracks.
     for (auto track : localTracks) {
         RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
 
