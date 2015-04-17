@@ -199,7 +199,7 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
         mediaDescription->setMediaStreamId("fix me");
         mediaDescription->setMediaStreamTrackId(track->id());
         mediaDescription->setType(track->kind());
-        mediaDescription->setMode("sendrcv");
+        mediaDescription->setMode("sendrecv");
         // FIXME: payloads
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
