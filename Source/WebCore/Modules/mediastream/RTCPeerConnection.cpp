@@ -169,40 +169,40 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
     // FIXME: Mark connection as needing negotiation.
 }
 
-static void updateMediaDescriptionsWithTracks(const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions, Vector<MediaStreamTrack*>& tracks)
+static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions, Vector<RTCRtpSender*>& senders)
 {
-    // Remove any track elements from tracks that are already represented by a media description
-    // and mark media descriptions that don't have a track (anymore) as "available".
+    // Remove any sender(s) from the senders list that already have their tracks represented by a media
+    // description. Mark media descriptions that don't have a sender/track (anymore) as "available".
     for (auto& mdesc : mediaDescriptions) {
         const String& mdescTrackId = mdesc->mediaStreamTrackId();
-        bool foundTrack = tracks.removeFirstMatching([mdescTrackId](const MediaStreamTrack* track) -> bool {
-            return track->id() == mdescTrackId;
+        bool foundSender = senders.removeFirstMatching([mdescTrackId](const RTCRtpSender* sender) -> bool {
+            return sender->track()->id() == mdescTrackId;
         });
-        if (!foundTrack) {
+        if (!foundSender) {
             mdesc->setMediaStreamId(emptyString());
             mdesc->setMediaStreamTrackId(emptyString());
         }
     }
 
-    // Remove any track elements from tracks that can be matched (by type) to an available media
-    // description. Media descriptions that don't get a local (sending) track is marked receive only.
+    // Remove any sender(s) from the senders list that can be matched (by track type) to an "available"
+    // media description. Mark media descriptions that don't get matched with a sender as receive only.
     for (auto& mdesc : mediaDescriptions) {
         if (mdesc->mediaStreamTrackId() != emptyString())
             continue;
 
-        MediaStreamTrack* track = nullptr;
-        for (auto t : tracks) {
-            if (t->kind() == mdesc->type()) {
-                track = t;
+        RTCRtpSender* sender = nullptr;
+        for (auto s : senders) {
+            if (s->track()->kind() == mdesc->type()) {
+                sender = s;
                 break;
             }
         }
 
-        if (track) {
-            mdesc->setMediaStreamId("fix me");
-            mdesc->setMediaStreamTrackId(track->id());
+        if (sender) {
+            mdesc->setMediaStreamId(sender->mediaStreamId());
+            mdesc->setMediaStreamTrackId(sender->track()->id());
             mdesc->setMode("sendrecv");
-            tracks.removeFirst(track);
+            senders.removeFirst(sender);
         } else
             mdesc->setMode("recvonly");
     }
@@ -227,17 +227,18 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localConfiguration ?
         MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get())) : MediaEndpointConfiguration::create();
 
-    Vector<MediaStreamTrack*> localTracks;
-    for (auto sender : m_senderSet.values())
-        localTracks.append(sender->track());
+    Vector<RTCRtpSender*> senders;
+    for (auto& sender : m_senderSet.values())
+        senders.append(sender.get());
 
-    updateMediaDescriptionsWithTracks(configurationSnapshot->mediaDescriptions(), localTracks);
+    updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
 
-    // Add media descriptions for remaining tracks.
-    for (auto track : localTracks) {
+    // Add media descriptions for remaining senders.
+    for (auto sender : senders) {
         RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
+        MediaStreamTrack* track = sender->track();
 
-        mediaDescription->setMediaStreamId("fix me");
+        mediaDescription->setMediaStreamId(sender->mediaStreamId());
         mediaDescription->setMediaStreamTrackId(track->id());
         mediaDescription->setType(track->kind());
         mediaDescription->setMode("sendrecv");
