@@ -47,6 +47,7 @@
 namespace WebCore {
 
 class MediaEndpointConfiguration;
+class MediaStream;
 class MediaStreamTrack;
 class RTCConfiguration;
 class RTCDataChannel;
@@ -69,7 +70,7 @@ public:
     Vector<RefPtr<RTCRtpSender>> getSenders() const;
     Vector<RefPtr<RTCRtpReceiver>> getReceivers() const;
 
-    RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, ExceptionCode&);
+    RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, const MediaStream* stream, ExceptionCode&);
     void removeTrack(RTCRtpSender*, ExceptionCode&);
 
     void createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback, RejectCallback, ExceptionCode&);

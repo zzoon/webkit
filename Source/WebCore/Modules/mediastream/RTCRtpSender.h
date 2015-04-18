@@ -34,16 +34,21 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "RTCRtpSenderReceiverBase.h"
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class RTCRtpSender : public RTCRtpSenderReceiverBase {
 public:
-    static RefPtr<RTCRtpSender> create(RefPtr<MediaStreamTrack>&&);
+    static RefPtr<RTCRtpSender> create(RefPtr<MediaStreamTrack>&&, const String& mediaStreamId);
     virtual ~RTCRtpSender();
 
+    const String& mediaStreamId() const { return m_mediaStreamId; }
+
 private:
-    RTCRtpSender(RefPtr<MediaStreamTrack>&&);
+    RTCRtpSender(RefPtr<MediaStreamTrack>&&, const String& mediaStreamId);
+
+    String m_mediaStreamId;
 };
 
 } // namespace WebCore

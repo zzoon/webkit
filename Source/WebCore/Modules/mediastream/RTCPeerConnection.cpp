@@ -44,6 +44,7 @@
 #include "MediaEndpointConfiguration.h"
 #include "MediaEndpointConfigurationConversions.h"
 #include "MediaEndpointInit.h"
+#include "MediaStream.h"
 #include "MediaStreamTrack.h"
 #include "PeerMediaDescription.h"
 #include "RTCConfiguration.h"
@@ -136,7 +137,7 @@ Vector<RefPtr<RTCRtpReceiver>> RTCPeerConnection::getReceivers() const
     return receivers;
 }
 
-RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, ExceptionCode& ec)
+RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, const MediaStream* stream, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingStateClosed) {
         ec = INVALID_STATE_ERR;
@@ -149,7 +150,7 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
         return nullptr;
     }
 
-    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track));
+    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track), stream->id());
     m_senderSet.add(track->id(), sender);
 
     return sender;
