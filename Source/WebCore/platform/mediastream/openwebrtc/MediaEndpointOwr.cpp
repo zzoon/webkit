@@ -42,6 +42,7 @@ namespace WebCore {
 
 static void gotCandidate(OwrSession*, OwrCandidate*, MediaEndpointOwr*);
 static void candidateGatheringDone(OwrSession*, MediaEndpointOwr*);
+static void gotDtlsCertificate(OwrSession*, GParamSpec*, MediaEndpointOwr*);
 
 static char* iceCandidateTypes[] = { "host", "srflx", "relay", nullptr };
 
@@ -137,10 +138,16 @@ void MediaEndpointOwr::dispatchGatheringDone(unsigned sessionIndex)
     m_client->doneGatheringCandidates(sessionIndex);
 }
 
+void MediaEndpointOwr::dispatchDtlsFingerprint(unsigned sessionIndex, const String& fingerprint, const String& hashFunction)
+{
+    m_client->gotDtlsFingerprint(sessionIndex, fingerprint, hashFunction);
+}
+
 void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription*)
 {
     g_signal_connect(session, "on-new-candidate", G_CALLBACK(gotCandidate), this);
     g_signal_connect(session, "on-candidate-gathering-done", G_CALLBACK(candidateGatheringDone), this);
+    g_signal_connect(session, "notify::dtls-certificate", G_CALLBACK(gotDtlsCertificate), this);
 }
 
 void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMediaDescription* mediaDescription)
@@ -200,6 +207,20 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
 static void candidateGatheringDone(OwrSession* session, MediaEndpointOwr* mediaEndpoint)
 {
     mediaEndpoint->dispatchGatheringDone(mediaEndpoint->sessionIndex(session));
+}
+
+static void gotDtlsCertificate(OwrSession* session, GParamSpec*, MediaEndpointOwr* mediaEndpoint)
+{
+    String fingerprint;
+    String hashFunction;
+
+    gchar* pem;
+
+    g_object_get(session, "dtls-certificate", &pem, nullptr);
+
+    printf("pem: %s\n", pem);
+
+    mediaEndpoint->dispatchDtlsFingerprint(mediaEndpoint->sessionIndex(session), fingerprint, hashFunction);
 }
 
 } // namespace WebCore
