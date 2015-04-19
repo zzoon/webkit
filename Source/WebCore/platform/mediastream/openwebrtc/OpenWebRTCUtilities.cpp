@@ -44,7 +44,12 @@ namespace WebCore {
 
 void initializeOpenWebRTC()
 {
+    static bool isInitialized = false;
+    if (isInitialized)
+        return;
+
     owr_init_with_main_context(g_main_context_default());
+    isInitialized = true;
 }
 
 }
