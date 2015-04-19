@@ -43,6 +43,8 @@ namespace WebCore {
 static void gotCandidate(OwrSession*, OwrCandidate*, MediaEndpointOwr*);
 static void candidateGatheringDone(OwrSession*, MediaEndpointOwr*);
 static void gotDtlsCertificate(OwrSession*, GParamSpec*, MediaEndpointOwr*);
+static void gotSendSsrc(OwrMediaSession*, GParamSpec*, MediaEndpointOwr*);
+static void gotIncomingSource(OwrMediaSession*, OwrMediaSource*, MediaEndpointOwr*);
 
 static const char* iceCandidateTypes[] = { "host", "srflx", "relay", nullptr };
 
@@ -156,6 +158,9 @@ void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMe
 
     bool useRtpMux = !isInitiator && mediaDescription->rtcpMux();
     g_object_set(mediaSession, "rtcp-mux", useRtpMux, nullptr);
+
+    g_signal_connect(mediaSession, "notify::send-ssrc", G_CALLBACK(gotSendSsrc), this);
+    g_signal_connect(mediaSession, "on-incoming-source", G_CALLBACK(gotIncomingSource), this);
 }
 
 void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs)
@@ -224,6 +229,16 @@ static void gotDtlsCertificate(OwrSession* session, GParamSpec*, MediaEndpointOw
     printf("pem: %s\n", pem);
 
     mediaEndpoint->dispatchDtlsFingerprint(mediaEndpoint->sessionIndex(session), fingerprint, hashFunction);
+}
+
+static void gotSendSsrc(OwrMediaSession* mediaSession, GParamSpec*, MediaEndpointOwr*)
+{
+    printf("-> gotSendSsrc\n");
+}
+
+static void gotIncomingSource(OwrMediaSession*, OwrMediaSource*, MediaEndpointOwr*)
+{
+    printf("-> gotIncomingSource\n");
 }
 
 } // namespace WebCore
