@@ -44,7 +44,7 @@ static void gotCandidate(OwrSession*, OwrCandidate*, MediaEndpointOwr*);
 static void candidateGatheringDone(OwrSession*, MediaEndpointOwr*);
 static void gotDtlsCertificate(OwrSession*, GParamSpec*, MediaEndpointOwr*);
 
-static char* iceCandidateTypes[] = { "host", "srflx", "relay", nullptr };
+static const char* iceCandidateTypes[] = { "host", "srflx", "relay", nullptr };
 
 static std::unique_ptr<MediaEndpoint> createMediaEndpointOwr(MediaEndpointClient* client)
 {
@@ -94,7 +94,7 @@ void MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuratio
     m_numberOfReceivePreparedSessions = m_sessions.size();
 }
 
-void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, bool isInitiator)
+void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration*, bool)
 {
     printf("-> MediaEndpointOwr::prepareToSend\n");
 }
