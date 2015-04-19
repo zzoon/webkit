@@ -56,24 +56,33 @@ public:
 
     virtual void stop() override;
 
-    unsigned mediaSessionIndex(OwrMediaSession*) const;
+    unsigned sessionIndex(OwrSession*) const;
 
-    void dispatchNewIceCandidate(unsigned mediaSessionIndex, RefPtr<IceCandidate>&&);
-    void dispatchGatheringDone(unsigned mediaSessionIndex);
+    void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&);
+    void dispatchGatheringDone(unsigned sessionIndex);
 
 private:
-    void prepareMediaSession(unsigned mdescIndex, OwrMediaSession*, PeerMediaDescription*);
-    void ensureTransportAgentAndMediaSessions(bool isInitiator, const Vector<String>& newMediaSessionDtlsRoles);
+    enum SessionType { SessionTypeMedia };
+
+    struct SessionConfig {
+        SessionType type;
+        bool isDtlsClient;
+    };
+
+    void prepareSession(OwrSession*, PeerMediaDescription*);
+    void prepareMediaSession(OwrMediaSession*, PeerMediaDescription*);
+
+    void ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs);
 
     RefPtr<MediaEndpointInit> m_configuration;
 
     OwrTransportAgent* m_transportAgent;
-    Vector<OwrMediaSession*> m_mediaSessions;
+    Vector<OwrSession*> m_sessions;
 
     MediaEndpointClient* m_client;
 
-    unsigned m_numberOfReceivePreparedMediaSessions;
-    unsigned m_numberOfSendPreparedMediaSessions;
+    unsigned m_numberOfReceivePreparedSessions;
+    unsigned m_numberOfSendPreparedSessions;
 };
 
 } // namespace WebCore

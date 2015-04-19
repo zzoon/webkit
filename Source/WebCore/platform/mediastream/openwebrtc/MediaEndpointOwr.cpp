@@ -40,8 +40,8 @@
 
 namespace WebCore {
 
-static void gotCandidate(OwrMediaSession*, OwrCandidate*, MediaEndpointOwr*);
-static void candidateGatheringDone(OwrMediaSession*, MediaEndpointOwr*);
+static void gotCandidate(OwrSession*, OwrCandidate*, MediaEndpointOwr*);
+static void candidateGatheringDone(OwrSession*, MediaEndpointOwr*);
 
 static char* iceCandidateTypes[] = { "host", "srflx", "relay", nullptr };
 
@@ -55,8 +55,8 @@ CreateMediaEndpoint MediaEndpoint::create = createMediaEndpointOwr;
 MediaEndpointOwr::MediaEndpointOwr(MediaEndpointClient* client)
     : m_transportAgent(nullptr)
     , m_client(client)
-    , m_numberOfReceivePreparedMediaSessions(0)
-    , m_numberOfSendPreparedMediaSessions(0)
+    , m_numberOfReceivePreparedSessions(0)
+    , m_numberOfSendPreparedSessions(0)
 {
     initializeOpenWebRTC();
 }
@@ -74,17 +74,23 @@ void MediaEndpointOwr::setConfiguration(RefPtr<MediaEndpointInit>&& configuratio
 
 void MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuration, bool isInitiator)
 {
-    Vector<String> dtlsRoles;
-    for (unsigned i = m_mediaSessions.size(); i < configuration->mediaDescriptions().size(); ++i)
-        dtlsRoles.append(configuration->mediaDescriptions()[i]->dtlsSetup());
+    Vector<SessionConfig> sessionConfigs;
+    for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {
+        SessionConfig config;
+        config.type = SessionTypeMedia;
+        config.isDtlsClient = configuration->mediaDescriptions()[i]->dtlsSetup() == "active";
+        sessionConfigs.append(WTF::move(config));
+    }
 
-    ensureTransportAgentAndMediaSessions(isInitiator, dtlsRoles);
+    ensureTransportAgentAndSessions(isInitiator, sessionConfigs);
 
-    // prepare the new media sessions
-    for (unsigned i = m_numberOfReceivePreparedMediaSessions; i < m_mediaSessions.size(); ++i)
-        prepareMediaSession(i, m_mediaSessions[i], configuration->mediaDescriptions()[i].get());
+    // Prepare the new sessions.
+    for (unsigned i = m_numberOfReceivePreparedSessions; i < m_sessions.size(); ++i) {
+        prepareMediaSession(OWR_MEDIA_SESSION(m_sessions[i]), configuration->mediaDescriptions()[i].get());
+        owr_transport_agent_add_session(m_transportAgent, m_sessions[i]);
+    }
 
-    m_numberOfReceivePreparedMediaSessions = m_mediaSessions.size();
+    m_numberOfReceivePreparedSessions = m_sessions.size();
 }
 
 void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, bool isInitiator)
@@ -114,32 +120,35 @@ void MediaEndpointOwr::stop()
     printf("MediaEndpointOwr::stop\n");
 }
 
-unsigned MediaEndpointOwr::mediaSessionIndex(OwrMediaSession* mediaSession) const
+unsigned MediaEndpointOwr::sessionIndex(OwrSession* session) const
 {
-    unsigned index = m_mediaSessions.find(mediaSession);
+    unsigned index = m_sessions.find(session);
     ASSERT(index != notFound);
     return index;
 }
 
-void MediaEndpointOwr::dispatchNewIceCandidate(unsigned mediaSessionIndex, RefPtr<IceCandidate>&& iceCandidate)
+void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate)
 {
-    m_client->gotIceCandidate(mediaSessionIndex, WTF::move(iceCandidate));
+    m_client->gotIceCandidate(sessionIndex, WTF::move(iceCandidate));
 }
 
-void MediaEndpointOwr::dispatchGatheringDone(unsigned mediaSessionIndex)
+void MediaEndpointOwr::dispatchGatheringDone(unsigned sessionIndex)
 {
-    m_client->doneGatheringCandidates(mediaSessionIndex);
+    m_client->doneGatheringCandidates(sessionIndex);
 }
 
-void MediaEndpointOwr::prepareMediaSession(unsigned mdescIndex, OwrMediaSession* mediaSession, PeerMediaDescription*)
+void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription*)
 {
-    g_signal_connect(mediaSession, "on-new-candidate", G_CALLBACK(gotCandidate), this);
-    g_signal_connect(mediaSession, "on-candidate-gathering-done", G_CALLBACK(candidateGatheringDone), this);
-
-    owr_transport_agent_add_session(m_transportAgent, OWR_SESSION(mediaSession));
+    g_signal_connect(session, "on-new-candidate", G_CALLBACK(gotCandidate), this);
+    g_signal_connect(session, "on-candidate-gathering-done", G_CALLBACK(candidateGatheringDone), this);
 }
 
-void MediaEndpointOwr::ensureTransportAgentAndMediaSessions(bool isInitiator, const Vector<String>& newMediaSessionDtlsRoles)
+void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMediaDescription* mediaDescription)
+{
+    prepareSession(OWR_SESSION(mediaSession), mediaDescription);
+}
+
+void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs)
 {
     if (!m_transportAgent) {
         m_transportAgent = owr_transport_agent_new(false);
@@ -153,11 +162,11 @@ void MediaEndpointOwr::ensureTransportAgentAndMediaSessions(bool isInitiator, co
 
     g_object_set(m_transportAgent, "ice-controlling-mode", isInitiator, nullptr);
 
-    for (auto role : newMediaSessionDtlsRoles)
-        m_mediaSessions.append(owr_media_session_new(role == "active"));
+    for (auto& config : sessionConfigs)
+        m_sessions.append(OWR_SESSION(owr_media_session_new(config.isDtlsClient)));
 }
 
-static void gotCandidate(OwrMediaSession* mediaSession, OwrCandidate* candidate, MediaEndpointOwr* mediaEndpoint)
+static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndpointOwr* mediaEndpoint)
 {
     OwrCandidateType candidateType;
     OwrComponentType componentType;
@@ -185,12 +194,12 @@ static void gotCandidate(OwrMediaSession* mediaSession, OwrCandidate* candidate,
     iceCandidate->setTransport(transportType == OWR_TRANSPORT_TYPE_UDP ? "UDP" : "TCP");
     // FIXME: set the rest
 
-    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->mediaSessionIndex(mediaSession), WTF::move(iceCandidate));
+    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionIndex(session), WTF::move(iceCandidate));
 }
 
-static void candidateGatheringDone(OwrMediaSession* mediaSession, MediaEndpointOwr* mediaEndpoint)
+static void candidateGatheringDone(OwrSession* session, MediaEndpointOwr* mediaEndpoint)
 {
-    mediaEndpoint->dispatchGatheringDone(mediaEndpoint->mediaSessionIndex(mediaSession));
+    mediaEndpoint->dispatchGatheringDone(mediaEndpoint->sessionIndex(session));
 }
 
 } // namespace WebCore
