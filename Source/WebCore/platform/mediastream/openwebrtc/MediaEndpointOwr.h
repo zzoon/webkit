@@ -71,7 +71,7 @@ private:
     };
 
     void prepareSession(OwrSession*, PeerMediaDescription*);
-    void prepareMediaSession(OwrMediaSession*, PeerMediaDescription*);
+    void prepareMediaSession(OwrMediaSession*, PeerMediaDescription*, bool isInitiator);
 
     void ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs);
 

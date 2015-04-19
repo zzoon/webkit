@@ -87,7 +87,7 @@ void MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuratio
 
     // Prepare the new sessions.
     for (unsigned i = m_numberOfReceivePreparedSessions; i < m_sessions.size(); ++i) {
-        prepareMediaSession(OWR_MEDIA_SESSION(m_sessions[i]), configuration->mediaDescriptions()[i].get());
+        prepareMediaSession(OWR_MEDIA_SESSION(m_sessions[i]), configuration->mediaDescriptions()[i].get(), isInitiator);
         owr_transport_agent_add_session(m_transportAgent, m_sessions[i]);
     }
 
@@ -150,9 +150,12 @@ void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription*
     g_signal_connect(session, "notify::dtls-certificate", G_CALLBACK(gotDtlsCertificate), this);
 }
 
-void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMediaDescription* mediaDescription)
+void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMediaDescription* mediaDescription, bool isInitiator)
 {
     prepareSession(OWR_SESSION(mediaSession), mediaDescription);
+
+    bool useRtpMux = !isInitiator && mediaDescription->rtcpMux();
+    g_object_set(mediaSession, "rtcp-mux", useRtpMux, nullptr);
 }
 
 void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs)
