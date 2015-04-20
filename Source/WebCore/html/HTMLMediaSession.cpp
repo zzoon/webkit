@@ -76,7 +76,6 @@ HTMLMediaSession::HTMLMediaSession(MediaSessionClient& client)
     , m_restrictions(NoRestrictions)
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     , m_targetAvailabilityChangedTimer(*this, &HTMLMediaSession::targetAvailabilityChangedTimerFired)
-    , m_playbackTarget(std::make_unique<MediaPlaybackTarget>())
 #endif
 {
 }
@@ -286,11 +285,11 @@ void HTMLMediaSession::setHasPlaybackTargetAvailabilityListeners(const HTMLMedia
 #endif
 }
 
-void HTMLMediaSession::didChoosePlaybackTarget(const MediaPlaybackTarget& device)
+void HTMLMediaSession::didChoosePlaybackTarget(Ref<MediaPlaybackTarget>&& device)
 {
-    m_playbackTarget->setDevicePickerContext(device.devicePickerContext());
-    client().setWirelessPlaybackTarget(*m_playbackTarget.get());
-    if (device.hasActiveRoute() && MediaSessionManager::sharedManager().currentSession() == this)
+    m_playbackTarget = WTF::move(device);
+    client().setWirelessPlaybackTarget(*m_playbackTarget.copyRef());
+    if (m_playbackTarget->hasActiveRoute() && MediaSessionManager::sharedManager().currentSession() == this)
         startPlayingToPlaybackTarget();
     else
         stopPlayingToPlaybackTarget();
@@ -317,6 +316,38 @@ bool HTMLMediaSession::requiresPlaybackTargetRouteMonitoring() const
 {
     return m_hasPlaybackTargetAvailabilityListeners;
 }
+
+bool HTMLMediaSession::canPlayToWirelessPlaybackTarget() const
+{
+    if (!m_playbackTarget || !m_playbackTarget->hasActiveRoute())
+        return false;
+
+    return client().canPlayToWirelessPlaybackTarget();
+}
+
+bool HTMLMediaSession::isPlayingToWirelessPlaybackTarget() const
+{
+    if (!m_playbackTarget || !m_playbackTarget->hasActiveRoute())
+        return false;
+
+    return client().isPlayingToWirelessPlaybackTarget();
+}
+
+void HTMLMediaSession::startPlayingToPlaybackTarget()
+{
+    if (!m_playbackTarget || !m_playbackTarget->hasActiveRoute())
+        return;
+
+    client().startPlayingToPlaybackTarget();
+}
+
+void HTMLMediaSession::stopPlayingToPlaybackTarget()
+{
+    if (!m_playbackTarget || !m_playbackTarget->hasActiveRoute())
+        return;
+
+    client().stopPlayingToPlaybackTarget();
+}    
 #endif
 
 MediaPlayer::Preload HTMLMediaSession::effectivePreloadForElement(const HTMLMediaElement& element) const

@@ -76,6 +76,7 @@ fast/events/crash-on-mutate-during-drop.html
 fast/events/drag-and-drop-dataTransfer-types-nocrash.html
 fast/events/drag-and-drop-fire-drag-dragover.html
 fast/events/drag-and-drop.html
+fast/events/drag-and-drop-link.html
 fast/events/drag-in-frames.html
 fast/events/drag-parent-node.html
 fast/events/dropzone-001.html
@@ -162,7 +163,7 @@ fast/events/drag-and-drop-subframe-dataTransfer.html
 fast/events/drag-selects-image.html
 fast/events/remove-target-with-shadow-in-drag.html
 
-webkit.org/b/81833 fast/events/drag-link.html [ Failure ]
+webkit.org/b/81833 fast/events/drag-and-drop-link-into-focused-contenteditable.html [ Failure ]
 
 # Missing functionality of textInputController
 # https://bugs.webkit.org/show_bug.cgi?id=89401
@@ -266,12 +267,14 @@ editing/spelling/grammar-markers-hidpi.html [ Skip ]
 editing/spelling/inline-spelling-markers.html [ Skip ]
 editing/spelling/inline-spelling-markers-hidpi.html [ Skip ]
 editing/spelling/spellcheck-async-mutation.html [ Skip ]
-editing/spelling/spellcheck-async-remove-frame.html [ Skip ]
 editing/spelling/spellcheck-async.html [ Skip ]
 editing/spelling/spellcheck-queue.html [ Skip ]
-editing/spelling/spellcheck-sequencenum.html [ Skip ]
 editing/spelling/spelling-insert-html.html [ Skip ]
-editing/spelling/spelling-marker-description.html [ Skip ]
+
+# These should work on 10.10.3 and later, but our bots need to get the 10.10.3 SDK first. 
+fast/events/mouse-force-changed.html [ Skip ]
+fast/events/mouse-force-down.html [ Skip ]
+fast/events/mouse-force-up.html [ Skip ]
 
 ### END OF (2) Classified failures without bug reports (yet)
 ########################################
@@ -297,6 +300,14 @@ webkit.org/b/132766 fast/hidpi/filters-hue-rotate.html [ ImageOnlyFailure ]
 webkit.org/b/132766 fast/hidpi/filters-invert.html [ ImageOnlyFailure ]
 webkit.org/b/132766 fast/hidpi/filters-multiple.html [ ImageOnlyFailure ]
 webkit.org/b/132766 fast/hidpi/filters-reference.html [ ImageOnlyFailure ]
+
+# Plug-in snapshotting tests do not make much sense:
+# - snapshotting is only supported for Flash, but we can't use Flash because it isn't installed everywhere;
+# - so most of the tests use QuickTime, which doesn't support snapshotting, and is 32-bit only, thus failing to load in engineering builds.
+plugins/snapshotting [ Pass Failure ]
+# These two tests use Flash, so they trigger a release assertion.
+plugins/snapshotting/autoplay-similar-to-dominant-after-delay.html [ Skip ]
+plugins/snapshotting/print-snapshotted-plugin.html [ Skip ]
 
 webkit.org/b/133227 plugins/snapshotting/set-plugin-size-to-tiny.html [ Failure ]
 webkit.org/b/133227 plugins/snapshotting/quicktime-plugin-snapshotted.html [ Pass Failure ]

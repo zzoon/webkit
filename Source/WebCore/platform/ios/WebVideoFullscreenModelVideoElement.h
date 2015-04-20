@@ -45,10 +45,13 @@ class WebVideoFullscreenInterface;
 
 class WebVideoFullscreenModelVideoElement : public WebVideoFullscreenModel, public EventListener {
 public:
-    WEBCORE_EXPORT WebVideoFullscreenModelVideoElement();
+    static RefPtr<WebVideoFullscreenModelVideoElement> create() {
+        return adoptRef(*new WebVideoFullscreenModelVideoElement());
+    }
     WEBCORE_EXPORT virtual ~WebVideoFullscreenModelVideoElement();
-    void setWebVideoFullscreenInterface(WebVideoFullscreenInterface* interface) {m_videoFullscreenInterface = interface;}
+    WEBCORE_EXPORT void setWebVideoFullscreenInterface(WebVideoFullscreenInterface*);
     WEBCORE_EXPORT void setVideoElement(HTMLVideoElement*);
+    WEBCORE_EXPORT HTMLVideoElement* videoElement() const { return m_videoElement.get(); }
     WEBCORE_EXPORT void setVideoFullscreenLayer(PlatformLayer*);
     
     WEBCORE_EXPORT virtual void handleEvent(WebCore::ScriptExecutionContext*, WebCore::Event*) override;
@@ -68,10 +71,15 @@ public:
     WEBCORE_EXPORT virtual void endScanning() override;
     WEBCORE_EXPORT virtual void requestExitFullscreen() override;
     WEBCORE_EXPORT virtual void setVideoLayerFrame(FloatRect) override;
-    WEBCORE_EXPORT virtual void setVideoLayerGravity(WebVideoFullscreenModel::VideoGravity) override;
+    WEBCORE_EXPORT virtual FloatRect videoLayerFrame() const override;
+    WEBCORE_EXPORT virtual void setVideoLayerGravity(VideoGravity) override;
+    WEBCORE_EXPORT virtual VideoGravity videoLayerGravity() const override;
     WEBCORE_EXPORT virtual void selectAudioMediaOption(uint64_t index) override;
     WEBCORE_EXPORT virtual void selectLegibleMediaOption(uint64_t index) override;
     WEBCORE_EXPORT virtual void fullscreenModeChanged(HTMLMediaElement::VideoFullscreenMode) override;
+
+protected:
+    WEBCORE_EXPORT WebVideoFullscreenModelVideoElement();
 
 private:
     static const Vector<WTF::AtomicString>& observedEventNames();
@@ -79,8 +87,8 @@ private:
     
     RefPtr<HTMLVideoElement> m_videoElement;
     RetainPtr<PlatformLayer> m_videoFullscreenLayer;
-    bool m_isListening;
-    WebVideoFullscreenInterface* m_videoFullscreenInterface;
+    bool m_isListening { false };
+    WebVideoFullscreenInterface* m_videoFullscreenInterface { nullptr };
     FloatRect m_videoFrame;
     Vector<RefPtr<TextTrack>> m_legibleTracksForMenu;
     Vector<RefPtr<AudioTrack>> m_audioTracksForMenu;

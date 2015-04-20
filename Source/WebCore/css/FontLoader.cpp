@@ -161,7 +161,7 @@ const char* FontLoader::activeDOMObjectName() const
     return "FontLoader";
 }
 
-bool FontLoader::canSuspend() const
+bool FontLoader::canSuspendForPageCache() const
 {
     return !m_numLoadingFromCSS && !m_numLoadingFromJS;
 }
@@ -295,7 +295,7 @@ bool FontLoader::resolveFontStyle(const String& fontString, FontCascade& font)
 {
     // Interpret fontString in the same way as the 'font' attribute of CanvasRenderingContext2D.
     RefPtr<MutableStyleProperties> parsedStyle = MutableStyleProperties::create();
-    CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, fontString, true, CSSStrictMode, 0);
+    CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, fontString, true, CSSStrictMode, nullptr);
     if (parsedStyle->isEmpty())
         return false;
     

@@ -165,7 +165,7 @@ private:
     // ActiveDOMObject
     void stop() override;
     const char* activeDOMObjectName() const override;
-    bool canSuspend() const override;
+    bool canSuspendForPageCache() const override;
 
     void changeSignalingState(SignalingState);
     void changeIceGatheringState(IceGatheringState);

@@ -30,6 +30,7 @@
 
 #include "ContentFilter.h"
 #include "ContentFilterUnblockHandler.h"
+#include "Logging.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
 #include "SharedBuffer.h"
@@ -57,7 +58,9 @@ static inline MockContentFilterSettings& settings()
 
 bool MockContentFilter::enabled()
 {
-    return settings().enabled();
+    bool enabled = settings().enabled();
+    LOG(ContentFiltering, "MockContentFilter is %s.\n", enabled ? "enabled" : "not enabled");
+    return enabled;
 }
 
 std::unique_ptr<MockContentFilter> MockContentFilter::create()
@@ -65,12 +68,27 @@ std::unique_ptr<MockContentFilter> MockContentFilter::create()
     return std::make_unique<MockContentFilter>();
 }
 
-void MockContentFilter::willSendRequest(ResourceRequest&, const ResourceResponse& redirectResponse)
+void MockContentFilter::willSendRequest(ResourceRequest& request, const ResourceResponse& redirectResponse)
 {
     if (redirectResponse.isNull())
         maybeDetermineStatus(DecisionPoint::AfterWillSendRequest);
     else
         maybeDetermineStatus(DecisionPoint::AfterRedirect);
+
+    if (m_status == Status::NeedsMoreData)
+        return;
+
+    String modifiedRequestURLString { settings().modifiedRequestURL() };
+    if (modifiedRequestURLString.isEmpty())
+        return;
+
+    URL modifiedRequestURL { request.url(), modifiedRequestURLString };
+    if (!modifiedRequestURL.isValid()) {
+        LOG(ContentFiltering, "MockContentFilter failed to convert %s to a WebCore::URL.\n", modifiedRequestURL.string().ascii().data());
+        return;
+    }
+
+    request.setURL(modifiedRequestURL);
 }
 
 void MockContentFilter::responseReceived(const ResourceResponse&)
@@ -114,6 +132,7 @@ ContentFilterUnblockHandler MockContentFilter::unblockHandler() const
             bool shouldAllow { settings().unblockRequestDecision() == Decision::Allow };
             if (shouldAllow)
                 settings().setDecision(Decision::Allow);
+            LOG(ContentFiltering, "MockContentFilter %s the unblock request.\n", shouldAllow ? "allowed" : "did not allow");
             decisionHandler(shouldAllow);
         }
     };
@@ -128,6 +147,8 @@ void MockContentFilter::maybeDetermineStatus(DecisionPoint decisionPoint)
 {
     if (m_status != Status::NeedsMoreData || decisionPoint != settings().decisionPoint())
         return;
+
+    LOG(ContentFiltering, "MockContentFilter stopped buffering with status %u at decision point %u.\n", m_status, decisionPoint);
 
     m_status = settings().decision() == Decision::Allow ? Status::Allowed : Status::Blocked;
     if (m_status != Status::Blocked)

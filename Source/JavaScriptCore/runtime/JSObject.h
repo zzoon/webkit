@@ -1031,6 +1031,7 @@ class JSFinalObject : public JSObject {
 
 public:
     typedef JSObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags;
 
     static size_t allocationSize(size_t inlineCapacity)
     {
@@ -1077,8 +1078,6 @@ private:
         : JSObject(vm, structure, butterfly)
     {
     }
-
-    static const unsigned StructureFlags = JSObject::StructureFlags;
 };
 
 inline JSFinalObject* JSFinalObject::create(
@@ -1246,9 +1245,8 @@ ALWAYS_INLINE bool JSObject::getOwnPropertySlot(JSObject* object, ExecState* exe
     Structure& structure = *object->structure(vm);
     if (object->inlineGetOwnPropertySlot(vm, structure, propertyName, slot))
         return true;
-    unsigned index = propertyName.asIndex();
-    if (index != PropertyName::NotAnIndex)
-        return getOwnPropertySlotByIndex(object, exec, index, slot);
+    if (Optional<uint32_t> index = parseIndex(propertyName))
+        return getOwnPropertySlotByIndex(object, exec, index.value(), slot);
     return false;
 }
 
@@ -1276,9 +1274,8 @@ ALWAYS_INLINE bool JSObject::getPropertySlot(ExecState* exec, PropertyName prope
         object = asObject(prototype);
     }
 
-    unsigned index = propertyName.asIndex();
-    if (index != PropertyName::NotAnIndex)
-        return getPropertySlot(exec, index, slot);
+    if (Optional<uint32_t> index = parseIndex(propertyName))
+        return getPropertySlot(exec, index.value(), slot);
     return false;
 }
 
@@ -1322,7 +1319,7 @@ inline bool JSObject::putDirectInternal(VM& vm, PropertyName propertyName, JSVal
     ASSERT(value);
     ASSERT(value.isGetterSetter() == !!(attributes & Accessor));
     ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(this));
-    ASSERT(propertyName.asIndex() == PropertyName::NotAnIndex);
+    ASSERT(!parseIndex(propertyName));
 
     Structure* structure = this->structure(vm);
     if (structure->isDictionary()) {

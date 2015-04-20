@@ -373,15 +373,16 @@ sub GenerateGetOwnPropertySlotBody
     }
 
     if ($indexedGetterFunction) {
-        push(@getOwnPropertySlotImpl, "    unsigned index = propertyName.asIndex();\n");
+        push(@getOwnPropertySlotImpl, "    Optional<uint32_t> optionalIndex = parseIndex(propertyName);\n");
 
         # If the item function returns a string then we let the TreatReturnedNullStringAs handle the cases
         # where the index is out of range.
         if ($indexedGetterFunction->signature->type eq "DOMString") {
-            push(@getOwnPropertySlotImpl, "    if (index != PropertyName::NotAnIndex) {\n");
+            push(@getOwnPropertySlotImpl, "    if (optionalIndex) {\n");
         } else {
-            push(@getOwnPropertySlotImpl, "    if (index != PropertyName::NotAnIndex && index < thisObject->impl().length()) {\n");
+            push(@getOwnPropertySlotImpl, "    if (optionalIndex && optionalIndex.value() < thisObject->impl().length()) {\n");
         }
+        push(@getOwnPropertySlotImpl, "        unsigned index = optionalIndex.value();\n");
         # Assume that if there's a setter, the index will be writable
         if ($interface->extendedAttributes->{"CustomIndexedSetter"}) {
             push(@getOwnPropertySlotImpl, "        unsigned attributes = ${namespaceMaybe}DontDelete;\n");
@@ -1102,6 +1103,16 @@ sub GenerateHeader
         push(@headerContent, "    }\n");
     }
 
+    # structure flags
+    if (%structureFlags) {
+        push(@headerContent, "public:\n");
+        push(@headerContent, "    static const unsigned StructureFlags = ");
+        foreach my $structureFlag (sort (keys %structureFlags)) {
+            push(@headerContent, $structureFlag . " | ");
+        }
+        push(@headerContent, "Base::StructureFlags;\n");
+    }
+
     push(@headerContent, "protected:\n");
 
     # Constructor
@@ -1116,15 +1127,6 @@ sub GenerateHeader
         push(@headerContent, "        Base::finishCreation(vm);\n");
         push(@headerContent, "        ASSERT(inherits(info()));\n");
         push(@headerContent, "    }\n\n");
-    }
-
-    # structure flags
-    if (%structureFlags) {
-        push(@headerContent, "    static const unsigned StructureFlags = ");
-        foreach my $structureFlag (sort (keys %structureFlags)) {
-            push(@headerContent, $structureFlag . " | ");
-        }
-        push(@headerContent, "Base::StructureFlags;\n");
     }
 
     # Index setter
@@ -2463,9 +2465,8 @@ sub GenerateImplementation
             push(@implContent, "    auto* thisObject = jsCast<${className}*>(cell);\n");
             push(@implContent, "    ASSERT_GC_OBJECT_INHERITS(thisObject, info());\n");
             if ($interface->extendedAttributes->{"CustomIndexedSetter"}) {
-                push(@implContent, "    unsigned index = propertyName.asIndex();\n");
-                push(@implContent, "    if (index != PropertyName::NotAnIndex) {\n");
-                push(@implContent, "        thisObject->indexSetter(exec, index, value);\n");
+                push(@implContent, "    if (Optional<uint32_t> index = parseIndex(propertyName)) {\n");
+                push(@implContent, "        thisObject->indexSetter(exec, index.value(), value);\n");
                 push(@implContent, "        return;\n");
                 push(@implContent, "    }\n");
             }
@@ -4303,7 +4304,7 @@ sub GeneratePrototypeDeclaration
 
     # structure flags
     if (%structureFlags) {
-        push(@$outputArray, "protected:\n");
+        push(@$outputArray, "public:\n");
         push(@$outputArray, "    static const unsigned StructureFlags = ");
         foreach my $structureFlag (sort (keys %structureFlags)) {
             push(@$outputArray, $structureFlag . " | ");

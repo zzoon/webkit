@@ -29,6 +29,7 @@
 #if HAVE(NETWORK_EXTENSION)
 
 #import "ContentFilterUnblockHandler.h"
+#import "Logging.h"
 #import "NEFilterSourceSPI.h"
 #import "ResourceRequest.h"
 #import "ResourceResponse.h"
@@ -43,9 +44,8 @@ SOFT_LINK_CLASS(NetworkExtension, NEFilterSource);
 #if HAVE(MODERN_NE_FILTER_SOURCE)
 static inline NSData *replacementDataFromDecisionInfo(NSDictionary *decisionInfo)
 {
-    id replacementData = decisionInfo[NEFilterSourceOptionsPageData];
-    ASSERT(!replacementData || [replacementData isKindOfClass:[NSData class]]);
-    return replacementData;
+    ASSERT_WITH_SECURITY_IMPLICATION(!decisionInfo || [decisionInfo isKindOfClass:[NSDictionary class]]);
+    return decisionInfo[NEFilterSourceOptionsPageData];
 }
 #endif
 
@@ -53,7 +53,9 @@ namespace WebCore {
 
 bool NetworkExtensionContentFilter::enabled()
 {
-    return [getNEFilterSourceClass() filterRequired];
+    bool enabled = [getNEFilterSourceClass() filterRequired];
+    LOG(ContentFiltering, "NetworkExtensionContentFilter is %s.\n", enabled ? "enabled" : "not enabled");
+    return enabled;
 }
 
 std::unique_ptr<NetworkExtensionContentFilter> NetworkExtensionContentFilter::create()
@@ -87,7 +89,10 @@ void NetworkExtensionContentFilter::willSendRequest(ResourceRequest& request, co
             return;
     }
 
-    [m_neFilterSource willSendRequest:request.nsURLRequest(DoNotUpdateHTTPBody) decisionHandler:[this](NEFilterSourceStatus status, NSDictionary *decisionInfo) {
+    RetainPtr<NSString> modifiedRequestURLString;
+    [m_neFilterSource willSendRequest:request.nsURLRequest(DoNotUpdateHTTPBody) decisionHandler:[this, &modifiedRequestURLString](NEFilterSourceStatus status, NSDictionary *decisionInfo) {
+        modifiedRequestURLString = decisionInfo[NEFilterSourceOptionsRedirectURL];
+        ASSERT(!modifiedRequestURLString || [modifiedRequestURLString isKindOfClass:[NSString class]]);
         handleDecision(status, replacementDataFromDecisionInfo(decisionInfo));
     }];
 
@@ -95,6 +100,17 @@ void NetworkExtensionContentFilter::willSendRequest(ResourceRequest& request, co
     // blocked/not blocked answer from the filter immediately after calling
     // addData(). We should find a way to make this asynchronous.
     dispatch_semaphore_wait(m_semaphore.get(), DISPATCH_TIME_FOREVER);
+
+    if (!modifiedRequestURLString)
+        return;
+
+    URL modifiedRequestURL { URL(), modifiedRequestURLString.get() };
+    if (!modifiedRequestURL.isValid()) {
+        LOG(ContentFiltering, "NetworkExtensionContentFilter failed to convert modified URL string %@ to a WebCore::URL.\n", modifiedRequestURLString.get());
+        return;
+    }
+
+    request.setURL(modifiedRequestURL);
 #else
     UNUSED_PARAM(request);
     UNUSED_PARAM(redirectResponse);
@@ -188,6 +204,7 @@ ContentFilterUnblockHandler NetworkExtensionContentFilter::unblockHandler() cons
     return ContentFilterUnblockHandler {
         ASCIILiteral("nefilter-unblock"), [neFilterSource](DecisionHandlerFunction decisionHandler) {
             [neFilterSource remediateWithDecisionHandler:[decisionHandler](NEFilterSourceStatus status, NSDictionary *) {
+                LOG(ContentFiltering, "NEFilterSource %s the unblock request.\n", status == NEFilterSourceStatusPass ? "allowed" : "did not allow");
                 decisionHandler(status == NEFilterSourceStatusPass);
             }];
         }
@@ -199,9 +216,14 @@ ContentFilterUnblockHandler NetworkExtensionContentFilter::unblockHandler() cons
 
 void NetworkExtensionContentFilter::handleDecision(NEFilterSourceStatus status, NSData *replacementData)
 {
+    ASSERT_WITH_SECURITY_IMPLICATION(!replacementData || [replacementData isKindOfClass:[NSData class]]);
     m_status = status;
     if (status == NEFilterSourceStatusBlock)
         m_replacementData = replacementData;
+#if !LOG_DISABLED
+    if (!needsMoreData())
+        LOG(ContentFiltering, "NetworkExtensionContentFilter stopped buffering with status %zd and replacement data length %zu.\n", status, replacementData.length);
+#endif
     dispatch_semaphore_signal(m_semaphore.get());
 }
 

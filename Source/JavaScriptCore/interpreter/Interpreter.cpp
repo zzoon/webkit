@@ -89,6 +89,47 @@ using namespace std;
 
 namespace JSC {
 
+String StackFrame::friendlySourceURL() const
+{
+    String traceLine;
+    
+    switch (codeType) {
+    case StackFrameEvalCode:
+    case StackFrameFunctionCode:
+    case StackFrameGlobalCode:
+        if (!sourceURL.isEmpty())
+            traceLine = sourceURL.impl();
+        break;
+    case StackFrameNativeCode:
+        traceLine = "[native code]";
+        break;
+    }
+    return traceLine.isNull() ? emptyString() : traceLine;
+}
+
+String StackFrame::friendlyFunctionName(CallFrame* callFrame) const
+{
+    String traceLine;
+    JSObject* stackFrameCallee = callee.get();
+
+    switch (codeType) {
+    case StackFrameEvalCode:
+        traceLine = "eval code";
+        break;
+    case StackFrameNativeCode:
+        if (callee)
+            traceLine = getCalculatedDisplayName(callFrame, stackFrameCallee).impl();
+        break;
+    case StackFrameFunctionCode:
+        traceLine = getCalculatedDisplayName(callFrame, stackFrameCallee).impl();
+        break;
+    case StackFrameGlobalCode:
+        traceLine = "global code";
+        break;
+    }
+    return traceLine.isNull() ? emptyString() : traceLine;
+}
+
 JSValue eval(CallFrame* callFrame)
 {
     if (!callFrame->argumentCount())
@@ -763,7 +804,7 @@ JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, J
                         PropertySlot slot(globalObject);
                         if (!globalObject->getPropertySlot(callFrame, JSONPPath[i].m_pathEntryName, slot)) {
                             if (entry)
-                                return callFrame->vm().throwException(callFrame, createUndefinedVariableError(globalObject->globalExec(), JSONPPath[i].m_pathEntryName));
+                                return callFrame->vm().throwException(callFrame, createUndefinedVariableError(callFrame, JSONPPath[i].m_pathEntryName));
                             goto failedJSONP;
                         }
                         baseObject = slot.getValue(callFrame, JSONPPath[i].m_pathEntryName);

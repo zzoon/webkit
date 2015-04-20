@@ -32,15 +32,15 @@
 #include "ScriptCallStack.h"
 #include "ScriptCallStackFactory.h"
 
-#if USE(CF)
-#include <CoreFoundation/CoreFoundation.h>
-#endif
-
 using namespace JSC;
 
 namespace Inspector {
 
+#if !LOG_DISABLED
+static bool sLogToSystemConsole = true;
+#else
 static bool sLogToSystemConsole = false;
+#endif
 
 bool JSGlobalObjectConsoleClient::logToSystemConsole()
 {
@@ -52,31 +52,14 @@ void JSGlobalObjectConsoleClient::setLogToSystemConsole(bool shouldLog)
     sLogToSystemConsole = shouldLog;
 }
 
-void JSGlobalObjectConsoleClient::initializeLogToSystemConsole()
-{
-#if !LOG_DISABLED
-    sLogToSystemConsole = true;
-#elif USE(CF)
-    Boolean keyExistsAndHasValidFormat = false;
-    Boolean preference = CFPreferencesGetAppBooleanValue(CFSTR("JavaScriptCoreOutputConsoleMessagesToSystemConsole"), kCFPreferencesCurrentApplication, &keyExistsAndHasValidFormat);
-    if (keyExistsAndHasValidFormat)
-        sLogToSystemConsole = preference;
-#endif
-}
-
 JSGlobalObjectConsoleClient::JSGlobalObjectConsoleClient(InspectorConsoleAgent* consoleAgent)
     : ConsoleClient()
     , m_consoleAgent(consoleAgent)
 {
-    static std::once_flag initializeLogging;
-    std::call_once(initializeLogging, []{
-        JSGlobalObjectConsoleClient::initializeLogToSystemConsole();
-    });
 }
 
 void JSGlobalObjectConsoleClient::messageWithTypeAndLevel(MessageType type, MessageLevel level, JSC::ExecState* exec, RefPtr<ScriptArguments>&& arguments)
 {
-
     if (JSGlobalObjectConsoleClient::logToSystemConsole())
         ConsoleClient::printConsoleMessageWithArguments(MessageSource::ConsoleAPI, type, level, exec, arguments.copyRef());
 

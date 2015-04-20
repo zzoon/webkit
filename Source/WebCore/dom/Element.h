@@ -469,11 +469,6 @@ public:
     virtual void dispatchBlurEvent(RefPtr<Element>&& newFocusedElement);
 
     WEBCORE_EXPORT bool dispatchMouseForceWillBegin();
-    WEBCORE_EXPORT void dispatchMouseForceChanged(float force, const PlatformMouseEvent&);
-    WEBCORE_EXPORT void dispatchMouseForceDown(const PlatformMouseEvent&);
-    WEBCORE_EXPORT void dispatchMouseForceUp(const PlatformMouseEvent&);
-    WEBCORE_EXPORT void dispatchMouseForceClick(const PlatformMouseEvent&);
-    WEBCORE_EXPORT void dispatchMouseForceCancelled(const PlatformMouseEvent&);
 
     virtual bool willRecalcStyle(Style::Change);
     virtual void didRecalcStyle(Style::Change);

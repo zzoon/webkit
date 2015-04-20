@@ -1219,24 +1219,14 @@ struct Node {
         m_opInfo = bitwise_cast<uintptr_t>(value);
     }
     
-    bool hasVariableWatchpointSet()
+    bool hasWatchpointSet()
     {
         return op() == NotifyWrite;
     }
     
-    VariableWatchpointSet* variableWatchpointSet()
+    WatchpointSet* watchpointSet()
     {
-        return reinterpret_cast<VariableWatchpointSet*>(m_opInfo);
-    }
-    
-    bool hasTypedArray()
-    {
-        return op() == TypedArrayWatchpoint;
-    }
-    
-    JSArrayBufferView* typedArray()
-    {
-        return reinterpret_cast<JSArrayBufferView*>(m_opInfo);
+        return reinterpret_cast<WatchpointSet*>(m_opInfo);
     }
     
     bool hasStoragePointer()

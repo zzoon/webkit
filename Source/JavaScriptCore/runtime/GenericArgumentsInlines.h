@@ -27,7 +27,6 @@
 #define GenericArgumentsInlines_h
 
 #include "GenericArguments.h"
-#include "JSArgumentsIterator.h"
 #include "JSCInlines.h"
 
 namespace JSC {
@@ -47,25 +46,19 @@ bool GenericArguments<Type>::getOwnPropertySlot(JSObject* object, ExecState* exe
             slot.setValue(thisObject, DontEnum, thisObject->callee().get());
             return true;
         }
-    }
-    
-    unsigned index = ident.asIndex();
-    if (thisObject->canAccessIndexQuickly(index)) {
-        slot.setValue(thisObject, None, thisObject->getIndexQuickly(index));
-        return true;
-    }
-    
-    if (Base::getOwnPropertySlot(thisObject, exec, ident, slot))
-        return true;
-    
-    if (ident == vm.propertyNames->iteratorSymbol) {
-        JSGlobalObject* globalObject = exec->lexicalGlobalObject();
-        thisObject->JSC_NATIVE_FUNCTION(vm.propertyNames->iteratorSymbol, argumentsFuncIterator, DontEnum, 0);
-        if (JSObject::getOwnPropertySlot(thisObject, exec, ident, slot))
+        if (ident == vm.propertyNames->iteratorSymbol) {
+            slot.setValue(thisObject, DontEnum, thisObject->globalObject()->arrayProtoValuesFunction());
             return true;
+        }
     }
     
-    return false;
+    Optional<uint32_t> index = parseIndex(ident);
+    if (index && thisObject->canAccessIndexQuickly(index.value())) {
+        slot.setValue(thisObject, None, thisObject->getIndexQuickly(index.value()));
+        return true;
+    }
+    
+    return Base::getOwnPropertySlot(thisObject, exec, ident, slot);
 }
 
 template<typename Type>
@@ -92,8 +85,10 @@ void GenericArguments<Type>::getOwnPropertyNames(JSObject* object, ExecState* ex
         array.add(Identifier::from(exec, i));
     }
     if (mode.includeDontEnumProperties() && !thisObject->overrodeThings()) {
-        array.add(exec->propertyNames().callee);
         array.add(exec->propertyNames().length);
+        array.add(exec->propertyNames().callee);
+        if (mode.includeSymbolProperties())
+            array.add(exec->propertyNames().iteratorSymbol);
     }
     Base::getOwnPropertyNames(thisObject, exec, array, mode);
 }
@@ -106,16 +101,17 @@ void GenericArguments<Type>::put(JSCell* cell, ExecState* exec, PropertyName ide
     
     if (!thisObject->overrodeThings()
         && (ident == vm.propertyNames->length
-            || ident == vm.propertyNames->callee)) {
+            || ident == vm.propertyNames->callee
+            || ident == vm.propertyNames->iteratorSymbol)) {
         thisObject->overrideThings(vm);
         PutPropertySlot dummy = slot; // This put is not cacheable, so we shadow the slot that was given to us.
         Base::put(thisObject, exec, ident, value, dummy);
         return;
     }
     
-    unsigned index = ident.asIndex();
-    if (thisObject->canAccessIndexQuickly(index)) {
-        thisObject->setIndexQuickly(vm, index, value);
+    Optional<uint32_t> index = parseIndex(ident);
+    if (index && thisObject->canAccessIndexQuickly(index.value())) {
+        thisObject->setIndexQuickly(vm, index.value(), value);
         return;
     }
     
@@ -144,12 +140,13 @@ bool GenericArguments<Type>::deleteProperty(JSCell* cell, ExecState* exec, Prope
     
     if (!thisObject->overrodeThings()
         && (ident == vm.propertyNames->length
-            || ident == vm.propertyNames->callee))
+            || ident == vm.propertyNames->callee
+            || ident == vm.propertyNames->iteratorSymbol))
         thisObject->overrideThings(vm);
     
-    unsigned index = ident.asIndex();
-    if (thisObject->canAccessIndexQuickly(index)) {
-        thisObject->overrideArgument(vm, index);
+    Optional<uint32_t> index = parseIndex(ident);
+    if (index && thisObject->canAccessIndexQuickly(index.value())) {
+        thisObject->overrideArgument(vm, index.value());
         return true;
     }
     
@@ -177,11 +174,13 @@ bool GenericArguments<Type>::defineOwnProperty(JSObject* object, ExecState* exec
     VM& vm = exec->vm();
     
     if (ident == vm.propertyNames->length
-        || ident == vm.propertyNames->callee)
+        || ident == vm.propertyNames->callee
+        || ident == vm.propertyNames->iteratorSymbol)
         thisObject->overrideThingsIfNecessary(vm);
     else {
-        unsigned index = ident.asIndex();
-        if (thisObject->canAccessIndexQuickly(index)) {
+        Optional<uint32_t> optionalIndex = parseIndex(ident);
+        if (optionalIndex && thisObject->canAccessIndexQuickly(optionalIndex.value())) {
+            uint32_t index = optionalIndex.value();
             if (!descriptor.isAccessorDescriptor()) {
                 // If the property is not deleted and we are using a non-accessor descriptor, then
                 // make sure that the aliased argument sees the value.

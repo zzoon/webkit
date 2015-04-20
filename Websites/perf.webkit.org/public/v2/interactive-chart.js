@@ -524,9 +524,6 @@ App.InteractiveChartComponent = Ember.Component.extend({
             var yDiff = mY - point.y;
             return xDiff * xDiff + yDiff * yDiff / 16; // Favor horizontal affinity.
         };
-        distanceHeuristics = function (m) {
-            return Math.abs(xScale(m.time) - point.x);
-        }
 
         var newItemIndex;
         if (point && !this._currentSelection()) {
@@ -656,6 +653,7 @@ App.InteractiveChartComponent = Ember.Component.extend({
                 linkRoute: linkRoute,
                 linkId: range.get('id'),
                 label: range.get('label'),
+                status: range.get('status'),
             });
         }));
 

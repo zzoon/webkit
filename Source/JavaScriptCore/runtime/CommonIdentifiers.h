@@ -21,13 +21,13 @@
 #ifndef CommonIdentifiers_h
 #define CommonIdentifiers_h
 
+#include "BytecodeIntrinsicRegistry.h"
 #include "Identifier.h"
 #include <wtf/Noncopyable.h>
 
 // MarkedArgumentBuffer of property names, passed to a macro so we can do set them up various
 // ways without repeating the list.
 #define JSC_COMMON_IDENTIFIERS_EACH_PROPERTY_NAME(macro) \
-    macro(ArgumentsIterator) \
     macro(Array) \
     macro(ArrayBuffer) \
     macro(ArrayIterator) \
@@ -58,6 +58,7 @@
     macro(URIError) \
     macro(UTC) \
     macro(WeakMap)\
+    macro(WeakSet)\
     macro(__defineGetter__) \
     macro(__defineSetter__) \
     macro(__lookupGetter__) \
@@ -82,6 +83,7 @@
     macro(clear) \
     macro(close) \
     macro(closed) \
+    macro(column) \
     macro(compilationKind) \
     macro(compilations) \
     macro(compile) \
@@ -127,6 +129,7 @@
     macro(keys) \
     macro(lastIndex) \
     macro(length) \
+    macro(line) \
     macro(message) \
     macro(multiline) \
     macro(name) \
@@ -141,6 +144,7 @@
     macro(osrExitSites) \
     macro(osrExits) \
     macro(parse) \
+    macro(parseInt) \
     macro(postMessage) \
     macro(profiledBytecodes) \
     macro(propertyIsEnumerable) \
@@ -153,6 +157,7 @@
     macro(size) \
     macro(slice) \
     macro(source) \
+    macro(sourceURL) \
     macro(sourceCode) \
     macro(stack) \
     macro(subarray) \
@@ -220,20 +225,26 @@
     macro(with) \
     macro(yield)
 
-#define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL(macro) \
+#define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL_NOT_IMPLEMENTED_YET(macro)\
     macro(hasInstance) \
     macro(isConcatSpreadable) \
-    macro(iterator) \
     macro(match) \
     macro(replace) \
     macro(search) \
     macro(species) \
     macro(split) \
     macro(toPrimitive) \
-    macro(toStringTag) \
+    macro(toStringTag)
+
+#define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL(macro) \
+    macro(iterator) \
     macro(unscopables)
 
+#define JSC_COMMON_BYTECODE_INTRINSICS_EACH_NAME(macro) \
+    macro(putByValDirect)
+
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_PROPERTY_NAME(macro) \
+    JSC_COMMON_BYTECODE_INTRINSICS_EACH_NAME(macro) \
     macro(iteratedObject) \
     macro(arrayIteratorNextIndex) \
     macro(arrayIterationKind) \
@@ -307,6 +318,11 @@ namespace JSC {
 
         const Identifier* getPrivateName(const Identifier&) const;
         Identifier getPublicName(const Identifier&) const;
+
+        const BytecodeIntrinsicRegistry& bytecodeIntrinsicRegistry() const { return m_bytecodeIntrinsicRegistry; }
+
+    private:
+        BytecodeIntrinsicRegistry m_bytecodeIntrinsicRegistry;
     };
 
 } // namespace JSC

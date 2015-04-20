@@ -274,13 +274,9 @@ private:
     enum class State { Suspended, Running, Interrupted, Closed };
     void setState(State);
 
-    // ScriptExecutionContext calls stop twice.
-    // We'd like to schedule only one stop action for them.
-    static void stopDispatch(void* userData);
     void clear();
 
     void scheduleNodeDeletion();
-    static void deleteMarkedNodesDispatch(void* userData);
 
     virtual void mediaCanStart() override;
 
@@ -297,7 +293,7 @@ private:
 
     // ActiveDOMObject API.
     void stop() override;
-    bool canSuspend() const override;
+    bool canSuspendForPageCache() const override;
     const char* activeDOMObjectName() const override;
 
     // When the context goes away, there might still be some sources which haven't finished playing.

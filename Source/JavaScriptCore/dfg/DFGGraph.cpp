@@ -311,10 +311,8 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
         out.print(comma, "^", node->phi()->index());
     if (node->hasExecutionCounter())
         out.print(comma, RawPointer(node->executionCounter()));
-    if (node->hasVariableWatchpointSet())
-        out.print(comma, RawPointer(node->variableWatchpointSet()));
-    if (node->hasTypedArray())
-        out.print(comma, inContext(JSValue(node->typedArray()), context));
+    if (node->hasWatchpointSet())
+        out.print(comma, RawPointer(node->watchpointSet()));
     if (node->hasStoragePointer())
         out.print(comma, RawPointer(node->storagePointer()));
     if (node->hasObjectMaterializationData())
@@ -1028,6 +1026,8 @@ JSValue Graph::tryGetConstantProperty(const AbstractValue& base, PropertyOffset 
 
 JSValue Graph::tryGetConstantClosureVar(JSValue base, ScopeOffset offset)
 {
+    // This has an awesome concurrency story. See comment for GetGlobalVar in ByteCodeParser.
+    
     if (!base)
         return JSValue();
     
@@ -1036,24 +1036,28 @@ JSValue Graph::tryGetConstantClosureVar(JSValue base, ScopeOffset offset)
         return JSValue();
     
     SymbolTable* symbolTable = activation->symbolTable();
-    ConcurrentJITLocker locker(symbolTable->m_lock);
+    JSValue value;
+    WatchpointSet* set;
+    {
+        ConcurrentJITLocker locker(symbolTable->m_lock);
+        
+        SymbolTableEntry* entry = symbolTable->entryFor(locker, offset);
+        if (!entry)
+            return JSValue();
+        
+        set = entry->watchpointSet();
+        if (!set)
+            return JSValue();
+        
+        if (set->state() != IsWatched)
+            return JSValue();
+        
+        ASSERT(entry->scopeOffset() == offset);
+        value = activation->variableAt(offset).get();
+        if (!value)
+            return JSValue();
+    }
     
-    if (symbolTable->m_functionEnteredOnce.hasBeenInvalidated())
-        return JSValue();
-    
-    SymbolTableEntry* entry = symbolTable->entryFor(locker, offset);
-    if (!entry)
-        return JSValue();
-    
-    VariableWatchpointSet* set = entry->watchpointSet();
-    if (!set)
-        return JSValue();
-    
-    JSValue value = set->inferredValue();
-    if (!value)
-        return JSValue();
-    
-    watchpoints().addLazily(symbolTable->m_functionEnteredOnce);
     watchpoints().addLazily(set);
     
     return value;
@@ -1071,27 +1075,25 @@ JSValue Graph::tryGetConstantClosureVar(Node* node, ScopeOffset offset)
     return tryGetConstantClosureVar(node->asJSValue(), offset);
 }
 
-JSArrayBufferView* Graph::tryGetFoldableView(Node* node)
+JSArrayBufferView* Graph::tryGetFoldableView(JSValue value)
 {
-    JSArrayBufferView* view = node->dynamicCastConstant<JSArrayBufferView*>();
-    if (!view)
+    if (!value)
+        return nullptr;
+    JSArrayBufferView* view = jsDynamicCast<JSArrayBufferView*>(value);
+    if (!value)
         return nullptr;
     if (!view->length())
         return nullptr;
     WTF::loadLoadFence();
+    watchpoints().addLazily(view);
     return view;
 }
 
-JSArrayBufferView* Graph::tryGetFoldableView(Node* node, ArrayMode arrayMode)
+JSArrayBufferView* Graph::tryGetFoldableView(JSValue value, ArrayMode arrayMode)
 {
     if (arrayMode.typedArrayType() == NotTypedArray)
-        return 0;
-    return tryGetFoldableView(node);
-}
-
-JSArrayBufferView* Graph::tryGetFoldableViewForChild1(Node* node)
-{
-    return tryGetFoldableView(child(node, 0).node(), node->arrayMode());
+        return nullptr;
+    return tryGetFoldableView(value);
 }
 
 void Graph::registerFrozenValues()

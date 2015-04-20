@@ -144,6 +144,9 @@
     <ClCompile Include="..\bytecode\BytecodeBasicBlock.cpp">
       <Filter>bytecode</Filter>
     </ClCompile>
+    <ClCompile Include="..\bytecode\BytecodeIntrinsicRegistry.cpp">
+      <Filter>bytecode</Filter>
+    </ClCompile>
     <ClCompile Include="..\bytecode\BytecodeLivenessAnalysis.cpp">
       <Filter>bytecode</Filter>
     </ClCompile>
@@ -361,9 +364,6 @@
       <Filter>interpreter</Filter>
     </ClCompile>
     <ClCompile Include="..\interpreter\StackVisitor.cpp">
-      <Filter>interpreter</Filter>
-    </ClCompile>
-    <ClCompile Include="..\interpreter\VMInspector.cpp">
       <Filter>interpreter</Filter>
     </ClCompile>
     <ClCompile Include="..\jit\ExecutableAllocator.cpp">
@@ -609,6 +609,9 @@
     <ClCompile Include="..\runtime\FunctionPrototype.cpp">
       <Filter>runtime</Filter>
     </ClCompile>
+    <ClCompile Include="..\runtime\FunctionRareData.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
     <ClCompile Include="..\runtime\GetterSetter.cpp">
       <Filter>runtime</Filter>
     </ClCompile>
@@ -715,6 +718,9 @@
       <Filter>runtime</Filter>
     </ClCompile>
     <ClCompile Include="..\runtime\JSWeakMap.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\runtime\JSWeakSet.cpp">
       <Filter>runtime</Filter>
     </ClCompile>
     <ClCompile Include="..\runtime\JSWrapperObject.cpp">
@@ -897,6 +903,15 @@
     <ClCompile Include="..\tools\CodeProfiling.cpp">
       <Filter>tools</Filter>
     </ClCompile>
+    <ClCompile Include="..\tools\FunctionOverrides.cpp">
+      <Filter>tools</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tools\JSDollarVM.cpp">
+      <Filter>tools</Filter>
+    </ClCompile>
+    <ClCompile Include="..\tools\JSDollarVMPrototype.cpp">
+      <Filter>tools</Filter>
+    </ClCompile>
     <ClCompile Include="..\yarr\RegularExpression.cpp">
       <Filter>yarr</Filter>
     </ClCompile>
@@ -1015,6 +1030,12 @@
       <Filter>runtime</Filter>
     </ClCompile>
     <ClCompile Include="..\runtime\WeakMapPrototype.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\runtime\WeakSetConstructor.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\runtime\WeakSetPrototype.cpp">
       <Filter>runtime</Filter>
     </ClCompile>
     <ClCompile Include="..\heap\CodeBlockSet.cpp">
@@ -1329,12 +1350,6 @@
     <ClCompile Include="..\runtime\ArrayIteratorPrototype.cpp">
       <Filter>runtime</Filter>
     </ClCompile>
-    <ClCompile Include="..\runtime\ArgumentsIteratorConstructor.cpp">
-      <Filter>runtime</Filter>
-    </ClCompile>
-    <ClCompile Include="..\runtime\ArgumentsIteratorPrototype.cpp">
-      <Filter>runtime</Filter>
-    </ClCompile>
     <ClCompile Include="..\runtime\MapIteratorConstructor.cpp">
       <Filter>runtime</Filter>
     </ClCompile>
@@ -1345,9 +1360,6 @@
       <Filter>jit</Filter>
     </ClCompile>
     <ClCompile Include="..\runtime\JSArrayIterator.cpp">
-      <Filter>runtime</Filter>
-    </ClCompile>
-    <ClCompile Include="..\runtime\JSArgumentsIterator.cpp">
       <Filter>runtime</Filter>
     </ClCompile>
     <ClCompile Include="..\runtime\JSMapIterator.cpp">
@@ -1913,6 +1925,9 @@
     <ClInclude Include="..\bytecode\BytecodeBasicBlock.h">
       <Filter>bytecode</Filter>
     </ClInclude>
+    <ClInclude Include="..\bytecode\BytecodeIntrinsicRegistry.h">
+      <Filter>bytecode</Filter>
+    </ClInclude>
     <ClInclude Include="..\bytecode\BytecodeLivenessAnalysis.h">
       <Filter>bytecode</Filter>
     </ClInclude>
@@ -2318,9 +2333,6 @@
     <ClInclude Include="..\interpreter\StackVisitor.h">
       <Filter>interpreter</Filter>
     </ClInclude>
-    <ClInclude Include="..\interpreter\VMInspector.h">
-      <Filter>interpreter</Filter>
-    </ClInclude>
     <ClInclude Include="..\jit\CompactJITCodeMap.h">
       <Filter>jit</Filter>
     </ClInclude>
@@ -2637,6 +2649,9 @@
       <Filter>runtime</Filter>
     </ClInclude>
     <ClInclude Include="..\runtime\FunctionPrototype.h">
+      <Filter>runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\runtime\FunctionRareData.h">
       <Filter>runtime</Filter>
     </ClInclude>
     <ClInclude Include="..\runtime\GetterSetter.h">
@@ -2973,6 +2988,15 @@
       <Filter>tools</Filter>
     </ClInclude>
     <ClInclude Include="..\tools\CodeProfiling.h">
+      <Filter>tools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tools\FunctionOverrides.h">
+      <Filter>tools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tools\JSDollarVM.h">
+      <Filter>tools</Filter>
+    </ClInclude>
+    <ClInclude Include="..\tools\JSDollarVMPrototype.h">
       <Filter>tools</Filter>
     </ClInclude>
     <ClInclude Include="..\tools\ProfileTreeNode.h">
@@ -3744,13 +3768,19 @@
     <ClInclude Include="..\runtime\WeakMapConstructor.h">
       <Filter>runtime</Filter>
     </ClInclude>
+    <ClInclude Include="..\runtime\WeakSetConstructor.h">
+      <Filter>runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\runtime\WeakSetPrototype.h">
+      <Filter>runtime</Filter>
+    </ClInclude>
     <ClInclude Include="..\runtime\JSWeakMap.h">
       <Filter>runtime</Filter>
     </ClInclude>
-    <ClInclude Include="..\runtime\JSArrayIterator.h">
+    <ClInclude Include="..\runtime\JSWeakSet.h">
       <Filter>runtime</Filter>
     </ClInclude>
-    <ClInclude Include="..\runtime\JSArgumentsIterator.h">
+    <ClInclude Include="..\runtime\JSArrayIterator.h">
       <Filter>runtime</Filter>
     </ClInclude>
     <ClInclude Include="..\runtime\JSMapIterator.h">

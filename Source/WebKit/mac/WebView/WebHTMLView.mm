@@ -38,6 +38,7 @@
 #import "WebActionMenuController.h"
 #import "WebArchive.h"
 #import "WebClipView.h"
+#import "WebContextMenuClient.h"
 #import "WebDOMOperationsInternal.h"
 #import "WebDataSourceInternal.h"
 #import "WebDefaultUIDelegate.h"
@@ -67,6 +68,7 @@
 #import "WebPreferences.h"
 #import "WebPreferencesPrivate.h"
 #import "WebResourcePrivate.h"
+#import "WebSharingServicePickerController.h"
 #import "WebTextCompletionController.h"
 #import "WebTypesInternal.h"
 #import "WebUIDelegatePrivate.h"
@@ -623,6 +625,10 @@ struct WebHTMLViewInterpretKeyEventsParameters {
 
 #ifndef NDEBUG
     BOOL enumeratingSubviews;
+#endif
+
+#if ENABLE(SERVICE_CONTROLS)
+    RetainPtr<WebSharingServicePickerController> currentSharingServicePickerController;
 #endif
 }
 - (void)clear;
@@ -3358,6 +3364,21 @@ static void setMenuTargets(NSMenu* menu)
     if (!coreMenu)
         return nil;
 
+    auto menuItemVector = contextMenuItemVector(coreMenu->platformDescription());
+    for (auto& menuItem : menuItemVector) {
+        if (menuItem.action() != ContextMenuItemTagShareMenu)
+            continue;
+
+        NSMenuItem *nsItem = menuItem.platformDescription();
+        if (![nsItem.representedObject isKindOfClass:[NSSharingServicePicker class]]) {
+            ASSERT_NOT_REACHED();
+            continue;
+        }
+#if ENABLE(SERVICE_CONTROLS)
+        _private->currentSharingServicePickerController = adoptNS([[WebSharingServicePickerController alloc] initWithSharingServicePicker:nsItem.representedObject client:static_cast<WebContextMenuClient&>(page->contextMenuController().client())]);
+#endif
+    }
+
     NSArray* menuItems = coreMenu->platformDescription();
     if (!menuItems)
         return nil;
@@ -5392,7 +5413,8 @@ static BOOL writingDirectionKeyBindingsEnabled()
 #if !PLATFORM(IOS)
 - (void)otherMouseDown:(NSEvent *)event
 {
-    if ([event buttonNumber] != 2 || ([NSMenu respondsToSelector:@selector(menuTypeForEvent:)] && [NSMenu menuTypeForEvent:event] == NSMenuTypeActionMenu)) {
+    if ([event buttonNumber] != 2 || ([NSMenu respondsToSelector:@selector(menuTypeForEvent:)]
+        && ([NSMenu menuTypeForEvent:event] == NSMenuTypeActionMenu || [NSMenu menuTypeForEvent:event] == NSMenuTypeContextMenu))) {
         [super otherMouseDown:event];
         return;
     }

@@ -1261,7 +1261,8 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
     }
         
-    case ToString: {
+    case ToString:
+    case CallStringConstructor: {
         switch (node->child1().useKind()) {
         case StringObjectUse:
             // This also filters that the StringObject has the primordial StringObject
@@ -1341,6 +1342,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     }
 
     case CreateThis: {
+        // FIXME: We can fold this to NewObject if the incoming callee is a constant.
         forNode(node).setType(SpecFinalObject);
         break;
     }
@@ -1382,9 +1384,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             m_graph, m_codeBlock->globalObjectFor(node->origin.semantic)->activationStructure());
         break;
         
-    case TypedArrayWatchpoint:
-        break;
-    
     case CreateDirectArguments:
         forNode(node).set(m_graph, m_codeBlock->globalObjectFor(node->origin.semantic)->directArgumentsStructure());
         break;
@@ -1403,6 +1402,15 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
         
     case GetCallee:
+        if (FunctionExecutable* executable = jsDynamicCast<FunctionExecutable*>(m_codeBlock->ownerExecutable())) {
+            InferredValue* singleton = executable->singletonFunction();
+            if (JSValue value = singleton->inferredValue()) {
+                m_graph.watchpoints().addLazily(singleton);
+                JSFunction* function = jsCast<JSFunction*>(value);
+                setConstant(node, *m_graph.freeze(function));
+                break;
+            }
+        }
         forNode(node).setType(SpecFunction);
         break;
         
@@ -1519,9 +1527,16 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
     }
             
-    case GetArrayLength:
+    case GetArrayLength: {
+        JSArrayBufferView* view = m_graph.tryGetFoldableView(
+            forNode(node->child1()).m_value, node->arrayMode());
+        if (view) {
+            setConstant(node, jsNumber(view->length()));
+            break;
+        }
         forNode(node).setType(SpecInt32);
         break;
+    }
         
     case CheckStructure: {
         AbstractValue& value = forNode(node->child1());
@@ -1704,13 +1719,25 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         value.set(m_graph, node->structure());
         break;
     }
-    case GetIndexedPropertyStorage:
+    case GetIndexedPropertyStorage: {
+        JSArrayBufferView* view = m_graph.tryGetFoldableView(
+            forNode(node->child1()).m_value, node->arrayMode());
+        if (view)
+            m_state.setFoundConstants(true);
+        forNode(node).clear();
+        break;
+    }
     case ConstantStoragePointer: {
         forNode(node).clear();
         break; 
     }
         
     case GetTypedArrayByteOffset: {
+        JSArrayBufferView* view = m_graph.tryGetFoldableView(forNode(node->child1()).m_value);
+        if (view) {
+            setConstant(node, jsNumber(view->byteOffset()));
+            break;
+        }
         forNode(node).setType(SpecInt32);
         break;
     }

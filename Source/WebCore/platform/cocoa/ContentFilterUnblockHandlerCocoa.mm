@@ -30,17 +30,25 @@
 
 #import "BlockExceptions.h"
 #import "ContentFilter.h"
+#import "Logging.h"
 #import "ResourceRequest.h"
 
+#if !LOG_DISABLED
+#import <wtf/text/CString.h>
+#endif
+
 #if PLATFORM(IOS)
-#import "SoftLinking.h"
 #import "WebCoreThreadRun.h"
+
+#if HAVE(PARENTAL_CONTROLS)
+#import "SoftLinking.h"
 #import "WebFilterEvaluatorSPI.h"
 
 SOFT_LINK_PRIVATE_FRAMEWORK(WebContentAnalysis);
 SOFT_LINK_CLASS(WebContentAnalysis, WebFilterEvaluator);
 
 static NSString * const webFilterEvaluatorKey { @"webFilterEvaluator" };
+#endif
 #endif
 
 static NSString * const unblockURLHostKey { @"unblockURLHost" };
@@ -52,13 +60,15 @@ ContentFilterUnblockHandler::ContentFilterUnblockHandler(String unblockURLHost, 
     : m_unblockURLHost { WTF::move(unblockURLHost) }
     , m_unblockRequester { WTF::move(unblockRequester) }
 {
+    LOG(ContentFiltering, "Creating ContentFilterUnblockHandler with an unblock requester and unblock URL host <%s>.\n", unblockURLHost.ascii().data());
 }
 
-#if PLATFORM(IOS)
+#if HAVE(PARENTAL_CONTROLS) && PLATFORM(IOS)
 ContentFilterUnblockHandler::ContentFilterUnblockHandler(String unblockURLHost, RetainPtr<WebFilterEvaluator> evaluator)
     : m_unblockURLHost { WTF::move(unblockURLHost) }
     , m_webFilterEvaluator { WTF::move(evaluator) }
 {
+    LOG(ContentFiltering, "Creating ContentFilterUnblockHandler with a WebFilterEvaluator and unblock URL host <%s>.\n", unblockURLHost.ascii().data());
 }
 #endif
 
@@ -71,7 +81,7 @@ void ContentFilterUnblockHandler::wrapWithDecisionHandler(const DecisionHandlerF
             decisionHandler(unblocked);
         });
     }};
-#if PLATFORM(IOS)
+#if HAVE(PARENTAL_CONTROLS) && PLATFORM(IOS)
     m_webFilterEvaluator = nullptr;
 #endif
     std::swap(m_unblockRequester, wrappedRequester);
@@ -79,7 +89,7 @@ void ContentFilterUnblockHandler::wrapWithDecisionHandler(const DecisionHandlerF
 
 bool ContentFilterUnblockHandler::needsUIProcess() const
 {
-#if PLATFORM(IOS)
+#if HAVE(PARENTAL_CONTROLS) && PLATFORM(IOS)
     return m_webFilterEvaluator;
 #else
     return false;
@@ -92,7 +102,7 @@ void ContentFilterUnblockHandler::encode(NSCoder *coder) const
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
     [coder encodeObject:m_unblockURLHost forKey:unblockURLHostKey];
     [coder encodeObject:(NSURL *)m_unreachableURL forKey:unreachableURLKey];
-#if PLATFORM(IOS)
+#if HAVE(PARENTAL_CONTROLS) && PLATFORM(IOS)
     [coder encodeObject:m_webFilterEvaluator.get() forKey:webFilterEvaluatorKey];
 #endif
     END_BLOCK_OBJC_EXCEPTIONS;
@@ -104,7 +114,7 @@ bool ContentFilterUnblockHandler::decode(NSCoder *coder, ContentFilterUnblockHan
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
     unblockHandler.m_unblockURLHost = [coder decodeObjectOfClass:[NSString class] forKey:unblockURLHostKey];
     unblockHandler.m_unreachableURL = [coder decodeObjectOfClass:[NSURL class] forKey:unreachableURLKey];
-#if PLATFORM(IOS)
+#if HAVE(PARENTAL_CONTROLS) && PLATFORM(IOS)
     unblockHandler.m_webFilterEvaluator = [coder decodeObjectOfClass:getWebFilterEvaluatorClass() forKey:webFilterEvaluatorKey];
 #endif
     return true;
@@ -115,7 +125,7 @@ bool ContentFilterUnblockHandler::decode(NSCoder *coder, ContentFilterUnblockHan
 bool ContentFilterUnblockHandler::canHandleRequest(const ResourceRequest& request) const
 {
     if (!m_unblockRequester) {
-#if PLATFORM(IOS)
+#if HAVE(PARENTAL_CONTROLS) && PLATFORM(IOS)
         if (!m_webFilterEvaluator)
             return false;
 #else
@@ -123,7 +133,12 @@ bool ContentFilterUnblockHandler::canHandleRequest(const ResourceRequest& reques
 #endif
     }
 
-    return request.url().protocolIs(ContentFilter::urlScheme()) && equalIgnoringCase(request.url().host(), m_unblockURLHost);
+    bool isUnblockRequest = request.url().protocolIs(ContentFilter::urlScheme()) && equalIgnoringCase(request.url().host(), m_unblockURLHost);
+#if !LOG_DISABLED
+    if (isUnblockRequest)
+        LOG(ContentFiltering, "ContentFilterUnblockHandler will handle <%s> as an unblock request.\n", request.url().string().ascii().data());
+#endif
+    return isUnblockRequest;
 }
 
 static inline void dispatchToMainThread(void (^block)())
@@ -139,10 +154,11 @@ static inline void dispatchToMainThread(void (^block)())
 
 void ContentFilterUnblockHandler::requestUnblockAsync(DecisionHandlerFunction decisionHandler) const
 {
-#if PLATFORM(IOS)
+#if HAVE(PARENTAL_CONTROLS) && PLATFORM(IOS)
     if (m_webFilterEvaluator) {
         [m_webFilterEvaluator unblockWithCompletion:[decisionHandler](BOOL unblocked, NSError *) {
             dispatchToMainThread([decisionHandler, unblocked] {
+                LOG(ContentFiltering, "WebFilterEvaluator %s the unblock request.\n", unblocked ? "allowed" : "did not allow");
                 decisionHandler(unblocked);
             });
         }];

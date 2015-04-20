@@ -267,11 +267,23 @@ private:
     NSNotificationCenter *defaultCenter = [NSNotificationCenter defaultCenter];
     UIWindow *window = self.window;
 
-    if (window)
+    if (window) {
         [defaultCenter removeObserver:self name:UIWindowDidMoveToScreenNotification object:window];
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000
+        [window.rootViewController unregisterPreviewSourceView:self];
+        [_previewGestureRecognizer setDelegate:nil];
+        _previewGestureRecognizer.clear();
+#endif
+    }
 
-    if (newWindow)
+    if (newWindow) {
         [defaultCenter addObserver:self selector:@selector(_windowDidMoveToScreenNotification:) name:UIWindowDidMoveToScreenNotification object:newWindow];
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000
+        [newWindow.rootViewController registerPreviewSourceView:self previewingDelegate:self];
+        _previewGestureRecognizer = self.gestureRecognizers.lastObject;
+        [_previewGestureRecognizer setDelegate:self];
+#endif
+    }
 }
 
 - (void)didMoveToWindow
@@ -490,7 +502,11 @@ private:
         [_webView _updateVisibleContentRects];
     }
     
-    [self _updateChangedSelection];
+    // Updating the selection requires a full editor state. If the editor state is missing post layout
+    // data then it means there is a layout pending and we're going to be called again after the layout
+    // so we delay the selection update.
+    if (!_page->editorState().isMissingPostLayoutData)
+        [self _updateChangedSelection];
 }
 
 - (void)_setAcceleratedCompositingRootView:(UIView *)rootView

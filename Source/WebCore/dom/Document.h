@@ -38,6 +38,7 @@
 #include "FontSelector.h"
 #include "MutationObserver.h"
 #include "PageVisibilityState.h"
+#include "PlatformEvent.h"
 #include "PlatformScreen.h"
 #include "ReferrerPolicy.h"
 #include "Region.h"
@@ -770,11 +771,15 @@ public:
         ANIMATIONITERATION_LISTENER          = 1 << 9,
         TRANSITIONEND_LISTENER               = 1 << 10,
         BEFORELOAD_LISTENER                  = 1 << 11,
-        SCROLL_LISTENER                      = 1 << 12
-        // 3 bits remaining
+        SCROLL_LISTENER                      = 1 << 12,
+        FORCEWILLBEGIN_LISTENER              = 1 << 13,
+        FORCECHANGED_LISTENER                = 1 << 14,
+        FORCEDOWN_LISTENER                   = 1 << 15,
+        FORCEUP_LISTENER                     = 1 << 16
     };
 
     bool hasListenerType(ListenerType listenerType) const { return (m_listenerTypes & listenerType); }
+    bool hasListenerTypeForEventType(PlatformEvent::Type) const;
     void addListenerTypeIfNeeded(const AtomicString& eventType);
 
     bool hasMutationObserversOfType(MutationObserver::MutationType type) const
@@ -1134,6 +1139,9 @@ public:
     WEBCORE_EXPORT unsigned wheelEventHandlerCount() const;
     WEBCORE_EXPORT unsigned touchEventHandlerCount() const;
 
+    WEBCORE_EXPORT void startTrackingStyleRecalcs();
+    WEBCORE_EXPORT unsigned styleRecalcCount() const;
+
     void didAddTouchEventHandler(Node&);
     void didRemoveTouchEventHandler(Node&, EventHandlerRemoval = EventHandlerRemoval::One);
 
@@ -1224,13 +1232,13 @@ public:
     WEBCORE_EXPORT void addAudioProducer(AudioProducer*);
     WEBCORE_EXPORT void removeAudioProducer(AudioProducer*);
     bool isPlayingAudio() const { return m_isPlayingAudio; }
-    WEBCORE_EXPORT void updateIsPlayingAudio();
+    WEBCORE_EXPORT void updateIsPlayingMedia();
     void pageMutedStateDidChange();
     WeakPtr<Document> createWeakPtr() { return m_weakFactory.createWeakPtr(); }
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     void showPlaybackTargetPicker(const HTMLMediaElement&);
-    void didChoosePlaybackTarget(const MediaPlaybackTarget&);
+    void didChoosePlaybackTarget(Ref<MediaPlaybackTarget>&&);
     void addPlaybackTargetPickerClient(MediaPlaybackTargetPickerClient&);
     void removePlaybackTargetPickerClient(MediaPlaybackTargetPickerClient&);
     bool requiresPlaybackTargetRouteMonitoring();
@@ -1400,7 +1408,7 @@ private:
     HashSet<NodeIterator*> m_nodeIterators;
     HashSet<Range*> m_ranges;
 
-    unsigned short m_listenerTypes;
+    unsigned m_listenerTypes;
 
     MutationObserverOptions m_mutationObserverTypes;
 
@@ -1432,6 +1440,8 @@ private:
 
     // http://www.whatwg.org/specs/web-apps/current-work/#ignore-destructive-writes-counter
     unsigned m_ignoreDestructiveWriteCount;
+
+    unsigned m_styleRecalcCount { 0 };
 
     StringWithDirection m_title;
     StringWithDirection m_rawTitle;

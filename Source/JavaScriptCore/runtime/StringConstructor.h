@@ -30,6 +30,7 @@ class StringPrototype;
 class StringConstructor : public InternalFunction {
 public:
     typedef InternalFunction Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot;
 
     static StringConstructor* create(VM& vm, Structure* structure, StringPrototype* stringPrototype)
     {
@@ -45,9 +46,6 @@ public:
         return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
     }
 
-protected:
-    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InternalFunction::StructureFlags;
-
 private:
     StringConstructor(VM&, Structure*);
     void finishCreation(VM&, StringPrototype*);
@@ -56,8 +54,9 @@ private:
 
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
 };
-    
+
 JSCell* JSC_HOST_CALL stringFromCharCode(ExecState*, int32_t);
+JSCell* stringConstructor(ExecState*, JSValue);
 
 } // namespace JSC
 

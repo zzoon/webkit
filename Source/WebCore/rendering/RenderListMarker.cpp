@@ -1201,7 +1201,7 @@ void RenderListMarker::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffse
         if (selectionState() != SelectionNone) {
             LayoutRect selRect = localSelectionRect();
             selRect.moveBy(boxOrigin);
-            context->fillRect(snappedIntRect(selRect), selectionBackgroundColor(), style().colorSpace());
+            context->fillRect(snappedIntRect(selRect), m_listItem.selectionBackgroundColor(), style().colorSpace());
         }
         return;
     }
@@ -1209,7 +1209,7 @@ void RenderListMarker::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffse
     if (selectionState() != SelectionNone) {
         LayoutRect selRect = localSelectionRect();
         selRect.moveBy(boxOrigin);
-        context->fillRect(snappedIntRect(selRect), selectionBackgroundColor(), style().colorSpace());
+        context->fillRect(snappedIntRect(selRect), m_listItem.selectionBackgroundColor(), style().colorSpace());
     }
 
     const Color color(style().visitedDependentColor(CSSPropertyColor));
@@ -1424,8 +1424,10 @@ void RenderListMarker::updateContent()
     if (isImage()) {
         // FIXME: This is a somewhat arbitrary width.  Generated images for markers really won't become particularly useful
         // until we support the CSS3 marker pseudoclass to allow control over the width and height of the marker box.
-        int bulletWidth = style().fontMetrics().ascent() / 2;
-        m_image->setContainerSizeForRenderer(this, FloatSize(bulletWidth, bulletWidth), style().effectiveZoom());
+        LayoutUnit bulletWidth = style().fontMetrics().ascent() / LayoutUnit(2);
+        LayoutSize defaultBulletSize(bulletWidth, bulletWidth);
+        LayoutSize imageSize = calculateImageIntrinsicDimensions(m_image.get(), defaultBulletSize, DoNotScaleByEffectiveZoom);
+        m_image->setContainerSizeForRenderer(this, imageSize, style().effectiveZoom());
         return;
     }
 

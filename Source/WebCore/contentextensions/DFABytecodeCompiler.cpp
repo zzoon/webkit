@@ -93,12 +93,17 @@ void DFABytecodeCompiler::emitTerminate()
     append<DFABytecodeInstruction>(m_bytecode, DFABytecodeInstruction::Terminate);
 }
 
-void DFABytecodeCompiler::compileNode(unsigned index)
+void DFABytecodeCompiler::compileNode(unsigned index, bool root)
 {
     const DFANode& node = m_dfa.nodeAt(index);
+    if (node.isKilled) {
+        m_nodeStartOffsets[index] = std::numeric_limits<unsigned>::max();
+        return;
+    }
 
     // Record starting index for linking.
-    m_nodeStartOffsets[index] = m_bytecode.size();
+    if (!root)
+        m_nodeStartOffsets[index] = m_bytecode.size();
 
     for (uint64_t action : node.actions) {
         // High bits are used to store flags. See compileRuleList.
@@ -107,6 +112,12 @@ void DFABytecodeCompiler::compileNode(unsigned index)
         else
             emitAppendAction(static_cast<unsigned>(action));
     }
+    
+    // If we jump to the root, we don't want to re-add its actions to a HashSet.
+    // We know we have already added them because the root is always compiled first and we always start interpreting at the beginning.
+    if (root)
+        m_nodeStartOffsets[index] = m_bytecode.size();
+    
     compileNodeTransitions(node);
 }
 
@@ -200,15 +211,21 @@ void DFABytecodeCompiler::compile()
     m_nodeStartOffsets.resize(m_dfa.size());
     
     // Make sure the root is always at the beginning of the bytecode.
-    compileNode(m_dfa.root());
+    compileNode(m_dfa.root(), true);
     for (unsigned i = 0; i < m_dfa.size(); i++) {
         if (i != m_dfa.root())
-            compileNode(i);
+            compileNode(i, false);
     }
 
     // Link.
-    for (const auto& linkRecord : m_linkRecords)
-        set32Bits(m_bytecode, linkRecord.first, m_nodeStartOffsets[linkRecord.second]);
+    for (const auto& linkRecord : m_linkRecords) {
+        unsigned offset = linkRecord.first;
+        ASSERT(!(*reinterpret_cast<unsigned*>(&m_bytecode[offset])));
+
+        unsigned target = m_nodeStartOffsets[linkRecord.second];
+        RELEASE_ASSERT(target != std::numeric_limits<unsigned>::max());
+        set32Bits(m_bytecode, offset, m_nodeStartOffsets[linkRecord.second]);
+    }
     
     // Set size header.
     set32Bits(m_bytecode, startLocation, m_bytecode.size() - startLocation);

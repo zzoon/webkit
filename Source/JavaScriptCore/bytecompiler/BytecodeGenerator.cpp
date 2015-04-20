@@ -466,9 +466,6 @@ BytecodeGenerator::BytecodeGenerator(VM& vm, FunctionNode* functionNode, Unlinke
         }
     }
     
-    if (m_symbolTable->scopeSize())
-        emitOpcode(op_touch_entry);
-
     if (isConstructor()) {
         if (constructorKind() == ConstructorKind::Derived) {
             m_newTargetRegister = addVar();
@@ -1513,7 +1510,7 @@ RegisterID* BytecodeGenerator::emitDirectPutById(RegisterID* base, const Identif
     instructions().append(0);
     instructions().append(0);
     instructions().append(0);
-    instructions().append(putType == PropertyNode::KnownDirect || (property != m_vm->propertyNames->underscoreProto && PropertyName(property).asIndex() == PropertyName::NotAnIndex));
+    instructions().append(putType == PropertyNode::KnownDirect || (property != m_vm->propertyNames->underscoreProto && !parseIndex(property)));
     return value;
 }
 

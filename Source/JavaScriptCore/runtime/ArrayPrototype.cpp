@@ -61,7 +61,6 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncIndexOf(ExecState*);
 EncodedJSValue JSC_HOST_CALL arrayProtoFuncReduce(ExecState*);
 EncodedJSValue JSC_HOST_CALL arrayProtoFuncReduceRight(ExecState*);
 EncodedJSValue JSC_HOST_CALL arrayProtoFuncLastIndexOf(ExecState*);
-EncodedJSValue JSC_HOST_CALL arrayProtoFuncValues(ExecState*);
 EncodedJSValue JSC_HOST_CALL arrayProtoFuncKeys(ExecState*);
 EncodedJSValue JSC_HOST_CALL arrayProtoFuncEntries(ExecState*);
 
@@ -140,9 +139,11 @@ void ArrayPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
     Base::finishCreation(vm);
     ASSERT(inherits(info()));
     vm.prototypeMap.addPrototype(this);
-    JSC_NATIVE_FUNCTION(vm.propertyNames->iteratorSymbol, arrayProtoFuncValues, DontEnum, 0);
 
-    if (globalObject->runtimeFlags().isSymbolEnabled()) {
+    putDirectWithoutTransition(vm, vm.propertyNames->values, globalObject->arrayProtoValuesFunction(), DontEnum);
+    putDirectWithoutTransition(vm, vm.propertyNames->iteratorSymbol, globalObject->arrayProtoValuesFunction(), DontEnum);
+
+    if (!globalObject->runtimeFlags().isSymbolDisabled()) {
         JSObject* unscopables = constructEmptyObject(globalObject->globalExec(), globalObject->nullPrototypeObjectStructure());
         const char* unscopableNames[] = {
             "copyWithin",
@@ -760,10 +761,11 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncSort(ExecState* exec)
     Vector<uint32_t, 0, UnsafeVectorOverflow> keys;
     for (size_t i = 0; i < nameArray.size(); ++i) {
         PropertyName name = nameArray[i];
-        uint32_t index = name.asIndex();
-        if (index == PropertyName::NotAnIndex)
+        Optional<uint32_t> optionalIndex = parseIndex(name);
+        if (!optionalIndex)
             continue;
-        
+
+        uint32_t index = optionalIndex.value();
         JSValue value = getOrHole(thisObj, exec, index);
         if (exec->hadException())
             return JSValue::encode(jsUndefined());

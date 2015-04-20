@@ -29,6 +29,7 @@
 #import "PluginComplexTextInputState.h"
 #import "SameDocumentNavigationType.h"
 #import "WebFindOptions.h"
+#import "WebHitTestResult.h"
 #import <wtf/Forward.h>
 #import <wtf/RetainPtr.h>
 #import <wtf/Vector.h>
@@ -55,7 +56,6 @@ class DrawingAreaProxy;
 class LayerTreeContext;
 class ViewSnapshot;
 class WebProcessPool;
-struct ActionMenuHitTestResult;
 struct ColorSpaceData;
 struct EditorState;
 struct WebPageConfiguration;
@@ -99,8 +99,7 @@ struct WebPageConfiguration;
 
 - (void)_pluginFocusOrWindowFocusChanged:(BOOL)pluginHasFocusAndWindowHasFocus pluginComplexTextInputIdentifier:(uint64_t)pluginComplexTextInputIdentifier;
 - (void)_setPluginComplexTextInputState:(WebKit::PluginComplexTextInputState)pluginComplexTextInputState pluginComplexTextInputIdentifier:(uint64_t)pluginComplexTextInputIdentifier;
-
-- (void)_setDragImage:(NSImage *)image at:(NSPoint)clientPoint linkDrag:(BOOL)linkDrag;
+- (void)_dragImageForView:(NSView *)view withImage:(NSImage *)image at:(NSPoint)clientPoint linkDrag:(BOOL)linkDrag;
 - (void)_setPromisedDataForImage:(WebCore::Image *)image withFileName:(NSString *)filename withExtension:(NSString *)extension withTitle:(NSString *)title withURL:(NSString *)url withVisibleURL:(NSString *)visibleUrl withArchive:(WebCore::SharedBuffer*) archiveBuffer forPasteboard:(NSString *)pasteboardName;
 #if ENABLE(ATTACHMENT_ELEMENT)
 - (void)_setPromisedDataForAttachment:(NSString *)filename withExtension:(NSString *)extension withTitle:(NSString *)title withURL:(NSString *)url withVisibleURL:(NSString *)visibleUrl forPasteboard:(NSString *)pasteboardName;
@@ -140,11 +139,14 @@ struct WebPageConfiguration;
 - (void)_closeFullScreenWindowController;
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
-- (void)_didPerformActionMenuHitTest:(const WebKit::ActionMenuHitTestResult&)hitTestResult forImmediateAction:(BOOL)forImmediateAction userData:(API::Object*)userData;
+- (void)_didPerformActionMenuHitTest:(const WebKit::WebHitTestResult::Data&)hitTestResult forImmediateAction:(BOOL)forImmediateAction contentPreventsDefault:(BOOL)contentPreventsDefault userData:(API::Object*)userData;
 #endif
 
 @property (nonatomic, retain, setter=_setPrimaryTrackingArea:) NSTrackingArea *_primaryTrackingArea;
 
 @property (readonly) NSWindow *_targetWindowForMovePreparation;
+
+@property (nonatomic, setter=_setAutomaticallyComputesFixedLayoutSizeFromViewScale:) BOOL _automaticallyComputesFixedLayoutSizeFromViewScale;
+- (void)_updateAutomaticallyComputedFixedLayoutSize;
 
 @end

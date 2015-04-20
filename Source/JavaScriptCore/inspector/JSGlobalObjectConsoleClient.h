@@ -40,7 +40,6 @@ public:
 
     static bool logToSystemConsole();
     static void setLogToSystemConsole(bool);
-    static void initializeLogToSystemConsole();
 
 protected:
     virtual void messageWithTypeAndLevel(MessageType, MessageLevel, JSC::ExecState*, RefPtr<ScriptArguments>&&) override;

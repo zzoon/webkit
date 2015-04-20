@@ -64,10 +64,6 @@
 #include "NetworkCacheCoders.h"
 #endif
 
-#if PLATFORM(IOS)
-#include "WebSQLiteDatabaseTracker.h"
-#endif
-
 using namespace WebCore;
 
 namespace WebKit {
@@ -85,6 +81,9 @@ NetworkProcess::NetworkProcess()
     , m_canHandleHTTPSServerTrustEvaluation(true)
 #if PLATFORM(COCOA)
     , m_clearCacheDispatchGroup(0)
+#endif
+#if PLATFORM(IOS)
+    , m_webSQLiteDatabaseTracker(*this)
 #endif
 {
     NetworkProcessPlatformStrategies::initialize();
@@ -167,6 +166,12 @@ AuthenticationManager& NetworkProcess::downloadsAuthenticationManager()
     return authenticationManager();
 }
 
+void NetworkProcess::lowMemoryHandler(bool critical)
+{
+    platformLowMemoryHandler(critical);
+    WTF::releaseFastMallocFreeMemory();
+}
+
 void NetworkProcess::initializeNetworkProcess(const NetworkProcessCreationParameters& parameters)
 {
     platformInitializeNetworkProcess(parameters);
@@ -175,8 +180,7 @@ void NetworkProcess::initializeNetworkProcess(const NetworkProcessCreationParame
 
     auto& memoryPressureHandler = MemoryPressureHandler::singleton();
     memoryPressureHandler.setLowMemoryHandler([this] (bool critical) {
-        platformLowMemoryHandler(critical);
-        WTF::releaseFastMallocFreeMemory();
+        lowMemoryHandler(critical);
     });
     memoryPressureHandler.install();
 
@@ -197,10 +201,6 @@ void NetworkProcess::initializeNetworkProcess(const NetworkProcessCreationParame
 
     if (parameters.shouldUseTestingNetworkSession)
         NetworkStorageSession::switchToNewTestingSession();
-
-#if PLATFORM(IOS)
-    m_webSQLiteDatabaseTracker = std::make_unique<WebSQLiteDatabaseTracker>(*this);
-#endif
 
     NetworkProcessSupplementMap::const_iterator it = m_supplements.begin();
     NetworkProcessSupplementMap::const_iterator end = m_supplements.end();
@@ -511,7 +511,7 @@ void NetworkProcess::terminate()
 
 void NetworkProcess::processWillSuspend()
 {
-    MemoryPressureHandler::singleton().releaseMemory(true);
+    lowMemoryHandler(true);
     parentProcessConnection()->send(Messages::NetworkProcessProxy::ProcessReadyToSuspend(), 0);
 }
 

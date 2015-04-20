@@ -32,6 +32,8 @@ WebInspector.ObjectTreeView = class ObjectTreeView extends WebInspector.Object
         console.assert(object instanceof WebInspector.RemoteObject);
         console.assert(!propertyPath || propertyPath instanceof WebInspector.PropertyPath);
 
+        var providedPropertyPath = propertyPath instanceof WebInspector.PropertyPath;
+
         this._object = object;
         this._mode = mode || WebInspector.ObjectTreeView.defaultModeForObject(object);
         this._propertyPath = propertyPath || new WebInspector.PropertyPath(this._object, "this");
@@ -52,6 +54,7 @@ WebInspector.ObjectTreeView = class ObjectTreeView extends WebInspector.Object
 
         if (this._object.preview) {
             this._previewView = new WebInspector.ObjectPreviewView(this._object.preview);
+            this._previewView.setOriginatingObjectInfo(this._object, providedPropertyPath ? propertyPath : null);
             this._previewView.element.addEventListener("click", this._handlePreviewOrTitleElementClick.bind(this));
             this._element.appendChild(this._previewView.element);
 
@@ -104,15 +107,21 @@ WebInspector.ObjectTreeView = class ObjectTreeView extends WebInspector.Object
         if (b === "__proto__")
             return -1;
 
-        // Put internal properties at the top.
-        if (a.isInternalProperty && !b.isInternalProperty)
+        // Put Internal properties at the top.
+        if (propertyA.isInternalProperty && !propertyB.isInternalProperty)
             return -1;
-        if (b.isInternalProperty && !a.isInternalProperty)
+        if (propertyB.isInternalProperty && !propertyA.isInternalProperty)
             return 1;
 
-        // if used elsewhere make sure to
-        //  - convert a and b to strings (not needed here, properties are all strings)
-        //  - check if a == b (not needed here, no two properties can be the same)
+        // Put Symbol properties at the bottom.
+        if (propertyA.symbol && !propertyB.symbol)
+            return 1;
+        if (propertyB.symbol && !propertyA.symbol)
+            return -1;
+
+        // Symbol properties may have the same description string but be different objects.
+        if (a === b)
+            return 0;
 
         var diff = 0;
         var chunk = /^\d+|^\D+/;

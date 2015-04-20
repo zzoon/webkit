@@ -1250,7 +1250,7 @@ void XMLHttpRequest::didTimeout()
 }
 #endif
 
-bool XMLHttpRequest::canSuspend() const
+bool XMLHttpRequest::canSuspendForPageCache() const
 {
     // If the load event has not fired yet, cancelling the load in suspend() may cause
     // the load event to be fired and arbitrary JS execution, which would be unsafe.
@@ -1265,8 +1265,6 @@ const char* XMLHttpRequest::activeDOMObjectName() const
 
 void XMLHttpRequest::suspend(ReasonForSuspension reason)
 {
-    NoEventDispatchAssertion assertNoEventDispatch;
-
     m_progressEventThrottle.suspend();
 
     if (m_resumeTimer.isActive()) {
@@ -1274,7 +1272,7 @@ void XMLHttpRequest::suspend(ReasonForSuspension reason)
         m_dispatchErrorOnResuming = true;
     }
 
-    if (reason == ActiveDOMObject::DocumentWillBecomeInactive && m_loader) {
+    if (reason == ActiveDOMObject::PageCache && m_loader) {
         // Going into PageCache, abort the request and dispatch a network error on resuming.
         genericError();
         m_dispatchErrorOnResuming = true;
@@ -1287,8 +1285,6 @@ void XMLHttpRequest::suspend(ReasonForSuspension reason)
 
 void XMLHttpRequest::resume()
 {
-    NoEventDispatchAssertion assertNoEventDispatch;
-
     m_progressEventThrottle.resume();
 
     // We are not allowed to execute arbitrary JS in resume() so dispatch
@@ -1306,7 +1302,6 @@ void XMLHttpRequest::resumeTimerFired()
 
 void XMLHttpRequest::stop()
 {
-    NoEventDispatchAssertion assertNoEventDispatch;
     internalAbort();
 }
 

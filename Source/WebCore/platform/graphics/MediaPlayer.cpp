@@ -886,9 +886,14 @@ bool MediaPlayer::canPlayToWirelessPlaybackTarget() const
     return m_private->canPlayToWirelessPlaybackTarget();
 }
 
-void MediaPlayer::setWirelessPlaybackTarget(const MediaPlaybackTarget& device)
+bool MediaPlayer::isPlayingToWirelessPlaybackTarget() const
 {
-    m_private->setWirelessPlaybackTarget(device);
+    return m_private->isPlayingToWirelessPlaybackTarget();
+}
+
+void MediaPlayer::setWirelessPlaybackTarget(Ref<MediaPlaybackTarget>&& device)
+{
+    m_private->setWirelessPlaybackTarget(WTF::move(device));
 }
 
 void MediaPlayer::startPlayingToPlaybackTarget()

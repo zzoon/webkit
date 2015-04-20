@@ -28,7 +28,6 @@
 
 #if PLATFORM(MAC)
 
-#import "ActionMenuHitTestResult.h"
 #import "AttributedString.h"
 #import "DataReference.h"
 #import "DictionaryPopupInfo.h"
@@ -45,6 +44,7 @@
 #import "WebEvent.h"
 #import "WebEventConversion.h"
 #import "WebFrame.h"
+#import "WebHitTestResult.h"
 #import "WebImage.h"
 #import "WebInspector.h"
 #import "WebPageOverlay.h"
@@ -88,7 +88,7 @@
 #import <WebKitSystemInterface.h>
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-#include <WebCore/MediaPlaybackTarget.h>
+#include <WebCore/MediaPlaybackTargetMac.h>
 #endif
 
 using namespace WebCore;
@@ -122,7 +122,7 @@ void WebPage::platformDetach()
     [m_mockAccessibilityElement setWebPage:nullptr];
 }
 
-void WebPage::platformEditorState(Frame& frame, EditorState& result) const
+void WebPage::platformEditorState(Frame& frame, EditorState& result, IncludePostLayoutDataHint) const
 {
 }
 
@@ -710,9 +710,9 @@ void WebPage::getDataSelectionForPasteboard(const String pasteboardType, SharedM
         return;
     }
     size = buffer->size();
-    RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::create(size);
+    RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::allocate(size);
     memcpy(sharedMemoryBuffer->data(), buffer->data(), size);
-    sharedMemoryBuffer->createHandle(handle, SharedMemory::ReadOnly);
+    sharedMemoryBuffer->createHandle(handle, SharedMemory::Protection::ReadOnly);
 }
 
 WKAccessibilityWebPageObject* WebPage::accessibilityRemoteObject()
@@ -1011,32 +1011,30 @@ static TextIndicatorPresentationTransition textIndicatorTransitionForActionMenu(
     return forImmediateAction ? TextIndicatorPresentationTransition::FadeIn : TextIndicatorPresentationTransition::Bounce;
 }
 
-void WebPage::performActionMenuHitTestAtLocation(WebCore::FloatPoint locationInViewCooordinates, bool forImmediateAction)
+void WebPage::performActionMenuHitTestAtLocation(WebCore::FloatPoint locationInViewCoordinates, bool forImmediateAction)
 {
     layoutIfNeeded();
 
     MainFrame& mainFrame = corePage()->mainFrame();
     if (!mainFrame.view() || !mainFrame.view()->renderView()) {
-        send(Messages::WebPageProxy::DidPerformActionMenuHitTest(ActionMenuHitTestResult(), forImmediateAction, UserData()));
+        send(Messages::WebPageProxy::DidPerformActionMenuHitTest(WebHitTestResult::Data(), forImmediateAction, false, UserData()));
         return;
     }
 
-    IntPoint locationInContentCoordinates = mainFrame.view()->rootViewToContents(roundedIntPoint(locationInViewCooordinates));
+    IntPoint locationInContentCoordinates = mainFrame.view()->rootViewToContents(roundedIntPoint(locationInViewCoordinates));
     HitTestResult hitTestResult = mainFrame.eventHandler().hitTestResultAtPoint(locationInContentCoordinates);
 
-    m_lastActionMenuHitTestPreventsDefault = false;
+    bool actionMenuHitTestPreventsDefault = false;
     Element* element = hitTestResult.innerElement();
 
     if (forImmediateAction) {
         mainFrame.eventHandler().setImmediateActionStage(ImmediateActionStage::PerformedHitTest);
         if (element)
-            m_lastActionMenuHitTestPreventsDefault = element->dispatchMouseForceWillBegin();
+            actionMenuHitTestPreventsDefault = element->dispatchMouseForceWillBegin();
     }
 
-    ActionMenuHitTestResult actionMenuResult;
-    actionMenuResult.hitTestLocationInViewCooordinates = locationInViewCooordinates;
-    actionMenuResult.hitTestResult = WebHitTestResult::Data(hitTestResult);
-    actionMenuResult.contentPreventsDefault = m_lastActionMenuHitTestPreventsDefault;
+    WebHitTestResult::Data actionMenuResult(hitTestResult, !forImmediateAction);
+    actionMenuResult.hitTestLocationInViewCoordinates = locationInViewCoordinates;
 
     RefPtr<Range> selectionRange = corePage()->focusController().focusedOrMainFrame().selection().selection().firstRange();
 
@@ -1048,7 +1046,7 @@ void WebPage::performActionMenuHitTestAtLocation(WebCore::FloatPoint locationInV
     }
 
     NSDictionary *options = nil;
-    RefPtr<Range> lookupRange = lookupTextAtLocation(locationInViewCooordinates, &options);
+    RefPtr<Range> lookupRange = lookupTextAtLocation(locationInViewCoordinates, &options);
     actionMenuResult.lookupText = lookupRange ? lookupRange->text() : String();
 
     if (lookupRange) {
@@ -1060,19 +1058,6 @@ void WebPage::performActionMenuHitTestAtLocation(WebCore::FloatPoint locationInV
 
     m_lastActionMenuRangeForSelection = lookupRange;
     m_lastActionMenuHitTestResult = hitTestResult;
-
-    if (!forImmediateAction) {
-        if (Image* image = hitTestResult.image()) {
-            RefPtr<SharedBuffer> buffer = image->data();
-            String imageExtension = image->filenameExtension();
-            if (!imageExtension.isEmpty() && buffer) {
-                actionMenuResult.imageSharedMemory = SharedMemory::create(buffer->size());
-                memcpy(actionMenuResult.imageSharedMemory->data(), buffer->data(), buffer->size());
-                actionMenuResult.imageExtension = imageExtension;
-                actionMenuResult.imageSize = buffer->size();
-            }
-        }
-    }
 
     bool pageOverlayDidOverrideDataDetectors = false;
     for (const auto& overlay : mainFrame.pageOverlayController().pageOverlays()) {
@@ -1086,7 +1071,7 @@ void WebPage::performActionMenuHitTestAtLocation(WebCore::FloatPoint locationInV
             continue;
 
         pageOverlayDidOverrideDataDetectors = true;
-        actionMenuResult.actionContext = actionContext;
+        actionMenuResult.detectedDataActionContext = actionContext;
 
         Vector<FloatQuad> quads;
         mainResultRange->textQuads(quads);
@@ -1107,8 +1092,8 @@ void WebPage::performActionMenuHitTestAtLocation(WebCore::FloatPoint locationInV
     if (!pageOverlayDidOverrideDataDetectors && hitTestResult.innerNode() && hitTestResult.innerNode()->isTextNode()) {
         FloatRect detectedDataBoundingBox;
         RefPtr<Range> detectedDataRange;
-        actionMenuResult.actionContext = DataDetection::detectItemAroundHitTestResult(hitTestResult, detectedDataBoundingBox, detectedDataRange);
-        if (actionMenuResult.actionContext && detectedDataRange) {
+        actionMenuResult.detectedDataActionContext = DataDetection::detectItemAroundHitTestResult(hitTestResult, detectedDataBoundingBox, detectedDataRange);
+        if (actionMenuResult.detectedDataActionContext && detectedDataRange) {
             actionMenuResult.detectedDataBoundingBox = detectedDataBoundingBox;
             actionMenuResult.detectedDataTextIndicator = TextIndicator::createWithRange(*detectedDataRange, textIndicatorTransitionForActionMenu(selectionRange.get(), *detectedDataRange, forImmediateAction, true));
             m_lastActionMenuRangeForSelection = detectedDataRange;
@@ -1118,16 +1103,16 @@ void WebPage::performActionMenuHitTestAtLocation(WebCore::FloatPoint locationInV
     RefPtr<API::Object> userData;
     injectedBundleContextMenuClient().prepareForActionMenu(*this, hitTestResult, userData);
 
-    send(Messages::WebPageProxy::DidPerformActionMenuHitTest(actionMenuResult, forImmediateAction, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
+    send(Messages::WebPageProxy::DidPerformActionMenuHitTest(actionMenuResult, forImmediateAction, actionMenuHitTestPreventsDefault, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
 }
 
-PassRefPtr<WebCore::Range> WebPage::lookupTextAtLocation(FloatPoint locationInViewCooordinates, NSDictionary **options)
+PassRefPtr<WebCore::Range> WebPage::lookupTextAtLocation(FloatPoint locationInViewCoordinates, NSDictionary **options)
 {
     MainFrame& mainFrame = corePage()->mainFrame();
     if (!mainFrame.view() || !mainFrame.view()->renderView())
         return nullptr;
 
-    IntPoint point = roundedIntPoint(locationInViewCooordinates);
+    IntPoint point = roundedIntPoint(locationInViewCoordinates);
     HitTestResult result = mainFrame.eventHandler().hitTestResultAtPoint(m_page->mainFrame().view()->windowToContents(point));
     return rangeForDictionaryLookupAtHitTestResult(result, options);
 }
@@ -1156,28 +1141,6 @@ void WebPage::focusAndSelectLastActionMenuHitTestResult()
     frame->selection().setSelection(position);
 }
 
-void WebPage::inputDeviceForceDidChange(float force, int stage)
-{
-    Element* element = m_lastActionMenuHitTestResult.innerElement();
-    if (!element)
-        return;
-
-    if (!m_lastActionMenuHitTestPreventsDefault)
-        return;
-
-    float overallForce = stage < 1 ? force : force + stage - 1;
-    element->dispatchMouseForceChanged(overallForce, m_page->mainFrame().eventHandler().lastMouseDownEvent());
-
-    if (m_lastForceStage == 1 && stage == 2)
-        element->dispatchMouseForceDown(m_page->mainFrame().eventHandler().lastMouseDownEvent());
-    else if (m_lastForceStage == 2 && stage == 1) {
-        element->dispatchMouseForceUp(m_page->mainFrame().eventHandler().lastMouseDownEvent());
-        element->dispatchMouseForceClick(m_page->mainFrame().eventHandler().lastMouseDownEvent());
-    }
-
-    m_lastForceStage = stage;
-}
-
 void WebPage::immediateActionDidUpdate()
 {
     m_page->mainFrame().eventHandler().setImmediateActionStage(ImmediateActionStage::ActionUpdated);
@@ -1186,15 +1149,6 @@ void WebPage::immediateActionDidUpdate()
 void WebPage::immediateActionDidCancel()
 {
     m_page->mainFrame().eventHandler().setImmediateActionStage(ImmediateActionStage::ActionCancelled);
-
-    Element* element = m_lastActionMenuHitTestResult.innerElement();
-    if (!element)
-        return;
-
-    if (!m_lastActionMenuHitTestPreventsDefault)
-        return;
-
-    element->dispatchMouseForceCancelled(m_page->mainFrame().eventHandler().lastMouseDownEvent());
 }
 
 void WebPage::immediateActionDidComplete()
@@ -1249,9 +1203,11 @@ void WebPage::setFont(const String& fontFamily, double fontSize, uint64_t fontTr
 }
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET) && !PLATFORM(IOS)
-void WebPage::playbackTargetSelected(const WebCore::MediaPlaybackTarget& playbackTarget) const
+void WebPage::playbackTargetSelected(const WebCore::MediaPlaybackTargetContext& targetContext) const
 {
-    m_page->didChoosePlaybackTarget(playbackTarget);
+    ASSERT(targetContext.type == MediaPlaybackTargetContext::AVOutputContextType);
+
+    m_page->didChoosePlaybackTarget(WebCore::MediaPlaybackTargetMac::create(targetContext.context.avOutputContext));
 }
 
 void WebPage::playbackTargetAvailabilityDidChange(bool changed)

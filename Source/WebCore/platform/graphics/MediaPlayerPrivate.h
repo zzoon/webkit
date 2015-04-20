@@ -170,7 +170,8 @@ public:
     virtual void setWirelessVideoPlaybackDisabled(bool) { }
 
     virtual bool canPlayToWirelessPlaybackTarget() const { return false; }
-    virtual void setWirelessPlaybackTarget(const MediaPlaybackTarget&) { }
+    virtual bool isPlayingToWirelessPlaybackTarget() { return false; }
+    virtual void setWirelessPlaybackTarget(Ref<MediaPlaybackTarget>&&) { }
 
     virtual void startPlayingToPlaybackTarget() { }
     virtual void stopPlayingToPlaybackTarget() { }

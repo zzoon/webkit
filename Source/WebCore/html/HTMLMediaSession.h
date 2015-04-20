@@ -63,6 +63,11 @@ public:
     void setWirelessVideoPlaybackDisabled(const HTMLMediaElement&, bool);
 
     void setHasPlaybackTargetAvailabilityListeners(const HTMLMediaElement&, bool);
+
+    virtual bool canPlayToWirelessPlaybackTarget() const override;
+    virtual bool isPlayingToWirelessPlaybackTarget() const override;
+    virtual void startPlayingToPlaybackTarget() override;
+    virtual void stopPlayingToPlaybackTarget() override;
 #endif
 
     bool requiresFullscreenForVideoPlayback(const HTMLMediaElement&) const;
@@ -99,7 +104,7 @@ private:
     void targetAvailabilityChangedTimerFired();
 
     // MediaPlaybackTargetPickerClient
-    virtual void didChoosePlaybackTarget(const MediaPlaybackTarget&) override;
+    virtual void didChoosePlaybackTarget(Ref<MediaPlaybackTarget>&&) override;
     virtual void externalOutputDeviceAvailableDidChange(bool) const override;
     virtual bool requiresPlaybackTargetRouteMonitoring() const override;
 #endif
@@ -108,7 +113,7 @@ private:
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     mutable Timer m_targetAvailabilityChangedTimer;
-    std::unique_ptr<MediaPlaybackTarget> m_playbackTarget;
+    RefPtr<MediaPlaybackTarget> m_playbackTarget;
     bool m_hasPlaybackTargetAvailabilityListeners { false };
     mutable bool m_hasPlaybackTargets { false };
 #endif

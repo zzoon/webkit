@@ -34,15 +34,13 @@
 
 namespace JSC {
 
-typedef JSObject* (*ErrorFactory)(ExecState*, const String&);
+typedef JSObject* (*ErrorFactory)(ExecState*, const String&, ErrorInstance::SourceAppender);
 
 JSObject* createTerminatedExecutionException(VM*);
 bool isTerminatedExecutionException(JSObject*);
 JS_EXPORT_PRIVATE bool isTerminatedExecutionException(JSValue);
-JS_EXPORT_PRIVATE JSObject* createError(ExecState*, ErrorFactory, JSValue, const String&, ErrorInstance::SourceAppender);
+JS_EXPORT_PRIVATE JSObject* createError(ExecState*, JSValue, const String&, ErrorInstance::SourceAppender);
 JS_EXPORT_PRIVATE JSObject* createStackOverflowError(ExecState*);
-JSObject* createStackOverflowError(JSGlobalObject*);
-JSObject* createOutOfMemoryError(JSGlobalObject*);
 JSObject* createUndefinedVariableError(ExecState*, const Identifier&);
 JSObject* createNotAnObjectError(ExecState*, JSValue);
 JSObject* createInvalidFunctionApplyParameterError(ExecState*, JSValue);
@@ -58,17 +56,10 @@ JS_EXPORT_PRIVATE JSObject* throwStackOverflowError(ExecState*);
 JS_EXPORT_PRIVATE JSObject* throwTerminatedExecutionException(ExecState*);
 
 
-class TerminatedExecutionError : public JSNonFinalObject {
-private:
-    TerminatedExecutionError(VM& vm)
-        : JSNonFinalObject(vm, vm.terminatedExecutionErrorStructure.get())
-    {
-    }
-
-    static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
-
+class TerminatedExecutionError final : public JSNonFinalObject {
 public:
     typedef JSNonFinalObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags | StructureIsImmortal;
 
     static TerminatedExecutionError* create(VM& vm)
     {
@@ -83,6 +74,15 @@ public:
     }
 
     DECLARE_EXPORT_INFO;
+
+private:
+    explicit TerminatedExecutionError(VM& vm)
+        : JSNonFinalObject(vm, vm.terminatedExecutionErrorStructure.get())
+    {
+    }
+
+    static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
+
 };
 
 } // namespace JSC
