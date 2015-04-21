@@ -23,6 +23,7 @@
       <dep package="atk"/>
       <dep package="at-spi2-core"/>
       <dep package="at-spi2-atk"/>
+      <dep package="libsrtp"/>
       <dep package="gstreamer"/>
       <dep package="gst-plugins-base"/>
       <dep package="gst-plugins-good"/>
@@ -60,6 +61,8 @@
       href="http://download.savannah.gnu.org/releases/"/>
   <repository type="git" name="freedesktop-git"
       href="http://anongit.freedesktop.org/git"/>
+  <repository type="tarball" name="github-https"
+      href="https://github.com/"/>
 
   <autotools id="cairo"
              autogenargs="--enable-gl=yes --enable-egl=yes --enable-glx=yes ac_cv_func_rsvg_pixbuf_from_file=no --disable-lto"
@@ -275,6 +278,15 @@
             md5sum="9c0cfef285d5c4a5c80d00904ddab380"/>
   </autotools>
 
+  <autotools id="libsrtp" autogen-sh="configure">
+    <branch module="cisco/libsrtp/archive/v1.5.2.tar.gz" version="1.5.2"
+            checkoutdir="libsrtp-1.5.2"
+            repo="github-https"
+            hash="sha256:86e1efe353397c0751f6bdd709794143bd1b76494412860f16ff2b6d9c304eda"
+            md5sum="2309aa6027992810a4285b042c71e644">
+    </branch>
+  </autotools>
+
   <autotools id="gstreamer" autogenargs="--disable-gtk-doc">
     <branch repo="freedesktop-git" module="gstreamer/gstreamer" version="1.5" checkoutdir="gstreamer" tag="41946aa3f63dacacb3e5e92a65f7bc8b50eac18c"/>
   </autotools>
@@ -297,9 +309,10 @@
     <branch repo="freedesktop-git" module="gstreamer/gst-plugins-good" version="1.5" checkoutdir="gst-plugins-good" tag="fc038f1f4e45c5c3eb9ba8261c4e0210dd125821"/>
   </autotools>
 
-  <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc">
+  <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc --enable-openh264 --enable-opus --enable-srtp">
     <dependencies>
       <dep package="gst-plugins-base"/>
+      <dep package="libsrtp"/>
     </dependencies>
 
     <branch repo="freedesktop-git" module="gstreamer/gst-plugins-bad" version="1.5" checkoutdir="gst-plugins-bad" tag="917c39540329fda619eaf67cd6dbe3fb585bae0e"/>
