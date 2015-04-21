@@ -276,10 +276,7 @@
   </autotools>
 
   <autotools id="gstreamer" autogenargs="--disable-gtk-doc">
-    <branch module="gstreamer/gstreamer-1.4.4.tar.xz" version="1.4.4"
-            repo="gstreamer"
-            hash="sha256:f0e305d91a93d05bf9e332cd4256ca07d77f5186a4d73847b7ae6db218f2c237"
-            md5sum="98f4a6d45a28dd195144baef0244ba38"/>
+    <branch repo="freedesktop-git" module="gstreamer/gstreamer" version="1.5" checkoutdir="gstreamer" tag="41946aa3f63dacacb3e5e92a65f7bc8b50eac18c"/>
   </autotools>
 
   <autotools id="gst-plugins-base"
@@ -288,11 +285,8 @@
     <dependencies>
       <dep package="gstreamer"/>
     </dependencies>
-    <branch module="gst-plugins-base/gst-plugins-base-1.4.4.tar.xz" version="1.4.4"
-            repo="gstreamer"
-            hash="sha256:49cd9e8f23c416b1607b43837a09833fa03e0106929d81ead2ddfde6c0ade44b"
-            md5sum="0c42eca8f9e4efd56d2ce8e9249ce4a1">
-    </branch>
+
+    <branch repo="freedesktop-git" module="gstreamer/gst-plugins-base" version="1.5" checkoutdir="gst-plugins-base" tag="ebf8ea4ed9408006a56f85ec31d0f72e645d7c75"/>
   </autotools>
 
   <autotools id="gst-plugins-good" autogenargs="--disable-examples --disable-soup --disable-gtk-doc">
@@ -300,33 +294,23 @@
       <dep package="gst-plugins-base"/>
     </dependencies>
 
-    <branch module="gst-plugins-good/gst-plugins-good-1.4.4.tar.xz" version="1.4.4"
-            repo="gstreamer"
-            hash="sha256:2df90e99da45211c7b2525ae4ac34830a9e7784bd48c072c406c0cf014bdb277"
-            md5sum="673cf9276952bd3937dafd817c9ead2b">
-    </branch>
+    <branch repo="freedesktop-git" module="gstreamer/gst-plugins-good" version="1.5" checkoutdir="gst-plugins-good" tag="fc038f1f4e45c5c3eb9ba8261c4e0210dd125821"/>
   </autotools>
 
   <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc">
     <dependencies>
       <dep package="gst-plugins-base"/>
     </dependencies>
-    <branch module="gst-plugins-bad/gst-plugins-bad-1.4.4.tar.xz" version="1.4.4"
-            repo="gstreamer"
-            hash="sha256:e41b36105c0a13a2cb1ff9f559714e839b82dc3841484cd664790fb7947e55c7"
-            md5sum="972c6e22dd2e44fcf0b04b9d810a56be">
-      <patch file="gst-plugins-bad-remove-gnustep-support.patch" strip="1"/>
-    </branch>
+
+    <branch repo="freedesktop-git" module="gstreamer/gst-plugins-bad" version="1.5" checkoutdir="gst-plugins-bad" tag="917c39540329fda619eaf67cd6dbe3fb585bae0e"/>
   </autotools>
 
   <autotools id="gst-libav" autogenargs="--with-libav-extra-configure='--disable-yasm' --disable-gtk-doc">
     <dependencies>
       <dep package="gst-plugins-base"/>
     </dependencies>
-    <branch module="gst-libav/gst-libav-1.4.4.tar.xz" version="1.4.4"
-            repo="gstreamer"
-            hash="sha256:2ec7285e5ec6731963b0955487cceb9eb04e285ca682f3ef575996c068cde8aa"
-            md5sum="64a3e2cda2687132cadca4efdc63f3b4"/>
+
+    <branch repo="freedesktop-git" module="gstreamer/gst-libav" version="1.5" checkoutdir="gst-libav" tag="490a896b2322fdb0d81efca5b092fddfc61eb1b1"/>
   </autotools>
 
   <autotools id="xserver" autogenargs="--disable-xinerama --enable-glx --enable-composite --disable-xorg --disable-dmx --disable-xnest --disable-xquartz --disable-xwin --disable-xephyr --disable-xfake --disable-xfbdev --disable-install-setuid --disable-unit-tests --enable-unix-transport --enable-tcp-transport --disable-local-transport --with-xkb-path=/usr/share/X11/xkb --with-xkb-output=/var/lib/xkb --with-xkb-bin-directory=/usr/bin --without-dtrace">
