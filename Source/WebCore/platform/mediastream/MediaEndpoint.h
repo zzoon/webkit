@@ -47,7 +47,7 @@ class RealTimeMediaSource; // not implemented
 class MediaEndpointClient {
 public:
     virtual void gotSendSSRC(unsigned mdescIndex, const String& ssrc, const String& cname) = 0;
-    virtual void gotDtlsFingerprint(unsigned mdescIndex, const String& fingerprint, const String& hashFunction) = 0;
+    virtual void gotDtlsCertificate(unsigned mdescIndex, const String& certificate) = 0;
     virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) = 0;
     virtual void doneGatheringCandidates(unsigned mdescIndex) = 0;
     virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealTimeMediaSource>&&) = 0;

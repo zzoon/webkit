@@ -60,7 +60,7 @@ public:
 
     void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&);
     void dispatchGatheringDone(unsigned sessionIndex);
-    void dispatchDtlsFingerprint(unsigned sessionIndex, const String& fingerprint, const String& hashFunction);
+    void dispatchDtlsCertificate(unsigned sessionIndex, const String& certificate);
 
 private:
     enum SessionType { SessionTypeMedia };

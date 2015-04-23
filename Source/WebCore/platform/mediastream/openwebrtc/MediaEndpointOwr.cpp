@@ -140,9 +140,9 @@ void MediaEndpointOwr::dispatchGatheringDone(unsigned sessionIndex)
     m_client->doneGatheringCandidates(sessionIndex);
 }
 
-void MediaEndpointOwr::dispatchDtlsFingerprint(unsigned sessionIndex, const String& fingerprint, const String& hashFunction)
+void MediaEndpointOwr::dispatchDtlsCertificate(unsigned sessionIndex, const String& certificate)
 {
-    m_client->gotDtlsFingerprint(sessionIndex, fingerprint, hashFunction);
+    m_client->gotDtlsCertificate(sessionIndex, certificate);
 }
 
 void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription*)
@@ -219,16 +219,13 @@ static void candidateGatheringDone(OwrSession* session, MediaEndpointOwr* mediaE
 
 static void gotDtlsCertificate(OwrSession* session, GParamSpec*, MediaEndpointOwr* mediaEndpoint)
 {
-    String fingerprint;
-    String hashFunction;
-
     gchar* pem;
-
     g_object_get(session, "dtls-certificate", &pem, nullptr);
 
-    printf("pem: %s\n", pem);
+    String certificate(pem);
+    g_free(pem);
 
-    mediaEndpoint->dispatchDtlsFingerprint(mediaEndpoint->sessionIndex(session), fingerprint, hashFunction);
+    mediaEndpoint->dispatchDtlsCertificate(mediaEndpoint->sessionIndex(session), certificate);
 }
 
 static void gotSendSsrc(OwrMediaSession* mediaSession, GParamSpec*, MediaEndpointOwr*)

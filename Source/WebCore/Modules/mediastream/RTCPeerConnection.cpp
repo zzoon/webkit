@@ -502,7 +502,7 @@ void RTCPeerConnection::gotSendSSRC(unsigned, const String&, const String&)
 {
 }
 
-void RTCPeerConnection::gotDtlsFingerprint(unsigned, const String&, const String&)
+void RTCPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const String& certificate)
 {
 }
 

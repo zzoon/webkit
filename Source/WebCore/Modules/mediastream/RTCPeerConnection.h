@@ -100,7 +100,7 @@ public:
 
     // MediaEndpointClient
     virtual void gotSendSSRC(unsigned mdescIndex, const String& ssrc, const String& cname) override;
-    virtual void gotDtlsFingerprint(unsigned mdescIndex, const String& fingerprint, const String& hashFunction) override;
+    virtual void gotDtlsCertificate(unsigned mdescIndex, const String& certificate) override;
     virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) override;
     virtual void doneGatheringCandidates(unsigned mdescIndex) override;
     virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealTimeMediaSource>&&) override;
