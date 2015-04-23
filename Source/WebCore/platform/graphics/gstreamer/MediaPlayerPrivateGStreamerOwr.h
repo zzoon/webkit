@@ -25,8 +25,8 @@
 #include "MediaPlayerPrivateGStreamerBase.h"
 #include "RealtimeMediaSource.h"
 
-typedef struct _OwrVideoRenderer OwrVideoRenderer;
-typedef struct _OwrAudioRenderer OwrAudioRenderer;
+typedef struct _OwrGstVideoRenderer OwrGstVideoRenderer;
+typedef struct _OwrGstAudioRenderer OwrGstAudioRenderer;
 
 namespace WebCore {
 
@@ -107,8 +107,8 @@ private:
     RefPtr<RealtimeMediaSourceOwr> m_audioSource;
     GRefPtr<GstElement> m_audioSink;
     RefPtr<MediaStreamPrivate> m_streamPrivate;
-    OwrVideoRenderer* m_videoRenderer;
-    OwrAudioRenderer* m_audioRenderer;
+    OwrGstVideoRenderer* m_videoRenderer;
+    OwrGstAudioRenderer* m_audioRenderer;
 };
 
 } // namespace WebCore

@@ -32,8 +32,8 @@
 #include "URL.h"
 #include <gst/audio/streamvolume.h>
 #include <owr/owr.h>
-#include <owr/owr_audio_renderer.h>
-#include <owr/owr_video_renderer.h>
+#include <owr/owr_gst_audio_renderer.h>
+#include <owr/owr_gst_video_renderer.h>
 #include <wtf/text/CString.h>
 
 GST_DEBUG_CATEGORY(webkit_openwebrtc_debug);
@@ -276,7 +276,7 @@ void MediaPlayerPrivateGStreamerOwr::createGSTAudioSinkBin()
     m_audioSink = adoptGRef(GST_ELEMENT(gst_child_proxy_get_child_by_index(childProxy, 0)));
     gst_element_set_state(sink.get(), GST_STATE_NULL);
 
-    m_audioRenderer = owr_audio_renderer_new(G_OBJECT(m_audioSink.get()));
+    m_audioRenderer = owr_gst_audio_renderer_new(m_audioSink.get());
 }
 
 void MediaPlayerPrivateGStreamerOwr::sourceReadyStateChanged()
@@ -315,7 +315,7 @@ bool MediaPlayerPrivateGStreamerOwr::observerIsEnabled()
 GstElement* MediaPlayerPrivateGStreamerOwr::createVideoSink()
 {
     GstElement* sink = MediaPlayerPrivateGStreamerBase::createVideoSink();
-    m_videoRenderer = owr_video_renderer_new(0, G_OBJECT(sink));
+    m_videoRenderer = owr_gst_video_renderer_new(sink);
     return nullptr;
 }
 
