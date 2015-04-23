@@ -334,7 +334,7 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
     if (!m_localConfiguration)
         return nullptr;
 
-    return RTCSessionDescription::create(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get()), m_localConfigurationType);
+    return RTCSessionDescription::create(m_localConfigurationType, MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get()));
 }
 
 void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
@@ -368,7 +368,7 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::remoteDescription() const
     if (!m_remoteConfiguration)
         return nullptr;
 
-    return RTCSessionDescription::create(MediaEndpointConfigurationConversions::toJSON(m_remoteConfiguration.get()), m_remoteConfigurationType);
+    return RTCSessionDescription::create(m_remoteConfigurationType, MediaEndpointConfigurationConversions::toJSON(m_remoteConfiguration.get()));
 }
 
 void RTCPeerConnection::updateIce(const Dictionary& rtcConfiguration, ExceptionCode& ec)
