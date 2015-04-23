@@ -36,6 +36,7 @@
 
 #include "RTCPeerConnection.h"
 
+#include "CryptoDigest.h"
 #include "DOMError.h"
 #include "Document.h"
 #include "Event.h"
@@ -56,6 +57,7 @@
 #include "RTCRtpSender.h"
 #include "RTCSessionDescription.h"
 #include <wtf/MainThread.h>
+#include <wtf/text/Base64.h>
 
 namespace WebCore {
 
@@ -324,9 +326,6 @@ void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, 
 
     if (m_remoteConfiguration)
         m_mediaEndpoint->prepareToSend(m_remoteConfiguration.get(), isInitiator);
-
-    // FIXME: Temporary solution
-    callOnMainThread(m_completeSetLocalDescription);
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
@@ -504,6 +503,42 @@ void RTCPeerConnection::gotSendSSRC(unsigned, const String&, const String&)
 
 void RTCPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const String& certificate)
 {
+    Vector<String> certificateRows;
+    Vector<uint8_t> der;
+
+    der.reserveCapacity(certificate.length() * 3/4 + 2);
+    certificate.split("\n", certificateRows);
+
+    for (auto& row : certificateRows) {
+        if (row.startsWith("-----"))
+            continue;
+
+        Vector<uint8_t> decodedRow;
+        if (!base64Decode(row, decodedRow, Base64FailOnInvalidCharacterOrExcessPadding)) {
+            ASSERT_NOT_REACHED();
+            return;
+        }
+        der.appendVector(decodedRow);
+    }
+
+    std::unique_ptr<CryptoDigest> digest = CryptoDigest::create(CryptoAlgorithmIdentifier::SHA_256);
+    if (!digest) {
+        ASSERT_NOT_REACHED();
+        return;
+    }
+
+    digest->addBytes(der.data(), der.size());
+    Vector<uint8_t> fingerprintVector = digest->computeHash();
+
+    StringBuilder fingerprint;
+    for (unsigned i = 0; i < fingerprintVector.size(); ++i)
+        fingerprint.append(String::format(i ? ":%02X" : "%02X", fingerprintVector[i]));
+
+    m_localConfiguration->mediaDescriptions()[mdescIndex]->setDtlsFingerprintHashFunction("sha256");
+    m_localConfiguration->mediaDescriptions()[mdescIndex]->setDtlsFingerprint(fingerprint.toString());
+
+    // FIXME: Temporary solution
+    m_completeSetLocalDescription();
 }
 
 void RTCPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate)
