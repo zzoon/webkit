@@ -154,6 +154,12 @@ RefPtr<MediaEndpointConfiguration> fromJSON(const String& json)
         if (mdescObject->getObject(ASCIILiteral("dtls"), dtlsObject)) {
             if (dtlsObject->getString(ASCIILiteral("setup"), stringValue))
                 mdesc->setDtlsSetup(stringValue);
+
+            if (dtlsObject->getString(ASCIILiteral("fingerprintHashFunction"), stringValue))
+                mdesc->setDtlsFingerprintHashFunction(stringValue);
+
+            if (dtlsObject->getString(ASCIILiteral("fingerprint"), stringValue))
+                mdesc->setDtlsFingerprint(stringValue);
         }
 
         RefPtr<InspectorObject> iceObject = InspectorObject::create();
@@ -232,6 +238,8 @@ String toJSON(MediaEndpointConfiguration* configuration)
 
         RefPtr<InspectorObject> dtlsObject = InspectorObject::create();
         dtlsObject->setString(ASCIILiteral("setup"), mdesc->dtlsSetup());
+        dtlsObject->setString(ASCIILiteral("fingerprintHashFunction"), mdesc->dtlsFingerprintHashFunction());
+        dtlsObject->setString(ASCIILiteral("fingerprint"), mdesc->dtlsFingerprint());
         mdescObject->setObject(ASCIILiteral("dtls"), dtlsObject);
 
         RefPtr<InspectorObject> iceObject = InspectorObject::create();

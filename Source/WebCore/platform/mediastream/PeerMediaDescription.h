@@ -72,6 +72,12 @@ public:
     const String& dtlsSetup() const { return m_dtlsSetup; }
     void setDtlsSetup(const String& dtlsSetup) { m_dtlsSetup = dtlsSetup; }
 
+    const String& dtlsFingerprintHashFunction() const { return m_dtlsFingerprintHashFunction; }
+    void setDtlsFingerprintHashFunction(const String& dtlsFingerprintHashFunction) { m_dtlsFingerprintHashFunction = dtlsFingerprintHashFunction; }
+
+    const String& dtlsFingerprint() const { return m_dtlsFingerprint; }
+    void setDtlsFingerprint(const String& dtlsFingerprint) { m_dtlsFingerprint = dtlsFingerprint; }
+
     const String& iceUfrag() const { return m_iceUfrag; }
     void setIceUfrag(const String& iceUfrag) { m_iceUfrag = iceUfrag; }
 
@@ -96,6 +102,8 @@ private:
     String m_mediaStreamTrackId;
 
     String m_dtlsSetup;
+    String m_dtlsFingerprintHashFunction;
+    String m_dtlsFingerprint;
 
     String m_iceUfrag;
     String m_icePassword;
