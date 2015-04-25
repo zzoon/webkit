@@ -93,8 +93,13 @@ public:
     const Vector<RefPtr<IceCandidate>>& iceCandidates() const { return m_iceCandidates; }
     void addIceCandidate(RefPtr<IceCandidate>&& candidate) { m_iceCandidates.append(WTF::move(candidate)); }
 
+    bool iceCandidateGatheringDone() const { return m_iceCandidateGatheringDone; }
+    void setIceCandidateGatheringDone(bool iceCandidateGatheringDone) { m_iceCandidateGatheringDone = iceCandidateGatheringDone; }
+
 private:
-    PeerMediaDescription() { }
+    PeerMediaDescription()
+        : m_iceCandidateGatheringDone(false)
+    { }
 
     String m_type;
     unsigned short m_port;
@@ -117,6 +122,7 @@ private:
     String m_iceUfrag;
     String m_icePassword;
     Vector<RefPtr<IceCandidate>> m_iceCandidates;
+    bool m_iceCandidateGatheringDone;
 };
 
 } // namespace WebCore
