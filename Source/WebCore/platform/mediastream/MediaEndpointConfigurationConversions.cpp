@@ -162,6 +162,17 @@ RefPtr<MediaEndpointConfiguration> fromJSON(const String& json)
                 mdesc->setDtlsFingerprint(stringValue);
         }
 
+        RefPtr<InspectorArray> ssrcsArray = InspectorArray::create();
+        mdescObject->getArray(ASCIILiteral("ssrcs"), ssrcsArray);
+
+        for (unsigned j = 0; j < ssrcsArray->length(); ++j) {
+            ssrcsArray->get(j)->asString(stringValue);
+            mdesc->addSsrc(stringValue);
+        }
+
+        if (mdescObject->getString(ASCIILiteral("cname"), stringValue))
+            mdesc->setCname(stringValue);
+
         RefPtr<InspectorObject> iceObject = InspectorObject::create();
         if (mdescObject->getObject(ASCIILiteral("ice"), iceObject)) {
             if (iceObject->getString(ASCIILiteral("ufrag"), stringValue))
@@ -241,6 +252,15 @@ String toJSON(MediaEndpointConfiguration* configuration)
         dtlsObject->setString(ASCIILiteral("fingerprintHashFunction"), mdesc->dtlsFingerprintHashFunction());
         dtlsObject->setString(ASCIILiteral("fingerprint"), mdesc->dtlsFingerprint());
         mdescObject->setObject(ASCIILiteral("dtls"), dtlsObject);
+
+        RefPtr<InspectorArray> ssrcsArray = InspectorArray::create();
+
+        for (const auto& ssrc : mdesc->ssrcs()) {
+            ssrcsArray->pushString(ssrc);
+        }
+        mdescObject->setArray(ASCIILiteral("ssrcs"), ssrcsArray);
+
+        mdescObject->setString(ASCIILiteral("cname"), mdesc->cname());
 
         RefPtr<InspectorObject> iceObject = InspectorObject::create();
         iceObject->setString(ASCIILiteral("ufrag"), mdesc->iceUfrag());
