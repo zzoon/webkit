@@ -98,7 +98,9 @@ public:
 
 private:
     PeerMediaDescription()
-        : m_iceCandidateGatheringDone(false)
+        : m_port(0)
+        , m_rtcpMux(false)
+        , m_iceCandidateGatheringDone(false)
     { }
 
     String m_type;

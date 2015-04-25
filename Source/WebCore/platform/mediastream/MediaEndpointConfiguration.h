@@ -52,7 +52,9 @@ public:
     void addMediaDescription(RefPtr<PeerMediaDescription>&& description) { m_mediaDescriptions.append(WTF::move(description)); }
 
 private:
-    MediaEndpointConfiguration() { }
+    MediaEndpointConfiguration()
+        : m_sessionId(0)
+    { }
 
     unsigned long m_sessionId;
 

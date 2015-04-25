@@ -60,7 +60,9 @@ public:
     void setTransport(const String& transport) { m_transport = transport; }
 
 private:
-    IceCandidate() { }
+    IceCandidate()
+        : m_componentId(0)
+    { }
 
     String m_type;
     String m_foundation;

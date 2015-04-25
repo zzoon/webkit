@@ -55,7 +55,10 @@ public:
     unsigned clockRate() const { return m_clockRate; }
 
 private:
-    MediaPayload() { }
+    MediaPayload()
+        : m_type(0)
+        , m_clockRate(0)
+    { }
 
     unsigned m_type;
     String m_encodingName;
