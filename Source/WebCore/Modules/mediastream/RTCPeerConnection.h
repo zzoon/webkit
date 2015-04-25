@@ -155,6 +155,16 @@ private:
     SignalingState targetSignalingState(SetterType, DescriptionType) const;
     DescriptionType parseDescriptionType(const String& typeName) const;
 
+    enum ResolveSetLocalDescriptionResult {
+        LocalConfigurationIncomplete,
+        SetLocalDescriptionResolvedSuccessfully,
+        SetLocalDescriptionAlreadyResolved
+    };
+
+    bool isLocalConfigurationComplete() const;
+    ResolveSetLocalDescriptionResult maybeResolveSetLocalDescription();
+    void maybeDispatchGatheringDone() const;
+
     void scheduleDispatchEvent(PassRefPtr<Event>);
     void scheduledEventTimerFired();
 
@@ -184,7 +194,7 @@ private:
     String m_localConfigurationType;
     String m_remoteConfigurationType;
 
-    std::function<void()> m_completeSetLocalDescription;
+    std::function<void()> m_resolveSetLocalDescription;
 
     Vector<RefPtr<RTCDataChannel>> m_dataChannels;
 

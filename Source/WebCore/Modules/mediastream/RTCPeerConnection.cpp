@@ -94,6 +94,7 @@ RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, PassRefPtr
     , m_signalingState(SignalingStateStable)
     , m_iceGatheringState(IceGatheringStateNew)
     , m_iceConnectionState(IceConnectionStateNew)
+    , m_resolveSetLocalDescription(nullptr)
     , m_scheduledEventTimer(*this, &RTCPeerConnection::scheduledEventTimerFired)
     , m_configuration(configuration)
     , m_stopped(false)
@@ -316,7 +317,7 @@ void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, 
     bool isInitiator = descriptionType == DescriptionTypeOffer;
 
     RefPtr<RTCPeerConnection> protectedThis(this);
-    m_completeSetLocalDescription = [targetState, resolveCallback, protectedThis]() mutable {
+    m_resolveSetLocalDescription = [targetState, resolveCallback, protectedThis]() mutable {
         protectedThis->m_signalingState = targetState;
         resolveCallback();
     };
@@ -499,6 +500,9 @@ void RTCPeerConnection::close()
 
 void RTCPeerConnection::gotSendSSRC(unsigned, const String&, const String&)
 {
+    printf("-> gotSendSSRC()\n");
+
+    maybeResolveSetLocalDescription();
 }
 
 void RTCPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const String& certificate)
@@ -537,8 +541,8 @@ void RTCPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const String& ce
     m_localConfiguration->mediaDescriptions()[mdescIndex]->setDtlsFingerprintHashFunction("sha256");
     m_localConfiguration->mediaDescriptions()[mdescIndex]->setDtlsFingerprint(fingerprint.toString());
 
-    // FIXME: Temporary solution
-    m_completeSetLocalDescription();
+    if (maybeResolveSetLocalDescription() == SetLocalDescriptionResolvedSuccessfully)
+        maybeDispatchGatheringDone();
 }
 
 void RTCPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate)
@@ -548,9 +552,14 @@ void RTCPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate
 
     ASSERT(scriptExecutionContext()->isContextThread());
 
-    String candidateString = MediaEndpointConfigurationConversions::iceCandidateToJSON(candidate.get());
-    RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateString, "", mdescIndex);
-    scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
+    ResolveSetLocalDescriptionResult result = maybeResolveSetLocalDescription();
+    if (result == SetLocalDescriptionResolvedSuccessfully)
+        maybeDispatchGatheringDone();
+    else if (result == SetLocalDescriptionAlreadyResolved) {
+        String candidateString = MediaEndpointConfigurationConversions::iceCandidateToJSON(candidate.get());
+        RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateString, "", mdescIndex);
+        scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
+    }
 }
 
 void RTCPeerConnection::doneGatheringCandidates(unsigned)
@@ -614,6 +623,38 @@ RTCPeerConnection::DescriptionType RTCPeerConnection::parseDescriptionType(const
 
     ASSERT(typeName == "answer");
     return DescriptionTypeAnswer;
+}
+
+bool RTCPeerConnection::isLocalConfigurationComplete() const
+{
+    for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
+        // FIXME: add more tests
+        if (mdesc->dtlsFingerprint().isEmpty())
+            return false;
+    }
+
+    return true;
+}
+
+RTCPeerConnection::ResolveSetLocalDescriptionResult RTCPeerConnection::maybeResolveSetLocalDescription()
+{
+    if (!m_resolveSetLocalDescription) {
+        ASSERT(isLocalConfigurationComplete());
+        return SetLocalDescriptionAlreadyResolved;
+    }
+
+    if (isLocalConfigurationComplete()) {
+        m_resolveSetLocalDescription();
+        m_resolveSetLocalDescription = nullptr;
+        return SetLocalDescriptionResolvedSuccessfully;
+    }
+
+    return LocalConfigurationIncomplete;
+}
+
+void RTCPeerConnection::maybeDispatchGatheringDone() const
+{
+    // FIXME: implement
 }
 
 const char* RTCPeerConnection::activeDOMObjectName() const
