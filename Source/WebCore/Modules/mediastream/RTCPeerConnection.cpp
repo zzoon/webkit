@@ -562,14 +562,15 @@ void RTCPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate
     }
 }
 
-void RTCPeerConnection::doneGatheringCandidates(unsigned)
+void RTCPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
 {
     printf("-> RTCPeerConnection::doneGatheringCandidates\n");
     printf("is context thread: %d\n", scriptExecutionContext()->isContextThread());
 
     ASSERT(scriptExecutionContext()->isContextThread());
 
-    scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, 0));
+    m_localConfiguration->mediaDescriptions()[mdescIndex]->setIceCandidateGatheringDone(true);
+    maybeDispatchGatheringDone();
 }
 
 void RTCPeerConnection::gotRemoteSource(unsigned, RefPtr<RealTimeMediaSource>&&)
@@ -652,9 +653,17 @@ RTCPeerConnection::ResolveSetLocalDescriptionResult RTCPeerConnection::maybeReso
     return LocalConfigurationIncomplete;
 }
 
-void RTCPeerConnection::maybeDispatchGatheringDone() const
+void RTCPeerConnection::maybeDispatchGatheringDone()
 {
-    // FIXME: implement
+    if (!isLocalConfigurationComplete())
+        return;
+
+    for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
+        if (!mdesc->iceCandidateGatheringDone())
+            return;
+    }
+
+    scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, nullptr));
 }
 
 const char* RTCPeerConnection::activeDOMObjectName() const

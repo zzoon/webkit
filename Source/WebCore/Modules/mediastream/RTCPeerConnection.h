@@ -163,7 +163,7 @@ private:
 
     bool isLocalConfigurationComplete() const;
     ResolveSetLocalDescriptionResult maybeResolveSetLocalDescription();
-    void maybeDispatchGatheringDone() const;
+    void maybeDispatchGatheringDone();
 
     void scheduleDispatchEvent(PassRefPtr<Event>);
     void scheduledEventTimerFired();
