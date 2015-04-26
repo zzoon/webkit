@@ -545,12 +545,21 @@ void RTCPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const String& ce
         maybeDispatchGatheringDone();
 }
 
-void RTCPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate)
+void RTCPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate, const String& ufrag, const String& password)
 {
-    printf("-> RTCPeerConnection::gotIceCandidate\n");
-    printf("is context thread: %d\n", scriptExecutionContext()->isContextThread());
+    printf("-> gotIceCandidate()\n");
 
     ASSERT(scriptExecutionContext()->isContextThread());
+
+    PeerMediaDescription& mdesc = *m_localConfiguration->mediaDescriptions()[mdescIndex];
+    if (mdesc.iceUfrag().isEmpty()) {
+        mdesc.setIceUfrag(ufrag);
+        mdesc.setIcePassword(password);
+    }
+
+    mdesc.addIceCandidate(candidate.copyRef());
+
+    // FIXME: update mdesc address (ideally with active candidate)
 
     ResolveSetLocalDescriptionResult result = maybeResolveSetLocalDescription();
     if (result == SetLocalDescriptionResolvedSuccessfully)
@@ -564,8 +573,7 @@ void RTCPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate
 
 void RTCPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
 {
-    printf("-> RTCPeerConnection::doneGatheringCandidates\n");
-    printf("is context thread: %d\n", scriptExecutionContext()->isContextThread());
+    printf("-> doneGatheringCandidates()\n");
 
     ASSERT(scriptExecutionContext()->isContextThread());
 
@@ -630,7 +638,7 @@ bool RTCPeerConnection::isLocalConfigurationComplete() const
 {
     for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
         // FIXME: add more tests
-        if (mdesc->dtlsFingerprint().isEmpty())
+        if (mdesc->dtlsFingerprint().isEmpty() || mdesc->iceUfrag().isEmpty())
             return false;
     }
 

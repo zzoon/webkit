@@ -46,7 +46,8 @@ static void gotDtlsCertificate(OwrSession*, GParamSpec*, MediaEndpointOwr*);
 static void gotSendSsrc(OwrMediaSession*, GParamSpec*, MediaEndpointOwr*);
 static void gotIncomingSource(OwrMediaSession*, OwrMediaSource*, MediaEndpointOwr*);
 
-static const char* iceCandidateTypes[] = { "host", "srflx", "relay", nullptr };
+static const char* iceCandidateTypes[] = { "host", "srflx", "relay" };
+static const char* iceCandidateTcpTypes[] = { "", "active", "passive", "so" };
 
 static std::unique_ptr<MediaEndpoint> createMediaEndpointOwr(MediaEndpointClient* client)
 {
@@ -130,9 +131,9 @@ unsigned MediaEndpointOwr::sessionIndex(OwrSession* session) const
     return index;
 }
 
-void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate)
+void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate, const String& ufrag, const String& password)
 {
-    m_client->gotIceCandidate(sessionIndex, WTF::move(iceCandidate));
+    m_client->gotIceCandidate(sessionIndex, WTF::move(iceCandidate), ufrag, password);
 }
 
 void MediaEndpointOwr::dispatchGatheringDone(unsigned sessionIndex)
@@ -184,32 +185,60 @@ void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const V
 static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndpointOwr* mediaEndpoint)
 {
     OwrCandidateType candidateType;
-    OwrComponentType componentType;
-    OwrTransportType transportType;
     gchar* foundation;
+    OwrComponentType componentId;
+    OwrTransportType transportType;
+    gint priority;
     gchar* address;
+    guint port;
     gchar* relatedAddress;
-    gint port, priority, relatedPort;
+    guint relatedPort;
+    gchar* ufrag;
+    gchar* password;
 
     g_object_get(candidate, "type", &candidateType,
-        "component-type", &componentType,
         "foundation", &foundation,
+        "component-type", &componentId,
         "transport-type", &transportType,
+        "priority", &priority,
         "address", &address,
         "port", &port,
-        "priority", &priority,
         "base-address", &relatedAddress,
-        "base-port", &relatedPort, nullptr);
+        "base-port", &relatedPort,
+        "ufrag", &ufrag,
+        "password", &password,
+        nullptr);
 
-    printf("candidateType: %d, foundation: %s, address: %s, port %d\n", candidateType, foundation, address, port);
+    ASSERT(candidateType >= 0 && candidateType <= 2);
+    ASSERT(transportType >= 0 && transportType <= 3);
 
     RefPtr<IceCandidate> iceCandidate = IceCandidate::create();
     iceCandidate->setType(iceCandidateTypes[candidateType]);
     iceCandidate->setFoundation(foundation);
-    iceCandidate->setTransport(transportType == OWR_TRANSPORT_TYPE_UDP ? "UDP" : "TCP");
-    // FIXME: set the rest
+    iceCandidate->setComponentId(componentId);
+    iceCandidate->setPriority(priority);
+    iceCandidate->setAddress(address);
+    iceCandidate->setPort(port);
 
-    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionIndex(session), WTF::move(iceCandidate));
+    if (transportType == OWR_TRANSPORT_TYPE_UDP)
+        iceCandidate->setTransport("UDP");
+    else {
+        iceCandidate->setTransport("TCP");
+        iceCandidate->setTcpType(iceCandidateTcpTypes[transportType]);
+    }
+
+    if (candidateType == OWR_CANDIDATE_TYPE_HOST) {
+        iceCandidate->setRelatedAddress(relatedAddress);
+        iceCandidate->setRelatedPort(relatedPort);
+    }
+
+    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionIndex(session), WTF::move(iceCandidate), String(ufrag), String(password));
+
+    g_free(foundation);
+    g_free(address);
+    g_free(relatedAddress);
+    g_free(ufrag);
+    g_free(password);
 }
 
 static void candidateGatheringDone(OwrSession* session, MediaEndpointOwr* mediaEndpoint)
