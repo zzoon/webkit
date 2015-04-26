@@ -498,9 +498,12 @@ void RTCPeerConnection::close()
     m_signalingState = SignalingStateClosed;
 }
 
-void RTCPeerConnection::gotSendSSRC(unsigned, const String&, const String&)
+void RTCPeerConnection::gotSendSSRC(unsigned mdescIndex, const String& ssrc, const String& cname)
 {
     printf("-> gotSendSSRC()\n");
+
+    m_localConfiguration->mediaDescriptions()[mdescIndex]->addSsrc(ssrc);
+    m_localConfiguration->mediaDescriptions()[mdescIndex]->setCname(cname);
 
     maybeResolveSetLocalDescription();
 }
@@ -637,9 +640,12 @@ RTCPeerConnection::DescriptionType RTCPeerConnection::parseDescriptionType(const
 bool RTCPeerConnection::isLocalConfigurationComplete() const
 {
     for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
-        // FIXME: add more tests
         if (mdesc->dtlsFingerprint().isEmpty() || mdesc->iceUfrag().isEmpty())
             return false;
+        if (mdesc->type() == "audio" || mdesc->type() == "video") {
+            if (!mdesc->ssrcs().size() || mdesc->cname().isEmpty())
+                return false;
+        }
     }
 
     return true;

@@ -146,6 +146,11 @@ void MediaEndpointOwr::dispatchDtlsCertificate(unsigned sessionIndex, const Stri
     m_client->gotDtlsCertificate(sessionIndex, certificate);
 }
 
+void MediaEndpointOwr::dispatchSendSSRC(unsigned sessionIndex, const String& ssrc, const String& cname)
+{
+    m_client->gotSendSSRC(sessionIndex, ssrc, cname);
+}
+
 void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription*)
 {
     g_signal_connect(session, "on-new-candidate", G_CALLBACK(gotCandidate), this);
@@ -257,9 +262,15 @@ static void gotDtlsCertificate(OwrSession* session, GParamSpec*, MediaEndpointOw
     mediaEndpoint->dispatchDtlsCertificate(mediaEndpoint->sessionIndex(session), certificate);
 }
 
-static void gotSendSsrc(OwrMediaSession* mediaSession, GParamSpec*, MediaEndpointOwr*)
+static void gotSendSsrc(OwrMediaSession* mediaSession, GParamSpec*, MediaEndpointOwr* mediaEndpoint)
 {
-    printf("-> gotSendSsrc\n");
+    gchar* cname;
+    g_object_get(mediaSession, "cname", &cname, nullptr);
+
+    // FIXME: fix send-ssrc
+    mediaEndpoint->dispatchSendSSRC(mediaEndpoint->sessionIndex(OWR_SESSION(mediaSession)), "fix me", String(cname));
+
+    g_free(cname);
 }
 
 static void gotIncomingSource(OwrMediaSession*, OwrMediaSource*, MediaEndpointOwr*)
