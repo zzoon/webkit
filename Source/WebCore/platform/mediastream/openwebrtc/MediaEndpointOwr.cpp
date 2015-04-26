@@ -35,6 +35,7 @@
 
 #include "MediaEndpointConfiguration.h"
 #include "OpenWebRTCUtilities.h"
+#include "RealtimeMediaSourceOwr.h"
 #include <owr/owr.h>
 #include <owr/owr_audio_payload.h>
 #include <owr/owr_video_payload.h>
@@ -99,9 +100,66 @@ void MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuratio
     m_numberOfReceivePreparedSessions = m_sessions.size();
 }
 
-void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration*, bool)
+void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, bool isInitiator)
 {
-    printf("-> MediaEndpointOwr::prepareToSend\n");
+    Vector<SessionConfig> sessionConfigs;
+    for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {
+        SessionConfig config;
+        config.type = SessionTypeMedia;
+        config.isDtlsClient = configuration->mediaDescriptions()[i]->dtlsSetup() != "active";
+        sessionConfigs.append(WTF::move(config));
+    }
+
+    ensureTransportAgentAndSessions(isInitiator, sessionConfigs);
+
+    for (unsigned i = 0; i < m_sessions.size(); ++i) {
+        if (i >= configuration->mediaDescriptions().size())
+            printf("prepareToSend: BAD missing configuration element for %d\n", i);
+
+        OwrSession* session = m_sessions[i];
+        PeerMediaDescription& mdesc = *configuration->mediaDescriptions()[i];
+
+        if (mdesc.type() == "audio" || mdesc.type() == "video")
+            g_object_set(session, "rtcp-mux", mdesc.rtcpMux(), nullptr);
+
+        if (mdesc.iceCandidates().size()) {
+            for (auto& candidate : mdesc.iceCandidates())
+                internalAddRemoteCandidate(session, *candidate, mdesc.iceUfrag(), mdesc.icePassword());
+        }
+
+        if (i < m_numberOfSendPreparedSessions)
+            continue;
+
+        if (!mdesc.source())
+            continue;
+
+        OwrPayload* sendPayload;
+        RealtimeMediaSourceOwr* source = static_cast<RealtimeMediaSourceOwr*>(mdesc.source());
+
+        if (mdesc.type() == "audio") {
+            // { "encodingName": "OPUS", "type": 111, "clockRate": 48000, "channels": 2 },
+            OwrCodecType codecType = OWR_CODEC_TYPE_OPUS;
+            gint64 payloadType = 111;
+            gint64 clockRate = 48000;
+            gint64 channels = 2;
+
+            sendPayload = owr_audio_payload_new(codecType, payloadType, clockRate, channels);
+        } else {
+            // { "encodingName": "VP8", "type": 100, "clockRate": 90000, "ccmfir": true, "nackpli": true, "nack": true }
+            OwrCodecType codecType = OWR_CODEC_TYPE_VP8;
+            gint64 payloadType = 100;
+            gint64 clockRate = 90000;
+            gboolean ccmfir = true;
+            gboolean nackpli = true;
+
+            sendPayload = owr_video_payload_new(codecType, payloadType, clockRate, ccmfir, nackpli);
+        }
+
+        owr_media_session_set_send_payload(OWR_MEDIA_SESSION(session), sendPayload);
+        owr_media_session_set_send_source(OWR_MEDIA_SESSION(session), source->mediaSource());
+
+        m_numberOfSendPreparedSessions = i + 1;
+    }
 }
 
 void MediaEndpointOwr::addRemoteCandidate(IceCandidate* candidate)
@@ -210,6 +268,36 @@ void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const V
 
     for (auto& config : sessionConfigs)
         m_sessions.append(OWR_SESSION(owr_media_session_new(config.isDtlsClient)));
+}
+
+void MediaEndpointOwr::internalAddRemoteCandidate(OwrSession* session, IceCandidate& candidate, const String& ufrag, const String& password)
+{
+    gboolean rtcpMux;
+    g_object_get(session, "rtcp-mux", &rtcpMux, nullptr);
+
+    if (rtcpMux && candidate.componentId() == OWR_COMPONENT_TYPE_RTCP)
+        return;
+
+    ASSERT(candidateTypes.find(candidate.type()) != notFound);
+    ASSERT(candidateTcpTypes.find(candidate.tcpType()) != notFound);
+
+    OwrCandidateType candidateType = static_cast<OwrCandidateType>(candidateTypes.find(candidate.type()));
+    OwrComponentType componentId = static_cast<OwrComponentType>(candidate.componentId());
+    OwrTransportType transportType = static_cast<OwrTransportType>(candidateTcpTypes.find(candidate.tcpType()));
+
+    OwrCandidate* owrCandidate = owr_candidate_new(candidateType, componentId);
+    g_object_set(owrCandidate, "transport-type", transportType,
+        "address", candidate.address().ascii().data(),
+        "port", candidate.port(),
+        "base-address", candidate.relatedAddress().ascii().data(),
+        "base-port", candidate.relatedPort(),
+        "priority", candidate.priority(),
+        "foundation", candidate.foundation().ascii().data(),
+        "ufrag", ufrag.ascii().data(),
+        "password", password.ascii().data(),
+        nullptr);
+
+    owr_session_add_remote_candidate(session, owrCandidate);
 }
 
 static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndpointOwr* mediaEndpoint)
