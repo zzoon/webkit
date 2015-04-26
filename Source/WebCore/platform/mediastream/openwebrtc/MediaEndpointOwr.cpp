@@ -36,6 +36,8 @@
 #include "MediaEndpointConfiguration.h"
 #include "OpenWebRTCUtilities.h"
 #include <owr/owr.h>
+#include <owr/owr_audio_payload.h>
+#include <owr/owr_video_payload.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
@@ -167,6 +169,29 @@ void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMe
 
     g_signal_connect(mediaSession, "notify::send-ssrc", G_CALLBACK(gotSendSsrc), this);
     g_signal_connect(mediaSession, "on-incoming-source", G_CALLBACK(gotIncomingSource), this);
+
+    OwrPayload* receivePayload;
+
+    if (mediaDescription->type() == "audio") {
+        // { "encodingName": "OPUS", "type": 111, "clockRate": 48000, "channels": 2 },
+        OwrCodecType codecType = OWR_CODEC_TYPE_OPUS;
+        gint64 payloadType = 111;
+        gint64 clockRate = 48000;
+        gint64 channels = 2;
+
+        receivePayload = owr_audio_payload_new(codecType, payloadType, clockRate, channels);
+    } else {
+        // { "encodingName": "VP8", "type": 100, "clockRate": 90000, "ccmfir": true, "nackpli": true, "nack": true }
+        OwrCodecType codecType = OWR_CODEC_TYPE_VP8;
+        gint64 payloadType = 100;
+        gint64 clockRate = 90000;
+        gboolean ccmfir = true;
+        gboolean nackpli = true;
+
+        receivePayload = owr_video_payload_new(codecType, payloadType, clockRate, ccmfir, nackpli);
+    }
+
+    owr_media_session_add_receive_payload(mediaSession, receivePayload);
 }
 
 void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs)
