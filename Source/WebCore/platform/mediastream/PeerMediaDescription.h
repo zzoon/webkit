@@ -35,6 +35,7 @@
 
 #include "IceCandidate.h"
 #include "MediaPayload.h"
+#include "RealtimeMediaSource.h"
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 
@@ -96,11 +97,15 @@ public:
     bool iceCandidateGatheringDone() const { return m_iceCandidateGatheringDone; }
     void setIceCandidateGatheringDone(bool iceCandidateGatheringDone) { m_iceCandidateGatheringDone = iceCandidateGatheringDone; }
 
+    RealtimeMediaSource* source() const { return m_source.get(); }
+    void setSource(RefPtr<RealtimeMediaSource>&& source) { m_source = source; }
+
 private:
     PeerMediaDescription()
         : m_port(0)
         , m_rtcpMux(false)
         , m_iceCandidateGatheringDone(false)
+        , m_source(nullptr)
     { }
 
     String m_type;
@@ -125,6 +130,8 @@ private:
     String m_icePassword;
     Vector<RefPtr<IceCandidate>> m_iceCandidates;
     bool m_iceCandidateGatheringDone;
+
+    RefPtr<RealtimeMediaSource> m_source;
 };
 
 } // namespace WebCore
