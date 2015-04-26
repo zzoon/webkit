@@ -59,15 +59,42 @@ public:
     const String& transport() const { return m_transport; }
     void setTransport(const String& transport) { m_transport = transport; }
 
+    int priority() const { return m_priority; }
+    void setPriority(int priority) { m_priority = priority; }
+
+    const String& address() const { return m_address; }
+    void setAddress(const String& address) { m_address = address; }
+
+    unsigned port() const { return m_port; }
+    void setPort(unsigned port) { m_port = port; }
+
+    const String& tcpType() const { return m_tcpType; }
+    void setTcpType(const String& tcpType) { m_tcpType = tcpType; }
+
+    const String& relatedAddress() const { return m_relatedAddress; }
+    void setRelatedAddress(const String& relatedAddress) { m_relatedAddress = relatedAddress; }
+
+    unsigned relatedPort() const { return m_relatedPort; }
+    void setRelatedPort(unsigned relatedPort) { m_relatedPort = relatedPort; }
+
 private:
     IceCandidate()
         : m_componentId(0)
+        , m_priority(0)
+        , m_port(0)
+        , m_relatedPort(0)
     { }
 
     String m_type;
     String m_foundation;
     unsigned m_componentId;
     String m_transport;
+    int m_priority;
+    String m_address;
+    unsigned m_port;
+    String m_tcpType;
+    String m_relatedAddress;
+    unsigned m_relatedPort;
 };
 
 } // namespace WebCore

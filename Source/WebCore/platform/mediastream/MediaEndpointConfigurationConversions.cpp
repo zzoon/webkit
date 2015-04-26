@@ -54,6 +54,12 @@ static RefPtr<InspectorObject> createCandidateObject(IceCandidate* candidate)
     candidateObject->setString(ASCIILiteral("foundation"), candidate->foundation());
     candidateObject->setInteger(ASCIILiteral("componentId"), candidate->componentId());
     candidateObject->setString(ASCIILiteral("transport"), candidate->transport());
+    candidateObject->setInteger(ASCIILiteral("priority"), candidate->priority());
+    candidateObject->setString(ASCIILiteral("address"), candidate->address());
+    candidateObject->setInteger(ASCIILiteral("port"), candidate->port());
+    candidateObject->setString(ASCIILiteral("tcpType"), candidate->tcpType());
+    candidateObject->setString(ASCIILiteral("relatedAddress"), candidate->relatedAddress());
+    candidateObject->setInteger(ASCIILiteral("relatedPort"), candidate->relatedPort());
 
     return candidateObject;
 }
@@ -75,6 +81,24 @@ static RefPtr<IceCandidate> createCandidate(InspectorObject* candidateObject)
 
     if (candidateObject->getString(ASCIILiteral("transport"), stringValue))
         candidate->setTransport(stringValue);
+
+    if (candidateObject->getInteger(ASCIILiteral("priority"), intValue))
+        candidate->setPriority(intValue);
+
+    if (candidateObject->getString(ASCIILiteral("address"), stringValue))
+        candidate->setAddress(stringValue);
+
+    if (candidateObject->getInteger(ASCIILiteral("port"), intValue))
+        candidate->setPort(intValue);
+
+    if (candidateObject->getString(ASCIILiteral("tcpType"), stringValue))
+        candidate->setTcpType(stringValue);
+
+    if (candidateObject->getString(ASCIILiteral("relatedAddress"), stringValue))
+        candidate->setRelatedAddress(stringValue);
+
+    if (candidateObject->getInteger(ASCIILiteral("relatedPort"), intValue))
+        candidate->setRelatedPort(intValue);
 
     return candidate;
 }
