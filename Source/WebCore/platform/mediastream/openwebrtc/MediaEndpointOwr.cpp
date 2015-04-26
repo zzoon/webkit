@@ -46,8 +46,8 @@ static void gotDtlsCertificate(OwrSession*, GParamSpec*, MediaEndpointOwr*);
 static void gotSendSsrc(OwrMediaSession*, GParamSpec*, MediaEndpointOwr*);
 static void gotIncomingSource(OwrMediaSession*, OwrMediaSource*, MediaEndpointOwr*);
 
-static const char* iceCandidateTypes[] = { "host", "srflx", "relay" };
-static const char* iceCandidateTcpTypes[] = { "", "active", "passive", "so" };
+static const Vector<String> candidateTypes = { "host", "srflx", "prflx", "relay" };
+static const Vector<String> candidateTcpTypes = { "", "active", "passive", "so" };
 
 static std::unique_ptr<MediaEndpoint> createMediaEndpointOwr(MediaEndpointClient* client)
 {
@@ -214,11 +214,11 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
         "password", &password,
         nullptr);
 
-    ASSERT(candidateType >= 0 && candidateType <= 2);
-    ASSERT(transportType >= 0 && transportType <= 3);
+    ASSERT(candidateType >= 0 && candidateType < candidateTypes.size());
+    ASSERT(transportType >= 0 && transportType < candidateTcpTypes.size());
 
     RefPtr<IceCandidate> iceCandidate = IceCandidate::create();
-    iceCandidate->setType(iceCandidateTypes[candidateType]);
+    iceCandidate->setType(candidateTypes[candidateType]);
     iceCandidate->setFoundation(foundation);
     iceCandidate->setComponentId(componentId);
     iceCandidate->setPriority(priority);
@@ -229,7 +229,7 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
         iceCandidate->setTransport("UDP");
     else {
         iceCandidate->setTransport("TCP");
-        iceCandidate->setTcpType(iceCandidateTcpTypes[transportType]);
+        iceCandidate->setTcpType(candidateTcpTypes[transportType]);
     }
 
     if (candidateType == OWR_CANDIDATE_TYPE_HOST) {
