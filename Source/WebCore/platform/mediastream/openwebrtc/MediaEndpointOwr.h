@@ -52,7 +52,7 @@ public:
     virtual void prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) override;
     virtual void prepareToSend(MediaEndpointConfiguration*, bool isInitiator) override;
 
-    virtual void addRemoteCandidate(IceCandidate*) override;
+    virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
 
     virtual void stop() override;
 

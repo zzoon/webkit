@@ -162,21 +162,9 @@ void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, 
     }
 }
 
-void MediaEndpointOwr::addRemoteCandidate(IceCandidate* candidate)
+void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, unsigned mdescIndex, const String& ufrag, const String& password)
 {
-    OwrCandidateType candidateType;
-    OwrComponentType componentType = (OwrComponentType) candidate->componentId();
-
-    if (candidate->type() == "host")
-        candidateType = OWR_CANDIDATE_TYPE_HOST;
-    else if (candidate->type() == "srflx")
-        candidateType = OWR_CANDIDATE_TYPE_SERVER_REFLEXIVE;
-    else
-        candidateType = OWR_CANDIDATE_TYPE_RELAY;
-
-    OwrCandidate* remoteCandidate = owr_candidate_new(candidateType, componentType);
-
-    printf("MediaEndpointOwr::addRemoteCandidate: created candidate: %p\n", remoteCandidate);
+    internalAddRemoteCandidate(m_sessions[mdescIndex], candidate, ufrag, password);
 }
 
 void MediaEndpointOwr::stop()

@@ -387,25 +387,48 @@ void RTCPeerConnection::updateIce(const Dictionary& rtcConfiguration, ExceptionC
     m_mediaEndpoint->setConfiguration(createMediaEndpointInit(*m_configuration));
 }
 
-void RTCPeerConnection::addIceCandidate(RTCIceCandidate* iceCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
+void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingStateClosed) {
         ec = INVALID_STATE_ERR;
         return;
     }
 
-    RefPtr<IceCandidate> candidate = MediaEndpointConfigurationConversions::iceCandidateFromJSON(iceCandidate->candidate());
-    if (!candidate) {
-        rejectCallback(DOMError::create("FIXME: bad candidate"));
+    if (!m_remoteConfiguration) {
+        callOnMainThread([rejectCallback] {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("InvalidStateError (no remote description)");
+            rejectCallback(error.get());
+        });
         return;
     }
 
-    printf("RTCPeerConnection::addIceCandidate: candidate: type %s, foundation: %s, componentId: %d, transport: %s\n",
-        candidate->type().ascii().data(), candidate->foundation().ascii().data(), candidate->componentId(), candidate->transport().ascii().data());
+    RefPtr<IceCandidate> candidate = MediaEndpointConfigurationConversions::iceCandidateFromJSON(rtcCandidate->candidate());
+    if (!candidate) {
+        callOnMainThread([rejectCallback] {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("SyntaxError (malformed candidate)");
+            rejectCallback(error.get());
+        });
+        return;
+    }
 
-    m_mediaEndpoint->addRemoteCandidate(candidate.get());
+    unsigned mdescIndex = rtcCandidate->sdpMLineIndex();
+    if (mdescIndex >= m_remoteConfiguration->mediaDescriptions().size()) {
+        callOnMainThread([rejectCallback] {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("InvalidSdpMlineIndex (sdpMLineIndex out of range");
+            rejectCallback(error.get());
+        });
+        return;
+    }
 
-    resolveCallback();
+    PeerMediaDescription& mdesc = *m_remoteConfiguration->mediaDescriptions()[mdescIndex];
+    mdesc.addIceCandidate(candidate.copyRef());
+
+    m_mediaEndpoint->addRemoteCandidate(*candidate, mdescIndex, mdesc.iceUfrag(), mdesc.icePassword());
+
+    callOnMainThread(resolveCallback);
 }
 
 String RTCPeerConnection::signalingState() const

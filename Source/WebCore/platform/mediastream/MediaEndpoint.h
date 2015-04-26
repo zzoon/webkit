@@ -68,7 +68,7 @@ public:
     virtual void prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) = 0;
     virtual void prepareToSend(MediaEndpointConfiguration*, bool isInitiator) = 0;
 
-    virtual void addRemoteCandidate(IceCandidate*) = 0;
+    virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) = 0;
 
     virtual void stop() = 0;
 };
