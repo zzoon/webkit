@@ -35,10 +35,10 @@ namespace WebCore {
 
 namespace ContentExtensions {
 
-class DFA;
+struct DFA;
 class DFANode;
 
-class DFABytecodeCompiler {
+class WEBCORE_EXPORT DFABytecodeCompiler {
 public:
     DFABytecodeCompiler(const DFA& dfa, Vector<DFABytecode>& bytecode)
         : m_bytecode(bytecode)

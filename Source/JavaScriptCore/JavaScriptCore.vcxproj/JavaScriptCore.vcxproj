@@ -326,6 +326,7 @@
     <ClCompile Include="..\bytecode\ComplexGetStatus.cpp" />
     <ClCompile Include="..\bytecode\ConstantStructureCheck.cpp" />
     <ClCompile Include="..\bytecode\DeferredCompilationCallback.cpp" />
+    <ClCompile Include="..\bytecode\DeferredSourceDump.cpp" />
     <ClCompile Include="..\bytecode\DFGExitProfile.cpp" />
     <ClCompile Include="..\bytecode\ExecutionCounter.cpp" />
     <ClCompile Include="..\bytecode\ExitKind.cpp" />
@@ -379,6 +380,7 @@
     <ClCompile Include="..\dfg\DFGCapabilities.cpp" />
     <ClCompile Include="..\dfg\DFGCFAPhase.cpp" />
     <ClCompile Include="..\dfg\DFGCFGSimplificationPhase.cpp" />
+    <ClCompile Include="..\dfg\DFGCleanUpPhase.cpp" />
     <ClCompile Include="..\dfg\DFGClobberize.cpp" />
     <ClCompile Include="..\dfg\DFGClobberSet.cpp" />
     <ClCompile Include="..\dfg\DFGCommon.cpp" />
@@ -400,6 +402,7 @@
     <ClCompile Include="..\dfg\DFGDominators.cpp" />
     <ClCompile Include="..\dfg\DFGDriver.cpp" />
     <ClCompile Include="..\dfg\DFGEdge.cpp" />
+    <ClCompile Include="..\dfg\DFGEpoch.cpp" />
     <ClCompile Include="..\dfg\DFGFailedFinalizer.cpp" />
     <ClCompile Include="..\dfg\DFGFinalizer.cpp" />
     <ClCompile Include="..\dfg\DFGFixupPhase.cpp" />
@@ -425,6 +428,7 @@
     <ClCompile Include="..\dfg\DFGLoopPreHeaderCreationPhase.cpp" />
     <ClCompile Include="..\dfg\DFGMayExit.cpp" />
     <ClCompile Include="..\dfg\DFGMinifiedNode.cpp" />
+    <ClCompile Include="..\dfg\DFGMovHintRemovalPhase.cpp" />
     <ClCompile Include="..\dfg\DFGNaiveDominators.cpp" />
     <ClCompile Include="..\dfg\DFGNaturalLoops.cpp" />
     <ClCompile Include="..\dfg\DFGNode.cpp" />
@@ -443,8 +447,7 @@
     <ClCompile Include="..\dfg\DFGOSRExitPreparation.cpp" />
     <ClCompile Include="..\dfg\DFGObjectAllocationSinkingPhase.cpp" />
     <ClCompile Include="..\dfg\DFGObjectMaterializationData.cpp" />
-    <ClCompile Include="..\dfg\DFGPhantomCanonicalizationPhase.cpp" />
-    <ClCompile Include="..\dfg\DFGPhantomRemovalPhase.cpp" />
+    <ClCompile Include="..\dfg\DFGPhantomInsertionPhase.cpp" />
     <ClCompile Include="..\dfg\DFGPhase.cpp" />
     <ClCompile Include="..\dfg\DFGPhiChildren.cpp" />
     <ClCompile Include="..\dfg\DFGPlan.cpp" />
@@ -454,7 +457,6 @@
     <ClCompile Include="..\dfg\DFGPromotedHeapLocation.cpp" />
     <ClCompile Include="..\dfg\DFGPureValue.cpp" />
     <ClCompile Include="..\dfg\DFGPutStackSinkingPhase.cpp" />
-    <ClCompile Include="..\dfg\DFGResurrectionForValidationPhase.cpp" />
     <ClCompile Include="..\dfg\DFGSafepoint.cpp" />
     <ClCompile Include="..\dfg\DFGSpeculativeJIT.cpp" />
     <ClCompile Include="..\dfg\DFGSpeculativeJIT32_64.cpp" />
@@ -839,6 +841,7 @@
     <ClCompile Include="..\runtime\TestRunnerUtils.cpp" />
     <ClCompile Include="..\runtime\TypedArrayController.cpp" />
     <ClCompile Include="..\runtime\TypedArrayType.cpp" />
+    <ClCompile Include="..\runtime\TypeofType.cpp" />
     <ClCompile Include="..\runtime\TypeLocationCache.cpp" />
     <ClCompile Include="..\runtime\TypeProfiler.cpp" />
     <ClCompile Include="..\runtime\TypeProfilerLog.cpp" />
@@ -975,6 +978,7 @@
     <ClInclude Include="..\bytecode\ConstantStructureCheck.h" />
     <ClInclude Include="..\bytecode\DataFormat.h" />
     <ClInclude Include="..\bytecode\DeferredCompilationCallback.h" />
+    <ClInclude Include="..\bytecode\DeferredSourceDump.h" />
     <ClInclude Include="..\bytecode\DFGExitProfile.h" />
     <ClInclude Include="..\bytecode\EvalCodeCache.h" />
     <ClInclude Include="..\bytecode\ExecutionCounter.h" />
@@ -1057,6 +1061,7 @@
     <ClInclude Include="..\dfg\DFGCCallHelpers.h" />
     <ClInclude Include="..\dfg\DFGCFAPhase.h" />
     <ClInclude Include="..\dfg\DFGCFGSimplificationPhase.h" />
+    <ClInclude Include="..\dfg\DFGCleanUpPhase.h" />
     <ClInclude Include="..\dfg\DFGClobberize.h" />
     <ClInclude Include="..\dfg\DFGClobberSet.h" />
     <ClInclude Include="..\dfg\DFGCommon.h" />
@@ -1081,6 +1086,7 @@
     <ClInclude Include="..\dfg\DFGEdge.h" />
     <ClInclude Include="..\dfg\DFGEdgeDominates.h" />
     <ClInclude Include="..\dfg\DFGEdgeUsesStructure.h" />
+    <ClInclude Include="..\dfg\DFGEpoch.h" />
     <ClInclude Include="..\dfg\DFGFailedFinalizer.h" />
     <ClInclude Include="..\dfg\DFGFiltrationResult.h" />
     <ClInclude Include="..\dfg\DFGFinalizer.h" />
@@ -1115,6 +1121,7 @@
     <ClInclude Include="..\dfg\DFGMinifiedGraph.h" />
     <ClInclude Include="..\dfg\DFGMinifiedID.h" />
     <ClInclude Include="..\dfg\DFGMinifiedNode.h" />
+    <ClInclude Include="..\dfg\DFGMovHintRemovalPhase.h" />
     <ClInclude Include="..\dfg\DFGNaiveDominators.h" />
     <ClInclude Include="..\dfg\DFGNaturalLoops.h" />
     <ClInclude Include="..\dfg\DFGNode.h" />
@@ -1135,8 +1142,7 @@
     <ClInclude Include="..\dfg\DFGOSRExitCompilerCommon.h" />
     <ClInclude Include="..\dfg\DFGOSRExitJumpPlaceholder.h" />
     <ClInclude Include="..\dfg\DFGOSRExitPreparation.h" />
-    <ClInclude Include="..\dfg\DFGPhantomCanonicalizationPhase.h" />
-    <ClInclude Include="..\dfg\DFGPhantomRemovalPhase.h" />
+    <ClInclude Include="..\dfg\DFGPhantomInsertionPhase.h" />
     <ClInclude Include="..\dfg\DFGPhase.h" />
     <ClInclude Include="..\dfg\DFGPhiChildren.h" />
     <ClInclude Include="..\dfg\DFGPlan.h" />
@@ -1150,7 +1156,6 @@
     <ClInclude Include="..\dfg\DFGPutStackSinkingPhase.h" />
     <ClInclude Include="..\dfg\DFGRegisterBank.h" />
     <ClInclude Include="..\dfg\DFGRegisterSet.h" />
-    <ClInclude Include="..\dfg\DFGResurrectionForValidationPhase.h" />
     <ClInclude Include="..\dfg\DFGSafeToExecute.h" />
     <ClInclude Include="..\dfg\DFGSafepoint.h" />
     <ClInclude Include="..\dfg\DFGSaneStringGetByValSlowPathGenerator.h" />
@@ -1521,6 +1526,7 @@
     <ClInclude Include="..\runtime\IntendedStructureChain.h" />
     <ClInclude Include="..\runtime\InternalFunction.h" />
     <ClInclude Include="..\runtime\Intrinsic.h" />
+    <ClInclude Include="..\runtime\IterationStatus.h" />
     <ClInclude Include="..\runtime\IteratorOperations.h" />
     <ClInclude Include="..\runtime\JSAPIValueWrapper.h" />
     <ClInclude Include="..\runtime\JSLexicalEnvironment.h" />
@@ -1683,6 +1689,7 @@
     <ClInclude Include="..\runtime\TypedArrayController.h" />
     <ClInclude Include="..\runtime\TypedArrayInlines.h" />
     <ClInclude Include="..\runtime\TypedArrayType.h" />
+    <ClInclude Include="..\runtime\TypeofType.h" />
     <ClInclude Include="..\runtime\TypeLocationCache.h" />
     <ClInclude Include="..\runtime\TypeProfiler.h" />
     <ClInclude Include="..\runtime\TypeProfilerLog.h" />

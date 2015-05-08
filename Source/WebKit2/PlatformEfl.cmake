@@ -2,7 +2,6 @@ list(APPEND WebKit2_SOURCES
     NetworkProcess/efl/NetworkProcessMainEfl.cpp
 
     NetworkProcess/soup/NetworkProcessSoup.cpp
-    NetworkProcess/soup/NetworkResourceLoadSchedulerSoup.cpp
     NetworkProcess/soup/RemoteNetworkingContextSoup.cpp
 
     Platform/IPC/unix/AttachmentUnix.cpp
@@ -349,12 +348,12 @@ if (ENABLE_ECORE_X)
     )
 endif ()
 
-add_custom_target(forwarding-headerEfl
+add_custom_target(forwarding-headersEflForWebKit2
     COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl --include-path ${WEBKIT2_DIR} --output ${DERIVED_SOURCES_WEBKIT2_DIR}/include --platform efl --platform CoordinatedGraphics --platform soup
 )
 
 set(WEBKIT2_EXTRA_DEPENDENCIES
-     forwarding-headerEfl
+     forwarding-headersEflForWebKit2
 )
 
 configure_file(efl/ewebkit2.pc.in ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2.pc @ONLY)

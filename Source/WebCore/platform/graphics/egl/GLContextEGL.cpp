@@ -22,7 +22,7 @@
 #if USE(EGL)
 
 #include "GraphicsContext3D.h"
-#include <wtf/OwnPtr.h>
+#include "PlatformDisplay.h"
 
 #if USE(CAIRO)
 #include <cairo.h>
@@ -35,11 +35,8 @@
 #include "OpenGLShims.h"
 #endif
 
-#if PLATFORM(GTK)
-#include "GtkUtilities.h"
-#if PLATFORM(WAYLAND) && !defined(GTK_API_VERSION_2)
-#include "WaylandDisplay.h"
-#endif
+#if PLATFORM(X11)
+#include "PlatformDisplayX11.h"
 #endif
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
@@ -52,33 +49,9 @@
 
 namespace WebCore {
 
-static EGLDisplay gSharedEGLDisplay = EGL_NO_DISPLAY;
-
-#if USE(OPENGL_ES_2)
-static const EGLenum gGLAPI = EGL_OPENGL_ES_API;
-#else
-static const EGLenum gGLAPI = EGL_OPENGL_API;
-#endif
-
 static EGLDisplay sharedEGLDisplay()
 {
-    static bool initialized = false;
-    if (!initialized) {
-        initialized = true;
-#if PLATFORM(GTK) && PLATFORM(WAYLAND) && !defined(GTK_API_VERSION_2)
-        if (getDisplaySystemType() == DisplaySystemType::Wayland && WaylandDisplay::instance())
-            gSharedEGLDisplay = eglGetDisplay(WaylandDisplay::instance()->nativeDisplay());
-        else // Note that this branch continutes outside this #if-guarded segment.
-#endif
-#if PLATFORM(X11)
-            gSharedEGLDisplay = eglGetDisplay(GLContext::sharedX11Display());
-#else
-            gSharedEGLDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-#endif
-        if (gSharedEGLDisplay != EGL_NO_DISPLAY && (!eglInitialize(gSharedEGLDisplay, 0, 0) || !eglBindAPI(gGLAPI)))
-            gSharedEGLDisplay = EGL_NO_DISPLAY;
-    }
-    return gSharedEGLDisplay;
+    return PlatformDisplay::sharedDisplay().eglDisplay();
 }
 
 static const EGLint gContextAttributes[] = {
@@ -187,7 +160,8 @@ std::unique_ptr<GLContextEGL> GLContextEGL::createPixmapContext(EGLContext shari
     if (!eglGetConfigAttrib(display, config, EGL_DEPTH_SIZE, &depth))
         return nullptr;
 
-    Pixmap pixmap = XCreatePixmap(sharedX11Display(), DefaultRootWindow(sharedX11Display()), 1, 1, depth);
+    Display* x11Display = downcast<PlatformDisplayX11>(PlatformDisplay::sharedDisplay()).native();
+    Pixmap pixmap = XCreatePixmap(x11Display, DefaultRootWindow(x11Display), 1, 1, depth);
     if (!pixmap)
         return nullptr;
 
@@ -311,7 +285,7 @@ cairo_device_t* GLContextEGL::cairoDevice()
 }
 #endif
 
-#if USE(3D_GRAPHICS)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
 PlatformGraphicsContext3D GLContextEGL::platformContext()
 {
     return m_context;

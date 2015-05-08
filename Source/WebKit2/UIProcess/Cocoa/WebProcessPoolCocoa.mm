@@ -108,7 +108,7 @@ static void registerUserDefaultsIfNeeded()
 
 #if ENABLE(NETWORK_CACHE)
     [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitNetworkCacheEnabledDefaultsKey];
-    [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitNetworkCacheEfficacyLoggingEnabledDefaultsKey];
+    [registrationDictionary setObject:[NSNumber numberWithBool:NO] forKey:WebKitNetworkCacheEfficacyLoggingEnabledDefaultsKey];
 #endif
 
     [[NSUserDefaults standardUserDefaults] registerDefaults:registrationDictionary];
@@ -217,6 +217,8 @@ void WebProcessPool::platformInitializeWebProcess(WebProcessCreationParameters& 
 #if ENABLE(NETWORK_PROCESS)
     }
 #endif
+
+    parameters.fontWhitelist = m_fontWhitelist;
 
     if (m_bundleParameters) {
         auto data = adoptNS([[NSMutableData alloc] init]);

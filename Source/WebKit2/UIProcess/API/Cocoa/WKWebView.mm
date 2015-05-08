@@ -47,6 +47,7 @@
 #import "WKBrowsingContextHandleInternal.h"
 #import "WKErrorInternal.h"
 #import "WKHistoryDelegatePrivate.h"
+#import "WKLayoutMode.h"
 #import "WKNSData.h"
 #import "WKNSURLExtras.h"
 #import "WKNavigationDelegate.h"
@@ -460,7 +461,7 @@ static int32_t deviceOrientation()
 
 - (WKNavigation *)loadData:(NSData *)data MIMEType:(NSString *)MIMEType characterEncodingName:(NSString *)characterEncodingName baseURL:(NSURL *)baseURL
 {
-    auto navigation = _page->loadData(API::Data::createWithoutCopying(data).get(), MIMEType, characterEncodingName, baseURL.absoluteString);
+    auto navigation = _page->loadData(API::Data::createWithoutCopying(data).ptr(), MIMEType, characterEncodingName, baseURL.absoluteString);
     if (!navigation)
         return nil;
 
@@ -717,6 +718,10 @@ static CGSize roundScrollViewContentSize(const WebKit::WebPageProxy& page, CGSiz
 {
     ASSERT(_customContentView);
     [_customContentView web_setContentProviderData:data suggestedFilename:suggestedFilename];
+
+    // FIXME: It may make more sense for custom content providers to invoke this when they're ready,
+    // because there's no guarantee that all custom content providers will lay out synchronously.
+    _page->didLayoutForCustomContentProvider();
 }
 
 - (void)_setViewportMetaTagWidth:(float)newWidth
@@ -791,6 +796,14 @@ static WebCore::Color scrollViewBackgroundColor(WKWebView *webView)
 
     auto uiBackgroundColor = adoptNS([[UIColor alloc] initWithCGColor:cachedCGColor(color, WebCore::ColorSpaceDeviceRGB)]);
     [_scrollView setBackgroundColor:uiBackgroundColor.get()];
+
+    // Update the indicator style based on the lightness/darkness of the background color.
+    double hue, saturation, lightness;
+    color.getHSL(hue, saturation, lightness);
+    if (lightness <= .5 && color.alpha() > 0)
+        [_scrollView setIndicatorStyle:UIScrollViewIndicatorStyleWhite];
+    else
+        [_scrollView setIndicatorStyle:UIScrollViewIndicatorStyleDefault];
 }
 
 - (CGPoint)_adjustedContentOffset:(CGPoint)point
@@ -2278,22 +2291,45 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
 
 - (_WKLayoutMode)_layoutMode
 {
-    if (_page->useFixedLayout()) {
 #if PLATFORM(MAC)
-        if ([_wkView _automaticallyComputesFixedLayoutSizeFromViewScale])
-            return _WKLayoutModeDynamicSizeComputedFromViewScale;
-#endif
+    switch ([_wkView _layoutMode]) {
+    case kWKLayoutModeFixedSize:
         return _WKLayoutModeFixedSize;
+    case kWKLayoutModeDynamicSizeComputedFromViewScale:
+        return _WKLayoutModeDynamicSizeComputedFromViewScale;
+    case kWKLayoutModeDynamicSizeWithMinimumViewSize:
+        return _WKLayoutModeDynamicSizeWithMinimumViewSize;
+    case kWKLayoutModeViewSize:
+    default:
+        return _WKLayoutModeViewSize;
     }
-    return _WKLayoutModeViewSize;
+#else
+    return _page->useFixedLayout() ? _WKLayoutModeFixedSize : _WKLayoutModeViewSize;
+#endif
 }
 
 - (void)_setLayoutMode:(_WKLayoutMode)layoutMode
 {
-    _page->setUseFixedLayout(layoutMode == _WKLayoutModeFixedSize || layoutMode == _WKLayoutModeDynamicSizeComputedFromViewScale);
-
 #if PLATFORM(MAC)
-    [_wkView _setAutomaticallyComputesFixedLayoutSizeFromViewScale:(layoutMode == _WKLayoutModeDynamicSizeComputedFromViewScale)];
+    WKLayoutMode wkViewLayoutMode;
+    switch (layoutMode) {
+    case _WKLayoutModeFixedSize:
+        wkViewLayoutMode = kWKLayoutModeFixedSize;
+        break;
+    case _WKLayoutModeDynamicSizeComputedFromViewScale:
+        wkViewLayoutMode = kWKLayoutModeDynamicSizeComputedFromViewScale;
+        break;
+    case _WKLayoutModeDynamicSizeWithMinimumViewSize:
+        wkViewLayoutMode = kWKLayoutModeDynamicSizeWithMinimumViewSize;
+        break;
+    case _WKLayoutModeViewSize:
+    default:
+        wkViewLayoutMode = kWKLayoutModeViewSize;
+        break;
+    }
+    [_wkView _setLayoutMode:wkViewLayoutMode];
+#else
+    _page->setUseFixedLayout(layoutMode == _WKLayoutModeFixedSize || layoutMode == _WKLayoutModeDynamicSizeComputedFromViewScale);
 #endif
 }
 
@@ -2314,14 +2350,29 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
 
 - (void)_setViewScale:(CGFloat)viewScale
 {
+#if PLATFORM(MAC)
+    [_wkView _setViewScale:viewScale];
+#else
     if (viewScale <= 0 || isnan(viewScale) || isinf(viewScale))
         [NSException raise:NSInvalidArgumentException format:@"View scale should be a positive number"];
 
     _page->scaleView(viewScale);
+#endif
+}
 
+- (void)_setMinimumViewSize:(CGSize)minimumViewSize
+{
 #if PLATFORM(MAC)
-    if ([_wkView _automaticallyComputesFixedLayoutSizeFromViewScale])
-        [_wkView _updateAutomaticallyComputedFixedLayoutSize];
+    [_wkView _setMinimumViewSize:minimumViewSize];
+#endif
+}
+
+- (CGSize)_minimumViewSize
+{
+#if PLATFORM(MAC)
+    return [_wkView _minimumViewSize];
+#else
+    return CGSizeZero;
 #endif
 }
 
@@ -2637,7 +2688,15 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
         destinationRect.origin.y = -snapshotRectInContentCoordinates.origin.y * imageScale;
         destinationRect.size.width *= imageScale;
         destinationRect.size.height *= imageScale;
-        [customContentView drawViewHierarchyInRect:destinationRect afterScreenUpdates:NO];
+
+        if ([_customContentView window])
+            [customContentView drawViewHierarchyInRect:destinationRect afterScreenUpdates:NO];
+        else {
+            CGContextRef context = UIGraphicsGetCurrentContext();
+            CGContextTranslateCTM(context, destinationRect.origin.x, destinationRect.origin.y);
+            CGContextScaleCTM(context, imageScale, imageScale);
+            [customContentView.layer renderInContext:context];
+        }
 
         completionHandler([UIGraphicsGetImageFromCurrentImageContext() CGImage]);
 

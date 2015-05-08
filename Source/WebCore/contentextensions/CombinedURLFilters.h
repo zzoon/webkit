@@ -28,6 +28,7 @@
 
 #if ENABLE(CONTENT_EXTENSIONS)
 
+#include "ContentExtensionsDebugging.h"
 #include "NFA.h"
 #include <wtf/Vector.h>
 
@@ -42,11 +43,19 @@ class WEBCORE_EXPORT CombinedURLFilters {
 public:
     CombinedURLFilters();
     ~CombinedURLFilters();
+
     void addPattern(uint64_t patternId, const Vector<Term>& pattern);
 
-    Vector<NFA> createNFAs() const;
-    void clear();
+    void processNFAs(size_t maxNFASize, std::function<void(NFA&&)> handler);
+    bool isEmpty();
 
+#if CONTENT_EXTENSIONS_PERFORMANCE_REPORTING
+    size_t memoryUsed() const;
+#endif
+#if CONTENT_EXTENSIONS_STATE_MACHINE_DEBUGGING
+    void print() const;
+#endif
+    
 private:
     std::unique_ptr<PrefixTreeVertex> m_prefixTreeRoot;
 };

@@ -184,6 +184,7 @@ typedef const char* optionString;
     v(unsigned, frequentCallThreshold, 2, nullptr) \
     v(double, minimumCallToKnownRate, 0.51, nullptr) \
     v(bool, optimizeNativeCalls, false, nullptr) \
+    v(bool, enableMovHintRemoval, true, nullptr) \
     v(bool, enableObjectAllocationSinking, true, nullptr) \
     \
     v(bool, enableConcurrentJIT, true, "allows the DFG / FTL compilation in threads other than the executing JS thread") \
@@ -290,6 +291,7 @@ typedef const char* optionString;
     v(gcLogLevel, logGC, GCLogging::None, "debugging option to log GC activity (0 = None, 1 = Basic, 2 = Verbose)") \
     v(bool, disableGC, false, nullptr) \
     v(unsigned, gcMaxHeapSize, 0, nullptr) \
+    v(unsigned, forceRAMSize, 0, nullptr) \
     v(bool, recordGCPauseTimes, false, nullptr) \
     v(bool, logHeapStatisticsAtExit, false, nullptr) \
     v(bool, enableTypeProfiler, false, nullptr) \

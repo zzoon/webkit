@@ -164,6 +164,11 @@ void WebInspectorUI::setDockSide(DockSide side)
     evaluateCommandOnLoad(ASCIILiteral("setDockSide"), ASCIILiteral(sideString));
 }
 
+void WebInspectorUI::setDockingUnavailable(bool unavailable)
+{
+    evaluateCommandOnLoad(ASCIILiteral("setDockingUnavailable"), unavailable);
+}
+
 void WebInspectorUI::changeAttachedWindowHeight(unsigned height)
 {
     WebProcess::singleton().parentProcessConnection()->send(Messages::WebInspectorProxy::SetAttachedWindowHeight(height), m_inspectedPageIdentifier);
@@ -256,7 +261,7 @@ void WebInspectorUI::evaluateCommandOnLoad(const String& command, const String& 
 
 void WebInspectorUI::evaluateCommandOnLoad(const String& command, bool argument)
 {
-    evaluateCommandOnLoad(command, ASCIILiteral(argument ? "true" : "false"));
+    evaluateExpressionOnLoad(makeString("InspectorFrontendAPI.dispatch([\"", command, "\", ", ASCIILiteral(argument ? "true" : "false"), "])"));
 }
 
 void WebInspectorUI::evaluateExpressionOnLoad(const String& expression)

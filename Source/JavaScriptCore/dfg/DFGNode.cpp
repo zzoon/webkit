@@ -85,6 +85,15 @@ bool Node::hasVariableAccessData(Graph& graph)
     }
 }
 
+void Node::remove()
+{
+    ASSERT(!(flags() & NodeHasVarArgs));
+    
+    children = children.justChecks();
+    
+    setOpAndDefaultFlags(Check);
+}
+
 void Node::convertToIdentity()
 {
     RELEASE_ASSERT(child1());
@@ -147,6 +156,14 @@ void Node::convertToPutByOffsetHint()
     convertToPutHint(
         PromotedLocationDescriptor(NamedPropertyPLoc, storageAccessData().identifierNumber),
         child2().node(), child3().node());
+}
+
+void Node::convertToPutClosureVarHint()
+{
+    ASSERT(m_op == PutClosureVar);
+    convertToPutHint(
+        PromotedLocationDescriptor(ClosureVarPLoc, scopeOffset().offset()),
+        child1().node(), child2().node());
 }
 
 PromotedLocationDescriptor Node::promotedLocationDescriptor()

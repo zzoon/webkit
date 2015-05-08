@@ -250,17 +250,17 @@ int WebBackForwardList::forwardListCount() const
     return m_page && m_hasCurrentIndex ? m_entries.size() - (m_currentIndex + 1) : 0;
 }
 
-PassRefPtr<API::Array> WebBackForwardList::backList() const
+Ref<API::Array> WebBackForwardList::backList() const
 {
     return backListAsAPIArrayWithLimit(backListCount());
 }
 
-PassRefPtr<API::Array> WebBackForwardList::forwardList() const
+Ref<API::Array> WebBackForwardList::forwardList() const
 {
     return forwardListAsAPIArrayWithLimit(forwardListCount());
 }
 
-PassRefPtr<API::Array> WebBackForwardList::backListAsAPIArrayWithLimit(unsigned limit) const
+Ref<API::Array> WebBackForwardList::backListAsAPIArrayWithLimit(unsigned limit) const
 {
     ASSERT(!m_hasCurrentIndex || m_currentIndex < m_entries.size());
 
@@ -284,7 +284,7 @@ PassRefPtr<API::Array> WebBackForwardList::backListAsAPIArrayWithLimit(unsigned 
     return API::Array::create(WTF::move(vector));
 }
 
-PassRefPtr<API::Array> WebBackForwardList::forwardListAsAPIArrayWithLimit(unsigned limit) const
+Ref<API::Array> WebBackForwardList::forwardListAsAPIArrayWithLimit(unsigned limit) const
 {
     ASSERT(!m_hasCurrentIndex || m_currentIndex < m_entries.size());
 
@@ -397,14 +397,18 @@ BackForwardListState WebBackForwardList::backForwardListState(const std::functio
         auto& entry = *m_entries[i];
 
         if (filter && !filter(entry)) {
-            if (backForwardListState.currentIndex && i <= backForwardListState.currentIndex.value())
-                --backForwardListState.currentIndex.value();
+            auto& currentIndex = backForwardListState.currentIndex;
+            if (currentIndex && i <= currentIndex.value() && currentIndex.value())
+                --currentIndex.value();
 
             continue;
         }
 
         backForwardListState.items.append(entry.itemState());
     }
+
+    if (backForwardListState.items.isEmpty())
+        backForwardListState.currentIndex = Nullopt;
 
     return backForwardListState;
 }
