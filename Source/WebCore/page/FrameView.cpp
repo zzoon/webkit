@@ -61,6 +61,7 @@
 #include "MemoryCache.h"
 #include "MemoryPressureHandler.h"
 #include "OverflowEvent.h"
+#include "PageCache.h"
 #include "PageOverlayController.h"
 #include "ProgressTracker.h"
 #include "RenderEmbeddedObject.h"
@@ -378,7 +379,14 @@ void FrameView::detachCustomScrollbars()
 void FrameView::recalculateScrollbarOverlayStyle()
 {
     ScrollbarOverlayStyle oldOverlayStyle = scrollbarOverlayStyle();
-    ScrollbarOverlayStyle overlayStyle = ScrollbarOverlayStyleDefault;
+    WTF::Optional<ScrollbarOverlayStyle> clientOverlayStyle = frame().page() ? frame().page()->chrome().client().preferredScrollbarOverlayStyle() : ScrollbarOverlayStyleDefault;
+    if (clientOverlayStyle) {
+        if (clientOverlayStyle.value() != oldOverlayStyle)
+            setScrollbarOverlayStyle(clientOverlayStyle.value());
+        return;
+    }
+
+    ScrollbarOverlayStyle computedOverlayStyle = ScrollbarOverlayStyleDefault;
 
     Color backgroundColor = documentBackgroundColor();
     if (backgroundColor.isValid()) {
@@ -388,11 +396,11 @@ void FrameView::recalculateScrollbarOverlayStyle()
         double hue, saturation, lightness;
         backgroundColor.getHSL(hue, saturation, lightness);
         if (lightness <= .5 && backgroundColor.alpha() > 0)
-            overlayStyle = ScrollbarOverlayStyleLight;
+            computedOverlayStyle = ScrollbarOverlayStyleLight;
     }
 
-    if (oldOverlayStyle != overlayStyle)
-        setScrollbarOverlayStyle(overlayStyle);
+    if (oldOverlayStyle != computedOverlayStyle)
+        setScrollbarOverlayStyle(computedOverlayStyle);
 }
 
 void FrameView::clear()
@@ -576,8 +584,10 @@ void FrameView::setContentsSize(const IntSize& size)
 
     page->chrome().contentsSizeChanged(&frame(), size); // Notify only.
 
-    if (frame().isMainFrame())
+    if (frame().isMainFrame()) {
         frame().mainFrame().pageOverlayController().didChangeDocumentSize();
+        PageCache::singleton().markPagesForContentsSizeChanged(*page);
+    }
 
     ASSERT(m_deferSetNeedsLayoutCount);
     m_deferSetNeedsLayoutCount--;
@@ -2974,7 +2984,11 @@ void FrameView::performPostLayoutTasks()
     frame().loader().client().dispatchDidLayout();
 
     updateWidgetPositions();
-    
+
+#if ENABLE(CSS_SCROLL_SNAP)
+    updateSnapOffsets();
+#endif
+
     // layout() protects FrameView, but it still can get destroyed when updateEmbeddedObjects()
     // is called through the post layout timer.
     Ref<FrameView> protect(*this);
@@ -2996,15 +3010,7 @@ void FrameView::performPostLayoutTasks()
     sendResizeEventIfNeeded();
     viewportContentsChanged();
 
-#if ENABLE(CSS_SCROLL_SNAP)
-    if (!frame().isMainFrame()) {
-        updateSnapOffsets();
-#if PLATFORM(MAC)
-        if (ScrollAnimator* scrollAnimator = existingScrollAnimator())
-            return scrollAnimator->updateScrollAnimatorsAndTimers();
-#endif
-    }
-#endif
+    updateScrollSnapState();
 }
 
 IntSize FrameView::sizeForResizeEvent() const

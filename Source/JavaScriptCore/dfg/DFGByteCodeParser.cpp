@@ -2111,6 +2111,16 @@ bool ByteCodeParser::handleIntrinsic(int resultOperand, Intrinsic intrinsic, int
         return true;
     }
         
+    case CheckInt32Intrinsic: {
+        insertChecks();
+        for (int i = 1; i < argumentCountIncludingThis; ++i) {
+            Node* node = get(virtualRegisterForArgument(i, registerOffset));
+            addToGraph(Phantom, Edge(node, Int32Use));
+        }
+        set(VirtualRegister(resultOperand), jsConstant(jsBoolean(true)));
+        return true;
+    }
+        
     case FiatInt52Intrinsic: {
         if (argumentCountIncludingThis != 2)
             return false;
@@ -2669,8 +2679,25 @@ bool ByteCodeParser::parseBlock(unsigned limit)
         case op_create_this: {
             int calleeOperand = currentInstruction[2].u.operand;
             Node* callee = get(VirtualRegister(calleeOperand));
+
+            JSFunction* function = callee->dynamicCastConstant<JSFunction*>();
+            if (!function) {
+                JSCell* cachedFunction = currentInstruction[4].u.jsCell.unvalidatedGet();
+                if (cachedFunction
+                    && cachedFunction != JSCell::seenMultipleCalleeObjects()
+                    && !m_inlineStackTop->m_exitProfile.hasExitSite(m_currentIndex, BadCell)) {
+                    ASSERT(cachedFunction->inherits(JSFunction::info()));
+
+                    FrozenValue* frozen = m_graph.freeze(cachedFunction);
+                    addToGraph(CheckCell, OpInfo(frozen), callee);
+                    set(VirtualRegister(currentInstruction[1].u.operand), addToGraph(JSConstant, OpInfo(frozen)));
+
+                    function = static_cast<JSFunction*>(cachedFunction);
+                }
+            }
+
             bool alreadyEmitted = false;
-            if (JSFunction* function = callee->dynamicCastConstant<JSFunction*>()) {
+            if (function) {
                 if (FunctionRareData* rareData = function->rareData()) {
                     if (Structure* structure = rareData->allocationStructure()) {
                         m_graph.freeze(rareData);

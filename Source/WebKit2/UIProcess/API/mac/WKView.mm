@@ -4442,6 +4442,47 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
     return _data->_totalHeightOfBanners;
 }
 
+- (void)_setOverlayScrollbarStyle:(_WKOverlayScrollbarStyle)scrollbarStyle
+{
+    WTF::Optional<WebCore::ScrollbarOverlayStyle> coreScrollbarStyle;
+
+    switch (scrollbarStyle) {
+    case _WKOverlayScrollbarStyleDark:
+        coreScrollbarStyle = ScrollbarOverlayStyleDark;
+        break;
+    case _WKOverlayScrollbarStyleLight:
+        coreScrollbarStyle = ScrollbarOverlayStyleLight;
+        break;
+    case _WKOverlayScrollbarStyleDefault:
+        coreScrollbarStyle = ScrollbarOverlayStyleDefault;
+        break;
+    case _WKOverlayScrollbarStyleAutomatic:
+    default:
+        break;
+    }
+
+    _data->_page->setOverlayScrollbarStyle(coreScrollbarStyle);
+}
+
+- (_WKOverlayScrollbarStyle)_overlayScrollbarStyle
+{
+    WTF::Optional<WebCore::ScrollbarOverlayStyle> coreScrollbarStyle = _data->_page->overlayScrollbarStyle();
+
+    if (!coreScrollbarStyle)
+        return _WKOverlayScrollbarStyleAutomatic;
+
+    switch (coreScrollbarStyle.value()) {
+    case ScrollbarOverlayStyleDark:
+        return _WKOverlayScrollbarStyleDark;
+    case ScrollbarOverlayStyleLight:
+        return _WKOverlayScrollbarStyleLight;
+    case ScrollbarOverlayStyleDefault:
+        return _WKOverlayScrollbarStyleDefault;
+    default:
+        return _WKOverlayScrollbarStyleAutomatic;
+    }
+}
+
 - (NSColor *)_pageExtendedBackgroundColor
 {
     WebCore::Color color = _data->_page->pageExtendedBackgroundColor();
@@ -4603,7 +4644,6 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
     _data->_gestureController->setDidMoveSwipeSnapshotCallback(callback);
 }
 
-
 - (NSArray *)_actionMenuItemsForHitTestResult:(WKHitTestResultRef)hitTestResult withType:(_WKActionMenuType)type defaultActionMenuItems:(NSArray *)defaultMenuItems
 {
     return defaultMenuItems;
@@ -4633,7 +4673,6 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
 
 - (void)_didChangeContentSize:(NSSize)newSize
 {
-
 }
 
 - (void)_dismissContentRelativeChildWindows
@@ -4647,9 +4686,11 @@ static NSString *pathWithUniqueFilenameForPath(NSString *path)
         if (Class lookupDefinitionModuleClass = getLULookupDefinitionModuleClass())
             [lookupDefinitionModuleClass hideDefinition];
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
         DDActionsManager *actionsManager = [getDDActionsManagerClass() sharedManager];
         if ([actionsManager respondsToSelector:@selector(requestBubbleClosureUnanchorOnFailure:)])
             [actionsManager requestBubbleClosureUnanchorOnFailure:YES];
+#endif
     }
 
     [self _clearTextIndicatorWithAnimation:TextIndicatorDismissalAnimation::FadeOut];

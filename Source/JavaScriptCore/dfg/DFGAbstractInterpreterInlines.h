@@ -348,7 +348,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             break;
         }
         forNode(node).setType(m_graph, forNode(node->child1()).m_type);
-        forNode(node).fixTypeForRepresentation(node);
+        forNode(node).fixTypeForRepresentation(m_graph, node);
         break;
     }
         
@@ -371,7 +371,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         }
         
         forNode(node).setType(m_graph, forNode(node->child1()).m_type & ~SpecDoubleImpureNaN);
-        forNode(node).fixTypeForRepresentation(node);
+        forNode(node).fixTypeForRepresentation(m_graph, node);
         break;
     }
         
@@ -814,7 +814,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         
     case ArithSin: {
         JSValue child = forNode(node->child1()).value();
-        if (false && child && child.isNumber()) {
+        if (child && child.isNumber()) {
             setConstant(node, jsDoubleNumber(sin(child.asNumber())));
             break;
         }
@@ -824,7 +824,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     
     case ArithCos: {
         JSValue child = forNode(node->child1()).value();
-        if (false && child && child.isNumber()) {
+        if (child && child.isNumber()) {
             setConstant(node, jsDoubleNumber(cos(child.asNumber())));
             break;
         }
