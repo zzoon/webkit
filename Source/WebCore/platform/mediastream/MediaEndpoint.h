@@ -42,7 +42,7 @@ namespace WebCore {
 class IceCandidate;
 class MediaEndpoint;
 class MediaEndpointConfiguration;
-class RealTimeMediaSource; // not implemented
+class RealtimeMediaSource;
 
 class MediaEndpointClient {
 public:
@@ -50,7 +50,7 @@ public:
     virtual void gotDtlsCertificate(unsigned mdescIndex, const String& certificate) = 0;
     virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&, const String& ufrag, const String& password) = 0;
     virtual void doneGatheringCandidates(unsigned mdescIndex) = 0;
-    virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealTimeMediaSource>&&) = 0;
+    virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) = 0;
 
     virtual ~MediaEndpointClient() { }
 };

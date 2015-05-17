@@ -607,7 +607,7 @@ void RTCPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
     maybeDispatchGatheringDone();
 }
 
-void RTCPeerConnection::gotRemoteSource(unsigned, RefPtr<RealTimeMediaSource>&&)
+void RTCPeerConnection::gotRemoteSource(unsigned, RefPtr<RealtimeMediaSource>&&)
 {
 }
 
