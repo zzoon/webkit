@@ -172,6 +172,18 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
     // FIXME: Mark connection as needing negotiation.
 }
 
+static RTCRtpSender* takeFirstSenderOfType(Vector<RTCRtpSender*>& senders, const String& type)
+{
+    for (unsigned i = 0; i < senders.size(); ++i) {
+        if (senders[i]->track()->kind() == type) {
+            RTCRtpSender* sender = senders[i];
+            senders.remove(i);
+            return sender;
+        }
+    }
+    return nullptr;
+}
+
 static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions, Vector<RTCRtpSender*>& senders)
 {
     // Remove any sender(s) from the senders list that already have their tracks represented by a media
@@ -193,19 +205,11 @@ static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDesc
         if (mdesc->mediaStreamTrackId() != emptyString())
             continue;
 
-        RTCRtpSender* sender = nullptr;
-        for (auto s : senders) {
-            if (s->track()->kind() == mdesc->type()) {
-                sender = s;
-                break;
-            }
-        }
-
+        RTCRtpSender* sender = takeFirstSenderOfType(senders, mdesc->type());
         if (sender) {
             mdesc->setMediaStreamId(sender->mediaStreamId());
             mdesc->setMediaStreamTrackId(sender->track()->id());
             mdesc->setMode("sendrecv");
-            senders.removeFirst(sender);
         } else
             mdesc->setMode("recvonly");
     }
