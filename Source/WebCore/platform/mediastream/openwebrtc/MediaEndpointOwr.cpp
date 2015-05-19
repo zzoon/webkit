@@ -194,7 +194,7 @@ void MediaEndpointOwr::dispatchDtlsCertificate(unsigned sessionIndex, const Stri
     m_client->gotDtlsCertificate(sessionIndex, certificate);
 }
 
-void MediaEndpointOwr::dispatchSendSSRC(unsigned sessionIndex, const String& ssrc, const String& cname)
+void MediaEndpointOwr::dispatchSendSSRC(unsigned sessionIndex, unsigned ssrc, const String& cname)
 {
     m_client->gotSendSSRC(sessionIndex, ssrc, cname);
 }
@@ -365,11 +365,11 @@ static void gotDtlsCertificate(OwrSession* session, GParamSpec*, MediaEndpointOw
 
 static void gotSendSsrc(OwrMediaSession* mediaSession, GParamSpec*, MediaEndpointOwr* mediaEndpoint)
 {
+    guint ssrc;
     gchar* cname;
-    g_object_get(mediaSession, "cname", &cname, nullptr);
+    g_object_get(mediaSession, "send-ssrc", &ssrc, "cname", &cname, nullptr);
 
-    // FIXME: fix send-ssrc
-    mediaEndpoint->dispatchSendSSRC(mediaEndpoint->sessionIndex(OWR_SESSION(mediaSession)), "fix me", String(cname));
+    mediaEndpoint->dispatchSendSSRC(mediaEndpoint->sessionIndex(OWR_SESSION(mediaSession)), ssrc, String(cname));
 
     g_free(cname);
 }

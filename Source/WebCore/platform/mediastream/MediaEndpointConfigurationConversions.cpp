@@ -190,8 +190,8 @@ RefPtr<MediaEndpointConfiguration> fromJSON(const String& json)
         mdescObject->getArray(ASCIILiteral("ssrcs"), ssrcsArray);
 
         for (unsigned j = 0; j < ssrcsArray->length(); ++j) {
-            ssrcsArray->get(j)->asString(stringValue);
-            mdesc->addSsrc(stringValue);
+            ssrcsArray->get(j)->asInteger(intValue);
+            mdesc->addSsrc(intValue);
         }
 
         if (mdescObject->getString(ASCIILiteral("cname"), stringValue))
@@ -279,9 +279,8 @@ String toJSON(MediaEndpointConfiguration* configuration)
 
         RefPtr<InspectorArray> ssrcsArray = InspectorArray::create();
 
-        for (const auto& ssrc : mdesc->ssrcs()) {
-            ssrcsArray->pushString(ssrc);
-        }
+        for (auto ssrc : mdesc->ssrcs())
+            ssrcsArray->pushDouble(ssrc);
         mdescObject->setArray(ASCIILiteral("ssrcs"), ssrcsArray);
 
         mdescObject->setString(ASCIILiteral("cname"), mdesc->cname());

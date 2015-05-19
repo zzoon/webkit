@@ -82,8 +82,8 @@ public:
     const String& cname() const { return m_cname; }
     void setCname(const String& cname) { m_cname = cname; }
 
-    const Vector<String>& ssrcs() const { return m_ssrcs; }
-    void addSsrc(const String& ssrc) { m_ssrcs.append(ssrc); }
+    const Vector<unsigned>& ssrcs() const { return m_ssrcs; }
+    void addSsrc(unsigned ssrc) { m_ssrcs.append(ssrc); }
 
     const String& iceUfrag() const { return m_iceUfrag; }
     void setIceUfrag(const String& iceUfrag) { m_iceUfrag = iceUfrag; }
@@ -123,7 +123,7 @@ private:
     String m_dtlsFingerprintHashFunction;
     String m_dtlsFingerprint;
 
-    Vector<String> m_ssrcs;
+    Vector<unsigned> m_ssrcs;
     String m_cname;
 
     String m_iceUfrag;

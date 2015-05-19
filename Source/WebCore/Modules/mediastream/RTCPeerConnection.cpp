@@ -525,7 +525,7 @@ void RTCPeerConnection::close()
     m_signalingState = SignalingStateClosed;
 }
 
-void RTCPeerConnection::gotSendSSRC(unsigned mdescIndex, const String& ssrc, const String& cname)
+void RTCPeerConnection::gotSendSSRC(unsigned mdescIndex, unsigned ssrc, const String& cname)
 {
     printf("-> gotSendSSRC()\n");
 
