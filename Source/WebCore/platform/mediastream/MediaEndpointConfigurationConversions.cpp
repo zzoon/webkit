@@ -124,6 +124,8 @@ RefPtr<MediaEndpointConfiguration> fromJSON(const String& json)
     if (object->getObject(ASCIILiteral("originator"), originatorObject)) {
         if (originatorObject->getInteger(ASCIILiteral("sessionId"), longValue))
             configuration->setSessionId(longValue);
+        if (originatorObject->getInteger(ASCIILiteral("sessionVersion"), intValue))
+            configuration->setSessionVersion(intValue);
     }
 
     RefPtr<InspectorArray> mediaDescriptionsArray = InspectorArray::create();
@@ -240,7 +242,8 @@ String toJSON(MediaEndpointConfiguration* configuration)
     RefPtr<InspectorObject> object = InspectorObject::create();
 
     RefPtr<InspectorObject> originatorObject = InspectorObject::create();
-    originatorObject->setInteger(ASCIILiteral("sessionId"), configuration->sessionId());
+    originatorObject->setDouble(ASCIILiteral("sessionId"), configuration->sessionId());
+    originatorObject->setInteger(ASCIILiteral("sessionVersion"), configuration->sessionVersion());
     object->setObject(ASCIILiteral("originator"), originatorObject);
 
     RefPtr<InspectorArray> mediaDescriptionsArray = InspectorArray::create();
