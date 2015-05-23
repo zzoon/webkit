@@ -589,7 +589,19 @@ void RTCPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate
 
     mdesc.addIceCandidate(candidate.copyRef());
 
-    // FIXME: update mdesc address (ideally with active candidate)
+    if (!candidate->address().contains(':')) { // not IPv6
+        if (candidate->componentId() == 1) { // RTP
+            if (mdesc.address().isEmpty() || mdesc.address() == "0.0.0.0") {
+                mdesc.setAddress(candidate->address());
+                mdesc.setPort(candidate->port());
+            }
+        } else { // RTCP
+            if (mdesc.rtcpAddress().isEmpty() || !mdesc.rtcpPort()) {
+                mdesc.setRtcpAddress(candidate->address());
+                mdesc.setRtcpPort(candidate->port());
+            }
+        }
+    }
 
     ResolveSetLocalDescriptionResult result = maybeResolveSetLocalDescription();
     if (result == SetLocalDescriptionResolvedSuccessfully)
