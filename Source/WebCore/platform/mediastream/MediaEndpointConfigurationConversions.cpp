@@ -57,9 +57,12 @@ static RefPtr<InspectorObject> createCandidateObject(IceCandidate* candidate)
     candidateObject->setInteger(ASCIILiteral("priority"), candidate->priority());
     candidateObject->setString(ASCIILiteral("address"), candidate->address());
     candidateObject->setInteger(ASCIILiteral("port"), candidate->port());
-    candidateObject->setString(ASCIILiteral("tcpType"), candidate->tcpType());
-    candidateObject->setString(ASCIILiteral("relatedAddress"), candidate->relatedAddress());
-    candidateObject->setInteger(ASCIILiteral("relatedPort"), candidate->relatedPort());
+    if (!candidate->tcpType().isEmpty())
+        candidateObject->setString(ASCIILiteral("tcpType"), candidate->tcpType());
+    if (candidate->type().upper() != "HOST") {
+        candidateObject->setString(ASCIILiteral("relatedAddress"), candidate->relatedAddress());
+        candidateObject->setInteger(ASCIILiteral("relatedPort"), candidate->relatedPort());
+    }
 
     return candidateObject;
 }
