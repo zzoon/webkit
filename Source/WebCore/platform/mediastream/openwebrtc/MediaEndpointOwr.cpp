@@ -333,7 +333,7 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
         iceCandidate->setTcpType(candidateTcpTypes[transportType]);
     }
 
-    if (candidateType == OWR_CANDIDATE_TYPE_HOST) {
+    if (candidateType != OWR_CANDIDATE_TYPE_HOST) {
         iceCandidate->setRelatedAddress(relatedAddress);
         iceCandidate->setRelatedPort(relatedPort);
     }
