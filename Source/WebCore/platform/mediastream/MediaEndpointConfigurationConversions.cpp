@@ -146,6 +146,9 @@ RefPtr<MediaEndpointConfiguration> fromJSON(const String& json)
         if (mdescObject->getInteger(ASCIILiteral("port"), intValue))
             mdesc->setPort(intValue);
 
+        if (mdescObject->getString(ASCIILiteral("address"), stringValue))
+            mdesc->setAddress(stringValue);
+
         if (mdescObject->getString(ASCIILiteral("mode"), stringValue))
             mdesc->setMode(stringValue);
 
@@ -171,6 +174,12 @@ RefPtr<MediaEndpointConfiguration> fromJSON(const String& json)
         if (mdescObject->getObject(ASCIILiteral("rtcp"), rtcpObject)) {
             if (rtcpObject->getBoolean(ASCIILiteral("mux"), boolValue))
                 mdesc->setRtcpMux(boolValue);
+
+            if (rtcpObject->getString(ASCIILiteral("rtcpAddress"), stringValue))
+                mdesc->setRtcpAddress(stringValue);
+
+            if (rtcpObject->getInteger(ASCIILiteral("rtcpPort"), intValue))
+                mdesc->setRtcpPort(intValue);
         }
 
         if (mdescObject->getString(ASCIILiteral("mediaStreamId"), stringValue))
@@ -256,6 +265,7 @@ String toJSON(MediaEndpointConfiguration* configuration)
 
         mdescObject->setString(ASCIILiteral("type"), mdesc->type());
         mdescObject->setInteger(ASCIILiteral("port"), mdesc->port());
+        mdescObject->setString(ASCIILiteral("address"), mdesc->address());
         mdescObject->setString(ASCIILiteral("mode"), mdesc->mode());
 
         RefPtr<InspectorArray> payloadsArray = InspectorArray::create();
@@ -272,6 +282,8 @@ String toJSON(MediaEndpointConfiguration* configuration)
 
         RefPtr<InspectorObject> rtcpObject = InspectorObject::create();
         rtcpObject->setBoolean(ASCIILiteral("mux"), mdesc->rtcpMux());
+        rtcpObject->setString(ASCIILiteral("address"), mdesc->rtcpAddress());
+        rtcpObject->setInteger(ASCIILiteral("port"), mdesc->rtcpPort());
         mdescObject->setObject(ASCIILiteral("rtcp"), rtcpObject);
 
         mdescObject->setString(ASCIILiteral("mediaStreamId"), mdesc->mediaStreamId());
