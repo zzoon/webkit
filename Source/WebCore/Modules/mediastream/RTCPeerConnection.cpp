@@ -568,7 +568,7 @@ void RTCPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const String& ce
     for (unsigned i = 0; i < fingerprintVector.size(); ++i)
         fingerprint.append(String::format(i ? ":%02X" : "%02X", fingerprintVector[i]));
 
-    m_localConfiguration->mediaDescriptions()[mdescIndex]->setDtlsFingerprintHashFunction("sha256");
+    m_localConfiguration->mediaDescriptions()[mdescIndex]->setDtlsFingerprintHashFunction("sha-256");
     m_localConfiguration->mediaDescriptions()[mdescIndex]->setDtlsFingerprint(fingerprint.toString());
 
     if (maybeResolveSetLocalDescription() == SetLocalDescriptionResolvedSuccessfully)
