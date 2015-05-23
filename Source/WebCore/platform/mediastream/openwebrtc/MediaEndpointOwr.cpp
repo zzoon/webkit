@@ -267,11 +267,19 @@ void MediaEndpointOwr::internalAddRemoteCandidate(OwrSession* session, IceCandid
         return;
 
     ASSERT(candidateTypes.find(candidate.type()) != notFound);
-    ASSERT(candidateTcpTypes.find(candidate.tcpType()) != notFound);
+    printf("ASSERT: %d\n", (candidateTypes.find(candidate.type()) != notFound));
 
     OwrCandidateType candidateType = static_cast<OwrCandidateType>(candidateTypes.find(candidate.type()));
     OwrComponentType componentId = static_cast<OwrComponentType>(candidate.componentId());
-    OwrTransportType transportType = static_cast<OwrTransportType>(candidateTcpTypes.find(candidate.tcpType()));
+    OwrTransportType transportType;
+
+    if (candidate.transport().upper() == "UDP")
+        transportType = OWR_TRANSPORT_TYPE_UDP;
+    else {
+        ASSERT(candidateTcpTypes.find(candidate.tcpType()) != notFound);
+        printf("ASSERT: %d\n", (candidateTcpTypes.find(candidate.tcpType()) != notFound));
+        transportType = static_cast<OwrTransportType>(candidateTcpTypes.find(candidate.tcpType()));
+    }
 
     OwrCandidate* owrCandidate = owr_candidate_new(candidateType, componentId);
     g_object_set(owrCandidate, "transport-type", transportType,
