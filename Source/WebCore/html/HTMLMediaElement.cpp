@@ -1253,9 +1253,11 @@ void HTMLMediaElement::loadResource(const URL& initialURL, ContentType& contentT
     } else
 #endif
 #if ENABLE(MEDIA_STREAM)
-        if (m_mediaStreamSrcObject)
-            m_player->load(m_mediaStreamSrcObject->privateStream());
-        else
+    if (!m_mediaStreamSrcObject && url.protocolIs(mediaSourceBlobProtocol))
+        m_mediaStreamSrcObject = static_cast<MediaStream*>(MediaStreamRegistry::registry().lookup(url.string()));
+    if (m_mediaStreamSrcObject)
+        m_player->load(m_mediaStreamSrcObject->privateStream());
+    else
 #endif
     if (!m_player->load(url, contentType, keySystem))
         mediaLoadingFailed(MediaPlayer::FormatError);
