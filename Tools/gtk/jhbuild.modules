@@ -309,6 +309,7 @@
   <autotools id="gst-plugins-good" autogenargs="--disable-examples --disable-soup --disable-gtk-doc">
     <dependencies>
       <dep package="gst-plugins-base"/>
+      <dep package="libvpx"/>
     </dependencies>
 
     <branch repo="freedesktop-git" module="gstreamer/gst-plugins-good" version="1.5" checkoutdir="gst-plugins-good" tag="fc038f1f4e45c5c3eb9ba8261c4e0210dd125821"/>
@@ -380,6 +381,11 @@
       <dep package="gstreamer"/>
     </dependencies>
     <branch repo="freedesktop-git" module="libnice/libnice.git" tag="0.1.10" checkoutdir="libnice"/>
+  </autotools>
+
+  <autotools id="libvpx"
+	autogen-template="./configure --prefix=%(prefix)s --libdir=%(libdir)s --enable-shared --enable-pic --as=yasm --disable-unit-tests ">
+	<branch repo="github.com" module="webmproject/libvpx.git" checkoutdir="libvpx" tag="v1.4.0"/>
   </autotools>
 
   <autotools id="openwebrtc" autogenargs="--enable-bridge=no --enable-owr-gst=yes">
