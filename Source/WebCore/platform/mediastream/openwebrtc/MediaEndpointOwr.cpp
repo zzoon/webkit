@@ -216,6 +216,11 @@ void MediaEndpointOwr::dispatchSendSSRC(unsigned sessionIndex, unsigned ssrc, co
     m_client->gotSendSSRC(sessionIndex, ssrc, cname);
 }
 
+void MediaEndpointOwr::dispatchRemoteSource(unsigned sessionIndex, RefPtr<RealtimeMediaSource>&& source)
+{
+    m_client->gotRemoteSource(sessionIndex, WTF::move(source));
+}
+
 void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription*)
 {
     g_signal_connect(session, "on-new-candidate", G_CALLBACK(gotCandidate), this);
@@ -397,9 +402,28 @@ static void gotSendSsrc(OwrMediaSession* mediaSession, GParamSpec*, MediaEndpoin
     g_free(cname);
 }
 
-static void gotIncomingSource(OwrMediaSession*, OwrMediaSource*, MediaEndpointOwr*)
+static void gotIncomingSource(OwrMediaSession* mediaSession, OwrMediaSource* source, MediaEndpointOwr* mediaEndpoint)
 {
-    printf("-> gotIncomingSource\n");
+    String name;
+    String id("not used");
+    OwrMediaType mediaType;
+
+    g_object_get(source, "media-type", &mediaType, nullptr);
+
+    RealtimeMediaSource::Type sourceType;
+    if (mediaType == OWR_MEDIA_TYPE_AUDIO) {
+        sourceType = RealtimeMediaSource::Audio;
+        name = "remote audio";
+    }
+    else if (mediaType == OWR_MEDIA_TYPE_VIDEO) {
+        sourceType = RealtimeMediaSource::Video;
+        name = "remote video";
+    }
+    else
+        ASSERT_NOT_REACHED();
+
+    RefPtr<RealtimeMediaSourceOwr> mediaSource = adoptRef(new RealtimeMediaSourceOwr(source, id, sourceType, name));
+    mediaEndpoint->dispatchRemoteSource(mediaEndpoint->sessionIndex(OWR_SESSION(mediaSession)), WTF::move(mediaSource));
 }
 
 } // namespace WebCore

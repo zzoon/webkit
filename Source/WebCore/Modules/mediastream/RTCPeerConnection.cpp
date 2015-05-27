@@ -56,6 +56,8 @@
 #include "RTCRtpReceiver.h"
 #include "RTCRtpSender.h"
 #include "RTCSessionDescription.h"
+#include "RTCTrackEvent.h"
+#include "UUID.h"
 #include <wtf/MainThread.h>
 #include <wtf/text/Base64.h>
 
@@ -792,8 +794,32 @@ void RTCPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
     maybeDispatchGatheringDone();
 }
 
-void RTCPeerConnection::gotRemoteSource(unsigned, RefPtr<RealtimeMediaSource>&&)
+void RTCPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&& source)
 {
+    if (m_signalingState == SignalingStateClosed)
+        return;
+
+    if (mdescIndex >= m_remoteConfiguration->mediaDescriptions().size()) {
+        printf("Warning: No remote configuration for incoming source.\n");
+        return;
+    }
+
+    PeerMediaDescription& mediaDescription = *m_remoteConfiguration->mediaDescriptions()[mdescIndex];
+    String trackId = mediaDescription.mediaStreamTrackId();
+
+    if (trackId.isEmpty()) {
+        // Non WebRTC media description (e.g. legacy)
+        trackId = createCanonicalUUIDString();
+    }
+
+    // FIXME: track should be set to muted (not supported yet)
+    // FIXME: MediaStream handling not implemented
+
+    RefPtr<MediaStreamTrackPrivate> trackPrivate = MediaStreamTrackPrivate::create(WTF::move(source), trackId);
+    RefPtr<MediaStreamTrack> track = MediaStreamTrack::create(*scriptExecutionContext(), *trackPrivate);
+    RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create(track.copyRef());
+
+    scheduleDispatchEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false, WTF::move(receiver), WTF::move(track)));
 }
 
 void RTCPeerConnection::stop()
