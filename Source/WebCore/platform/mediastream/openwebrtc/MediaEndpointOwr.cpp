@@ -332,7 +332,7 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
     iceCandidate->setComponentId(componentId);
     iceCandidate->setPriority(priority);
     iceCandidate->setAddress(address);
-    iceCandidate->setPort(port);
+    iceCandidate->setPort(port ? port : 9);
 
     if (transportType == OWR_TRANSPORT_TYPE_UDP)
         iceCandidate->setTransport("UDP");
@@ -343,7 +343,7 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
 
     if (candidateType != OWR_CANDIDATE_TYPE_HOST) {
         iceCandidate->setRelatedAddress(relatedAddress);
-        iceCandidate->setRelatedPort(relatedPort);
+        iceCandidate->setRelatedPort(relatedPort ? relatedPort : 9);
     }
 
     mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionIndex(session), WTF::move(iceCandidate), String(ufrag), String(password));
