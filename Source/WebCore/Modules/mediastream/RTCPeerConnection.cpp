@@ -332,7 +332,7 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
     resolveCallback(WTF::move(offer));
 }
 
-void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswerResolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
+void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingStateClosed) {
         ec = INVALID_STATE_ERR;
@@ -348,7 +348,51 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswe
         return;
     }
 
-    // TODO
+    if (!m_remoteConfiguration) {
+        callOnMainThread([rejectCallback] {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("InvalidStateError (no remote description)");
+            rejectCallback(error.get());
+        });
+        return;
+    }
+
+    RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localConfiguration ?
+        MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get())) : MediaEndpointConfiguration::create();
+
+    for (unsigned i = 0; i < m_remoteConfiguration->mediaDescriptions().size(); ++i) {
+        RefPtr<PeerMediaDescription> remoteMediaDescription = m_remoteConfiguration->mediaDescriptions()[i];
+        RefPtr<PeerMediaDescription> localMediaDescription;
+
+        if (i < configurationSnapshot->mediaDescriptions().size())
+            localMediaDescription = configurationSnapshot->mediaDescriptions()[i];
+        else {
+            localMediaDescription = PeerMediaDescription::create();
+            localMediaDescription->setType(remoteMediaDescription->type());
+            localMediaDescription->setDtlsSetup(remoteMediaDescription->dtlsSetup() == "active" ? "passive" : "active");
+
+            configurationSnapshot->addMediaDescription(localMediaDescription.copyRef());
+        }
+
+        localMediaDescription->setPayloads(remoteMediaDescription->payloads());
+
+        localMediaDescription->setRtcpMux(remoteMediaDescription->rtcpMux());
+
+        if (localMediaDescription->dtlsSetup() == "actpass")
+            localMediaDescription->setDtlsSetup("passive");
+    }
+
+    Vector<RTCRtpSender*> senders;
+    for (auto& sender : m_senderSet.values())
+        senders.append(sender.get());
+
+    updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
+
+    RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get()));
+
+    callOnMainThread([resolveCallback, answer] {
+        resolveCallback(answer);
+    });
 }
 
 void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
@@ -408,6 +452,32 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
     return RTCSessionDescription::create(m_localConfigurationType, MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get()));
 }
 
+static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayload>>& remotePayloads, const String& type)
+{
+    Vector<RefPtr<MediaPayload>> defaultPayloads = createDefaultPayloads(type);
+    Vector<RefPtr<MediaPayload>> filteredPayloads;
+
+    for (auto& remotePayload : remotePayloads) {
+        MediaPayload* defaultPayload = nullptr;
+        for (auto& p : defaultPayloads) {
+            if (p->encodingName() == remotePayload->encodingName().upper()) {
+                defaultPayload = p.get();
+                break;
+            }
+        }
+        if (!defaultPayload)
+            continue;
+
+        if (defaultPayload->parameters().contains("packetizationMode") && remotePayload->parameters().contains("packetizationMode")
+            && (defaultPayload->parameters().get("packetizationMode") != defaultPayload->parameters().get("packetizationMode")))
+            continue;
+
+        filteredPayloads.append(remotePayload);
+    }
+
+    return filteredPayloads;
+}
+
 void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingStateClosed) {
@@ -426,6 +496,36 @@ void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description,
         });
         return;
     }
+
+    m_remoteConfiguration = MediaEndpointConfigurationConversions::fromJSON(description->sdp());
+    m_remoteConfigurationType = description->type();
+
+    if (!m_remoteConfiguration) {
+        callOnMainThread([rejectCallback] {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
+            rejectCallback(error.get());
+        });
+        return;
+    }
+
+    Vector<RTCRtpSender*> senders;
+    for (auto& sender : m_senderSet.values())
+        senders.append(sender.get());
+
+    for (auto& mediaDescription : m_remoteConfiguration->mediaDescriptions()) {
+        if (mediaDescription->type() != "audio" && mediaDescription->type() != "video")
+            continue;
+
+        mediaDescription->setPayloads(filterPayloads(mediaDescription->payloads(), mediaDescription->type()));
+
+        RTCRtpSender* sender = takeFirstSenderOfType(senders, mediaDescription->type());
+        if (sender)
+            mediaDescription->setSource(sender->track()->source());
+    }
+
+    bool isInitiator = m_remoteConfigurationType == "answer";
+    m_mediaEndpoint->prepareToSend(m_remoteConfiguration.get(), isInitiator);
 
     RefPtr<RTCPeerConnection> protectedThis(this);
     callOnMainThread([targetState, resolveCallback, protectedThis]() mutable {
