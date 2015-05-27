@@ -629,6 +629,8 @@ void RTCPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
     ASSERT(scriptExecutionContext()->isContextThread());
 
     m_localConfiguration->mediaDescriptions()[mdescIndex]->setIceCandidateGatheringDone(true);
+    // Test: No trickle
+    maybeResolveSetLocalDescription();
     maybeDispatchGatheringDone();
 }
 
@@ -689,6 +691,9 @@ bool RTCPeerConnection::isLocalConfigurationComplete() const
 {
     for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
         if (mdesc->dtlsFingerprint().isEmpty() || mdesc->iceUfrag().isEmpty())
+            return false;
+        // Test: No trickle
+        if (!mdesc->iceCandidateGatheringDone())
             return false;
         if (mdesc->type() == "audio" || mdesc->type() == "video") {
             if (!mdesc->ssrcs().size() || mdesc->cname().isEmpty())
