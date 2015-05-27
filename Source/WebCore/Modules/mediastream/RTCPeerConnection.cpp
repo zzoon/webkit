@@ -317,6 +317,15 @@ void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, 
     m_localConfiguration = MediaEndpointConfigurationConversions::fromJSON(description->sdp());
     m_localConfigurationType = description->type();
 
+    if (!m_localConfiguration) {
+        callOnMainThread([rejectCallback] {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
+            rejectCallback(error.get());
+        });
+        return;
+    }
+
     bool hasNewMediaDescriptions = m_localConfiguration->mediaDescriptions().size() > previousNumberOfMediaDescriptions;
     bool isInitiator = descriptionType == DescriptionTypeOffer;
 
