@@ -51,6 +51,7 @@ static void gotIncomingSource(OwrMediaSession*, OwrMediaSource*, MediaEndpointOw
 
 static const Vector<String> candidateTypes = { "host", "srflx", "prflx", "relay" };
 static const Vector<String> candidateTcpTypes = { "", "active", "passive", "so" };
+static const Vector<String> codecTypes = { "NONE", "PCMU", "PCMA", "OPUS", "H264", "VP8" };
 
 static std::unique_ptr<MediaEndpoint> createMediaEndpointOwr(MediaEndpointClient* client)
 {
@@ -100,6 +101,16 @@ void MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuratio
     m_numberOfReceivePreparedSessions = m_sessions.size();
 }
 
+static RefPtr<MediaPayload> findRtxPayload(Vector<RefPtr<MediaPayload>> payloads, unsigned apt)
+{
+    for (auto& payload : payloads) {
+        if (payload->encodingName().upper() == "RTX" && payload->parameters().contains("apt")
+            && (payload->parameters().get("apt") == apt))
+            return payload;
+    }
+    return nullptr;
+}
+
 void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, bool isInitiator)
 {
     Vector<SessionConfig> sessionConfigs;
@@ -133,26 +144,32 @@ void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, 
         if (!mdesc.source())
             continue;
 
-        OwrPayload* sendPayload;
+        MediaPayload* payload = nullptr;
+        for (auto& p : mdesc.payloads()) {
+            if (p->encodingName().upper() != "RTX") {
+                payload = p.get();
+                break;
+            }
+        }
+
+        if (!payload) {
+            printf("prepareToSend: no payloads\n");
+            return;
+        }
+
+        RefPtr<MediaPayload> rtxPayload = findRtxPayload(mdesc.payloads(), payload->type());
         RealtimeMediaSourceOwr* source = static_cast<RealtimeMediaSourceOwr*>(mdesc.source());
 
-        if (mdesc.type() == "audio") {
-            // { "encodingName": "OPUS", "type": 111, "clockRate": 48000, "channels": 2 },
-            OwrCodecType codecType = OWR_CODEC_TYPE_OPUS;
-            gint64 payloadType = 111;
-            gint64 clockRate = 48000;
-            gint64 channels = 2;
+        ASSERT(codecTypes.find(payload->encodingName().upper()) != notFound);
+        OwrCodecType codecType = static_cast<OwrCodecType>(codecTypes.find(payload->encodingName().upper()));
 
-            sendPayload = owr_audio_payload_new(codecType, payloadType, clockRate, channels);
-        } else {
-            // { "encodingName": "VP8", "type": 100, "clockRate": 90000, "ccmfir": true, "nackpli": true, "nack": true }
-            OwrCodecType codecType = OWR_CODEC_TYPE_VP8;
-            gint64 payloadType = 100;
-            gint64 clockRate = 90000;
-            gboolean ccmfir = true;
-            gboolean nackpli = true;
-
-            sendPayload = owr_video_payload_new(codecType, payloadType, clockRate, ccmfir, nackpli);
+        OwrPayload* sendPayload;
+        if (mdesc.type() == "audio")
+            sendPayload = owr_audio_payload_new(codecType, payload->type(), payload->clockRate(), payload->channels());
+        else {
+            sendPayload = owr_video_payload_new(codecType, payload->type(), payload->clockRate(), payload->ccmfir(), payload->nackpli());
+            g_object_set(sendPayload, "rtx-payload-type", rtxPayload ? rtxPayload->type() : -1,
+                "rtx-time", rtxPayload && rtxPayload->parameters().contains("rtxTime") ? rtxPayload->parameters().get("rtxTime") : 0, nullptr);
         }
 
         owr_media_session_set_send_payload(OWR_MEDIA_SESSION(session), sendPayload);
@@ -216,28 +233,26 @@ void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMe
     g_signal_connect(mediaSession, "notify::send-ssrc", G_CALLBACK(gotSendSsrc), this);
     g_signal_connect(mediaSession, "on-incoming-source", G_CALLBACK(gotIncomingSource), this);
 
-    OwrPayload* receivePayload;
+    for (auto& payload : mediaDescription->payloads()) {
+        if (payload->encodingName().upper() == "RTX")
+            continue;
 
-    if (mediaDescription->type() == "audio") {
-        // { "encodingName": "OPUS", "type": 111, "clockRate": 48000, "channels": 2 },
-        OwrCodecType codecType = OWR_CODEC_TYPE_OPUS;
-        gint64 payloadType = 111;
-        gint64 clockRate = 48000;
-        gint64 channels = 2;
+        RefPtr<MediaPayload> rtxPayload = findRtxPayload(mediaDescription->payloads(), payload->type());
 
-        receivePayload = owr_audio_payload_new(codecType, payloadType, clockRate, channels);
-    } else {
-        // { "encodingName": "VP8", "type": 100, "clockRate": 90000, "ccmfir": true, "nackpli": true, "nack": true }
-        OwrCodecType codecType = OWR_CODEC_TYPE_VP8;
-        gint64 payloadType = 100;
-        gint64 clockRate = 90000;
-        gboolean ccmfir = true;
-        gboolean nackpli = true;
+        ASSERT(codecTypes.find(payload->encodingName()) != notFound);
+        OwrCodecType codecType = static_cast<OwrCodecType>(codecTypes.find(payload->encodingName()));
 
-        receivePayload = owr_video_payload_new(codecType, payloadType, clockRate, ccmfir, nackpli);
+        OwrPayload* receivePayload;
+        if (mediaDescription->type() == "audio")
+            receivePayload = owr_audio_payload_new(codecType, payload->type(), payload->clockRate(), payload->channels());
+        else {
+            receivePayload = owr_video_payload_new(codecType, payload->type(), payload->clockRate(), payload->ccmfir(), payload->nackpli());
+            g_object_set(receivePayload, "rtx-payload-type", rtxPayload ? rtxPayload->type() : -1,
+                "rtx-time", rtxPayload && rtxPayload->parameters().contains("rtxTime") ? rtxPayload->parameters().get("rtxTime") : 0, nullptr);
+        }
+
+        owr_media_session_add_receive_payload(mediaSession, receivePayload);
     }
-
-    owr_media_session_add_receive_payload(mediaSession, receivePayload);
 }
 
 void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs)

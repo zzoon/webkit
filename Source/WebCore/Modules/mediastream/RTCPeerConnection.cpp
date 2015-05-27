@@ -215,6 +215,64 @@ static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDesc
     }
 }
 
+// FIXME: This information should be fetched from the platform
+static Vector<RefPtr<MediaPayload>> createDefaultPayloads(const String& type)
+{
+    Vector<RefPtr<MediaPayload>> payloads;
+    RefPtr<MediaPayload> payload;
+
+    if (type == "audio") {
+        payload = MediaPayload::create();
+        payload->setType(111);
+        payload->setEncodingName("OPUS");
+        payload->setClockRate(48000);
+        payload->setChannels(2);
+        payloads.append(payload);
+
+        payload = MediaPayload::create();
+        payload->setType(8);
+        payload->setEncodingName("PCMA");
+        payload->setClockRate(8000);
+        payload->setChannels(1);
+        payloads.append(payload);
+
+        payload = MediaPayload::create();
+        payload->setType(0);
+        payload->setEncodingName("PCMU");
+        payload->setClockRate(8000);
+        payload->setChannels(1);
+        payloads.append(payload);
+    } else {
+        payload = MediaPayload::create();
+        payload->setType(103);
+        payload->setEncodingName("H264");
+        payload->setClockRate(90000);
+        payload->setCcmfir(true);
+        payload->setNackpli(true);
+        payload->addParameter("packetizationMode", 1);
+        payloads.append(payload);
+
+        payload = MediaPayload::create();
+        payload->setType(100);
+        payload->setEncodingName("VP8");
+        payload->setClockRate(90000);
+        payload->setCcmfir(true);
+        payload->setNackpli(true);
+        payload->setNack(true);
+        payloads.append(payload);
+
+        payload = MediaPayload::create();
+        payload->setType(120);
+        payload->setEncodingName("RTX");
+        payload->setClockRate(90000);
+        payload->addParameter("apt", 100);
+        payload->addParameter("rtxTime", 200);
+        payloads.append(payload);
+    }
+
+    return payloads;
+}
+
 void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingStateClosed) {
@@ -249,7 +307,7 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
         mediaDescription->setMediaStreamTrackId(track->id());
         mediaDescription->setType(track->kind());
         mediaDescription->setMode("sendrecv");
-        // FIXME: payloads
+        mediaDescription->setPayloads(createDefaultPayloads(track->kind()));
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
 
@@ -258,12 +316,12 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
 
     int extraMediaDescriptionCount = options->offerToReceiveAudio() + options->offerToReceiveVideo();
     for (int i = 0; i < extraMediaDescriptionCount; ++i) {
-        bool audioType = i < options->offerToReceiveAudio();
+        String type = i < options->offerToReceiveAudio() ? "audio" : "video";
         RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
 
-        mediaDescription->setType(audioType ? "audio" : "video");
+        mediaDescription->setType(type);
         mediaDescription->setMode("recvonly");
-        // FIXME: payloads
+        mediaDescription->setPayloads(createDefaultPayloads(type));
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
 
