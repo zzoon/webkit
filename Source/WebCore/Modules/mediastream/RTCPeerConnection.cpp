@@ -245,14 +245,14 @@ static Vector<RefPtr<MediaPayload>> createDefaultPayloads(const String& type)
         payload->setChannels(1);
         payloads.append(payload);
     } else {
-        payload = MediaPayload::create();
-        payload->setType(103);
-        payload->setEncodingName("H264");
-        payload->setClockRate(90000);
-        payload->setCcmfir(true);
-        payload->setNackpli(true);
-        payload->addParameter("packetizationMode", 1);
-        payloads.append(payload);
+        // payload = MediaPayload::create();
+        // payload->setType(103);
+        // payload->setEncodingName("H264");
+        // payload->setClockRate(90000);
+        // payload->setCcmfir(true);
+        // payload->setNackpli(true);
+        // payload->addParameter("packetizationMode", 1);
+        // payloads.append(payload);
 
         payload = MediaPayload::create();
         payload->setType(100);
