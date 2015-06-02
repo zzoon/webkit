@@ -63,9 +63,9 @@ public:
     static PassRefPtr<RTCPeerConnection> create(ScriptExecutionContext&, const Dictionary& rtcConfiguration, ExceptionCode&);
     ~RTCPeerConnection();
 
-    typedef std::function<void(RefPtr<RTCSessionDescription>)> OfferAnswerResolveCallback;
+    typedef std::function<void(RTCSessionDescription&)> OfferAnswerResolveCallback;
     typedef std::function<void()> VoidResolveCallback;
-    typedef std::function<void(RefPtr<DOMError>)> RejectCallback;
+    typedef std::function<void(DOMError&)> RejectCallback;
 
     Vector<RefPtr<RTCRtpSender>> getSenders() const;
     Vector<RefPtr<RTCRtpReceiver>> getReceivers() const;

@@ -285,7 +285,7 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
     RefPtr<RTCOfferOptions> options = RTCOfferOptions::create(offerOptions, ec);
     if (ec) {
         RefPtr<DOMError> error = DOMError::create("Invalid createOffer argument.");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 
@@ -329,7 +329,7 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
     }
 
     RefPtr<RTCSessionDescription> offer = RTCSessionDescription::create("offer", MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get()));
-    resolveCallback(WTF::move(offer));
+    resolveCallback(*offer);
 }
 
 void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
@@ -342,14 +342,14 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswe
     RefPtr<RTCAnswerOptions> options = RTCAnswerOptions::create(answerOptions, ec);
     if (ec) {
         RefPtr<DOMError> error = DOMError::create("Invalid createAnswer argument.");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 
     if (!m_remoteConfiguration) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidStateError (no remote description)");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 
@@ -385,7 +385,7 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswe
     updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
 
     RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get()));
-    resolveCallback(answer);
+    resolveCallback(*answer);
 }
 
 void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
@@ -401,7 +401,7 @@ void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, 
     if (targetState == SignalingStateInvalid) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 
@@ -413,7 +413,7 @@ void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, 
     if (!m_localConfiguration) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 
@@ -480,7 +480,7 @@ void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description,
     if (targetState == SignalingStateInvalid) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 
@@ -490,7 +490,7 @@ void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description,
     if (!m_remoteConfiguration) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 
@@ -552,7 +552,7 @@ void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResol
     if (!m_remoteConfiguration) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidStateError (no remote description)");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 
@@ -560,7 +560,7 @@ void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResol
     if (!candidate) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("SyntaxError (malformed candidate)");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 
@@ -568,7 +568,7 @@ void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResol
     if (mdescIndex >= m_remoteConfiguration->mediaDescriptions().size()) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSdpMlineIndex (sdpMLineIndex out of range");
-        rejectCallback(error.get());
+        rejectCallback(*error);
         return;
     }
 

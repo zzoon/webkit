@@ -96,14 +96,14 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnect
         RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec->argument(1)), globalObject);
 
         RefPtr<RTCPeerConnection> protectedImpl = &impl;
-        auto resolveCallback = [protectedImpl, sessionDescriptionCallback](RefPtr<RTCSessionDescription> description) mutable {
-            RefPtr<RTCSessionDescription> protectedDescription = description;
+        auto resolveCallback = [protectedImpl, sessionDescriptionCallback](RTCSessionDescription& description) mutable {
+            RefPtr<RTCSessionDescription> protectedDescription = &description;
             protectedImpl->scriptExecutionContext()->postTask([sessionDescriptionCallback, protectedDescription](ScriptExecutionContext&) mutable {
                 sessionDescriptionCallback->handleEvent(protectedDescription.get());
             });
         };
-        auto rejectCallback = [protectedImpl, errorCallback](RefPtr<DOMError> error) mutable {
-            RefPtr<DOMError> protectedError = error;
+        auto rejectCallback = [protectedImpl, errorCallback](DOMError& error) mutable {
+            RefPtr<DOMError> protectedError = &error;
             protectedImpl->scriptExecutionContext()->postTask([errorCallback, protectedError](ScriptExecutionContext&) mutable {
                 errorCallback->handleEvent(protectedError.get());
             });
@@ -124,11 +124,11 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnect
     }
 
     DeferredWrapper wrapper(exec, globalObject);
-    auto resolveCallback = [wrapper](RefPtr<RTCSessionDescription> description) mutable {
-        wrapper.resolve(description.get());
+    auto resolveCallback = [wrapper](RTCSessionDescription &description) mutable {
+        wrapper.resolve(&description);
     };
-    auto rejectCallback = [wrapper](RefPtr<DOMError> error) mutable {
-        wrapper.reject(error.get());
+    auto rejectCallback = [wrapper](DOMError& error) mutable {
+        wrapper.reject(&error);
     };
 
     (impl.*implFunction)(options, WTF::move(resolveCallback), WTF::move(rejectCallback), ec);
@@ -171,8 +171,8 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPee
                 voidCallback->handleEvent();
             });
         };
-        auto rejectCallback = [protectedImpl, errorCallback](RefPtr<DOMError> error) mutable {
-            RefPtr<DOMError> protectedError = error;
+        auto rejectCallback = [protectedImpl, errorCallback](DOMError& error) mutable {
+            RefPtr<DOMError> protectedError = &error;
             protectedImpl->scriptExecutionContext()->postTask([errorCallback, protectedError](ScriptExecutionContext&) mutable {
                 errorCallback->handleEvent(protectedError.get());
             });
@@ -188,8 +188,8 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPee
     auto resolveCallback = [wrapper]() mutable {
         wrapper.resolve(false);
     };
-    auto rejectCallback = [wrapper](RefPtr<DOMError> error) mutable {
-        wrapper.reject(error.get());
+    auto rejectCallback = [wrapper](DOMError& error) mutable {
+        wrapper.reject(&error);
     };
 
     (impl.*implFunction)(description.get(), WTF::move(resolveCallback), WTF::move(rejectCallback), ec);
@@ -232,8 +232,8 @@ JSValue JSRTCPeerConnection::addIceCandidate(ExecState* exec)
                 voidCallback->handleEvent();
             });
         };
-        auto rejectCallback = [protectedImpl, errorCallback](RefPtr<DOMError> error) mutable {
-            RefPtr<DOMError> protectedError = error;
+        auto rejectCallback = [protectedImpl, errorCallback](DOMError& error) mutable {
+            RefPtr<DOMError> protectedError = &error;
             protectedImpl->scriptExecutionContext()->postTask([errorCallback, protectedError](ScriptExecutionContext&) mutable {
                 errorCallback->handleEvent(protectedError.get());
             });
@@ -249,8 +249,8 @@ JSValue JSRTCPeerConnection::addIceCandidate(ExecState* exec)
     auto resolveCallback = [wrapper]() mutable {
         wrapper.resolve(false);
     };
-    auto rejectCallback = [wrapper](RefPtr<DOMError> error) mutable {
-        wrapper.reject(error.get());
+    auto rejectCallback = [wrapper](DOMError& error) mutable {
+        wrapper.reject(&error);
     };
 
     impl().addIceCandidate(candidate.get(), WTF::move(resolveCallback), WTF::move(rejectCallback), ec);
