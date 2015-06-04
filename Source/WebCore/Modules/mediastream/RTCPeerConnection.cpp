@@ -61,6 +61,14 @@
 #include <wtf/MainThread.h>
 #include <wtf/text/Base64.h>
 
+// FIXME: Headers for sdp.js supported SDP conversion is kept on the side for now
+#include "JSDOMWindow.h"
+#include "ScriptController.h"
+#include "ScriptGlobalObject.h"
+#include "ScriptSourceCode.h"
+#include "SDPScriptResource.h"
+#include <bindings/ScriptObject.h>
+
 namespace WebCore {
 
 static RefPtr<MediaEndpointInit> createMediaEndpointInit(RTCConfiguration& rtcConfig)
@@ -328,7 +336,8 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
         configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
     }
 
-    RefPtr<RTCSessionDescription> offer = RTCSessionDescription::create("offer", MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get()));
+    String json = MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get());
+    RefPtr<RTCSessionDescription> offer = RTCSessionDescription::create("offer", toSDP(json));
     resolveCallback(*offer);
 }
 
@@ -384,7 +393,8 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswe
 
     updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
 
-    RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get()));
+    String json = MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get());
+    RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", toSDP(json));
     resolveCallback(*answer);
 }
 
@@ -407,7 +417,8 @@ void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, 
 
     unsigned previousNumberOfMediaDescriptions = m_localConfiguration ? m_localConfiguration->mediaDescriptions().size() : 0;
 
-    m_localConfiguration = MediaEndpointConfigurationConversions::fromJSON(description->sdp());
+    String json = fromSDP(description->sdp());
+    m_localConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
     m_localConfigurationType = description->type();
 
     if (!m_localConfiguration) {
@@ -438,7 +449,8 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
     if (!m_localConfiguration)
         return nullptr;
 
-    return RTCSessionDescription::create(m_localConfigurationType, MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get()));
+    String json = MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get());
+    return RTCSessionDescription::create(m_localConfigurationType, toSDP(json));
 }
 
 static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayload>>& remotePayloads, const String& type)
@@ -484,7 +496,8 @@ void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description,
         return;
     }
 
-    m_remoteConfiguration = MediaEndpointConfigurationConversions::fromJSON(description->sdp());
+    String json = fromSDP(description->sdp());
+    m_remoteConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
     m_remoteConfigurationType = description->type();
 
     if (!m_remoteConfiguration) {
@@ -523,7 +536,8 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::remoteDescription() const
     if (!m_remoteConfiguration)
         return nullptr;
 
-    return RTCSessionDescription::create(m_remoteConfigurationType, MediaEndpointConfigurationConversions::toJSON(m_remoteConfiguration.get()));
+    String json = MediaEndpointConfigurationConversions::toJSON(m_remoteConfiguration.get());
+    return RTCSessionDescription::create(m_remoteConfigurationType, toSDP(json));
 }
 
 void RTCPeerConnection::updateIce(const Dictionary& rtcConfiguration, ExceptionCode& ec)
@@ -556,7 +570,8 @@ void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResol
         return;
     }
 
-    RefPtr<IceCandidate> candidate = MediaEndpointConfigurationConversions::iceCandidateFromJSON(rtcCandidate->candidate());
+    String json = iceCandidateFromSDP(rtcCandidate->candidate());
+    RefPtr<IceCandidate> candidate = MediaEndpointConfigurationConversions::iceCandidateFromJSON(json);
     if (!candidate) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("SyntaxError (malformed candidate)");
@@ -753,7 +768,8 @@ void RTCPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate
         maybeDispatchGatheringDone();
     else if (result == SetLocalDescriptionAlreadyResolved) {
         String candidateString = MediaEndpointConfigurationConversions::iceCandidateToJSON(candidate.get());
-        RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateString, "", mdescIndex);
+        String sdpFragment = iceCandidateToSDP(candidateString);
+        RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(sdpFragment, "", mdescIndex);
         scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
     }
 }
@@ -891,6 +907,71 @@ void RTCPeerConnection::maybeDispatchGatheringDone()
     }
 
     scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, nullptr));
+}
+
+String RTCPeerConnection::toSDP(const String& json) const
+{
+    return sdpConversion("toSDP", json);
+}
+
+String RTCPeerConnection::fromSDP(const String& sdp) const
+{
+    return sdpConversion("fromSDP", sdp);
+}
+
+String RTCPeerConnection::iceCandidateToSDP(const String& json) const
+{
+    return sdpConversion("iceCandidateToSDP", json);
+}
+
+String RTCPeerConnection::iceCandidateFromSDP(const String& sdpFragment) const
+{
+    return sdpConversion("iceCandidateFromSDP", sdpFragment);
+}
+
+String RTCPeerConnection::sdpConversion(const String& functionName, const String& argument) const
+{
+    Document* document = downcast<Document>(scriptExecutionContext());
+
+    if (!m_isolatedWorld)
+        m_isolatedWorld = DOMWrapperWorld::create(JSDOMWindow::commonVM());
+
+    ScriptController& scriptController = document->frame()->script();
+    JSDOMGlobalObject* globalObject = JSC::jsCast<JSDOMGlobalObject*>(scriptController.globalObject(*m_isolatedWorld));
+    JSC::ExecState* exec = globalObject->globalExec();
+    JSC::JSLockHolder lock(exec);
+
+    JSC::JSValue probeFunctionValue = globalObject->get(exec, JSC::Identifier::fromString(exec, "toSDP"));
+    if (!probeFunctionValue.isFunction()) {
+        URL scriptURL;
+        scriptController.evaluateInWorld(ScriptSourceCode(SDPScriptResource::getString(), scriptURL), *m_isolatedWorld);
+        if (exec->hadException()) {
+            exec->clearException();
+            return emptyString();
+        }
+    }
+
+    JSC::JSValue functionValue = globalObject->get(exec, JSC::Identifier::fromString(exec, functionName));
+    if (!functionValue.isFunction())
+        return emptyString();
+
+    JSC::JSObject* function = functionValue.toObject(exec);
+    JSC::CallData callData;
+    JSC::CallType callType = function->methodTable()->getCallData(function, callData);
+    if (callType == JSC::CallTypeNone)
+        return emptyString();
+
+    JSC::MarkedArgumentBuffer argList;
+    argList.append(JSC::jsString(exec, argument));
+
+    JSC::JSValue result = JSC::call(exec, function, callType, callData, globalObject, argList);
+    if (exec->hadException()) {
+        printf("sdpConversion: js function (%s) threw\n", functionName.ascii().data());
+        exec->clearException();
+        return emptyString();
+    }
+
+    return result.isString() ? result.getString(exec) : emptyString();
 }
 
 const char* RTCPeerConnection::activeDOMObjectName() const

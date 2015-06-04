@@ -165,6 +165,12 @@ private:
     ResolveSetLocalDescriptionResult maybeResolveSetLocalDescription();
     void maybeDispatchGatheringDone();
 
+    String toSDP(const String& json) const;
+    String fromSDP(const String& sdp) const;
+    String iceCandidateToSDP(const String& json) const;
+    String iceCandidateFromSDP(const String& sdpFragment) const;
+    String sdpConversion(const String& functionName, const String& argument) const;
+
     void scheduleDispatchEvent(PassRefPtr<Event>);
     void scheduledEventTimerFired();
 
@@ -199,6 +205,8 @@ private:
     Vector<RefPtr<RTCDataChannel>> m_dataChannels;
 
     std::unique_ptr<MediaEndpoint> m_mediaEndpoint;
+
+    mutable RefPtr<DOMWrapperWorld> m_isolatedWorld;
 
     Timer m_scheduledEventTimer;
     Vector<RefPtr<Event>> m_scheduledEvents;
