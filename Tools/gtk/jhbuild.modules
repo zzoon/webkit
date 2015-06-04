@@ -293,6 +293,14 @@
     </branch>
   </autotools>
 
+  <autotools id="openh264" autogen-sh="pseudo-configure">
+    <branch module="cisco/openh264/archive/v1.4.0.tar.gz" version="1.4.0"
+            checkoutdir="openh264-1.4.0"
+            repo="github-https">
+      <patch file="openh264-configure.patch" strip="0"/>
+    </branch>
+  </autotools>
+
   <autotools id="gstreamer" autogenargs="--disable-gtk-doc">
     <branch repo="freedesktop-git" module="gstreamer/gstreamer" version="1.5" checkoutdir="gstreamer" tag="41946aa3f63dacacb3e5e92a65f7bc8b50eac18c"/>
   </autotools>
@@ -315,10 +323,11 @@
     <branch repo="freedesktop-git" module="gstreamer/gst-plugins-good" version="1.5" checkoutdir="gst-plugins-good" tag="fc038f1f4e45c5c3eb9ba8261c4e0210dd125821"/>
   </autotools>
 
-  <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc --enable-openh264 --enable-opus --enable-srtp">
+  <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc --enable-openh264 --enable-opus --enable-srtp -- PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$JHBUILD_PREFIX/lib/pkgconfig">
     <dependencies>
       <dep package="gst-plugins-base"/>
       <dep package="libsrtp"/>
+      <dep package="openh264"/>
     </dependencies>
 
     <branch repo="freedesktop-git" module="gstreamer/gst-plugins-bad" version="1.5" checkoutdir="gst-plugins-bad" tag="917c39540329fda619eaf67cd6dbe3fb585bae0e"/>

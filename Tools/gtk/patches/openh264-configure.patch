@@ -1,0 +1,9 @@
+--- /dev/null	2015-06-04 16:39:40.000000000 +1000
++++ pseudo-configure	2015-06-04 16:39:42.000000000 +1000
+@@ -0,0 +1,5 @@
++#!/bin/sh
++
++sed -e "s:^PREFIX=.*:PREFIX=$JHBUILD_PREFIX:" Makefile > Makefile.tmp && mv Makefile.tmp Makefile
++X=build/x86-common.mk
++sed -e "s:^ASM =.*:ASM = yasm:" $X > ${X}.tmp && mv ${X}.tmp $X
+
