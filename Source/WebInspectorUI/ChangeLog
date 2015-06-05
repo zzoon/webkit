@@ -1,3 +1,268 @@
+2015-05-31  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Web Inspector: Drop forEach from WeakMap / WeakSet native member function maps
+        https://bugs.webkit.org/show_bug.cgi?id=145497
+
+        Reviewed by Sam Weinig.
+
+        WeakMap / WeakSet don't have forEach method.
+        This patch drops it from the native prototype function parameters map.
+
+        * UserInterface/Models/NativeFunctionParameters.js:
+
+2015-05-29  Timothy Hatcher  <timothy@apple.com>
+
+        Web Inspector: Resources tab navigation sidebar should have a type filter header
+        https://bugs.webkit.org/show_bug.cgi?id=145474
+
+        Reviewed by Joseph Pecoraro.
+
+        * Localizations/en.lproj/localizedStrings.js: Updated.
+
+        * UserInterface/Images/UpDownArrows.svg: Make styleable.
+
+        * UserInterface/Main.html: Added new files.
+
+        * UserInterface/Views/LogContentView.js:
+        (WebInspector.LogContentView): Drive-by fix. Mark All as exclusive.
+
+        * UserInterface/Views/MultipleScopeBarItem.js: Added.
+        (WebInspector.MultipleScopeBarItem):
+        (WebInspector.MultipleScopeBarItem.prototype.get element):
+        (WebInspector.MultipleScopeBarItem.prototype.get exclusive):
+        (WebInspector.MultipleScopeBarItem.prototype.get scopeBarItems):
+        (WebInspector.MultipleScopeBarItem.set scopeBarItems.createOption):
+        (WebInspector.MultipleScopeBarItem.prototype.set scopeBarItems):
+        (WebInspector.MultipleScopeBarItem.prototype.get selected):
+        (WebInspector.MultipleScopeBarItem.prototype.set selected):
+        (WebInspector.MultipleScopeBarItem.prototype.get selectedScopeBarItem):
+        (WebInspector.MultipleScopeBarItem.prototype.set selectedScopeBarItem):
+        (WebInspector.MultipleScopeBarItem.prototype._clicked):
+        (WebInspector.MultipleScopeBarItem.prototype._selectElementSelectionChanged):
+        (WebInspector.MultipleScopeBarItem.prototype._itemSelectionDidChange):
+
+        * UserInterface/Views/NavigationSidebarPanel.js:
+        (WebInspector.NavigationSidebarPanel.prototype.matchTreeElementAgainstFilterFunctions):
+        (WebInspector.NavigationSidebarPanel.prototype.applyFiltersToTreeElement.matchTextFilter):
+        (WebInspector.NavigationSidebarPanel.prototype.applyFiltersToTreeElement.makeVisible):
+        (WebInspector.NavigationSidebarPanel.prototype.applyFiltersToTreeElement):
+        (WebInspector.NavigationSidebarPanel.prototype._updateFilter):
+        (WebInspector.NavigationSidebarPanel.prototype._treeElementAddedOrChanged):
+        Improve filtering so non-text filters can choose to auto-expand the tree.
+
+        * UserInterface/Views/ResourceSidebarPanel.css: Added.
+        (.sidebar > .panel.navigation.resource > :matches(.content, .empty-content-placeholder)):
+        (.sidebar > .panel.navigation.resource > .navigation-bar):
+
+        * UserInterface/Views/ResourceSidebarPanel.js:
+        (WebInspector.ResourceSidebarPanel):
+        (WebInspector.ResourceSidebarPanel.prototype.hasCustomFilters):
+        (WebInspector.ResourceSidebarPanel.prototype.matchTreeElementAgainstCustomFilters.match):
+        (WebInspector.ResourceSidebarPanel.prototype.matchTreeElementAgainstCustomFilters):
+        (WebInspector.ResourceSidebarPanel.prototype._scopeBarSelectionDidChange):
+        Make a ScopeBar and make it filter the TreeOutline when needed.
+
+        * UserInterface/Views/ScopeBar.css:
+        (.scope-bar > li.multiple):
+        (.scope-bar > li.multiple > select):
+        (.scope-bar > li.multiple.selected > select):
+        (.scope-bar > li.multiple > .arrows):
+        (.scope-bar > li.multiple:matches(.selected, :hover, :active) > .arrows svg .filled):
+        (.scope-bar > li.multiple:matches(.selected, :hover, :active) > .arrows svg .stroked):
+
+        * UserInterface/Views/ScopeBar.js:
+        (WebInspector.ScopeBar): Support shouldGroupNonExclusiveItems which will use MultipleScopeBarItem.
+        (WebInspector.ScopeBar.prototype._populate):
+        (WebInspector.ScopeBar.prototype._itemSelectionDidChange):
+        (WebInspector.ScopeBar.prototype.updateLayout): Deleted. Not needed for our current styles.
+
+        * UserInterface/Views/ScopeBarItem.js:
+        (WebInspector.ScopeBarItem):
+        (WebInspector.ScopeBarItem.prototype.get id):
+        (WebInspector.ScopeBarItem.prototype.get label):
+        (WebInspector.ScopeBarItem.prototype.get exclusive):
+        (WebInspector.ScopeBarItem.prototype.setSelected):
+        (WebInspector.ScopeBarItem.prototype._clicked):
+        (WebInspector.ScopeBarItem.prototype.get element): Deleted.
+        (WebInspector.ScopeBarItem.prototype._markElementSelected): Deleted.
+        Cleaned up and modernized a bit.
+
+2015-05-29  Tobias Reiss  <tobi+webkit@basecode.de>
+
+        Web Inspector: Activity Viewer does not update on "clear all console messages"
+        https://bugs.webkit.org/show_bug.cgi?id=144681
+
+        Reviewed by Joseph Pecoraro.
+
+        Do not apply "ignoreDidClearMessages" hack on "Clear log" Button and Context menu.
+
+        * UserInterface/Views/LogContentView.js:
+        (WebInspector.LogContentView.prototype._sessionStarted):
+        (WebInspector.LogContentView.prototype._clearLogIgnoringClearMessages):
+        (WebInspector.LogContentView.prototype._clearLog): Deleted.
+
+2015-05-29  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Remove unused expandTreeElementsWhenArrowing property from TreeOutline
+        https://bugs.webkit.org/show_bug.cgi?id=145470
+
+        Reviewed by Joseph Pecoraro.
+
+        * UserInterface/Views/TreeOutline.js:
+        (WebInspector.TreeOutline.prototype._treeKeyDown):
+        Replaced uses of removed property with boolean literal.
+
+2015-05-29  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Tabs should have Context Menus
+        https://bugs.webkit.org/show_bug.cgi?id=144208
+
+        Reviewed by Timothy Hatcher.
+
+        Give non-pinned tabs "Close Tab" and "Close Other Tabs" context
+        menu items to affect other non-pinned tabs.
+
+        * Localizations/en.lproj/localizedStrings.js:
+        * UserInterface/Views/TabBarItem.js:
+        (WebInspector.TabBarItem):
+        (WebInspector.TabBarItem.prototype._handleContextMenuEvent.closeTab):
+        (WebInspector.TabBarItem.prototype._handleContextMenuEvent.closeOtherTabs):
+        (WebInspector.TabBarItem.prototype._handleContextMenuEvent):
+
+2015-05-29  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Restoring the last selected DOM node fails on reload (DOMAgent: No node with given path found)
+        https://bugs.webkit.org/show_bug.cgi?id=144231
+
+        Reviewed by Timothy Hatcher.
+
+        Removed _restoreSelectedNodeIsAllowed flag from DOMTreeContentView. The frontend receives two documentUpdated
+        events from the DOM Agent during page reload, and the flag was preventing DOMTreeContentView from restoring
+        the previous selection in response to the second event.
+
+        * UserInterface/Views/DOMTreeContentView.js:
+        (WebInspector.DOMTreeContentView.prototype.selectLastSelectedNode):
+        (WebInspector.DOMTreeContentView.prototype._restoreSelectedNodeAfterUpdate):
+
+2015-05-28  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Update toolbar styles
+        https://bugs.webkit.org/show_bug.cgi?id=145419
+
+        Also, use hairline borders (1 phisical pixel) on retina (DPI >= 2).
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/ButtonToolbarItem.css:
+        (.toolbar .item.button): Deleted.
+        (.toolbar.icon-and-label-vertical .item.button): Deleted.
+        (.toolbar.icon-and-label-horizontal .item.button): Deleted.
+        (.toolbar .item.button > .glyph): Deleted.
+        (.toolbar.small-size .item.button > .glyph): Deleted.
+        * UserInterface/Views/DashboardContainerView.css:
+        (.toolbar .dashboard-container): Deleted.
+        (.toolbar.collapsed .dashboard-container): Deleted.
+        (.toolbar.small-size:matches(.icon-only, .icon-and-label-vertical, .icon-and-label-horizontal) .dashboard-container): Deleted.
+        (.toolbar .dashboard.slide-out-down): Deleted.
+        (.toolbar .dashboard.slide-in-up): Deleted.
+        * UserInterface/Views/Toolbar.css:
+        (.toolbar .search-bar > input[type="search"]):
+        (.toolbar .search-bar > input[type="search"]::-webkit-textfield-decoration-container):
+        (body:not(.unknown-mac) .toolbar .dashboard-container):
+        (body:not(.unknown-mac) .toolbar .search-bar > input[type="search"]):
+        (body:not(.unknown-mac) .toolbar .search-bar > input[type="search"]:focus):
+        (body:not(.unknown-mac) .toolbar .item.button:active):
+        (body.window-inactive:not(.unknown-mac) .toolbar .dashboard-container):
+        (body.unknown-mac .toolbar .dashboard-container):
+        (body.unknown-mac .toolbar .search-bar > input[type="search"]):
+        (body.unknown-mac .toolbar .search-bar > input[type="search"]:focus):
+        (@media (-webkit-min-device-pixel-ratio: 2)):
+        (body.unknown-mac .toolbar .item.button:active):
+        (body.unknown-mac.window-inactive .toolbar .dashboard-container):
+
+2015-05-28  Devin Rousso  <drousso@apple.com>
+
+        Web Inspector: Jump from a computed style to the rule it came from
+        https://bugs.webkit.org/show_bug.cgi?id=120640
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/CSSStyleDeclarationTextEditor.js:
+        (WebInspector.CSSStyleDeclarationTextEditor.prototype._createTextMarkerForPropertyIfNeeded):
+        If the delegate of CSSStyleDeclarationTextEditor has cssStyleDeclarationTextEditorShouldAddPropertyGoToArrows set to true, add a goToArrow to all CSS property entries.
+        (WebInspector.CSSStyleDeclarationTextEditor.prototype.highlightProperty.propertiesMatch):
+        (WebInspector.CSSStyleDeclarationTextEditor.prototype.highlightProperty.hasMatchingLonghandProperty):
+        (WebInspector.CSSStyleDeclarationTextEditor.prototype.highlightProperty):
+        Determines if a given CSS property is in the CSS style section and if so, select that CSS property, focus on the section containing that CSS property, and return true.
+        * UserInterface/Views/CSSStyleDeclarationSection.js:
+        (WebInspector.CSSStyleDeclarationSection.prototype.highlightProperty):
+        Searches through the properties of the section for a given property and scrolls to it if found.
+        * UserInterface/Views/CSSStyleDetailsSidebarPanel.js:
+        (WebInspector.CSSStyleDetailsSidebarPanel.prototype.computedStyleDetailsPanelShowProperty):
+        Switches to the rulesStyleDetailsPanel and scrolls to and hightlights a given property in that panel.
+        (WebInspector.CSSStyleDetailsSidebarPanel.prototype._navigationItemSelected):
+        (WebInspector.CSSStyleDetailsSidebarPanel.prototype._switchPanels):
+        Moved this function out of _navigationItemSelected for better reusablity.
+        * UserInterface/Views/ComputedStyleDetailsPanel.js:
+        (WebInspector.ComputedStyleDetailsPanel.prototype.cssStyleDeclarationTextEditorShowProperty):
+        Function that calls the delegate (which should be CSSStyleDetailsSidebarPanel) function computedStyleDetailsPanelShowProperty.
+        * UserInterface/Views/RulesStyleDetailsPanel.js:
+        (WebInspector.RulesStyleDetailsPanel):
+        (WebInspector.RulesStyleDetailsPanel.prototype.refresh):
+        (WebInspector.RulesStyleDetailsPanel.prototype.scrollToSectionAndHighlightProperty):
+        Searches through all the sections of the RulesStyleDetailsPanel for a given CSS property.
+        (WebInspector.RulesStyleDetailsPanel.prototype.shown):
+        (WebInspector.RulesStyleDetailsPanel.prototype.hidden):
+        (WebInspector.RulesStyleDetailsPanel.prototype.nodeStylesRefreshed):
+        Added a flag to this function that will highlight and scroll to a given property (_propertyToSelectAndHighlight) if set on load.
+        * UserInterface/Views/StyleDetailsPanel.js:
+        (WebInspector.StyleDetailsPanel.prototype.markAsNeedsRefresh):
+        (WebInspector.StyleDetailsPanel.prototype.nodeStylesRefreshed):
+        Made into protected function to allow it to be overridden.
+        (WebInspector.StyleDetailsPanel.prototype._nodeStylesRefreshed): Deleted.
+
+2015-05-28  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Should have a keyboard shortcut to switch between inspector tabs
+        https://bugs.webkit.org/show_bug.cgi?id=144207
+
+        Reviewed by Timothy Hatcher.
+
+        These keyboard shortcuts work well in an undocked inspector window.
+        Be careful that some keyboard shortcuts, when used inside a text
+        editor / text field are just text actions. However, some keyboard
+        shortcuts will work no matter where you trigger them.
+
+        * UserInterface/Models/KeyboardShortcut.js:
+        * UserInterface/Views/TabBar.js:
+        (WebInspector.TabBar.prototype.selectPreviousTab):
+        (WebInspector.TabBar.prototype.selectNextTab):
+        * UserInterface/Views/TabBrowser.js:
+        (WebInspector.TabBrowser):
+        (WebInspector.TabBrowser.prototype._showPreviousTab):
+        (WebInspector.TabBrowser.prototype._showNextTab):
+
+2015-05-28  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: NewTabContentView should update button disabled state as other tabs are added/removed
+        https://bugs.webkit.org/show_bug.cgi?id=145448
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/NewTabContentView.js:
+        (WebInspector.NewTabContentView):
+        Always add a click listener and add the type as a private property on the element.
+
+        (WebInspector.NewTabContentView.prototype.shown):
+        (WebInspector.NewTabContentView.prototype.hidden):
+        Add / remove event listeners for tab changes. Also update the view when shown.
+        
+        (WebInspector.NewTabContentView.prototype._createNewTab):
+        A disabled button an now be clicked. Do nothing if a new tab of this type is not allowed.
+
+        (WebInspector.NewTabContentView.prototype._updateTabItems):
+        Refresh the disabled state for each of the buttons.
+
 2015-05-27  Joseph Pecoraro  <pecoraro@apple.com>
 
         Web Inspector: Show Page Source does not switch to Resources tab if inspector was closed

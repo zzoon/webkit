@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006, 2007, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,33 +23,19 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WAKViewPrivate_h
-#define WAKViewPrivate_h
+#ifndef WKBundleNavigationActionPrivate_h
+#define WKBundleNavigationActionPrivate_h
 
-#if TARGET_OS_IPHONE
+#include <WebKit/WKBase.h>
 
-#import "WAKView.h"
-#import "WKViewPrivate.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-@interface WAKView (WAKPrivate)
-- (WKViewRef)_viewRef;
-+ (WAKView *)_wrapperForViewRef:(WKViewRef)_viewRef;
-- (id)_initWithViewRef:(WKViewRef)view;
-- (BOOL)_handleResponderCall:(WKViewResponderCallbackType)type;
-- (NSMutableSet *)_subviewReferences;
-- (BOOL)_selfHandleEvent:(WebEvent *)event;
-@end
+WK_EXPORT bool WKBundleNavigationActionGetShouldOpenExternalURLs(WKBundleNavigationActionRef);
 
-static inline WAKView *WAKViewForWKViewRef(WKViewRef view)
-{
-    if (!view)
-        return nil;
-    WAKView *wrapper = (WAKView *)view->wrapper;
-    if (wrapper)
-        return wrapper;
-    return [WAKView _wrapperForViewRef:view];
+#ifdef __cplusplus
 }
+#endif
 
-#endif // TARGET_OS_IPHONE
-
-#endif // WAKViewPrivate_h
+#endif // WKBundleNavigationActionPrivate_h

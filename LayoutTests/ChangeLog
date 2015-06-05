@@ -1,3 +1,298 @@
+2015-06-01  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Test font selection for zh fonts
+        https://bugs.webkit.org/show_bug.cgi?id=145478
+
+        Rubber-stamped by Zalan Bujtas.
+
+        * platform/mac/fast/text/font-weights-zh-expected.txt: Added.
+        * platform/mac/fast/text/font-weights-zh.html: Added.
+
+2015-06-01  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r185074 and r185085.
+        https://bugs.webkit.org/show_bug.cgi?id=145533
+
+        Moving to a separate test (Requested by litherum on #webkit).
+
+        Reverted changesets:
+
+        "Test font selection for zh fonts"
+        https://bugs.webkit.org/show_bug.cgi?id=145478
+        http://trac.webkit.org/changeset/185074
+
+        "Test gardening after r185074"
+        https://bugs.webkit.org/show_bug.cgi?id=145478
+        http://trac.webkit.org/changeset/185085
+
+2015-06-01  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Test gardening after r185074
+        https://bugs.webkit.org/show_bug.cgi?id=145478
+
+        Unreviewed.
+
+        * platform/mac-mavericks/fast/text/font-weights-expected.txt: Copied from LayoutTests/platform/mac/fast/text/font-weights-expected.txt.
+        * platform/mac/fast/text/font-weights-expected.txt: Yosemite-specific test results.
+
+2015-06-01  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Test font selection for zh fonts
+        https://bugs.webkit.org/show_bug.cgi?id=145478
+
+        Reviewed by Zalan Bujtas.
+
+        We want to make sure that font selection works correctly for more than just Helvetica and Avenir.
+
+        * platform/mac/fast/text/font-weights-expected.txt:
+        * platform/mac/fast/text/font-weights.html:
+
+2015-06-01  Brady Eidson  <beidson@apple.com>
+
+        Add WKTR support for "should open external URLs".
+        https://bugs.webkit.org/show_bug.cgi?id=145505
+
+        Reviewed by Darin Adler.
+
+        * loader/navigation-policy/resources/notify-done.html: Added.
+        * loader/navigation-policy/should-load-external-urls-set-by-api-basic-expected.txt: Added.
+        * loader/navigation-policy/should-load-external-urls-set-by-api-basic.html: Added.
+        * loader/navigation-policy/should-not-load-external-urls-set-by-api-basic-expected.txt: Added.
+        * loader/navigation-policy/should-not-load-external-urls-set-by-api-basic.html: Added.
+
+        * platform/ios-simulator-wk1/TestExpectations:
+        * platform/mac-wk1/TestExpectations:
+        * platform/win/TestExpectations:
+
+2015-06-01  Chris Dumez  <cdumez@apple.com>
+
+        ASSERT(revalidatingResource.inCache()) in MemoryCache when reloading tumblr.com
+        https://bugs.webkit.org/show_bug.cgi?id=145518
+        <rdar://problem/21168573>
+
+        Reviewed by Darin Adler.
+
+        Add layout test to make sure we no longer crash if the memory cache is
+        pruned while a resource is being revalidated.
+
+        * http/tests/cache/memory-cache-pruning-during-revalidation-expected.txt: Added.
+        * http/tests/cache/memory-cache-pruning-during-revalidation.html: Added.
+
+2015-05-31  Youenn Fablet  <youenn.fablet@crf.canon.fr>
+
+        Async XMLHttpRequest should get access to AppCache resources stored as flat files
+        https://bugs.webkit.org/show_bug.cgi?id=138506
+
+        Reviewed by Darin Adler.
+
+        * http/tests/appcache/resources/simple-video-async.manifest: Added.
+        * http/tests/appcache/simple-video-async-expected.txt: Added.
+        * http/tests/appcache/simple-video-async.html: Added.
+
+2015-05-31  Xabier Rodriguez Calvar  <calvaris@igalia.com> and Youenn Fablet <youenn.fablet@crf.canon.fr>
+
+        [Streams API] Implement ReadableStreamController constructor
+        https://bugs.webkit.org/show_bug.cgi?id=143752
+
+        Reviewed by Darin Adler.
+
+        * streams/readable-stream.html: checking controller constructor.
+        * streams/reference-implementation/brand-checks-expected.txt:
+
+2015-05-31  Jordan Harband  <ljharb@gmail.com>
+
+        Array#reduce and reduceRight don't follow ToLength
+        https://bugs.webkit.org/show_bug.cgi?id=145364
+
+        Reviewed by Yusuke Suzuki.
+
+        * js/array-reduce-expected.txt:
+        * js/array-reduceRight-expected.txt:
+        * js/dom/array-prototype-properties-expected.txt:
+        * js/dom/script-tests/array-prototype-properties.js:
+        * js/script-tests/array-reduce.js:
+        * js/script-tests/array-reduceRight.js:
+
+2015-05-30  Filip Pizlo  <fpizlo@apple.com>
+
+        FTL codegen for MultiGetByOffset and MultiPutByOffset where the structure set is already proved should have an unreachable default case instead of an exit
+        https://bugs.webkit.org/show_bug.cgi?id=145469
+
+        Reviewed by Geoffrey Garen.
+
+        * js/regress/repeat-multi-get-by-offset-expected.txt: Added.
+        * js/regress/repeat-multi-get-by-offset.html: Added.
+        * js/regress/script-tests/repeat-multi-get-by-offset.js: Added.
+        (foo):
+
+2015-05-29  Keith Miller  <keith_miller@apple.com>
+
+        WeakMap reference w/ DOM element as key does not survive long enough.
+        https://bugs.webkit.org/show_bug.cgi?id=137651
+
+        Reviewed by Geoffrey Garen.
+
+        * js/dom/script-tests/weakmap-gc-unobservable-dom-nodes.js: Added.
+        (.set gc):
+        * js/dom/weakmap-gc-unobservable-dom-nodes.html: Added.
+
+2015-05-29  Zalan Bujtas  <zalan@apple.com>
+
+        Text disappears shortly after page load on Nexus 7 site.
+        https://bugs.webkit.org/show_bug.cgi?id=145467
+        rdar://problem/18327239
+
+        Reviewed by Simon Fraser.
+
+        This patch ensures that overlap testing for composited layers works properly when the sibling
+        layer gets composited through its child.
+
+        When a layer gets composited through its child content, the recursive overlap testing should build up the
+        overlapmap stack so that sibling content is intersected both against the child and its parent bounds.
+
+        * compositing/sibling-layer-does-not-get-composited-overflow-hidden-case-expected.html: Added.
+        * compositing/sibling-layer-does-not-get-composited-overflow-hidden-case.html: Added.
+        * compositing/sibling-layer-does-not-get-composited-transform-case-expected.html: Added.
+        * compositing/sibling-layer-does-not-get-composited-transform-case.html: Added.
+
+2015-05-29  Chris Dumez  <cdumez@apple.com>
+
+        Consider throttling DOM timers in iframes outside the viewport
+        https://bugs.webkit.org/show_bug.cgi?id=145465
+        <rdar://problem/20768957>
+
+        Reviewed by Darin Adler.
+
+        Add a layout test to check that DOM timers in iframes outside the
+        viewport get throttled.
+
+        * fast/dom/resources/timer-frame-2.html: Added.
+        * fast/dom/resources/timer-frame.html: Added.
+        * fast/dom/timer-throttling-subframe-expected.txt: Added.
+        * fast/dom/timer-throttling-subframe.html: Added.
+
+2015-05-28  Filip Pizlo  <fpizlo@apple.com>
+
+        Non-speculative Branch should be fast in the FTL
+        https://bugs.webkit.org/show_bug.cgi?id=145452
+
+        Reviewed by Andreas Kling.
+
+        * js/regress/logical-not-weird-types-expected.txt: Added.
+        * js/regress/logical-not-weird-types.html: Added.
+        * js/regress/script-tests/logical-not-weird-types.js: Added.
+        (foo):
+
+2015-05-29  Filip Pizlo  <fpizlo@apple.com>
+
+        Land some .html/-expected.txt files for some tests that were added without them.
+
+        Rubber stamped by Andreas Kling.
+
+        * js/regress/cse-new-array-buffer-expected.txt: Added.
+        * js/regress/cse-new-array-buffer.html: Added.
+        * js/regress/cse-new-array-expected.txt: Added.
+        * js/regress/cse-new-array.html: Added.
+
+2015-05-29  Zalan Bujtas  <zalan@apple.com>
+
+        Unreviewed Win and GTK gardening.
+
+        Skip Mac font specific test.
+
+        * platform/gtk/TestExpectations:
+        * platform/win/TestExpectations:
+
+2015-05-29  Youenn Fablet  <youenn.fablet@crf.canon.fr>
+
+        MediaDevices.getUserMedia should reject promise instead of throwing exceptions
+        https://bugs.webkit.org/show_bug.cgi?id=145282
+
+        Reviewed by Darin Adler.
+
+        Updating test to expect rejection and not error throwing.
+
+        * fast/mediastream/MediaDevices-getUserMedia-expected.txt:
+        * fast/mediastream/MediaDevices-getUserMedia.html:
+
+2015-05-28  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Unreviewed gardening on 29th May
+
+        Unskip passing tests for viewport-percentage, text, sub-pixel
+        and update new failing accessibility, fast/overflow and so on.
+
+        * platform/efl/TestExpectations:
+
+2015-05-28  Zalan Bujtas  <zalan@apple.com>
+
+        Subpixel rendering: Pixel crack in text selection of simple text in <textarea>.
+        https://bugs.webkit.org/show_bug.cgi?id=145393
+        rdar://problem/19918941
+
+        Reviewed by Darin Adler.
+
+        Float to LayoutUnit conversion is lossy. To ensure that selection
+        painting always lines up (snaps) properly, the calculated width needs to
+        be adjusted by ceiling the float to the next LayoutUnit value.
+
+        * fast/text/hidpi-text-selection-gap-between-words-expected.html: Added.
+        * fast/text/hidpi-text-selection-gap-between-words.html: Added.
+        * platform/mac/platform/mac/editing/input/caret-primary-bidi-expected.txt:
+
+2015-05-28  Andreas Kling  <akling@apple.com>
+
+        GraphicsLayerCA should start out with m_intersectsCoverageRect=false
+        <https://webkit.org/b/145443>
+        <rdar://problem/19685798>
+
+        Reviewed by Simon Fraser.
+
+        Add a test (based on iframe-and-layers.html) that makes an iframe with compositing
+        layers inside it and places it far outside the visible viewport.
+
+        The layer dump should show that the "intersects coverage rect" flag is 0 for the
+        iframe and its sublayers.
+
+        * compositing/visible-rect/iframe-with-layers-outside-viewport-expected.txt: Added.
+        * compositing/visible-rect/iframe-with-layers-outside-viewport.html: Added.
+
+2015-05-28  Xabier Rodriguez Calvar  <calvaris@igalia.com> and Youenn Fablet <youenn.fablet@crf.canon.fr>
+
+        [Streams API] ReadableStreamReader should not be exposed
+        https://bugs.webkit.org/show_bug.cgi?id=143564
+
+        Reviewed by Darin Adler.
+
+        Rebasing tests as ReadableStreamReader is no longer defined globally.
+
+        * js/dom/global-constructors-attributes-expected.txt:
+        * platform/efl/js/dom/global-constructors-attributes-expected.txt:
+        * platform/gtk/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac-mavericks/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac/js/dom/global-constructors-attributes-expected.txt:
+        * platform/win/js/dom/global-constructors-attributes-expected.txt:
+
+2015-05-27  Alexey Proskuryakov  <ap@apple.com>
+
+        Delete media/controls-layers.html. It's a bad test that fails and asserts, and there
+        are apparently no plans to fix any of that (see https://bugs.webkit.org/show_bug.cgi?id=145420).
+
+        * media/controls-layers.html: Removed.
+        * platform/mac-mavericks/media/controls-layers-expected.txt: Removed.
+        * platform/mac/media/controls-layers-expected.txt: Removed.
+
+2015-05-27  Jordan Harband  <ljharb@gmail.com>
+
+        Array.of should work with other constructors
+        https://bugs.webkit.org/show_bug.cgi?id=145365
+
+        Reviewed by Yusuke Suzuki.
+
+        * js/array-of-expected.txt:
+        * js/script-tests/array-of.js:
+        (Foo):
+
 2015-05-27  Benjamin Poulain  <bpoulain@apple.com>
 
         [JSC] Add undefined->double conversion to DoubleRep
