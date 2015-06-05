@@ -2769,8 +2769,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setWebGLEnabled(store.getBoolValueForKey(WebPreferencesKey::webGLEnabledKey()));
     settings.setForceSoftwareWebGLRendering(store.getBoolValueForKey(WebPreferencesKey::forceSoftwareWebGLRenderingKey()));
     settings.setAccelerated2dCanvasEnabled(store.getBoolValueForKey(WebPreferencesKey::accelerated2dCanvasEnabledKey()));
-    settings.setMediaPlaybackRequiresUserGesture(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackRequiresUserGestureKey()));
-    settings.setMediaPlaybackAllowsInline(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackAllowsInlineKey()));
+    settings.setRequiresUserGestureForMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::requiresUserGestureForMediaPlaybackKey()));
+    settings.setAllowsInlineMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::allowsInlineMediaPlaybackKey()));
     settings.setAllowsAlternateFullscreen(store.getBoolValueForKey(WebPreferencesKey::allowsAlternateFullscreenKey()));
     settings.setMockScrollbarsEnabled(store.getBoolValueForKey(WebPreferencesKey::mockScrollbarsEnabledKey()));
     settings.setHyperlinkAuditingEnabled(store.getBoolValueForKey(WebPreferencesKey::hyperlinkAuditingEnabledKey()));
@@ -2819,7 +2819,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-    settings.setMediaPlaybackAllowsAirPlay(store.getBoolValueForKey(WebPreferencesKey::mediaPlaybackAllowsAirPlayKey()));
+    settings.setAllowsAirPlayForMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::allowsAirPlayForMediaPlaybackKey()));
 #endif
 
     settings.setSuppressesIncrementalRendering(store.getBoolValueForKey(WebPreferencesKey::suppressesIncrementalRenderingKey()));
@@ -4430,18 +4430,11 @@ void WebPage::didChangeSelection()
 {
     Frame& frame = m_page->focusController().focusedOrMainFrame();
     FrameView* view = frame.view();
-#if PLATFORM(COCOA) && !defined(NDEBUG)
-    int layoutCount = view ? view->layoutCount() : 0;
-#endif
 
     // If there is a layout pending, we should avoid populating EditorState that require layout to be done or it will
     // trigger a synchronous layout every time the selection changes. sendPostLayoutEditorStateIfNeeded() will be called
     // to send the full editor state after layout is done if we send a partial editor state here.
     auto editorState = this->editorState(view && view->needsLayout() ? IncludePostLayoutDataHint::No : IncludePostLayoutDataHint::Yes);
-#if PLATFORM(COCOA) && !defined(NDEBUG)
-    if (view)
-        ASSERT_WITH_MESSAGE(layoutCount == view->layoutCount(), "Calling editorState() should not cause a synchronous layout.");
-#endif
     m_isEditorStateMissingPostLayoutData = editorState.isMissingPostLayoutData;
 
 #if PLATFORM(MAC) && USE(ASYNC_NSTEXTINPUTCLIENT)

@@ -497,12 +497,9 @@ public:
     void setAssistedNodeValue(const String&);
     void setAssistedNodeValueAsNumber(double);
     void setAssistedNodeSelectedIndex(uint32_t index, bool allowMultipleSelection = false);
-
     void applicationWillEnterForeground();
-    void applicationDidEnterBackground();
     void applicationWillResignActive();
     void applicationDidBecomeActive();
-
     void zoomToRect(WebCore::FloatRect, double minimumScale, double maximumScale);
     void commitPotentialTapFailed();
     void didNotHandleTapAsClick(const WebCore::IntPoint&);
@@ -1007,9 +1004,7 @@ public:
     void removeNavigationGestureSnapshot();
 
     WebHitTestResult* lastMouseMoveHitTestResult() const { return m_lastMouseMoveHitTestResult.get(); }
-    void performActionMenuHitTestAtLocation(WebCore::FloatPoint, bool forImmediateAction);
-    void selectLastActionMenuRange();
-    void focusAndSelectLastActionMenuHitTestResult();
+    void performImmediateActionHitTestAtLocation(WebCore::FloatPoint);
 
     void immediateActionDidUpdate();
     void immediateActionDidCancel();
@@ -1441,7 +1436,7 @@ private:
     void viewDidEnterWindow();
 
 #if PLATFORM(MAC)
-    void didPerformActionMenuHitTest(const WebHitTestResult::Data&, bool forImmediateAction, bool contentPreventsDefault, const UserData&);
+    void didPerformImmediateActionHitTest(const WebHitTestResult::Data&, bool contentPreventsDefault, const UserData&);
 #endif
 
     void handleAutoFillButtonClick(const UserData&);

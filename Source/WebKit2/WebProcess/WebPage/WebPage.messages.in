@@ -87,12 +87,9 @@ messages -> WebPage LegacyReceiver {
     SetAssistedNodeValue(String value)
     SetAssistedNodeValueAsNumber(double value)
     SetAssistedNodeSelectedIndex(uint32_t index, bool allowMultipleSelection)
-
     ApplicationWillResignActive()
     ApplicationWillEnterForeground()
-    ApplicationDidEnterBackground(uint64_t callbackID)
     ApplicationDidBecomeActive()
-
     ContentSizeCategoryDidChange(String contentSizeCategory)
     ExecuteEditCommandWithCallback(String name, uint64_t callbackID)
     GetLookupContextAtPoint(WebCore::IntPoint point, uint64_t callbackID)
@@ -413,9 +410,7 @@ messages -> WebPage LegacyReceiver {
     
     TakeSnapshot(WebCore::IntRect snapshotRect, WebCore::IntSize bitmapSize, uint32_t options, uint64_t callbackID)
 #if PLATFORM(MAC)
-    PerformActionMenuHitTestAtLocation(WebCore::FloatPoint location, bool forImmediateAction)
-    SelectLastActionMenuRange()
-    FocusAndSelectLastActionMenuHitTestResult()
+    PerformImmediateActionHitTestAtLocation(WebCore::FloatPoint location)
     ImmediateActionDidUpdate()
     ImmediateActionDidCancel()
     ImmediateActionDidComplete()

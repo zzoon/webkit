@@ -628,6 +628,16 @@ void MediaPlayer::setVideoFullscreenGravity(MediaPlayer::VideoGravity gravity)
     m_private->setVideoFullscreenGravity(gravity);
 }
 
+void MediaPlayer::setVideoFullscreenMode(MediaPlayer::VideoFullscreenMode mode)
+{
+    m_private->setVideoFullscreenMode(mode);
+}
+
+MediaPlayer::VideoFullscreenMode MediaPlayer::fullscreenMode() const
+{
+    return m_client.mediaPlayerFullscreenMode();
+}
+
 NSArray* MediaPlayer::timedMetadata() const
 {
     return m_private->timedMetadata();
@@ -879,11 +889,6 @@ void MediaPlayer::currentPlaybackTargetIsWirelessChanged()
 bool MediaPlayer::canPlayToWirelessPlaybackTarget() const
 {
     return m_private->canPlayToWirelessPlaybackTarget();
-}
-
-bool MediaPlayer::isPlayingToWirelessPlaybackTarget() const
-{
-    return m_private->isPlayingToWirelessPlaybackTarget();
 }
 
 void MediaPlayer::setWirelessPlaybackTarget(Ref<MediaPlaybackTarget>&& device)
@@ -1239,6 +1244,11 @@ void MediaPlayer::syncTextTrackBounds()
     m_private->syncTextTrackBounds();
 }
 
+void MediaPlayer::tracksChanged()
+{
+    m_private->tracksChanged();
+}
+
 #if ENABLE(AVF_CAPTIONS)
 void MediaPlayer::notifyTrackModeChanged()
 {
@@ -1353,6 +1363,11 @@ void MediaPlayer::handlePlaybackCommand(MediaSession::RemoteControlCommandType c
 String MediaPlayer::sourceApplicationIdentifier() const
 {
     return m_client.mediaPlayerSourceApplicationIdentifier();
+}
+
+Vector<String> MediaPlayer::preferredAudioCharacteristics() const
+{
+    return m_client.mediaPlayerPreferredAudioCharacteristics();
 }
 
 void MediaPlayerFactorySupport::callRegisterMediaEngine(MediaEngineRegister registerMediaEngine)

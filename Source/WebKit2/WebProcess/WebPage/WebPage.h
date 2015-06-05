@@ -786,12 +786,9 @@ public:
     void updateVisibleContentRects(const VisibleContentRectUpdateInfo&, double oldestTimestamp);
     bool scaleWasSetByUIProcess() const { return m_scaleWasSetByUIProcess; }
     void willStartUserTriggeredZooming();
-
     void applicationWillResignActive();
     void applicationWillEnterForeground();
-    void applicationDidEnterBackground(uint64_t callbackID);
     void applicationDidBecomeActive();
-
     void zoomToRect(WebCore::FloatRect, double minimumScale, double maximumScale);
     void completePendingSyntheticClickForContentChangeObserver();
 #endif
@@ -1105,10 +1102,8 @@ private:
     void reportUsedFeatures();
 
 #if PLATFORM(MAC)
-    void performActionMenuHitTestAtLocation(WebCore::FloatPoint, bool forImmediateAction);
+    void performImmediateActionHitTestAtLocation(WebCore::FloatPoint);
     PassRefPtr<WebCore::Range> lookupTextAtLocation(WebCore::FloatPoint, NSDictionary **options);
-    void selectLastActionMenuRange();
-    void focusAndSelectLastActionMenuHitTestResult();
     void immediateActionDidUpdate();
     void immediateActionDidCancel();
     void immediateActionDidComplete();
@@ -1367,12 +1362,6 @@ private:
 
 #if ENABLE(WEBGL)
     WebCore::WebGLLoadPolicy m_systemWebGLPolicy;
-#endif
-
-#if PLATFORM(MAC)
-    RefPtr<WebCore::Range> m_lastActionMenuRangeForSelection;
-    WebCore::HitTestResult m_lastActionMenuHitTestResult;
-    RefPtr<WebPageOverlay> m_lastActionMenuHitPageOverlay;
 #endif
 
     bool m_mainFrameProgressCompleted;

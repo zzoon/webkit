@@ -318,10 +318,10 @@ static bool shouldAllowAlternateFullscreen()
     webPageConfiguration.preferenceValues.set(WebKit::WebPreferencesKey::suppressesIncrementalRenderingKey(), WebKit::WebPreferencesStore::Value(!![_configuration suppressesIncrementalRendering]));
 
 #if PLATFORM(IOS)
-    webPageConfiguration.preferenceValues.set(WebKit::WebPreferencesKey::mediaPlaybackAllowsInlineKey(), WebKit::WebPreferencesStore::Value(!![_configuration allowsInlineMediaPlayback]));
+    webPageConfiguration.preferenceValues.set(WebKit::WebPreferencesKey::allowsInlineMediaPlaybackKey(), WebKit::WebPreferencesStore::Value(!![_configuration allowsInlineMediaPlayback]));
     webPageConfiguration.preferenceValues.set(WebKit::WebPreferencesKey::allowsAlternateFullscreenKey(), WebKit::WebPreferencesStore::Value(!![_configuration _allowsAlternateFullscreen] && shouldAllowAlternateFullscreen()));
-    webPageConfiguration.preferenceValues.set(WebKit::WebPreferencesKey::mediaPlaybackRequiresUserGestureKey(), WebKit::WebPreferencesStore::Value(!![_configuration mediaPlaybackRequiresUserAction]));
-    webPageConfiguration.preferenceValues.set(WebKit::WebPreferencesKey::mediaPlaybackAllowsAirPlayKey(), WebKit::WebPreferencesStore::Value(!![_configuration mediaPlaybackAllowsAirPlay]));
+    webPageConfiguration.preferenceValues.set(WebKit::WebPreferencesKey::requiresUserGestureForMediaPlaybackKey(), WebKit::WebPreferencesStore::Value(!![_configuration mediaPlaybackRequiresUserAction]));
+    webPageConfiguration.preferenceValues.set(WebKit::WebPreferencesKey::allowsAirPlayForMediaPlaybackKey(), WebKit::WebPreferencesStore::Value(!![_configuration mediaPlaybackAllowsAirPlay]));
 #endif
 
 #if PLATFORM(IOS)
@@ -2718,34 +2718,6 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
     CGFloat imageHeight = imageScale * snapshotRectInContentCoordinates.size.height;
     CGSize imageSize = CGSizeMake(imageWidth, imageHeight);
 
-    if (_customContentView) {
-        UIGraphicsBeginImageContextWithOptions(imageSize, YES, 1);
-
-        UIView *customContentView = _customContentView.get();
-        [customContentView.backgroundColor set];
-        UIRectFill(CGRectMake(0, 0, imageWidth, imageHeight));
-
-        CGRect destinationRect = customContentView.bounds;
-        destinationRect.origin.x = -snapshotRectInContentCoordinates.origin.x * imageScale;
-        destinationRect.origin.y = -snapshotRectInContentCoordinates.origin.y * imageScale;
-        destinationRect.size.width *= imageScale;
-        destinationRect.size.height *= imageScale;
-
-        if ([_customContentView window])
-            [customContentView drawViewHierarchyInRect:destinationRect afterScreenUpdates:NO];
-        else {
-            CGContextRef context = UIGraphicsGetCurrentContext();
-            CGContextTranslateCTM(context, destinationRect.origin.x, destinationRect.origin.y);
-            CGContextScaleCTM(context, imageScale, imageScale);
-            [customContentView.layer renderInContext:context];
-        }
-
-        completionHandler([UIGraphicsGetImageFromCurrentImageContext() CGImage]);
-
-        UIGraphicsEndImageContext();
-        return;
-    }
-
 #if USE(IOSURFACE)
     // If we are parented and thus won't incur a significant penalty from paging in tiles, snapshot the view hierarchy directly.
     if (self.window) {
@@ -2759,6 +2731,25 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
         return;
     }
 #endif
+    
+    if (_customContentView) {
+        UIGraphicsBeginImageContextWithOptions(imageSize, YES, 1);
+
+        UIView *customContentView = _customContentView.get();
+        [customContentView.backgroundColor set];
+        UIRectFill(CGRectMake(0, 0, imageWidth, imageHeight));
+
+        CGContextRef context = UIGraphicsGetCurrentContext();
+        CGContextTranslateCTM(context, -snapshotRectInContentCoordinates.origin.x * imageScale, -snapshotRectInContentCoordinates.origin.y * imageScale);
+        CGContextScaleCTM(context, imageScale, imageScale);
+        [customContentView.layer renderInContext:context];
+
+        completionHandler([UIGraphicsGetImageFromCurrentImageContext() CGImage]);
+
+        UIGraphicsEndImageContext();
+        return;
+    }
+
 
     void(^copiedCompletionHandler)(CGImageRef) = [completionHandler copy];
     _page->takeSnapshot(WebCore::enclosingIntRect(snapshotRectInContentCoordinates), WebCore::expandedIntSize(WebCore::FloatSize(imageSize)), WebKit::SnapshotOptionsExcludeDeviceScaleFactor, [=](const WebKit::ShareableBitmap::Handle& imageHandle, WebKit::CallbackBase::Error) {
