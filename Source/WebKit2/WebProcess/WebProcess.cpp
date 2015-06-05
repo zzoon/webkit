@@ -1226,7 +1226,7 @@ void WebProcess::resetAllGeolocationPermissions()
 
 void WebProcess::actualPrepareToSuspend(ShouldAcknowledgeWhenReadyToSuspend shouldAcknowledgeWhenReadyToSuspend)
 {
-    MemoryPressureHandler::singleton().releaseMemory(true);
+    MemoryPressureHandler::singleton().releaseMemory(Critical::Yes, Synchronous::Yes);
     setAllLayerTreeStatesFrozen(true);
 
     if (markAllLayersVolatileIfPossible()) {
@@ -1266,20 +1266,16 @@ void WebProcess::cancelPrepareToSuspend()
 bool WebProcess::markAllLayersVolatileIfPossible()
 {
     bool successfullyMarkedAllLayersVolatile = true;
-    for (auto& page : m_pageMap.values()) {
-        if (auto drawingArea = page->drawingArea())
-            successfullyMarkedAllLayersVolatile &= drawingArea->markLayersVolatileImmediatelyIfPossible();
-    }
+    for (auto& page : m_pageMap.values())
+        successfullyMarkedAllLayersVolatile &= page->markLayersVolatileImmediatelyIfPossible();
 
     return successfullyMarkedAllLayersVolatile;
 }
 
 void WebProcess::setAllLayerTreeStatesFrozen(bool frozen)
 {
-    for (auto& page : m_pageMap.values()) {
-        if (auto drawingArea = page->drawingArea())
-            drawingArea->setLayerTreeStateIsFrozen(frozen);
-    }
+    for (auto& page : m_pageMap.values())
+        page->setLayerTreeStateIsFrozen(frozen);
 }
 
 void WebProcess::processSuspensionCleanupTimerFired()

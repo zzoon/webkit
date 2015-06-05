@@ -38,8 +38,8 @@
 #include "HTMLNames.h"
 #include "HTMLVideoElement.h"
 #include "Logging.h"
-#include "MediaSessionManager.h"
 #include "Page.h"
+#include "PlatformMediaSessionManager.h"
 #include "ScriptController.h"
 #include "SourceBuffer.h"
 
@@ -87,21 +87,21 @@ MediaElementSession::MediaElementSession(PlatformMediaSessionClient& client)
 {
 }
 
-void MediaElementSession::registerWithDocument(const HTMLMediaElement& element)
+void MediaElementSession::registerWithDocument(Document& document)
 {
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-    element.document().addPlaybackTargetPickerClient(*this);
+    document.addPlaybackTargetPickerClient(*this);
 #else
-    UNUSED_PARAM(element);
+    UNUSED_PARAM(document);
 #endif
 }
 
-void MediaElementSession::unregisterWithDocument(const HTMLMediaElement& element)
+void MediaElementSession::unregisterWithDocument(Document& document)
 {
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-    element.document().removePlaybackTargetPickerClient(*this);
+    document.removePlaybackTargetPickerClient(*this);
 #else
-    UNUSED_PARAM(element);
+    UNUSED_PARAM(document);
 #endif
 }
 
@@ -203,7 +203,7 @@ bool MediaElementSession::hasWirelessPlaybackTargets(const HTMLMediaElement&) co
 {
 #if PLATFORM(IOS)
     // FIXME: consolidate Mac and iOS implementations
-    m_hasPlaybackTargets = MediaSessionManager::sharedManager().hasWirelessTargetsAvailable();
+    m_hasPlaybackTargets = PlatformMediaSessionManager::sharedManager().hasWirelessTargetsAvailable();
 #endif
 
     LOG(Media, "MediaElementSession::hasWirelessPlaybackTargets - returning %s", m_hasPlaybackTargets ? "TRUE" : "FALSE");
@@ -268,7 +268,7 @@ void MediaElementSession::setHasPlaybackTargetAvailabilityListeners(const HTMLMe
 #if PLATFORM(IOS)
     UNUSED_PARAM(element);
     m_hasPlaybackTargetAvailabilityListeners = hasListeners;
-    MediaSessionManager::sharedManager().configureWireLessTargetMonitoring();
+    PlatformMediaSessionManager::sharedManager().configureWireLessTargetMonitoring();
 #else
     UNUSED_PARAM(hasListeners);
     element.document().playbackTargetPickerClientStateDidChange(*this, element.mediaState());
@@ -328,13 +328,13 @@ void MediaElementSession::mediaStateDidChange(const HTMLMediaElement& element, M
 
 MediaPlayer::Preload MediaElementSession::effectivePreloadForElement(const HTMLMediaElement& element) const
 {
-    MediaSessionManager::SessionRestrictions restrictions = MediaSessionManager::sharedManager().restrictions(mediaType());
+    PlatformMediaSessionManager::SessionRestrictions restrictions = PlatformMediaSessionManager::sharedManager().restrictions(mediaType());
     MediaPlayer::Preload preload = element.preloadValue();
 
-    if ((restrictions & MediaSessionManager::MetadataPreloadingNotPermitted) == MediaSessionManager::MetadataPreloadingNotPermitted)
+    if ((restrictions & PlatformMediaSessionManager::MetadataPreloadingNotPermitted) == PlatformMediaSessionManager::MetadataPreloadingNotPermitted)
         return MediaPlayer::None;
 
-    if ((restrictions & MediaSessionManager::AutoPreloadingNotPermitted) == MediaSessionManager::AutoPreloadingNotPermitted) {
+    if ((restrictions & PlatformMediaSessionManager::AutoPreloadingNotPermitted) == PlatformMediaSessionManager::AutoPreloadingNotPermitted) {
         if (preload > MediaPlayer::MetaData)
             return MediaPlayer::MetaData;
     }
@@ -344,7 +344,7 @@ MediaPlayer::Preload MediaElementSession::effectivePreloadForElement(const HTMLM
 
 bool MediaElementSession::requiresFullscreenForVideoPlayback(const HTMLMediaElement& element) const
 {
-    if (!MediaSessionManager::sharedManager().sessionRestrictsInlineVideoPlayback(*this))
+    if (!PlatformMediaSessionManager::sharedManager().sessionRestrictsInlineVideoPlayback(*this))
         return false;
 
     Settings* settings = element.document().settings();

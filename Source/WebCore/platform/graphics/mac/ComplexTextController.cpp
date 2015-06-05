@@ -603,9 +603,7 @@ void ComplexTextController::adjustGlyphsAndAdvances()
         ComplexTextRun& complexTextRun = *m_complexTextRuns[r];
         unsigned glyphCount = complexTextRun.glyphCount();
         const Font& font = complexTextRun.font();
-#if PLATFORM(IOS)
-        bool isEmoji = font.platformData().m_isEmoji;
-#endif
+        bool isEmoji = font.platformData().isEmoji();
 
         // Represent the initial advance for a text run by adjusting the advance
         // of the last glyph of the previous text run in the glyph buffer.
@@ -653,10 +651,8 @@ void ComplexTextController::adjustGlyphsAndAdvances()
             bool treatAsSpace = FontCascade::treatAsSpace(ch);
             CGGlyph glyph = treatAsSpace ? font.spaceGlyph() : glyphs[i];
             CGSize advance = treatAsSpace ? CGSizeMake(spaceWidth, advances[i].height) : advances[i];
-#if PLATFORM(IOS)
             if (isEmoji && advance.width)
                 advance.width = font.widthForGlyph(glyph);
-#endif
 
             if (ch == '\t' && m_run.allowTabs())
                 advance.width = m_font.tabWidth(font, m_run.tabSize(), m_run.xPos() + m_totalWidth + widthSinceLastCommit);
@@ -682,7 +678,7 @@ void ComplexTextController::adjustGlyphsAndAdvances()
                 if (advance.width)
                     advance.width += m_font.letterSpacing();
 
-                bool lastCharacter = static_cast<unsigned>(characterIndex + 1) == m_run.length() || (U16_IS_SURROGATE_LEAD(ch) && static_cast<unsigned>(characterIndex + 2) == m_run.length() && U16_IS_SURROGATE_TRAIL(*(cp + characterIndex + 1)));
+                bool lastCharacter = static_cast<unsigned>(characterIndex + 1) == complexTextRun.stringLength() || (U16_IS_LEAD(ch) && static_cast<unsigned>(characterIndex + 2) == complexTextRun.stringLength() && U16_IS_TRAIL(*(cp + characterIndex + 1)));
 
                 bool forceLeadingExpansion = false; // On the left, regardless of m_run.ltr()
                 bool forceTrailingExpansion = false; // On the right, regardless of m_run.ltr()

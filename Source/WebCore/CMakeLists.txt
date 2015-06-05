@@ -9,6 +9,7 @@ set(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/indexeddb"
     "${WEBCORE_DIR}/Modules/indieui"
     "${WEBCORE_DIR}/Modules/mediacontrols/"
+    "${WEBCORE_DIR}/Modules/mediasession"
     "${WEBCORE_DIR}/Modules/mediasource"
     "${WEBCORE_DIR}/Modules/mediastream"
     "${WEBCORE_DIR}/Modules/navigatorcontentutils"
@@ -218,7 +219,9 @@ set(WebCore_NON_SVG_IDL_FILES
 
     Modules/mediacontrols/MediaControlsHost.idl
 
+    Modules/mediasession/HTMLMediaElementMediaSession.idl
     Modules/mediasession/MediaRemoteControls.idl
+    Modules/mediasession/MediaSession.idl
 
     Modules/mediasource/DOMURLMediaSource.idl
     Modules/mediasource/MediaSource.idl
@@ -875,7 +878,9 @@ set(WebCore_SOURCES
 
     Modules/mediacontrols/MediaControlsHost.cpp
 
+    Modules/mediasession/HTMLMediaElementMediaSession.cpp
     Modules/mediasession/MediaRemoteControls.cpp
+    Modules/mediasession/MediaSession.cpp
 
     Modules/mediasource/DOMURLMediaSource.cpp
     Modules/mediasource/MediaSource.cpp
@@ -2112,10 +2117,10 @@ set(WebCore_SOURCES
     platform/audio/HRTFElevation.cpp
     platform/audio/HRTFKernel.cpp
     platform/audio/HRTFPanner.cpp
-    platform/audio/MediaSessionManager.cpp
     platform/audio/MultiChannelResampler.cpp
     platform/audio/Panner.cpp
     platform/audio/PlatformMediaSession.cpp
+    platform/audio/PlatformMediaSessionManager.cpp
     platform/audio/Reverb.cpp
     platform/audio/ReverbAccumulationBuffer.cpp
     platform/audio/ReverbConvolver.cpp

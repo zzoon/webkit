@@ -1,3 +1,336 @@
+2015-06-04  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Class constructor appearing as Object Tree property does not include parameters
+        https://bugs.webkit.org/show_bug.cgi?id=145661
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Protocol/RemoteObject.js:
+        (WebInspector.RemoteObject):
+        (WebInspector.RemoteObject.fromPrimitiveValue):
+        (WebInspector.RemoteObject.fromPayload):
+        (WebInspector.RemoteObject.prototype.get functionDescription):
+        Include the className as only use it for "class" types to override
+        the normal description string. Stash the actual function description
+        in a property we can access later.
+
+        * UserInterface/Views/ObjectTreePropertyTreeElement.js:
+        (WebInspector.ObjectTreePropertyTreeElement.prototype._functionParameterString):
+        Even if this property is a "class" we want to specifically parse it's
+        function description string. So use functionDescription.
+
+2015-06-04  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Close and open tabs on mouseup, not mousedown
+        https://bugs.webkit.org/show_bug.cgi?id=145656
+
+        Match Safari's behaviour.
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/TabBar.js:
+        (WebInspector.TabBar):
+        (WebInspector.TabBar.prototype.set newTabItem):
+        (WebInspector.TabBar.prototype._handleMouseDown):
+        (WebInspector.TabBar.prototype._handleClick): Added.
+        (WebInspector.TabBar.prototype._handleMouseUp):
+        (WebInspector.TabBar.prototype._handleNewTabClick): Added.
+        (WebInspector.TabBar.prototype._handleMouseMoved):
+
+2015-06-04  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Decrease tabs height to match Safari's tabs height
+        https://bugs.webkit.org/show_bug.cgi?id=145647
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/TabBar.css:
+        (.tab-bar):
+
+2015-06-04  Tobias Reiss  <tobi+webkit@basecode.de>
+        
+        Web Inspector: Activity Viewer does not update on "Clear Log on reload"
+        https://bugs.webkit.org/show_bug.cgi?id=145466
+        
+        Reviewed by Joseph Pecoraro.
+
+        1. Isolate logic within LogManager and remove hacks/logic from all other files
+        2. Within LogManager: Differentiate "messagesCleared" calls
+         a) that happen as a result of a "requested clear" by Frontend (e.g. Button)
+         b) that happen on page reload and install "clear/keep-on-page-reload" logic
+         c) that happen on frame navigated, console.clear() or clear()
+        3. Unify "ActiveLogCleared" and "Cleared" events to "Cleared"
+        
+        For step 2b and 2c it is important to delay the handling and wait until
+        "_mainResourceDidChange" has determined whether a page reload happened or
+        not.
+        
+        * UserInterface/Base/Main.js:
+        (WebInspector.loaded):
+        Store "clear-log-on-reload" setting globally.
+        
+        * UserInterface/Controllers/IssueManager.js:
+        (WebInspector.IssueManager):
+        * UserInterface/Models/DefaultDashboard.js:
+        (WebInspector.DefaultDashboard): Deleted.
+        * UserInterface/Views/ObjectTreeView.js:
+        (WebInspector.ObjectTreeView.prototype._trackWeakEntries): Deleted.
+        (WebInspector.ObjectTreeView.prototype._untrackWeakEntries): Deleted.
+        (WebInspector.ObjectTreeView): Deleted.
+        Remove deleted events.
+        
+        * UserInterface/Controllers/JavaScriptLogViewController.js:
+        (WebInspector.JavaScriptLogViewController.prototype._handleClearShortcut):
+        (WebInspector.JavaScriptLogViewController.prototype.clear): Deleted.
+        Remove delegate function call and call LogManager directly.
+        
+        * UserInterface/Controllers/LogManager.js:
+        (WebInspector.LogManager):
+        (WebInspector.LogManager.prototype.messagesCleared):
+        (WebInspector.LogManager.prototype._delayedMessagesCleared):
+        (WebInspector.LogManager.prototype.requestClearMessages):
+        (WebInspector.LogManager.prototype._mainResourceDidChange):
+        Isolate "clear log" logic, especially clear/keep-log-on-reload logic.
+        
+        * UserInterface/Views/LogContentView.js:
+        (WebInspector.LogContentView):
+        (WebInspector.LogContentView.prototype._sessionStarted):
+        (WebInspector.LogContentView.prototype._handleContextMenuEvent):
+        (WebInspector.LogContentView.prototype._logCleared):
+        (WebInspector.LogContentView.prototype._toggleClearLogOnReloadSetting):
+        (WebInspector.LogContentView.prototype._clearLog):
+        (WebInspector.LogContentView.prototype.didClearMessages): Deleted.
+        (WebInspector.LogContentView.prototype._sessionsCleared): Deleted.
+        (WebInspector.LogContentView.prototype._activeLogCleared): Deleted.
+        (WebInspector.LogContentView.prototype._clearLogIgnoringClearMessages): Deleted.
+        Make it a consumer of LogManager and remove special hacks. Simplify code.
+
+2015-06-03  Devin Rousso  <drousso@apple.com>
+
+        Web Inspector: if a known CSS property has an unsupported value, only strikethrough the value
+        https://bugs.webkit.org/show_bug.cgi?id=141262
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Models/CSSCompletions.js:
+        (WebInspector.CSSCompletions.prototype.nameMatchesValidPropertyExactly): Loops through the full property list and returns true only if a property exactly matches the given property name.
+        (WebInspector.CSSCompletions): Added nameMatchesValidPropertyExactly function.
+        * UserInterface/Views/CSSStyleDeclarationTextEditor.js:
+        (WebInspector.CSSStyleDeclarationTextEditor.prototype._createTextMarkerForPropertyIfNeeded): Added logic to limit the invalid class marker to only the property value if the property name is an actual property.
+
+2015-06-03  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Search field bottom border doesn't match the rest of the toolbar
+        https://bugs.webkit.org/show_bug.cgi?id=145611
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/Toolbar.css:
+        (body:not(.unknown-mac) .toolbar .search-bar > input[type="search"]):
+
+2015-06-03  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Uncaught exception starting a NavigationBar drag and mousing over a different NavigationBar
+        https://bugs.webkit.org/show_bug.cgi?id=145589
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/NavigationBar.js:
+        (WebInspector.NavigationBar.prototype._mouseDown):
+        (WebInspector.NavigationBar.prototype._mouseUp):
+        When mouse dragging for navigation bars, only match against navigation
+        bar items inside this navigation bar. Also, fix horizontal detection
+        of navigation bar items by scanning in the middle of the navigation
+        bar instead of the top, which missed the items.
+
+2015-06-03  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Debugger Popover for Node object should have go-to-arrow to show the node in DOM tree
+        https://bugs.webkit.org/show_bug.cgi?id=145594
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Controllers/DOMTreeManager.js:
+        (WebInspector.DOMTreeManager.prototype.inspectElement):
+        Previously we could get an exception later on if we tried to
+        inspect an element that was not in the DOM. Bail if the node
+        is not in the DOM or not.
+
+        * UserInterface/Views/SourceCodeTextEditor.css:
+        (.popover .debugger-popover-content > .title > .go-to-arrow):
+        * UserInterface/Views/SourceCodeTextEditor.js:
+        (WebInspector.SourceCodeTextEditor.prototype._showPopoverForObject.data.pushNodeToFrontend):
+        (WebInspector.SourceCodeTextEditor.prototype._showPopoverForObject):
+        For a node type, add a go-to-arrow in the popover if it is in the DOM or not.
+
+2015-06-02  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Remove uses of delete in Sidebar related code
+        https://bugs.webkit.org/show_bug.cgi?id=145592
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/CSSStyleDetailsSidebarPanel.js:
+        (WebInspector.CSSStyleDetailsSidebarPanel.prototype.refresh):
+        Clear value instead of deleting.
+
+        * UserInterface/Views/SearchSidebarPanel.js:
+        (WebInspector.SearchSidebarPanel.prototype.performSearch):
+        Just clear the search identifier. Also assert it (a required string) is always non-falsey.
+
+        * UserInterface/Views/Sidebar.js:
+        (WebInspector.Sidebar.prototype.resizerDragEnded): Deleted.
+        This entire callback is unnecessary because whenever we start
+        a drag we save the value.
+
+2015-06-02  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Sidebar and sometimes ContentView scroll position is lost when switching between tabs
+        https://bugs.webkit.org/show_bug.cgi?id=145591
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/Sidebar.js:
+        (WebInspector.Sidebar.prototype.removeSidebarPanel):
+        When removing a sidebar panel, ensure we call hidden if it was the visible panel.
+
+        * UserInterface/Views/SidebarPanel.js:
+        (WebInspector.SidebarPanel):
+        (WebInspector.SidebarPanel.prototype.shown):
+        (WebInspector.SidebarPanel.prototype.hidden):
+        Save and restore content element scroll position when sidebar panels are shown / hidden.
+
+        * UserInterface/Views/CSSStyleDetailsSidebarPanel.js:
+        (WebInspector.CSSStyleDetailsSidebarPanel.prototype.visibilityDidChange):
+        * UserInterface/Views/ComputedStyleDetailsPanel.js:
+        (WebInspector.ComputedStyleDetailsPanel.prototype.shown):
+        * UserInterface/Views/DetailsSidebarPanel.js:
+        (WebInspector.DetailsSidebarPanel.prototype.shown):
+        * UserInterface/Views/LayerTreeDetailsSidebarPanel.js:
+        (WebInspector.LayerTreeDetailsSidebarPanel.prototype.shown):
+        (WebInspector.LayerTreeDetailsSidebarPanel.prototype.hidden):
+        Cleanup. Since sidebar panels are using ES6 classes, have super class calls use `super`!
+
+2015-06-02  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Use non-monospace font for the frame selector
+        https://bugs.webkit.org/show_bug.cgi?id=145586
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/HierarchicalPathComponent.css:
+        (.hierarchical-path-component):
+
+2015-06-02  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Dashboard arrow icon on the right is overlapped by a long function/file name
+        https://bugs.webkit.org/show_bug.cgi?id=145540
+
+        Also, increase clickable area of the arrow icon.
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/DashboardContainerView.css:
+        (.dashboard-container .advance-arrow):
+        (.dashboard-container .advance-arrow.advance-forward):
+        (.dashboard-container .advance-arrow.advance-backward):
+        * UserInterface/Views/DebuggerDashboardView.css:
+        (.dashboard.debugger > .location):
+        (.toolbar .dashboard.debugger):
+        Increase padding on the right so the content of the dashboard would be never be overlayed by the arrow.
+
+2015-06-02  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Shift + Cmd + Left/Right shouldn't switch tabs while editing text
+        https://bugs.webkit.org/show_bug.cgi?id=145562
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/TabBrowser.js:
+        (WebInspector.TabBrowser):
+        Only these keyboard shortcuts should check if we are in an editable field.
+        Remove the implicit prevent default so they can fall back to system behavior
+        if necessary.
+
+        (WebInspector.TabBrowser.prototype._showNextTabCheckingForEditableField):
+        (WebInspector.TabBrowser.prototype._showPreviousTabCheckingForEditableField):
+        Bail if we are in an editable field. Otherwise perform the action and prevent default.
+
+2015-06-02  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: ⌘F no longer brings up the find-in-page bar after typing in the quick console
+        https://bugs.webkit.org/show_bug.cgi?id=145546
+
+        Reviewed by Timothy Hatcher.
+
+        Scope ContentBrowser keyboard events within the ContentBrowser instead
+        of global, where they might conflict between ContentBrowsers. The scoped
+        shortcuts now no longer need to be enabled/disabled.
+
+        * UserInterface/Views/ContentBrowser.js:
+        (WebInspector.ContentBrowser):
+        Scope the keyboard shortcuts.
+
+        (WebInspector.ContentBrowser.prototype.shown):
+        (WebInspector.ContentBrowser.prototype.hidden):
+        No longer need to control enabling / disabling these non-global shortcuts.
+
+2015-06-01  Jono Wells  <jonowells@apple.com>
+
+        Web Inspector: Type token text descenders touch bottom of container
+        https://bugs.webkit.org/show_bug.cgi?id=145544
+
+        Reviewed by Timothy Hatcher.
+
+        Move 1px padding from top to bottom of token.
+
+        * UserInterface/Views/TypeTokenView.css:
+        (.type-token):
+
+2015-06-01  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Better handle keyboard events in the quick console prompt
+        https://bugs.webkit.org/show_bug.cgi?id=145548
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Base/Main.js:
+        (WebInspector.saveDataToFile):
+        Move generic InspectorFrontendHost code here.
+
+        * UserInterface/Views/ContentBrowser.js:
+        (WebInspector.ContentBrowser.prototype._save):
+        (WebInspector.ContentBrowser.prototype._saveAs):
+        (WebInspector.ContentBrowser.prototype._saveDataToFile): Deleted.
+        Use the generic save code.
+
+        * UserInterface/Controllers/JavaScriptLogViewController.js:
+        (WebInspector.JavaScriptLogViewController):
+        (WebInspector.JavaScriptLogViewController.prototype._save):
+        (WebInspector.JavaScriptLogViewController.prototype._saveAs):
+        Handle save keyboard shortcuts while the prompt is focused.
+
+        * UserInterface/Views/LogContentView.js:
+        (WebInspector.LogContentView.prototype.focusSearchBar):
+        (WebInspector.LogContentView.prototype.save):
+        (WebInspector.LogContentView.prototype.saveAs):
+        Better handle keyboard shortcut cases in the console prompt for cases
+        like a collapsed or split console view.
+
+2015-06-01  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Pause/resume button in the debugger dashboard is vertically misaligned
+        https://bugs.webkit.org/show_bug.cgi?id=145534
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/ButtonNavigationItem.css:
+        (.navigation-bar .item.button.suppress-emboss):
+        Never show borders for the pause/resume button.
+
+        * UserInterface/Views/DebuggerDashboardView.css:
+        (.dashboard.debugger .navigation-bar .item.button):
+
 2015-05-31  Yusuke Suzuki  <utatane.tea@gmail.com>
 
         Web Inspector: Drop forEach from WeakMap / WeakSet native member function maps

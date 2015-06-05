@@ -1320,7 +1320,7 @@ static WebCore::FloatPoint constrainContentOffset(WebCore::FloatPoint contentOff
 
 - (void)didMoveToWindow
 {
-    _page->viewStateDidChange(WebCore::ViewState::IsInWindow);
+    _page->viewStateDidChange(WebCore::ViewState::AllFlags);
 }
 
 - (void)setOpaque:(BOOL)opaque
@@ -1749,7 +1749,6 @@ static WebCore::FloatPoint constrainContentOffset(WebCore::FloatPoint contentOff
 - (NSDragOperation)draggingUpdated:(id <NSDraggingInfo>)sender
 {
     return [_wkView draggingUpdated:sender];
-    
 }
 
 - (void)draggingExited:(id <NSDraggingInfo>)sender

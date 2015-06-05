@@ -65,10 +65,10 @@
 #include "MediaPlayer.h"
 #include "MediaQueryEvaluator.h"
 #include "MediaResourceLoader.h"
-#include "MediaSessionManager.h"
 #include "NetworkingContext.h"
 #include "PageGroup.h"
 #include "PageThrottler.h"
+#include "PlatformMediaSessionManager.h"
 #include "ProgressTracker.h"
 #include "RenderLayerCompositor.h"
 #include "RenderVideo.h"
@@ -112,6 +112,10 @@
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
 #include "WebKitPlaybackTargetAvailabilityEvent.h"
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+#include "MediaSession.h"
 #endif
 
 #if ENABLE(MEDIA_SOURCE)
@@ -461,7 +465,7 @@ HTMLMediaElement::~HTMLMediaElement()
 
 void HTMLMediaElement::registerWithDocument(Document& document)
 {
-    m_mediaSession->registerWithDocument(*this);
+    m_mediaSession->registerWithDocument(document);
 
     if (m_isWaitingUntilMediaCanStart)
         document.addMediaCanStartListener(this);
@@ -493,7 +497,7 @@ void HTMLMediaElement::registerWithDocument(Document& document)
 
 void HTMLMediaElement::unregisterWithDocument(Document& document)
 {
-    m_mediaSession->unregisterWithDocument(*this);
+    m_mediaSession->unregisterWithDocument(document);
 
     if (m_isWaitingUntilMediaCanStart)
         document.removeMediaCanStartListener(this);
@@ -531,9 +535,8 @@ void HTMLMediaElement::didMoveToNewDocument(Document* oldDocument)
         document().incrementLoadEventDelayCount();
     }
 
-    if (oldDocument) {
+    if (oldDocument)
         unregisterWithDocument(*oldDocument);
-    }
 
     registerWithDocument(document());
 
@@ -543,12 +546,12 @@ void HTMLMediaElement::didMoveToNewDocument(Document* oldDocument)
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
 void HTMLMediaElement::documentWillSuspendForPageCache()
 {
-    m_mediaSession->unregisterWithDocument(*this);
+    m_mediaSession->unregisterWithDocument(document());
 }
 
 void HTMLMediaElement::documentDidResumeFromPageCache()
 {
-    m_mediaSession->registerWithDocument(*this);
+    m_mediaSession->registerWithDocument(document());
 }
 #endif
 
@@ -6356,6 +6359,20 @@ bool HTMLMediaElement::canSaveMediaData() const
 
     return false;
 }
+
+#if ENABLE(MEDIA_SESSION)
+
+MediaSession* HTMLMediaElement::session() const
+{
+    return m_session.get();
+}
+
+void HTMLMediaElement::setSession(MediaSession* session)
+{
+    m_session = session;
+}
+
+#endif
 
 }
 

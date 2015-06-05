@@ -151,6 +151,7 @@ WebInspector.loaded = function()
 
     this.showShadowDOMSetting = new WebInspector.Setting("show-shadow-dom", false);
     this.showReplayInterfaceSetting = new WebInspector.Setting("show-web-replay", false);
+    this.clearLogOnReload = new WebInspector.Setting("clear-log-on-reload", true);
 
     this.showJavaScriptTypeInformationSetting = new WebInspector.Setting("show-javascript-type-information", false);
     if (this.showJavaScriptTypeInformationSetting.value && window.RuntimeAgent && RuntimeAgent.enableTypeProfiler)
@@ -653,6 +654,25 @@ WebInspector.close = function()
     this._isClosing = true;
 
     InspectorFrontendHost.closeWindow();
+};
+
+WebInspector.saveDataToFile = function(saveData, forceSaveAs)
+{
+    console.assert(saveData);
+    if (!saveData)
+        return;
+
+    if (typeof saveData.customSaveHandler === "function") {
+        saveData.customSaveHandler(forceSaveAs);
+        return;
+    }
+
+    console.assert(saveData.url);
+    console.assert(typeof saveData.content === "string");
+    if (!saveData.url || typeof saveData.content !== "string")
+        return;
+
+    InspectorFrontendHost.save(saveData.url, saveData.content, false, forceSaveAs || saveData.forceSaveAs);
 };
 
 WebInspector.isConsoleFocused = function()

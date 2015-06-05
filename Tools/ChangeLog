@@ -1,3 +1,167 @@
+2015-06-04  Benjamin Poulain  <bpoulain@apple.com>
+
+        Combine tiny DFAs into slightly larger ones
+        https://bugs.webkit.org/show_bug.cgi?id=145572
+
+        Reviewed by Alex Christensen.
+
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebCore/DFACombiner.cpp: Added.
+        (TestWebKitAPI::DFACombinerTest::SetUp):
+        (TestWebKitAPI::combine):
+        (TestWebKitAPI::TEST_F):
+        * TestWebKitAPI/Tests/WebCore/DFAHelpers.h: Copied from Source/WebCore/contentextensions/DFA.h.
+        (TestWebKitAPI::countLiveNodes):
+        (TestWebKitAPI::createNFAs):
+        (TestWebKitAPI::buildDFAFromPatterns):
+        * TestWebKitAPI/Tests/WebCore/DFAMinimizer.cpp:
+        (TestWebKitAPI::countLiveNodes): Deleted.
+        (TestWebKitAPI::createNFAs): Deleted.
+        (TestWebKitAPI::buildDFAFromPatterns): Deleted.
+
+2015-06-04  Alexey Proskuryakov  <ap@apple.com>
+
+        WebKitTestRunner leaks strings in generateWhitelist()
+        https://bugs.webkit.org/show_bug.cgi?id=145665
+
+        Reviewed by Myles C. Maxfield.
+
+        * WebKitTestRunner/mac/TestControllerMac.mm:
+        (WTR::generateWhitelist):
+
+2015-06-03  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Fix options in build-jsc for CMake builds
+        https://bugs.webkit.org/show_bug.cgi?id=145636
+
+        Reviewed by Gyuyoung Kim.
+
+        CMake only accepts -DXXX=YYY style options.
+        And ensured that ENABLE_JIT=OFF when specifying `--cloop`.
+
+        * Scripts/build-jsc:
+
+2015-06-03  Matthew Daiter  <mdaiter@apple.com>
+
+        Added a patch so that the colors displayed on the page could be toggled
+        in case people need accessibility colors displayed in their browser.
+        https://bugs.webkit.org/show_bug.cgi?id=145570
+        <rdar://problem/20994468>
+
+        Added in CSS colors and toggle buttons for checkmarks in the page, so that
+        the page could be rendered in a specific way for accessibility needs if needed.
+
+        Reviewed by Alexey Proskuryakov.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/Main.js:
+        (updateHiddenPlatforms):
+        (applyAccessibilityColorSetting): Initial loading of accessibility colors if necessary
+        (toggleAccessibilityColors): Toggle colors on and off
+        (documentReady): Needed to make changes to the initialization
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Styles/Main.css:
+        (a:hover):
+        (div.cellButton, div.accessibilityButton): Added in similar properties for cellButton and accessibilityButton
+        (div.cellButton.hide, div.accessibilityButton.hide):
+        (div.cellButton.unhide, div.accessibilityButton.unhide):
+        (.settings-visible div.accessibilityButton.hide, .settings-visible div.accessibilityButton.unhide):
+        (.popover-tracking:hover):
+        (.accessibilityButton):
+        (div.cellButton): Deleted.
+        (div.cellButton.hide): Deleted.
+        (div.cellButton.unhide): Deleted.
+        (.settings-visible div.cellButton.hide, .settings-visible div.cellButton.unhide): Deleted.
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Styles/StatusLineView.css:
+        (.status-line.neutral .bubble):
+        (.status-line.unauthorized .bubble):
+        (.status-line.danger .bubble.pictogram):
+        (.status-line.bad .bubble.pictogram):
+        (.status-line.no-bubble .message):
+        (.status-line.bad .bubble):
+        (.status-line.good .bubble):
+        (.status-line.good .message):
+        (.status-line.bad .message):
+        (body.accessibility-colors .status-line.good .bubble):
+        (body.accessibility-colors .status-line.bad .bubble):
+        (body.accessibility-colors .status-line.good .message):
+        (body.accessibility-colors .status-line.bad .message):
+        (.status-line.danger .message):
+        (.status-line.unauthorized .message):
+
+2015-06-03  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Unreviewed build fix for Dromaeo.
+
+        * Scripts/webkitpy/benchmark_runner/benchmark_results.py:
+        (BenchmarkResults._aggregate_results_for_test):
+
+2015-06-03  Anders Carlsson  <andersca@apple.com>
+
+        Fix build.
+
+        * DumpRenderTree/mac/TestRunnerMac.mm:
+
+2015-06-03  Daniel Bates  <dabates@apple.com>
+
+        WebKit2.TextFieldDidBeginAndEndEditing is flaky on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=145616
+
+        Skip the test on Mac for now to avoid having the bots turn red due to the flakiness
+        of the test. Further investigation is needed.
+
+        * TestWebKitAPI/Tests/WebKit2/TextFieldDidBeginAndEndEditing.cpp:
+        * TestWebKitAPI/Tests/WebKit2/TextFieldDidBeginAndEndEditing_Bundle.cpp:
+
+2015-06-03  Brady Eidson  <beidson@apple.com>
+
+        REGRESSION (r183498): Certain types of frame loads in iframes with <base target="_blank"> can open urls in new window/tabs
+        https://bugs.webkit.org/show_bug.cgi?id=145580
+
+        Reviewed by Mark Lam.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.cpp:
+        (WTR::InjectedBundlePage::didSameDocumentNavigationForFrame): Implement the dump for "didChangeLocationWithinPageForFrame"
+
+2015-06-03  Alexey Proskuryakov  <ap@apple.com>
+
+        Attempt to fix CSSPropertyParserTest.GridTrackLimits API test after http://trac.webkit.org/r185147
+
+        * TestWebKitAPI/Tests/WebCore/CSSParser.cpp:
+        (TestWebKitAPI::TEST): Update the syntax.
+
+2015-06-02  Mark Lam  <mark.lam@apple.com>
+
+        build-jsc's --cloop option is broken.
+        https://bugs.webkit.org/show_bug.cgi?id=145516
+
+        Reviewed by Darin Adler.
+
+        * Scripts/build-jsc:
+        - Make sure to disable the JIT when --cloop is specified.
+          Did analogous fix for --ftljit.
+
+2015-06-02  Daniel Bates  <dabates@apple.com>
+
+        Update ATS keys used in MiniBrowser and WebKitTestRunnerApp
+
+        Rubber-stamped by Alexey Proskuryakov.
+
+        * MiniBrowser/mac/Info.plist:
+        * WebKitTestRunner/WebKitTestRunnerApp/WebKitTestRunnerApp-Info.plist:
+
+2015-06-01  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r185066.
+        https://bugs.webkit.org/show_bug.cgi?id=145543
+
+        it breaks the FTL JIT builds with a local checkout of llvm
+        (Requested by pizlo on #webkit).
+
+        Reverted changeset:
+
+        "build-jsc's --cloop option is broken."
+        https://bugs.webkit.org/show_bug.cgi?id=145516
+        http://trac.webkit.org/changeset/185066
+
 2015-06-01  Daniel Bates  <dabates@apple.com>
 
         Notify client that we began editing when text field is focused
