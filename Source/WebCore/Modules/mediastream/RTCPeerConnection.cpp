@@ -80,7 +80,7 @@ static RefPtr<MediaEndpointInit> createMediaEndpointInit(RTCConfiguration& rtcCo
     return MediaEndpointInit::create(iceServers, rtcConfig.iceTransportPolicy(), rtcConfig.bundlePolicy());
 }
 
-PassRefPtr<RTCPeerConnection> RTCPeerConnection::create(ScriptExecutionContext& context, const Dictionary& rtcConfiguration, ExceptionCode& ec)
+RefPtr<RTCPeerConnection> RTCPeerConnection::create(ScriptExecutionContext& context, const Dictionary& rtcConfiguration, ExceptionCode& ec)
 {
     printf("-> RTCConfiguration::create\n");
 
@@ -96,7 +96,7 @@ PassRefPtr<RTCPeerConnection> RTCPeerConnection::create(ScriptExecutionContext& 
         return nullptr;
 
     printf("RTCPeerConnection: before release\n");
-    return peerConnection.release();
+    return peerConnection;
 }
 
 RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, PassRefPtr<RTCConfiguration> configuration, ExceptionCode& ec)

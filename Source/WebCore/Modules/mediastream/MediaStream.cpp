@@ -39,26 +39,26 @@
 
 namespace WebCore {
 
-RefPtr<MediaStream> MediaStream::create(ScriptExecutionContext& context)
+Ref<MediaStream> MediaStream::create(ScriptExecutionContext& context)
 {
     return MediaStream::create(context, MediaStreamPrivate::create());
 }
 
-RefPtr<MediaStream> MediaStream::create(ScriptExecutionContext& context, MediaStream* stream)
+Ref<MediaStream> MediaStream::create(ScriptExecutionContext& context, MediaStream* stream)
 {
     ASSERT(stream);
 
-    return adoptRef(new MediaStream(context, stream->getTracks()));
+    return adoptRef(*new MediaStream(context, stream->getTracks()));
 }
 
-RefPtr<MediaStream> MediaStream::create(ScriptExecutionContext& context, const Vector<RefPtr<MediaStreamTrack>>& tracks)
+Ref<MediaStream> MediaStream::create(ScriptExecutionContext& context, const Vector<RefPtr<MediaStreamTrack>>& tracks)
 {
-    return adoptRef(new MediaStream(context, tracks));
+    return adoptRef(*new MediaStream(context, tracks));
 }
 
-RefPtr<MediaStream> MediaStream::create(ScriptExecutionContext& context, RefPtr<MediaStreamPrivate>&& streamPrivate)
+Ref<MediaStream> MediaStream::create(ScriptExecutionContext& context, RefPtr<MediaStreamPrivate>&& streamPrivate)
 {
-    return adoptRef(new MediaStream(context, WTF::move(streamPrivate)));
+    return adoptRef(*new MediaStream(context, WTF::move(streamPrivate)));
 }
 
 MediaStream::MediaStream(ScriptExecutionContext& context, const Vector<RefPtr<MediaStreamTrack>>& tracks)

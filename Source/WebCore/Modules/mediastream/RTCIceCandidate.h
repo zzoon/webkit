@@ -47,7 +47,7 @@ class RTCIceCandidateDescriptor;
 class RTCIceCandidate : public RefCounted<RTCIceCandidate>, public ScriptWrappable {
 public:
     static RefPtr<RTCIceCandidate> create(const Dictionary&, ExceptionCode&);
-    static RefPtr<RTCIceCandidate> create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
+    static Ref<RTCIceCandidate> create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
     virtual ~RTCIceCandidate();
 
     const String& candidate() const;

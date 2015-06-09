@@ -60,7 +60,7 @@ class RTCStatsCallback;
 
 class RTCPeerConnection final : public RefCounted<RTCPeerConnection>, public ScriptWrappable, public MediaEndpointClient, public EventTargetWithInlineData, public ActiveDOMObject {
 public:
-    static PassRefPtr<RTCPeerConnection> create(ScriptExecutionContext&, const Dictionary& rtcConfiguration, ExceptionCode&);
+    static RefPtr<RTCPeerConnection> create(ScriptExecutionContext&, const Dictionary& rtcConfiguration, ExceptionCode&);
     ~RTCPeerConnection();
 
     typedef std::function<void(RTCSessionDescription&)> OfferAnswerResolveCallback;

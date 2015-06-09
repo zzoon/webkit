@@ -63,14 +63,14 @@ RefPtr<RTCSessionDescription> RTCSessionDescription::create(const Dictionary& di
     return adoptRef(new RTCSessionDescription(type, sdp));
 }
 
-RefPtr<RTCSessionDescription> RTCSessionDescription::create(const RTCSessionDescription* description)
+Ref<RTCSessionDescription> RTCSessionDescription::create(const RTCSessionDescription* description)
 {
-    return adoptRef(new RTCSessionDescription(description->type(), description->sdp()));
+    return adoptRef(*new RTCSessionDescription(description->type(), description->sdp()));
 }
 
-RefPtr<RTCSessionDescription> RTCSessionDescription::create(const String& type, const String& sdp)
+Ref<RTCSessionDescription> RTCSessionDescription::create(const String& type, const String& sdp)
 {
-    return adoptRef(new RTCSessionDescription(type, sdp));
+    return adoptRef(*new RTCSessionDescription(type, sdp));
 }
 
 RTCSessionDescription::RTCSessionDescription(const String& type, const String& sdp)

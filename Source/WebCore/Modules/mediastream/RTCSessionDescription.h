@@ -46,8 +46,8 @@ class Dictionary;
 class RTCSessionDescription : public RefCounted<RTCSessionDescription>, public ScriptWrappable {
 public:
     static RefPtr<RTCSessionDescription> create(const Dictionary&, ExceptionCode&);
-    static RefPtr<RTCSessionDescription> create(const RTCSessionDescription*);
-    static RefPtr<RTCSessionDescription> create(const String& type, const String& sdp);
+    static Ref<RTCSessionDescription> create(const RTCSessionDescription*);
+    static Ref<RTCSessionDescription> create(const String& type, const String& sdp);
     virtual ~RTCSessionDescription();
 
     const String& type() const;

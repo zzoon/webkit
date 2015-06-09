@@ -74,9 +74,9 @@ RefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary, Ex
     return adoptRef(new RTCIceCandidate(candidate, sdpMid, sdpMLineIndex));
 }
 
-RefPtr<RTCIceCandidate> RTCIceCandidate::create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex)
+Ref<RTCIceCandidate> RTCIceCandidate::create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex)
 {
-    return adoptRef(new RTCIceCandidate(candidate, sdpMid, sdpMLineIndex));
+    return adoptRef(*new RTCIceCandidate(candidate, sdpMid, sdpMLineIndex));
 }
 
 RTCIceCandidate::RTCIceCandidate(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex)

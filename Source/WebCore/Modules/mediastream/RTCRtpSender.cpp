@@ -35,9 +35,9 @@
 
 namespace WebCore {
 
-RefPtr<RTCRtpSender> RTCRtpSender::create(RefPtr<MediaStreamTrack>&& track, const String& mediaStreamId)
+Ref<RTCRtpSender> RTCRtpSender::create(RefPtr<MediaStreamTrack>&& track, const String& mediaStreamId)
 {
-    return adoptRef(new RTCRtpSender(WTF::move(track), mediaStreamId));
+    return adoptRef(*new RTCRtpSender(WTF::move(track), mediaStreamId));
 }
 
 RTCRtpSender::RTCRtpSender(RefPtr<MediaStreamTrack>&& track, const String& mediaStreamId)

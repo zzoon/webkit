@@ -39,7 +39,7 @@ namespace WebCore {
 
 class RTCRtpReceiver : public RTCRtpSenderReceiverBase {
 public:
-    static RefPtr<RTCRtpReceiver> create(RefPtr<MediaStreamTrack>&&);
+    static Ref<RTCRtpReceiver> create(RefPtr<MediaStreamTrack>&&);
     virtual ~RTCRtpReceiver();
 
 private:
