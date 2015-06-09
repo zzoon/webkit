@@ -1,3 +1,484 @@
+2015-06-08  Daniel Bates  <dabates@apple.com>
+
+        Update iOS TestExpectations files
+
+        * platform/ios-simulator-wk1/TestExpectations:
+        * platform/ios-simulator-wk2/TestExpectations:
+        * platform/ios-simulator/TestExpectations:
+
+2015-06-08  Zalan Bujtas  <zalan@apple.com>
+
+        Subpixel rendering: Clip-path does not work properly on subpixel positions.
+        https://bugs.webkit.org/show_bug.cgi?id=145749
+        rdar://problem/20824305
+
+        Reviewed by Simon Fraser.
+
+        This patch ensures that clip-path is device pixel snapped both for composited and
+        non-composited content.
+
+        * compositing/masks/compositing-clip-path-on-subpixel-position-expected.html: Added.
+        * compositing/masks/compositing-clip-path-on-subpixel-position.html: Added.
+        * fast/masking/clip-path-on-subpixel-position-expected.html: Added.
+        * fast/masking/clip-path-on-subpixel-position.html: Added.
+
+2015-06-08  Daniel Bates  <dabates@apple.com>
+
+        Mouse release on AutoFill button activates it; should only activate on click
+        https://bugs.webkit.org/show_bug.cgi?id=145774
+        <rdar://problem/21069245>
+
+        Reviewed by Ryosuke Niwa.
+
+        Add test to ensure we only dispatch a click event at the HTML input element when pressing
+        on the editable portion of the input element and releasing the mouse on the AutoFill button.
+
+        * fast/forms/auto-fill-button/mouse-down-input-mouse-release-auto-fill-button-expected.txt: Added.
+        * fast/forms/auto-fill-button/mouse-down-input-mouse-release-auto-fill-button.html: Added.
+
+2015-06-08  Brady Eidson  <beidson@apple.com>
+
+        Fix up the layouttest situation after r185322.
+        https://bugs.webkit.org/show_bug.cgi?id=145777
+
+        Reviewed by Alexey Proskuryakov.
+
+        * js/dom/global-constructors-attributes-expected.txt:
+        * js/dom/global-constructors-attributes-idb-expected.txt: Added.
+        * js/dom/global-constructors-attributes-idb.html: Copied from LayoutTests/js/dom/global-constructors-attributes.html.
+        * js/dom/global-constructors-attributes.html:
+
+        Run this test only against IDB* and webkitIDB* constructors:
+        * js/dom/script-tests/global-constructors-attributes-idb.js: Copied from LayoutTests/js/dom/script-tests/global-constructors-attributes.js.
+        (.self.postMessage):
+        (.self.onconnect.self.postMessage):
+        (.self.onconnect):
+        (classNameForObject):
+        (constructorPropertiesOnGlobalObject):
+
+        Don’t run the test against known IDB constructors:
+        * js/dom/script-tests/global-constructors-attributes.js:
+
+        Update all the various platform-specific results for the main test to remove mentions of IDB.
+        * platform/efl/js/dom/global-constructors-attributes-expected.txt:
+        * platform/gtk/js/dom/global-constructors-attributes-expected.txt:
+        * platform/ios-sim-deprecated/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac-mavericks/TestExpectations:
+        * platform/mac-mavericks/js/dom/global-constructors-attributes-expected.txt:
+        * platform/mac-wk1/js/dom/global-constructors-attributes-expected.txt: Removed.
+        * platform/mac/js/dom/global-constructors-attributes-expected.txt:
+        * platform/win/js/dom/global-constructors-attributes-expected.txt:
+        * platform/wk2/js/dom/global-constructors-attributes-idb-expected.txt: Added.
+
+2015-06-08  Chris Dumez  <cdumez@apple.com>
+
+        WebContent crash in WebCore::Page::sessionID() const + 0 (Page.cpp:1660)
+        https://bugs.webkit.org/show_bug.cgi?id=145748
+        <rdar://problem/21226577>
+
+        Reviewed by Brady Eidson.
+
+        * http/tests/navigation/image-load-in-pagehide-handler-expected.txt: Added.
+        * http/tests/navigation/image-load-in-pagehide-handler.html: Added.
+        * http/tests/navigation/resources/image-load-in-pagehide-handler-2.html: Added.
+
+        Add layout test to make sure that ping loads in 'pagehide' handlers are
+        still going through after this change.
+
+        * http/tests/navigation/resources/frame-do-load.html: Added.
+        * http/tests/navigation/resources/frame-pagehide-starts-load-in-subframe.html: Added.
+        * http/tests/navigation/resources/frame-pagehide-starts-load.html: Added.
+        * http/tests/navigation/subframe-pagehide-handler-starts-load-expected.txt: Added.
+        * http/tests/navigation/subframe-pagehide-handler-starts-load.html: Added.
+        * http/tests/navigation/subframe-pagehide-handler-starts-load2-expected.txt: Added.
+        * http/tests/navigation/subframe-pagehide-handler-starts-load2.html: Added.
+
+        Add layout tests to make sure we don't crash if a frame starts an XHR load
+        from the 'pagehide' event handler. One of the tests covers the case where a
+        frame's pagehide handler starts a load in a subframe as this case is
+        requires a bit more handling.
+
+2015-06-08  Chris Fleizach  <cfleizach@apple.com>
+
+        AX: improve list heuristics (presentational use versus actual lists)
+       ​https://bugs.webkit.org/show_bug.cgi?id=134187
+
+        Unreviewed. Rolling this change out temporarily.
+
+        * accessibility/list-detection-expected.txt:
+        * accessibility/list-detection.html:
+        * accessibility/list-detection2-expected.txt: Removed.
+        * accessibility/list-detection2.html: Removed.
+        * platform/gtk/accessibility/list-detection-expected.txt:
+        * platform/win/TestExpectations:
+
+2015-06-08  Alexey Proskuryakov  <ap@apple.com>
+
+        Unskip http/tests/misc/webtiming-ssl.php, as it should be passing on Yosemite.
+
+        * platform/mac/TestExpectations:
+
+2015-06-08  Daniel Bates  <dabates@apple.com>
+
+        Many LayoutTests/http tests time out in DumpRenderTree
+        https://bugs.webkit.org/show_bug.cgi?id=145770
+        <rdar://problem/19593910>
+
+        Reviewed by Alexey Proskuryakov.
+
+        Unskip LayoutTests/http tests in WebKit1 and explicitly skip the HTTP disk-cache tests
+        in WebKit1 as the network disk cache code is specific to WebKit2. Move common expectations
+        from the WebKit{1, 2}-specific TestExpectations file to platform/ios-simulator/TestExpectations.
+
+        * platform/ios-simulator-wk1/TestExpectations:
+        * platform/ios-simulator-wk2/TestExpectations:
+        * platform/ios-simulator/TestExpectations:
+
+2015-06-08  Javier Fernandez  <jfernandez@igalia.com>
+
+        [CSS Grid Layout] Setting height on a grid item doesn't have any effect
+        https://bugs.webkit.org/show_bug.cgi?id=145604
+
+        Reviewed by Sergio Villar Senin.
+
+        Tests to verify that we clear the override height set by the stretching logic
+        whenever height or margin change in a way they don't allow stretching anymore.
+
+        * fast/css-grid-layout/grid-item-should-not-be-stretched-when-height-or-margin-change-expected.txt: Added.
+        * fast/css-grid-layout/grid-item-should-not-be-stretched-when-height-or-margin-change.html: Added.
+
+2015-06-08  Brady Eidson  <beidson@apple.com>
+
+        Completely remove all IDB properties/constructors when it is disabled at runtime.
+        rdar://problem/18429374 and https://bugs.webkit.org/show_bug.cgi?id=137034
+
+        Reviewed by Geoffrey Garen.
+
+        * platform/mac-mavericks/TestExpectations: Disable global-constructors-attributes on Mavericks as
+          there is no way to have different WK1 and WK2 results.
+        * platform/mac-wk1/TestExpectations: Enable the new "properties are missing" test for Mac WK1.
+        * platform/mac-wk1/js/dom/global-constructors-attributes-expected.txt: Added.
+        * platform/win/TestExpectations: Enable the new "properties are missing" test for Win WK1
+        * platform/wk2/TestExpectations: Disable the new "properties are missing" test for all WK2.
+        * storage/indexeddb/properties-disabled-at-runtime-expected.txt: Added.
+        * storage/indexeddb/properties-disabled-at-runtime.html: Added.
+
+2015-06-08  Sergio Villar Senin  <svillar@igalia.com>
+
+        [CSS Grid Layout] Add some more testing for grid line names
+        https://bugs.webkit.org/show_bug.cgi?id=145691
+
+        Reviewed by Darin Adler.
+
+        After moving to the new syntax which uses brackets instead of
+        parentheses for grid line names lists, it's good to improve a bit
+        the testing of the feature with some more new test cases.
+
+        * fast/css-grid-layout/named-grid-line-get-set-expected.txt:
+        * fast/css-grid-layout/named-grid-line-get-set.html:
+
+2015-06-07  Darin Adler  <darin@apple.com>
+
+        REGRESSION (r181720): Unnecessary layout triggered any time animated GIF advances to a new frame
+        https://bugs.webkit.org/show_bug.cgi?id=145733
+
+        Reviewed by Andreas Kling.
+
+        * TestExpectations: Expect image failures on the animated GIF tests (the one
+        old one I am fixing and the one new one I am adding) because they don't yet work
+        under DumpRenderTree.
+
+        * fast/images/animated-gif-no-layout-expected.html: Added.
+        * fast/images/animated-gif-no-layout.html: Added.
+
+        * fast/images/gif-loop-count-expected.html: Added. This test was worthless as a render
+        tree dump test, and only valuable as a pixel test. And that hid the fact that it was
+        failing under WebKit1. Changing it to a reference test makes it a valuable test again.
+        * fast/images/gif-loop-count-expected.png: Removed.
+        * fast/images/gif-loop-count-expected.txt: Removed.
+
+        * platform/wk2/TestExpectations: Expect successes on these two tests.
+
+2015-06-06  Alexey Proskuryakov  <ap@apple.com>
+
+        Clean up tests for blocking mixed content
+        https://bugs.webkit.org/show_bug.cgi?id=145718
+
+        Reviewed by Darin Adler.
+
+        Stop using timeouts, which were making the tests flaky.
+
+        * http/tests/xmlhttprequest/access-control-response-with-body.html: This wasn't even
+        a mixed content test, but the file was reused in one. I now made a separate helper
+        document, so this is just a regular test now, not another test's resource.
+
+        * http/tests/security/mixedContent/redirect-http-to-https-iframe-in-main-frame.html:
+        * http/tests/security/mixedContent/redirect-https-to-http-iframe-in-main-frame.html:
+        * http/tests/security/mixedContent/resources/frame-with-insecure-frame.html:
+        * http/tests/security/mixedContent/resources/frame-with-redirect-http-to-https-frame.html:
+        * http/tests/security/mixedContent/resources/frame-with-redirect-https-to-http-frame.html:
+        Refactored to not depend on timeouts.
+
+        * http/tests/security/mixedContent/insecure-xhr-in-main-frame-expected.txt:
+        * http/tests/security/mixedContent/insecure-xhr-in-main-frame.html:
+        * http/tests/security/mixedContent/resources/insecure-xhr-in-main-frame-window.html: Added.
+        This test still needs a timeout, because of a WebKit bug. I just made it much longer.
+
+2015-06-06  Mark Lam  <mark.lam@apple.com>
+
+        Returned Exception* values need to be initialized to nullptr when no exceptions are thrown.
+        https://bugs.webkit.org/show_bug.cgi?id=145720
+
+        Reviewed by Dan Bernstein.
+
+        * platform/win/TestExpectations:
+        - Undoing skipped tests.
+
+2015-06-05  Mark Lam  <mark.lam@apple.com>
+
+        Gardening: skip some inspector-protocol tests while the issue is being investigated.
+        https://bugs.webkit.org/show_bug.cgi?id=145720
+
+        Not reviewed.
+
+        * platform/win/TestExpectations:
+
+2015-06-05  Zalan Bujtas  <zalan@apple.com>
+
+        [Win] Skip fast/text/decorations-vertical-underline-expected.html
+
+        Unreviewed gardening.
+
+        * platform/win/TestExpectations:
+
+2015-06-05  Zalan Bujtas  <zalan@apple.com>
+
+        [Win] Update expected results.
+
+        Unreviewed gardening.
+
+        * platform/win/fast/forms/select-element-focus-ring-expected.txt: Added.
+        * platform/win/fast/text/emoji-expected.txt: Added.
+
+2015-06-05  Chris Dumez  <cdumez@apple.com>
+
+        Regression(r176212): Broke app switching on iCloud.com
+        https://bugs.webkit.org/show_bug.cgi?id=145708
+        <rdar://problem/21235277>
+
+        Reviewed by Simon Fraser.
+
+        Remove layout tests covering DOM Timer throttling.
+
+        * fast/canvas/canvas-outside-viewport-timer-throttling-expected.txt: Removed.
+        * fast/canvas/canvas-outside-viewport-timer-throttling.html: Removed.
+        * fast/dom/nested-timer-display-none-element-throttling-expected.txt: Removed.
+        * fast/dom/nested-timer-display-none-element-throttling.html: Removed.
+        * fast/dom/repeating-timer-display-none-element-throttling-expected.txt: Removed.
+        * fast/dom/repeating-timer-display-none-element-throttling.html: Removed.
+        * fast/dom/repeating-timer-element-overflow-hidden-throttling-expected.txt: Removed.
+        * fast/dom/repeating-timer-element-overflow-hidden-throttling.html: Removed.
+        * fast/dom/resources/timer-throttling-iframe.html: Removed.
+        * fast/dom/timer-throttle-on-scrolling-iframe-away-expected.txt: Removed.
+        * fast/dom/timer-throttle-on-scrolling-iframe-away.html: Removed.
+        * fast/dom/timer-unthrottle-on-layout-expected.txt: Removed.
+        * fast/dom/timer-unthrottle-on-layout.html: Removed.
+        * fast/dom/timer-unthrottle-on-scroll-expected.txt: Removed.
+        * fast/dom/timer-unthrottle-on-scroll.html: Removed.
+
+2015-06-05  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [iOS] Emoji overlap preceeding lines
+        https://bugs.webkit.org/show_bug.cgi?id=145678
+        <rdar://problem/10684914>
+
+        Reviewed by Enrica Casucci.
+
+        * fast/text/emoji.html:
+        * platform/mac/TestExpectations: Removed unnecessary line.
+        * platform/mac-mavericks/fast/text/emoji-expected.html:
+        * platform/mac/fast/text/emoji-expected.html:
+        * platform/ios-simulator/fast/text/emoji-expected.html:
+        * TestExpectations: Removed unnecessary line.
+
+2015-06-05  Mark Lam  <mark.lam@apple.com>
+
+        finally blocks should not set the exception stack trace when re-throwing the exception.
+        https://bugs.webkit.org/show_bug.cgi?id=145525
+
+        Reviewed by Geoffrey Garen.
+
+        * TestExpectations:
+        - Skip the new tests until webkit.org/b/145090 is fixed.
+
+        * fast/dom/regress-131530-expected.txt:
+        - Rebased results because we now have a proper line number.
+
+        * http/tests/inspector/inspector-test.js:
+        (InspectorTestProxy.clearResults):
+        (InspectorTestProxy.reportUncaughtException):
+        - Add the feature to sanitize the url reported by reportUncaughtException() since
+          we can have tests that do expect uncaught exceptions, and we need the test
+          results to be invariant.  Sanitization of the url, in this case means, stripping
+          off the preceding path.
+
+        * inspector/debugger/break-on-exception-expected.txt: Added.
+        * inspector/debugger/break-on-exception.html: Added.
+        * inspector/debugger/break-on-exception-catch-expected.txt: Added.
+        * inspector/debugger/break-on-exception-catch.html: Added.
+        * inspector/debugger/break-on-exception-finally-expected.txt: Added.
+        * inspector/debugger/break-on-exception-finally.html: Added.
+        * inspector/debugger/break-on-exception-native-expected.txt: Added.
+        * inspector/debugger/break-on-exception-native.html: Added.
+
+        * inspector/debugger/break-on-exception-throw-in-promise-expected.txt: Added.
+        * inspector/debugger/break-on-exception-throw-in-promise.html: Added.
+        * inspector/debugger/break-on-exception-throw-in-promise-with-catch-expected.txt: Added.
+        * inspector/debugger/break-on-exception-throw-in-promise-with-catch.html: Added.
+        * inspector/debugger/break-on-exception-throw-in-promise-then-expected.txt: Added.
+        * inspector/debugger/break-on-exception-throw-in-promise-then.html: Added.
+        * inspector/debugger/break-on-exception-throw-in-promise-then-with-catch-expected.txt: Added.
+        * inspector/debugger/break-on-exception-throw-in-promise-then-with-catch.html: Added.
+        * inspector/debugger/break-on-exception-throw-in-promise-rethrow-in-catch-expected.txt: Added.
+        * inspector/debugger/break-on-exception-throw-in-promise-rethrow-in-catch.html: Added.
+
+        * inspector/debugger/break-on-exception-window-onerror-expected.txt: Added.
+        * inspector/debugger/break-on-exception-window-onerror.html: Added.
+
+        * inspector/debugger/break-on-uncaught-exception-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception.html: Added.
+        * inspector/debugger/break-on-uncaught-exception-catch-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception-catch.html: Added.
+        * inspector/debugger/break-on-uncaught-exception-finally-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception-finally.html: Added.
+        * inspector/debugger/break-on-uncaught-exception-native-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception-native.html: Added.
+
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise.html: Added.
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise-with-catch-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise-with-catch.html: Added.
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise-then-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise-then.html: Added.
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise-then-with-catch-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise-then-with-catch.html: Added.
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise-rethrow-in-catch-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception-throw-in-promise-rethrow-in-catch.html: Added.
+
+        * inspector/debugger/break-on-uncaught-exception-window-onerror-expected.txt: Added.
+        * inspector/debugger/break-on-uncaught-exception-window-onerror.html: Added.
+
+        * inspector/debugger/resources/break-on-exception-tests.js: Added.
+        (doThrow):
+        (testCatch):
+        (testFinally):
+        (testThrowingThruNativeCode):
+        (testThrowingInPromise):
+        (testThrowingInPromiseWithCatch):
+        (testThrowingInPromiseThen):
+        (testThrowingInPromiseThenWithCatch):
+        (testThrowingInPromiseWithRethrowInCatch):
+
+2015-06-05  Eric Carlson  <eric.carlson@apple.com>
+
+        Layout tests fullscreen/video-controls-drag.html and media/video-fullscreeen-only-controls.html
+        fail on WK1 and WK2
+        https://bugs.webkit.org/show_bug.cgi?id=145675
+
+        Reviewed by Dean Jackson.
+
+        * TestExpectations: Unskip tests.
+        * fullscreen/video-controls-drag.html: Minor cleanup, force layout before testing control location.
+
+2015-06-05  Zalan Bujtas  <zalan@apple.com>
+
+        [iOS] Rebaseline expected results.
+
+        Unreviewed gardening.
+
+        * platform/ios-simulator/compositing/overflow/overflow-positioning-expected.txt:
+        * platform/ios-simulator/css3/selectors3/xhtml/css3-modsel-15c-expected.txt:
+        * platform/ios-simulator/css3/selectors3/xml/css3-modsel-15c-expected.txt:
+        * platform/ios-simulator/ios/scrolling/overflow-div-scrolling-expected.txt:
+        * platform/ios-simulator/ios/touch/touch-handler-on-window-expected.txt:
+
+2015-06-05  David Hyatt  <hyatt@apple.com>
+
+        Underlines too close in vertical Chinese text.
+        https://bugs.webkit.org/show_bug.cgi?id=145651
+        <rdar://problem/11105920>
+
+        Reviewed by Simon Fraser.
+
+        * fast/text/decorations-vertical-underline-expected.html: Added.
+        * fast/text/decorations-vertical-underline.html: Added.
+
+2015-06-05  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        Layout test http/tests/misc/acid3.html times out on Yosemite WK2 Debug.
+        https://bugs.webkit.org/show_bug.cgi?id=145702
+
+        * platform/mac-wk2/TestExpectations: Marking as flaky for now.
+
+2015-06-05  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        [iOS] Rebaseline expected results for svg font tests
+
+        Reviewed by Daniel Bates.
+
+        * platform/ios-simulator/svg/custom/svg-fonts-no-latin-glyph-expected.txt: Added.
+        * platform/ios-simulator/svg/custom/svg-fonts-segmented-expected.txt:
+        * platform/ios-simulator/svg/custom/svg-fonts-with-no-element-reference-expected.txt: Added.
+        * platform/ios-simulator/svg/text/text-overflow-ellipsis-svgfont-expected.txt:
+        * platform/ios-simulator/svg/text/text-overflow-ellipsis-svgfont-kerning-ligatures-expected.txt:
+        * svg/custom/svg-fonts-no-latin-glyph-expected.txt:
+        * svg/custom/svg-fonts-no-latin-glyph.html:
+
+2015-06-05  Zalan Bujtas  <zalan@apple.com>
+
+        [iOS] Mask layer now is part of the layer tree output.
+
+        Unreviewed gardening.
+
+        * platform/ios-simulator/compositing/masks/compositing-clip-path-change-no-repaint-expected.txt:
+
+2015-06-05  Dean Jackson  <dino@apple.com>
+
+        [Mac] Popup focus is cut off
+        https://bugs.webkit.org/show_bug.cgi?id=145688
+        <rdar://problem/18313375>
+
+        Reviewed by Brent Fulgham.
+
+        * fast/forms/select-element-focus-ring.html: Added.
+        * platform/mac/fast/forms/select-element-focus-ring-expected.png: Added.
+        * platform/mac/fast/forms/select-element-focus-ring-expected.txt: Added.
+
+2015-06-05  Brent Fulgham  <bfulgham@apple.com>
+
+        Add WK1 versions of tests from Bugs 145637 and 145642
+        https://bugs.webkit.org/show_bug.cgi?id=145649
+
+        Reviewed by Zalan Bujtas.
+
+        * platform/mac/fast/scrolling/iframe_in_iframe-expected.txt: Added.
+        * platform/mac/fast/scrolling/iframe_in_iframe.html: Added.
+        * platform/mac/fast/scrolling/resources/inner_content.html: Added.
+        * platform/mac/fast/scrolling/resources/testContent.html: Added.
+        * platform/mac/fast/scrolling/resources/testImage.png: Added.
+
+2015-06-05  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [CSS Grid Layout] Support dots sequences in grid-template-areas
+        https://bugs.webkit.org/show_bug.cgi?id=145693
+
+        Reviewed by Sergio Villar Senin.
+
+        Added new test cases to check the new behavior.
+
+        * fast/css-grid-layout/grid-template-areas-get-set-expected.txt:
+        * fast/css-grid-layout/grid-template-areas-get-set.html:
+
 2015-06-03  Filip Pizlo  <fpizlo@apple.com>
 
         Simplify unboxing of double JSValues known to be not NaN and not Int32

@@ -74,6 +74,7 @@
 			buildConfigurationList = C0CE72891247E68600BC0EC4 /* Build configuration list for PBXAggregateTarget "Derived Sources" */;
 			buildPhases = (
 				C0CE72841247E66800BC0EC4 /* Generate Derived Sources */,
+				3740E7281B23724A004ADEF1 /* Derive Entitlements for Manual Sandboxing */,
 			);
 			dependencies = (
 			);
@@ -180,7 +181,6 @@
 		1A1D8BA11731A36300141DA4 /* LocalStorageDatabase.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1A1D8B9F1731A36300141DA4 /* LocalStorageDatabase.cpp */; };
 		1A1D8BA21731A36300141DA4 /* LocalStorageDatabase.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A1D8BA01731A36300141DA4 /* LocalStorageDatabase.h */; };
 		1A1DC340196346D700FF7059 /* LegacySessionStateCoding.h in Headers */ = {isa = PBXBuildFile; fileRef = 31607F3819627002009B87DA /* LegacySessionStateCoding.h */; };
-		1A1E01E91B1FBB7900973E1F /* WKBackForwardListItemPrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A1E01E81B1FBB7900973E1F /* WKBackForwardListItemPrivate.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		1A1E093318861D3800D2DC49 /* WebProgressTrackerClient.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1A1E093118861D3800D2DC49 /* WebProgressTrackerClient.cpp */; };
 		1A1E093418861D3800D2DC49 /* WebProgressTrackerClient.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A1E093218861D3800D2DC49 /* WebProgressTrackerClient.h */; };
 		1A1EC69E1872092100B951F0 /* ImportanceAssertion.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A1EC69D1872092100B951F0 /* ImportanceAssertion.h */; };
@@ -2304,7 +2304,6 @@
 		1A1D2117191D996C0001619F /* MigrateHeadersFromWebKitLegacy.make */ = {isa = PBXFileReference; lastKnownFileType = text; name = MigrateHeadersFromWebKitLegacy.make; path = mac/MigrateHeadersFromWebKitLegacy.make; sourceTree = "<group>"; };
 		1A1D8B9F1731A36300141DA4 /* LocalStorageDatabase.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = LocalStorageDatabase.cpp; sourceTree = "<group>"; };
 		1A1D8BA01731A36300141DA4 /* LocalStorageDatabase.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = LocalStorageDatabase.h; sourceTree = "<group>"; };
-		1A1E01E81B1FBB7900973E1F /* WKBackForwardListItemPrivate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WKBackForwardListItemPrivate.h; sourceTree = "<group>"; };
 		1A1E093118861D3800D2DC49 /* WebProgressTrackerClient.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WebProgressTrackerClient.cpp; sourceTree = "<group>"; };
 		1A1E093218861D3800D2DC49 /* WebProgressTrackerClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WebProgressTrackerClient.h; sourceTree = "<group>"; };
 		1A1EC69D1872092100B951F0 /* ImportanceAssertion.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ImportanceAssertion.h; sourceTree = "<group>"; };
@@ -5429,7 +5428,6 @@
 				37C4C08518149C5B003688B9 /* WKBackForwardListItem.h */,
 				37C4C08418149C5B003688B9 /* WKBackForwardListItem.mm */,
 				37C4C08818149F23003688B9 /* WKBackForwardListItemInternal.h */,
-				1A1E01E81B1FBB7900973E1F /* WKBackForwardListItemPrivate.h */,
 				1A9F28101958F478008CAC72 /* WKBackForwardListPrivate.h */,
 				1AF4592D19464B2000F9D4A2 /* WKError.h */,
 				1AF4592C19464B2000F9D4A2 /* WKError.mm */,
@@ -8191,7 +8189,6 @@
 				33367630130C9998006C9DE2 /* WebResourceCacheManager.h in Headers */,
 				33367656130C9ECA006C9DE2 /* WebResourceCacheManagerMessages.h in Headers */,
 				33367636130C99B2006C9DE2 /* WebResourceCacheManagerProxy.h in Headers */,
-				1A1E01E91B1FBB7900973E1F /* WKBackForwardListItemPrivate.h in Headers */,
 				33367658130C9ECB006C9DE2 /* WebResourceCacheManagerProxyMessages.h in Headers */,
 				510AFFBA16542048001BA05E /* WebResourceLoader.h in Headers */,
 				51F060E01654317F00F3281B /* WebResourceLoaderMessages.h in Headers */,
@@ -8690,6 +8687,7 @@
 				1A1D2115191D96380001619F /* Postprocess Framework Headers */,
 				8DC2EF520486A6940098B216 /* Resources */,
 				7CB16FEE1724BA05007A0A95 /* Copy Plug-in Sandbox Profiles */,
+				37E531011B2391090074F0DF /* Copy iOS Sandbox Profiles for Manual Sandboxing */,
 				1A07D2F71919B36500ECDA16 /* Copy Message Generation Scripts */,
 				8DC2EF540486A6940098B216 /* Sources */,
 				8DC2EF560486A6940098B216 /* Frameworks */,
@@ -9201,6 +9199,26 @@
 			shellPath = /bin/sh;
 			shellScript = "if [ \"${ACTION}\" = \"installhdrs\" ]; then\n    exit 0;\nfi\n\nif [ -f ../../Tools/Scripts/check-for-inappropriate-objc-class-names ]; then\n    ../../Tools/Scripts/check-for-inappropriate-objc-class-names WK _WK || exit $?\nfi";
 		};
+		3740E7281B23724A004ADEF1 /* Derive Entitlements for Manual Sandboxing */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Configurations/Databases-iOS.entitlements",
+				"$(SRCROOT)/Configurations/Network-iOS.entitlements",
+				"$(SRCROOT)/Configurations/WebContent-iOS.entitlements",
+			);
+			name = "Derive Entitlements for Manual Sandboxing";
+			outputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/DerivedSources/WebKit2/Databases-iOS-no-sandbox.entitlements",
+				"$(BUILT_PRODUCTS_DIR)/DerivedSources/WebKit2/Network-iOS-no-sandbox.entitlements",
+				"$(BUILT_PRODUCTS_DIR)/DerivedSources/WebKit2/WebContent-iOS-no-sandbox.entitlements",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [[ \"${WK_MANUAL_SANDBOXING_ENABLED}\" != \"YES\" || \"${PLATFORM_NAME}\" == \"macosx\" ]]; then\n    exit\nfi\n\nif [[ \"${ACTION}\" == \"build\" || \"${ACTION}\" == \"install\" ]]; then\n    for ((i = 0; i < ${SCRIPT_INPUT_FILE_COUNT}; ++i)); do\n        eval ENTITLEMENTS=\\${SCRIPT_INPUT_FILE_${i}}\n        ENTITLEMENTS_BASE=${ENTITLEMENTS##*/}\n        ENTITLEMENTS_BASE=${ENTITLEMENTS_BASE%.entitlements}\n        plutil -remove seatbelt-profiles -o \"${BUILT_PRODUCTS_DIR}/DerivedSources/WebKit2/${ENTITLEMENTS_BASE}-no-sandbox.entitlements\" \"${ENTITLEMENTS}\"\n    done\nfi";
+		};
 		375A248817E5048E00C9A086 /* Postprocess WKBase.h */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -9215,6 +9233,26 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "WKBASE_H=${TARGET_BUILD_DIR}/${PRIVATE_HEADERS_FOLDER_PATH}/WKBase.h\n\nunifdef -B -D__APPLE__ -UBUILDING_GTK__ -UUSE_SOUP -UBUILDING_EFL__ -UBUILDING_QT__ -o ${WKBASE_H}.unifdef ${WKBASE_H}\n\ncase $? in\n0)\n    rm ${WKBASE_H}.unifdef\n    ;;\n1)\n    mv ${WKBASE_H}{.unifdef,}\n    ;;\n*)\n    exit 1\nesac\n";
+		};
+		37E531011B2391090074F0DF /* Copy iOS Sandbox Profiles for Manual Sandboxing */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Resources/SandboxProfiles/ios/com.apple.WebKit.Databases.sb",
+				"$(SRCROOT)/Resources/SandboxProfiles/ios/com.apple.WebKit.Networking.sb",
+				"$(SRCROOT)/Resources/SandboxProfiles/ios/com.apple.WebKit.WebContent.sb",
+			);
+			name = "Copy iOS Sandbox Profiles for Manual Sandboxing";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/com.apple.WebKit.Databases.sb",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/com.apple.WebKit.Networking.sb",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/com.apple.WebKit.WebContent.sb",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [[ \"${WK_MANUAL_SANDBOXING_ENABLED}\" != \"YES\" || \"${PLATFORM_NAME}\" == \"macosx\" ]]; then\n    exit\nfi\n\nif [[ \"${ACTION}\" == \"build\" || \"${ACTION}\" == \"install\" ]]; then\n    for ((i = 0; i < ${SCRIPT_INPUT_FILE_COUNT}; ++i)); do\n        eval SANDBOX_PROFILE=\\${SCRIPT_INPUT_FILE_${i}}\n        ditto \"${SANDBOX_PROFILE}\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/${SANDBOX_PROFILE##*/}\"\n    done\nfi";
 		};
 		5DF408C5131DD46700130071 /* Check For Weak VTables and Externals */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -11141,6 +11179,7 @@
 				377E7CD21B20FF9E00931AFC /* Production */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Production;
 		};
 		510031F21379CACB00C8DFE4 /* Build configuration list for PBXNativeTarget "SecItemShim" */ = {
 			isa = XCConfigurationList;

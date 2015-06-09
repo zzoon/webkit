@@ -1,3 +1,460 @@
+2015-06-08  Dan Bernstein  <mitz@apple.com>
+
+        [Cocoa] Use generics in framework headers
+        https://bugs.webkit.org/show_bug.cgi?id=145781
+
+        Reviewed by Sam Weinig.
+
+        * mac/postprocess-framework-headers.sh: Use the parameter to WK_ARRAY and WK_SET.
+
+2015-06-08  Chris Dumez  <cdumez@apple.com>
+
+        Access GCController instance via GCController::singleton() instead of a free function
+        https://bugs.webkit.org/show_bug.cgi?id=145776
+
+        Reviewed by Darin Adler.
+
+        Access GCController instance via GCController::singleton() instead of a
+        free function as per coding style and for consistency with other
+        singleton classes in the codebase.
+
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::garbageCollectJavaScriptObjects):
+        (WebKit::InjectedBundle::garbageCollectJavaScriptObjectsOnAlternateThreadForDebugging):
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::terminate):
+        (WebKit::WebProcess::didClose):
+        (WebKit::WebProcess::garbageCollectJavaScriptObjects):
+        (WebKit::WebProcess::setJavaScriptGarbageCollectorTimerEnabled):
+
+2015-06-08  Anders Carlsson  <andersca@apple.com>
+
+        Include IndexedDB databases in -[WKWebsiteDataStore allWebsiteDataTypes]
+        https://bugs.webkit.org/show_bug.cgi?id=145775
+
+        Reviewed by Simon Fraser.
+
+        * UIProcess/API/Cocoa/WKWebsiteDataStore.mm:
+        (+[WKWebsiteDataStore allWebsiteDataTypes]):
+
+2015-06-08  Anders Carlsson  <andersca@apple.com>
+
+        Move the snapshot layer contents SPI to the web view
+        https://bugs.webkit.org/show_bug.cgi?id=145771
+
+        Reviewed by Geoffrey Garen.
+
+        We need to potentially ask the web page to take a snapshot of the current item,
+        so move the SPI to WKWebView and name it appropriately.
+
+        * UIProcess/API/Cocoa/WKBackForwardListItem.mm:
+        (-[WKBackForwardListItem _snapshotLayerContents]): Deleted.
+        * UIProcess/API/Cocoa/WKBackForwardListItemPrivate.h: Removed.
+        * UIProcess/API/Cocoa/WKWebView.mm:
+        (-[WKWebView _snapshotLayerContentsForBackForwardListItem:]):
+        * UIProcess/API/Cocoa/WKWebViewPrivate.h:
+        * WebKit2.xcodeproj/project.pbxproj:
+
+2015-06-08  Brady Eidson  <beidson@apple.com>
+
+        Completely remove all IDB properties/constructors when it is disabled at runtime.
+        rdar://problem/18429374 and https://bugs.webkit.org/show_bug.cgi?id=137034
+
+        Reviewed by Geoffrey Garen.
+
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::WebProcess): Enable IDB at runtime if it's enabled at compile time.
+
+2015-06-08  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [SOUP] Performs DNS prefetch when a proxy is configured (information leak)
+        https://bugs.webkit.org/show_bug.cgi?id=145542
+
+        Reviewed by Alexey Proskuryakov.
+
+        Add documentation to webkit_web_context_prefetch_dns to indicate that the function does
+        nothing if the system configuration indicates we should use a proxy to resolve the host.
+
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+
+2015-06-08  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        REGRESSION(r185251): [GTK] webkit_web_context_set_disk_cache_directory() doesn't work when using shared secondary process model after r185251
+        https://bugs.webkit.org/show_bug.cgi?id=145751
+
+        Reviewed by Darin Adler.
+
+        In r185251 the CFNetwork cache was disabled in the web process,
+        but it also removed the disk cache directory web process
+        initialization parameter. While we support networking in the web
+        process when shared secondary process model is used, the network
+        cache should still work. We can remove this if we eventually
+        switch to use the network process unconditionally.
+
+        * Shared/WebProcessCreationParameters.cpp:
+        (WebKit::WebProcessCreationParameters::encode): Encode disk cache directory.
+        (WebKit::WebProcessCreationParameters::decode): Decode disk cache directory.
+        * Shared/WebProcessCreationParameters.h: Bring back disk cache directory only for soup.
+        * UIProcess/gtk/WebProcessPoolGtk.cpp:
+        (WebKit::WebProcessPool::platformInitializeWebProcess): Initialize disk cache directory parameter.
+        * WebProcess/soup/WebProcessSoup.cpp:
+        (WebKit::WebProcess::platformInitializeWebProcess): Use the disck cache directory parameter again.
+
+2015-06-08  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [GTK] Remove the unused scroll function from WebPageGtk.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=145756
+
+        Reviewed by Carlos Garcia Campos.
+
+        * WebProcess/WebPage/gtk/WebPageGtk.cpp:
+        (WebKit::scroll): Deleted.
+
+2015-06-08  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        REGRESSION(r185262): [EFL] Modify legacyPlatformDefaultNetworkCacheDirectory() according to network cache
+        https://bugs.webkit.org/show_bug.cgi?id=145752
+
+        Reviewed by Carlos Garcia Campos.
+
+        EFL port needs to add different prefix for network cache directory since r185262.
+        Modify it basedon GTK port fix.
+
+        * UIProcess/efl/WebProcessPoolEfl.cpp:
+        (WebKit::WebProcessPool::legacyPlatformDefaultNetworkCacheDirectory):
+
+2015-06-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        REGRESSION(r185262): [GTK] webkit_web_context_set_disk_cache_directory() doesn't work after r185262
+        https://bugs.webkit.org/show_bug.cgi?id=145735
+
+        Reviewed by Darin Adler.
+
+        * NetworkProcess/soup/NetworkProcessSoup.cpp:
+        (WebKit::NetworkProcess::platformInitializeNetworkProcess): Use
+        the directory name to clear the old cache, since the disk cache
+        subdirectory is now added in the UI process.
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+        (webkit_web_context_set_disk_cache_directory): Update the
+        WebProcessPool configuration to override the disk cache directory.
+        * UIProcess/WebProcessPool.cpp:
+        (WebKit::WebProcessPool::ensureNetworkProcess): Use the
+        configuration to get the disk cache directory.
+        (WebKit::WebProcessPool::WebProcessPool): Remove
+        m_diskCacheDirectory member initialization.
+        * UIProcess/WebProcessPool.h: Remove m_diskCacheDirectory member.
+        * UIProcess/gtk/WebProcessPoolGtk.cpp:
+        (WebKit::WebProcessPool::legacyPlatformDefaultNetworkCacheDirectory):
+        Append the disk cache subdirectory.
+
+2015-06-07  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL][GTK] Fix build  break since r185262
+        https://bugs.webkit.org/show_bug.cgi?id=145724
+
+        Unreviewed, fix build break for EFL and GTK ports.
+
+        * UIProcess/API/APIWebsiteDataStore.cpp:
+        (API::WebsiteDataStore::defaultLocalStorageDirectory):
+        (API::WebsiteDataStore::defaultWebSQLDatabaseDirectory):
+        (API::WebsiteDataStore::defaultNetworkCacheDirectory):
+        (API::WebsiteDataStore::defaultApplicationCacheDirectory):
+        (API::WebsiteDataStore::defaultMediaKeysStorageDirectory):
+        (API::WebsiteDataStore::defaultIndexedDBDatabaseDirectory):
+        * UIProcess/efl/WebProcessPoolEfl.cpp:
+        (WebKit::WebProcessPool::legacyPlatformDefaultNetworkCacheDirectory):
+        (WebKit::WebProcessPool::platformDefaultDiskCacheDirectory): Deleted.
+        * WebProcess/soup/WebProcessSoup.cpp:
+        (WebKit::WebProcess::platformInitializeWebProcess):
+
+2015-06-06  Dan Bernstein  <mitz@apple.com>
+
+        Don’t enable manual sandboxing in the iOS Simulator. This should fix all the tests timing out.
+
+        * Configurations/DebugRelease.xcconfig:
+
+2015-06-06  Dan Bernstein  <mitz@apple.com>
+
+        [iOS] Can’t debug with Development XPC services due to automatic sandboxing
+        https://bugs.webkit.org/show_bug.cgi?id=145731
+
+        Rubber-stamped by Darin Adler.
+
+        In iOS, the XPC services are automatically sandboxed based on their entitlements. The
+        sandbox doesn’t allow them to re-exec, which is necessary for linking against engineering
+        builds of the WebKit frameworks placed in a non-system location.
+
+        The solution is to opt Engineering builds into manual sandboxing.
+
+        * Configurations/BaseTarget.xcconfig:
+        - Add ENABLE_MANUAL_SANDBOXING to
+          GCC_PREPROCESSOR_DEFINITIONS when WK_MANUAL_SANDBOXING_ENABLED is YES.
+        - Set WK_MANUAL_SANDBOXING_ENABLED to YES for OS X, because we always use manual
+          sandboxing on that platform.
+
+        * Configurations/DebugRelease.xcconfig: Removed unused definition of DEBUG_OR_RELEASE. Set
+          WK_MANUAL_SANDBOXING_ENABLED to YES for all engineering builds.
+
+        * Configurations/BaseXPCService.xcconfig: Define CODE_SIGN_ENTITLEMENTS for iOS to be empty
+          if the service is not installed; to use the base entitlements file from Configurations if
+          manual sandboxing is not enabled; and to use a derived entitlements file, which doesn’t
+          specify a sandbox profile, if manual sandboxing is enabled.
+
+        * Configurations/DatabaseService.Development.xcconfig: Define
+          WK_XPC_SERVICE_IOS_ENTITLEMENTS_BASE and let BaseXPCService.xcconfig define
+          CODE_SIGN_ENTITLEMENTS for iOS.
+
+        * Configurations/DatabaseService.xcconfig: Ditto.
+        * Configurations/NetworkService.Development.xcconfig: Ditto.
+        * Configurations/NetworkService.xcconfig: Ditto.
+        * Configurations/WebContentService.Development.xcconfig: Ditto.
+        * Configurations/WebContentService.xcconfig: Ditto.
+
+        * WebKit2.xcodeproj/project.pbxproj:
+        - In the Derived Sources target, added a Derive Entitlements for Manual Sandboxing script
+          build phase. When building for iOS with manual sandboxing enabled, it creates copies of
+          the iOS entitlements files with a -no-sandbox suffix and the seatbelt-profiles key
+          removed.
+        - In the WebKit target, added a Copy iOS Sandbox Profiles for Manual Sandboxing script build
+          phase. When building for iOS with manual sandboxing enabled, it copies the iOS sandbox
+          profiles into the framework, so that the services can apply them to themselves at runtime.
+
+        * Shared/ios/ChildProcessIOS.mm:
+        (WebKit::ChildProcess::initializeSandbox): Use ENABLE(MANUAL_SANDBOXING) and don’t define it
+        here.
+
+        * WebProcess/cocoa/WebProcessCocoa.mm:
+        (WebKit::WebProcess::initializeSandbox): Use ENABLE(MANUAL_SANDBOXING) instead of defining
+        and using ENABLE_MANUAL_WEBPROCESS_SANDBOXING here.
+
+2015-06-06  Anders Carlsson  <andersca@apple.com>
+
+        Remove support from getting plug-in information from Carbon resources
+        https://bugs.webkit.org/show_bug.cgi?id=145730
+
+        Reviewed by Dan Bernstein.
+
+        No current plug-in versions use this feature, and both Chrome and Mozilla for
+        Mac stopped looking at Carbon resources years ago.
+
+        * Shared/Plugins/Netscape/mac/NetscapePluginModuleMac.mm:
+        (WebKit::NetscapePluginModule::getPluginInfo):
+        (WebKit::ResourceMap::ResourceMap): Deleted.
+        (WebKit::ResourceMap::~ResourceMap): Deleted.
+        (WebKit::ResourceMap::isValid): Deleted.
+        (WebKit::getStringListResource): Deleted.
+        (WebKit::getPluginInfoFromCarbonResources): Deleted.
+
+2015-06-05  Anders Carlsson  <andersca@apple.com>
+
+        Only allow plug-ins to create custom MIME property lists on older versions of OS X
+        https://bugs.webkit.org/show_bug.cgi?id=145716
+
+        Reviewed by Dan Bernstein.
+
+        * PluginProcess/EntryPoint/mac/LegacyProcess/PluginProcessMain.mm:
+        * Shared/Plugins/Netscape/NetscapePluginModule.h:
+        * Shared/Plugins/Netscape/mac/NetscapePluginModuleMac.mm:
+        (WebKit::getMIMETypesFromPluginBundle):
+        * UIProcess/Plugins/PluginProcessProxy.h:
+        * UIProcess/Plugins/mac/PluginProcessProxyMac.mm:
+
+2015-06-05  Chris Dumez  <cdumez@apple.com>
+
+        [WK2][iOS] Limit the number of vnodes used by the WebContent processes
+        https://bugs.webkit.org/show_bug.cgi?id=145672
+        <rdar://problem/21126637>
+
+        Reviewed by Antti Koivisto.
+
+        Have the WebContent process register a vnode pressure handler on iOS,
+        which calls the memory pressure handler.
+
+        On non-critical pressure, it will prune dead resources from the memory
+        cache, which should free up some vnodes. On critical pressure, the
+        handler will clear the PageCache and do a JS GC, which should free even
+        more vnodes.
+
+        * WebProcess/cocoa/WebProcessCocoa.mm:
+        (WebKit::WebProcess::platformInitializeWebProcess):
+
+2015-06-05  Anders Carlsson  <andersca@apple.com>
+
+        Fix refacto, don't put IndexedDB databases in the cache directory
+        https://bugs.webkit.org/show_bug.cgi?id=145714
+
+        Reviewed by Antti Koivisto.
+
+        * UIProcess/API/Cocoa/APIWebsiteDataStoreCocoa.mm:
+        (API::WebsiteDataStore::defaultIndexedDBDatabaseDirectory):
+
+2015-06-05  Anders Carlsson  <andersca@apple.com>
+
+        Make the network cache directory part of WKContextConfigurationRef
+        https://bugs.webkit.org/show_bug.cgi?id=145711
+
+        Reviewed by Antti Koivisto.
+
+        Also, make the UI process be in control of where we place the new network cache.
+        When using the Modern WebKit API, put the cache in ~/Library/Caches/<Bundle ID>/WebKit/NetworkCache,
+        and put the cache in ~/Library/Caches/<Bundle ID>/WebKitCache otherwise (this is just for Safari).
+
+        * NetworkProcess/cache/NetworkCacheStorage.cpp:
+        (WebKit::NetworkCache::Storage::open):
+        * UIProcess/API/APIProcessPoolConfiguration.cpp:
+        (API::ProcessPoolConfiguration::createWithLegacyOptions):
+        (API::ProcessPoolConfiguration::ProcessPoolConfiguration):
+        (API::ProcessPoolConfiguration::copy):
+        * UIProcess/API/APIProcessPoolConfiguration.h:
+        * UIProcess/API/C/WKContext.cpp:
+        (WKContextSetDiskCacheDirectory): Deleted.
+        * UIProcess/API/C/WKContextConfigurationRef.cpp:
+        (WKContextConfigurationCopyDiskCacheDirectory):
+        (WKContextConfigurationSetDiskCacheDirectory):
+        * UIProcess/API/C/WKContextConfigurationRef.h:
+        * UIProcess/API/C/WKContextPrivate.h:
+        * UIProcess/Cocoa/WebProcessPoolCocoa.mm:
+        (WebKit::WebProcessPool::platformInitializeNetworkProcess):
+        (WebKit::WebProcessPool::legacyPlatformDefaultNetworkCacheDirectory):
+        (WebKit::WebProcessPool::isNetworkCacheEnabled):
+        (WebKit::WebProcessPool::platformDefaultDiskCacheDirectory): Deleted.
+        * UIProcess/WebProcessPool.cpp:
+        (WebKit::legacyWebsiteDataStoreConfiguration):
+        (WebKit::WebProcessPool::WebProcessPool):
+        (WebKit::WebProcessPool::ensureNetworkProcess):
+        (WebKit::WebProcessPool::diskCacheDirectory): Deleted.
+        * UIProcess/WebProcessPool.h:
+
+2015-06-05  Anders Carlsson  <andersca@apple.com>
+
+        Make the application cache directory part of WKContextConfigurationRef
+        https://bugs.webkit.org/show_bug.cgi?id=145704
+
+        Reviewed by Geoffrey Garen.
+
+        * UIProcess/API/APIProcessPoolConfiguration.cpp:
+        (API::ProcessPoolConfiguration::createWithLegacyOptions):
+        (API::ProcessPoolConfiguration::ProcessPoolConfiguration):
+        (API::ProcessPoolConfiguration::copy):
+        * UIProcess/API/APIProcessPoolConfiguration.h:
+        * UIProcess/API/C/WKContext.cpp:
+        (WKContextSetApplicationCacheDirectory): Deleted.
+        * UIProcess/API/C/WKContextConfigurationRef.cpp:
+        (WKContextConfigurationCopyApplicationCacheDirectory):
+        (WKContextConfigurationSetApplicationCacheDirectory):
+        * UIProcess/API/C/WKContextConfigurationRef.h:
+        * UIProcess/API/C/WKContextPrivate.h:
+        * UIProcess/WebProcessPool.cpp:
+        (WebKit::WebProcessPool::WebProcessPool):
+        (WebKit::WebProcessPool::createNewWebProcess):
+        (WebKit::WebProcessPool::applicationCacheDirectory): Deleted.
+        * UIProcess/WebProcessPool.h:
+
+2015-06-05  Mark Lam  <mark.lam@apple.com>
+
+        finally blocks should not set the exception stack trace when re-throwing the exception.
+        https://bugs.webkit.org/show_bug.cgi?id=145525
+
+        Reviewed by Geoffrey Garen.
+
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::reportException):
+        - Changed to use the new Exception object.
+
+2015-06-05  Anders Carlsson  <andersca@apple.com>
+
+        Disable the CFNetwork cache in the web process
+        https://bugs.webkit.org/show_bug.cgi?id=145700
+        rdar://problem/20243343
+
+        Reviewed by Geoffrey Garen.
+
+        * NetworkProcess/cache/NetworkCacheStorage.cpp:
+        (WebKit::NetworkCache::Storage::open):
+        * Shared/WebProcessCreationParameters.cpp:
+        (WebKit::WebProcessCreationParameters::WebProcessCreationParameters): Deleted.
+        (WebKit::WebProcessCreationParameters::encode): Deleted.
+        (WebKit::WebProcessCreationParameters::decode): Deleted.
+        * Shared/WebProcessCreationParameters.h:
+        * UIProcess/Cocoa/WebProcessPoolCocoa.mm:
+        (WebKit::WebProcessPool::platformInitializeWebProcess): Deleted.
+        * UIProcess/WebProcessPool.cpp:
+        (WebKit::WebProcessPool::createNewWebProcess): Deleted.
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::WebProcess): Deleted.
+        (WebKit::WebProcess::initializeWebProcess): Deleted.
+        * WebProcess/WebProcess.h:
+        * WebProcess/cocoa/WebProcessCocoa.mm:
+        (WebKit::WebProcess::platformClearResourceCaches):
+        (WebKit::WebProcess::platformInitializeWebProcess):
+        (WebKit::WebProcess::platformSetCacheModel): Deleted.
+        (WebKit::WebProcess::platformTerminate): Deleted.
+
+2015-06-05  Anders Carlsson  <andersca@apple.com>
+
+        Consolidate default website data directory computations
+        https://bugs.webkit.org/show_bug.cgi?id=145698
+
+        Reviewed by Andreas Kling.
+
+        * UIProcess/API/APIProcessPoolConfiguration.cpp:
+        (API::ProcessPoolConfiguration::ProcessPoolConfiguration):
+        * UIProcess/API/APIWebsiteDataStore.h:
+        * UIProcess/API/Cocoa/APIWebsiteDataStoreCocoa.mm:
+        (API::WebsiteDataStore::defaultApplicationCacheDirectory):
+        (API::WebsiteDataStore::defaultNetworkCacheDirectory):
+        (API::WebsiteDataStore::defaultIndexedDBDatabaseDirectory):
+        (API::WebsiteDataStore::defaultLocalStorageDirectory):
+        (API::WebsiteDataStore::defaultMediaKeysStorageDirectory):
+        (API::WebsiteDataStore::defaultWebSQLDatabaseDirectory):
+        (API::WebsiteDataStore::defaultDataStoreConfiguration):
+        (API::applicationCacheDirectory): Deleted.
+
+2015-06-01  Jon Honeycutt  <jhoneycutt@apple.com>
+
+        [iOS] Uploading an animated GIF from the photo library uploads a JPEG
+
+        <https://bugs.webkit.org/show_bug.cgi?id=145539>
+        <rdar://problem/19760877
+
+        Selecting a photo from the photo library using UIImagePickerController
+        results in an NSDictionary with image info and a UIImage with the
+        image. It's not possible to get the original image data from the
+        UIImage, only a PNG or JPEG representation, so we were getting a JPEG
+        representation and uploading that to the server. For animated GIFs,
+        this meant a JPEG representation of the first frame.
+
+        To fix this, we'll get the asset URL, if available, and use the Photos
+        API to query for the original image data.
+
+        Reviewed by Andy Estes and Joe Pecoraro.
+
+        * UIProcess/ios/forms/WKFileUploadPanel.mm:
+        Soft link the Photos framework.
+
+        (-[WKFileUploadPanel _uploadItemForImageData:originalImage:imageName:successBlock:failureBlock:]):
+        Save the image's data to a temporary location, and create a
+        _WKImageFileUploadItem. Code moved from
+        -_uploadItemFromMediaInfo:successBlock:failureBlock:.
+
+        (-[WKFileUploadPanel _uploadItemForJPEGRepresentationOfImage:successBlock:failureBlock:]):
+        Get a JPEG representation of the UIImage, and create an upload item
+        from that data.
+
+        (uploadImageNameFromUTI):
+        Return a filename for the uploaded image based on the UTI.
+
+        (-[WKFileUploadPanel _uploadItemForImage:withAssetURL:successBlock:failureBlock:]):
+        Fetch the photo asset with the given asset URL. Create an image manager
+        object, and request the image data for the photo asset. Create an
+        upload item from that data. If we fail, fall back to a JPEG
+        representation.
+
+        (-[WKFileUploadPanel _uploadItemFromMediaInfo:successBlock:failureBlock:]):
+        Return early if the media item is not an image type. If it is, and we
+        have an asset URL, try to create an upload item for the native image.
+        If we don't have an asset URL, use a JPEG representation of the image.
+
 2015-06-04  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
 
         REGRESSION(r185091): Crash happens on indexdb tests

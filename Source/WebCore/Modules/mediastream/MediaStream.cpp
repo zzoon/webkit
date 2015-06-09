@@ -99,7 +99,7 @@ MediaStream::MediaStream(ScriptExecutionContext& context, RefPtr<MediaStreamPriv
 
 MediaStream::~MediaStream()
 {
-    m_private->setClient(0);
+    m_private->setClient(nullptr);
 }
 
 bool MediaStream::active() const

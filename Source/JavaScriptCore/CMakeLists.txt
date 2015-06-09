@@ -154,6 +154,7 @@ set(JavaScriptCore_SOURCES
     dfg/DFGCompilationKey.cpp
     dfg/DFGCompilationMode.cpp
     dfg/DFGConstantFoldingPhase.cpp
+    dfg/DFGConstantHoistingPhase.cpp
     dfg/DFGCriticalEdgeBreakingPhase.cpp
     dfg/DFGDCEPhase.cpp
     dfg/DFGDesiredIdentifiers.cpp
@@ -454,6 +455,7 @@ set(JavaScriptCore_RUNTIME_SOURCES
     runtime/ErrorHandlingScope.cpp
     runtime/ErrorInstance.cpp
     runtime/ErrorPrototype.cpp
+    runtime/Exception.cpp
     runtime/ExceptionFuzz.cpp
     runtime/ExceptionHelpers.cpp
     runtime/Executable.cpp
