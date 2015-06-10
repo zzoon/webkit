@@ -1,3 +1,79 @@
+2015-06-10  Hyungwook Lee  <hyungwook.lee@navercorp.com>
+
+        [EFL] Execute Javascript method in mini browser address bar.
+        https://bugs.webkit.org/show_bug.cgi?id=145725
+
+        Reviewed by Gyuyoung Kim.
+
+        Support 'javascript:' scheme in WebKit EFL Mini Browser.
+
+        * MiniBrowser/efl/main.c:
+        (url_from_user_input):
+        (url_load_from_user_input):
+        (on_url_bar_activated):
+        (elm_main):
+
+2015-06-09  Hyungwook Lee  <hyungwook.lee@navercorp.com>
+
+        Implement dumpProgressFinishedCallback() for Win layoutTestController.
+        https://bugs.webkit.org/show_bug.cgi?id=66773
+
+        Reviewed by Darin Adler.
+
+        * DumpRenderTree/win/FrameLoadDelegate.cpp:
+        * DumpRenderTree/win/FrameLoadDelegate.h:
+
+2015-06-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        run-benchmark should either checkout JetStream 1.0.1 or support running the latest version
+        https://bugs.webkit.org/show_bug.cgi?id=145764
+
+        Reviewed by Darin Adler.
+
+        Added the support for checkout a subversion directory in run-benchmark and used in the plans for
+        JetStream and SunSpider.
+
+        * Scripts/webkitpy/benchmark_runner/benchmark_builder/generic_benchmark_builder.py:
+        (GenericBenchmarkBuilder):
+        (GenericBenchmarkBuilder.prepare): Instead of taking each argument from benchmark plan, just accept
+        the whole JSON as the input.
+        (GenericBenchmarkBuilder._checkoutWithSubverion): Added.
+        (GenericBenchmarkBuilder._applyPatch): Check the existence of benchmark_patch in prepare() instead.
+        * Scripts/webkitpy/benchmark_runner/benchmark_runner.py:
+        (BenchmarkRunner.execute): Removed the check for having either 'local_copy' or 'remote_archive' in
+        a benchmark plan now that it's checkedi in GenericBenchmarkBuilder.prepare.
+        * Scripts/webkitpy/benchmark_runner/data/plans/jetstream.plan:
+        * Scripts/webkitpy/benchmark_runner/data/plans/sunspider.plan:
+
+2015-06-09  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        Remove ewstool scripts used by chromium port
+        https://bugs.webkit.org/show_bug.cgi?id=145789
+
+        Reviewed by Csaba Osztrogonác.
+
+        * EWSTools/GoogleComputeEngine/build-chromium-ews.sh: Removed.
+        * EWSTools/GoogleComputeEngine/build-commit-queue.sh: Removed.
+        * EWSTools/GoogleComputeEngine/build-cr-linux-debug-ews.sh: Removed.
+        * EWSTools/GoogleComputeEngine/build-feeder-style-sheriffbot.sh: Removed.
+        * EWSTools/GoogleComputeEngine/findzone.sh: Removed.
+
+2015-06-09  Michał Pakuła vel Rutka  <m.pakula@samsung.com>
+
+        Unreviewed, updated my list of email addresses.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2015-06-09  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [cmake] Fix the style issues in cmake project files
+        https://bugs.webkit.org/show_bug.cgi?id=145755
+
+        Reviewed by Darin Adler.
+
+        * TestWebKitAPI/CMakeLists.txt:
+        * TestWebKitAPI/PlatformEfl.cmake:
+
 2015-06-08  Ryosuke Niwa  <rniwa@webkit.org>
 
         Fix a typo in r185345.

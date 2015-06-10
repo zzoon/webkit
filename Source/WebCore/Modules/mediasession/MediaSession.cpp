@@ -29,6 +29,7 @@
 #if ENABLE(MEDIA_SESSION)
 
 #include "HTMLMediaElement.h"
+#include "MediaSessionManager.h"
 
 namespace WebCore {
 
@@ -37,10 +38,13 @@ MediaSession::MediaSession(ScriptExecutionContext& context, const String& kind)
 {
     if (m_kind == "content")
         m_controls = adoptRef(*new MediaRemoteControls(context));
+
+    MediaSessionManager::singleton().addMediaSession(*this);
 }
 
 MediaSession::~MediaSession()
 {
+    MediaSessionManager::singleton().removeMediaSession(*this);
 }
 
 MediaRemoteControls* MediaSession::controls(bool& isNull)
@@ -76,6 +80,16 @@ Vector<HTMLMediaElement*> MediaSession::activeParticipatingElements() const
 
 void MediaSession::releaseSession()
 {
+}
+
+void MediaSession::togglePlayback()
+{
+    for (auto* element : activeParticipatingElements()) {
+        if (element->paused())
+            element->play();
+        else
+            element->pause();
+    }
 }
 
 }

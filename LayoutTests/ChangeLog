@@ -1,3 +1,182 @@
+2015-06-10  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Unreviewed, EFL gardening on Jun 10th
+
+        * platform/efl/TestExpectations: Mark fast tests to flaky since r183540.
+
+2015-06-10  Xabier Rodriguez Calvar  <calvaris@igalia.com> and Youenn Fablet <youenn.fablet@crf.canon.fr>
+
+        [Streams API] Implement pulling of a source by a ReadableStream
+        https://bugs.webkit.org/show_bug.cgi?id=145262
+
+        Reviewed by Darin Adler
+
+        Rebased expectations, removed some "timeout: 50" parameters.
+        Removed a test from streams/reference-implementation/readable-stream.html that cannot pass
+        until promises returned to start and pull JS callbacks are handled.
+        Fixed bug in streams-utils.js (was using the old API replaced by controller).
+
+        * streams/reference-implementation/bad-underlying-sources-expected.txt:
+        * streams/reference-implementation/bad-underlying-sources.html:
+        * streams/reference-implementation/readable-stream-expected.txt:
+        * streams/reference-implementation/readable-stream.html:
+        * streams/reference-implementation/resources/streams-utils.js:
+        (.stream.new.ReadableStream.):
+        (.stream.new.ReadableStream):
+        (sequentialReadableStream):
+
+2015-06-09  Daegyu Lee  <daegyu.lee@navercorp.com>
+
+        3D-transformed video does not display on platforms without accelerated video rendering
+        https://bugs.webkit.org/show_bug.cgi?id=144782
+
+        Reviewed by Simon Fraser.
+
+        Add layout test that is simply checking video transform by javascript works properly.
+
+        * media/video-transformed-by-javascript-expected.txt: Added.
+        * media/video-transformed-by-javascript.html: Added.
+        * platform/gtk/TestExpectations:
+        * platform/ios-simulator-wk1/TestExpectations:
+        * platform/ios-simulator-wk2/TestExpectations:
+        * platform/ios-simulator/TestExpectations:
+        * platform/mac-wk1/TestExpectations:
+        * platform/mac-wk2/TestExpectations:
+        * platform/mac/TestExpectations:
+
+2015-06-09  Daniel Bates  <dabates@apple.com>
+
+        Update iOS TestExpectations files
+
+        * platform/ios-simulator-wk1/TestExpectations:
+        * platform/ios-simulator-wk2/TestExpectations:
+
+2015-06-09  Hyungwook Lee  <hyungwook.lee@navercorp.com>
+
+        Implement dumpProgressFinishedCallback() for Win layoutTestController.
+        https://bugs.webkit.org/show_bug.cgi?id=66773
+
+        Reviewed by Darin Adler.
+
+        * platform/win/TestExpectations:
+
+2015-06-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION(r180867): Tabbing to login field on iCloud.com doesn't have highlight for text
+        https://bugs.webkit.org/show_bug.cgi?id=145830
+
+        Reviewed by Darin Adler.
+
+        Added a regression test.
+
+        * editing/selection/update-selection-by-style-change-expected.html: Added.
+        * editing/selection/update-selection-by-style-change.html: Added.
+
+2015-06-09  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        SVG Fragment is not rendered if it is the css background image of an HTML element
+        https://bugs.webkit.org/show_bug.cgi?id=91790
+
+        Reviewed by Darin Adler.
+
+        * svg/css/svg-resource-fragment-identifier-background-expected.html: Added.
+        * svg/css/svg-resource-fragment-identifier-background.html: Added.
+        Ensure that the SVG fragment is displayed correctly when it's used as a
+        css background image.
+
+2015-06-09  Darin Adler  <darin@apple.com>
+
+        Takes two delete key presses to delete pasted emoji up-pointing index finger with skin tone
+        https://bugs.webkit.org/show_bug.cgi?id=145823
+
+        Reviewed by Anders Carlsson.
+
+        * editing/deleting/delete-emoji-expected.txt: Updated to expect a little more testing.
+        * editing/deleting/delete-emoji.html: Added a test case and streamlined the test a bit.
+
+2015-06-09  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        feComposite filter does not clip the paint rect to its effect rect when the operator is 'in' or 'atop'
+        https://bugs.webkit.org/show_bug.cgi?id=137856
+
+        Reviewed by Darin Adler.
+
+        * svg/filters/feComposite-background-rect-control-operators-expected.svg: Added.
+        * svg/filters/feComposite-background-rect-control-operators.svg: Added.
+        Ensure the painting rect of the feComposite filter with operator 'in' or
+        'atop' is clipped to its bounding rectangle
+
+2015-06-09  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Introduce getter definition into static hash tables and use it for getters in RegExp.prototype.
+        https://bugs.webkit.org/show_bug.cgi?id=145705
+
+        Reviewed by Darin Adler.
+
+        Adjust RegExp.prototype and instance's getter layout.
+        This is a breaking change from ES5.
+        So ES5 conformance tests like sputnik is needed to be fixed.
+
+        * ietestcenter/Javascript/15.2.3.3-4-212-expected.txt:
+        * ietestcenter/Javascript/15.2.3.3-4-213-expected.txt:
+        * ietestcenter/Javascript/15.2.3.3-4-214-expected.txt:
+        * ietestcenter/Javascript/15.2.3.3-4-215-expected.txt:
+        * ietestcenter/Javascript/TestCases/15.2.3.3-4-212.js:
+        (ES5Harness.registerTest):
+        * ietestcenter/Javascript/TestCases/15.2.3.3-4-213.js:
+        (ES5Harness.registerTest):
+        * ietestcenter/Javascript/TestCases/15.2.3.3-4-214.js:
+        (ES5Harness.registerTest):
+        * ietestcenter/Javascript/TestCases/15.2.3.3-4-215.js:
+        (ES5Harness.registerTest):
+        * js/Object-getOwnPropertyNames-expected.txt:
+        * js/dom/getOwnPropertyDescriptor-expected.txt:
+        * js/mozilla/strict/15.10.7-expected.txt:
+        * js/mozilla/strict/script-tests/15.10.7.js:
+        * js/pic/cached-named-property-getter.html:
+        * js/resources/getOwnPropertyDescriptor.js:
+        (.get descriptorShouldBe):
+        * js/script-tests/Object-getOwnPropertyNames.js:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.1_source/S15.10.7.1_A10.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.1_source/S15.10.7.1_A8.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.1_source/S15.10.7.1_A9.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.2_global/S15.10.7.2_A10.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.2_global/S15.10.7.2_A8.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.2_global/S15.10.7.2_A9.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.3_ignoreCase/S15.10.7.3_A10.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.3_ignoreCase/S15.10.7.3_A8.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.3_ignoreCase/S15.10.7.3_A9.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.4_multiline/S15.10.7.4_A10.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.4_multiline/S15.10.7.4_A8.html:
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.7/15.10.7.4_multiline/S15.10.7.4_A9.html:
+
+2015-06-09  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Crash when passing Symbol to NPAPI plugin objects
+        https://bugs.webkit.org/show_bug.cgi?id=145798
+
+        Reviewed by Darin Adler.
+
+        * plugins/npruntime/script-object-with-symbols-expected.txt: Added.
+        * plugins/npruntime/script-object-with-symbols.html: Added.
+
+2015-06-09  Daniel Bates  <dabates@apple.com>
+
+        Update iOS TestExpectations files 
+
+        * platform/ios-simulator-wk1/TestExpectations:
+        * platform/ios-simulator-wk2/TestExpectations:
+
+2015-06-09  Xabier Rodriguez Calvar  <calvaris@igalia.com> and Youenn Fablet <youenn.fablet@crf.canon.fr>
+
+        [Streams API] ReadableJSStream should handle JS source getters that throw
+        https://bugs.webkit.org/show_bug.cgi?id=145600
+
+        Reviewed by Darin Adler.
+
+        * streams/reference-implementation/bad-underlying-sources-expected.txt:
+        * streams/reference-implementation/readable-stream-expected.txt:
+
 2015-06-08  Daniel Bates  <dabates@apple.com>
 
         Update iOS TestExpectations files

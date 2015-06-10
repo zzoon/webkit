@@ -1,3 +1,275 @@
+2015-06-10  Andreas Kling  <akling@apple.com>
+
+        [JSC] InlineCallFrame::arguments should be sized-to-fit.
+        <https://webkit.org/b/145782>
+
+        Reviewed by Darin Adler.
+
+        I spotted this Vector<ValueRecovery> looking a bit chubby in Instruments,
+        with 354 kB of memory allocated on cnet.com.
+
+        Use resizeToFit() instead of resize() since we know the final size up front.
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::InlineStackEntry::InlineStackEntry):
+
+2015-06-09  Chris Dumez  <cdumez@apple.com>
+
+        Allow one sync GC per gcTimer interval on critical memory pressure warning
+        https://bugs.webkit.org/show_bug.cgi?id=145773
+
+        Reviewed by Geoffrey Garen.
+
+        On critical memory pressure warning, we were calling GCController::garbageCollectSoon(),
+        which does not offer any guarantee on when the garbage collection will actually take
+        place.
+
+        On critical memory pressure, we need to free up memory as soon as possible to avoid
+        getting killed so this is an issue. Also, the fact that we clear the PageCache on
+        critical memory pressure means a GC would likely be useful, even if the last
+        collection did not free much memory.
+
+        This patch adds a new GCController::garbageCollectNowIfNotDoneRecently() API that allows
+        one synchronous GC per gcTimer interval on critical memory pressure warning. This makes
+        us more responsive to critical memory pressure and avoids doing synchronous GCs too
+        often.
+
+        * heap/FullGCActivityCallback.cpp:
+        (JSC::FullGCActivityCallback::doCollection):
+        * heap/FullGCActivityCallback.h:
+        (JSC::GCActivityCallback::createFullTimer):
+        * heap/GCActivityCallback.h:
+        * heap/Heap.cpp:
+        (JSC::Heap::collectAllGarbageIfNotDoneRecently):
+        * heap/Heap.h:
+
+        * heap/IncrementalSweeper.cpp:
+        (JSC::IncrementalSweeper::doWork): Deleted.
+        * heap/IncrementalSweeper.h:
+
+        Drop fullSweep() API as it no longer seems useful. garbageCollectNow()
+        already does a sweep after the full collection.
+
+2015-06-09  Andreas Kling  <akling@apple.com>
+
+        [JSC] CodeBlock::m_constantRegisters should be sized-to-fit.
+        <https://webkit.org/b/145784>
+
+        Reviewed by Darin Adler.
+
+        Spotted this Vector looking chubby on cnet.com, with 1.23 MB of memory
+        allocated below CodeBlock::setConstantRegisters().
+
+        Use resizeToFit() instead since we know the final size up front.
+        Also removed some unused functions that operated on this constants vector
+        and the corresponding one in UnlinkedCodeBlock.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::addOrFindConstant): Deleted.
+        (JSC::CodeBlock::findConstant): Deleted.
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::setConstantRegisters):
+        (JSC::CodeBlock::numberOfConstantRegisters): Deleted.
+        * bytecode/UnlinkedCodeBlock.cpp:
+        (JSC::UnlinkedCodeBlock::addOrFindConstant): Deleted.
+        * bytecode/UnlinkedCodeBlock.h:
+        (JSC::UnlinkedCodeBlock::numberOfConstantRegisters): Deleted.
+        (JSC::UnlinkedCodeBlock::getConstant): Deleted.
+
+2015-06-09  Andreas Kling  <akling@apple.com>
+
+        [JSC] Polymorphic{Get,Put}ByIdList::addAccess() should optimize for size, not speed.
+        <https://webkit.org/b/145786>
+
+        Reviewed by Darin Adler.
+
+        These functions already contained comments saying they optimize for size over speed,
+        but they were using Vector::resize() which adds the usual slack for faster append().
+
+        Switch them over to using Vector::resizeToFit() instead, which makes the Vector
+        allocate a perfectly sized backing store.
+
+        Spotted 670 kB of the GetById ones, and 165 kB of PutById on cnet.com, so these
+        Vectors are definitely worth shrink-wrapping.
+
+        * bytecode/PolymorphicGetByIdList.cpp:
+        (JSC::PolymorphicGetByIdList::addAccess):
+        * bytecode/PolymorphicPutByIdList.cpp:
+        (JSC::PolymorphicPutByIdList::addAccess):
+
+2015-06-09  Andreas Kling  <akling@apple.com>
+
+        [JSC] JSPropertyNameEnumerator's property name vector should be sized-to-fit.
+        <https://webkit.org/b/145787>
+
+        Reviewed by Darin Adler.
+
+        Saw 108 kB worth of JSPropertyNameEnumerator backing store Vectors on cnet.com.
+        Use Vector::resizeToFit() since we know the perfect size up front.
+
+        * runtime/JSPropertyNameEnumerator.cpp:
+        (JSC::JSPropertyNameEnumerator::finishCreation):
+
+2015-06-09  Andreas Kling  <akling@apple.com>
+
+        FunctionExecutable::isCompiling() is weird and wrong.
+        <https://webkit.org/b/145689>
+
+        Reviewed by Geoffrey Garen.
+
+        Remove FunctionExecutable::isCompiling() and the clearCodeIfNotCompiling() style
+        functions that called it before throwing away code.
+
+        isCompiling() would consider the executable to be "compiling" if it had a CodeBlock
+        but no JITCode. In practice, every executable gets a JITCode at the same time as it
+        gets a CodeBlock, by way of prepareForExecutionImpl().
+
+        * debugger/Debugger.cpp:
+        * heap/Heap.cpp:
+        (JSC::Heap::deleteAllCompiledCode):
+        (JSC::Heap::deleteAllUnlinkedFunctionCode):
+        * inspector/agents/InspectorRuntimeAgent.cpp:
+        (Inspector::TypeRecompiler::visit):
+        * runtime/Executable.cpp:
+        (JSC::FunctionExecutable::clearUnlinkedCodeForRecompilation):
+        (JSC::FunctionExecutable::clearCodeIfNotCompiling): Deleted.
+        (JSC::FunctionExecutable::clearUnlinkedCodeForRecompilationIfNotCompiling): Deleted.
+        * runtime/Executable.h:
+        * runtime/VM.cpp:
+        (JSC::StackPreservingRecompiler::visit):
+
+2015-06-09  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Introduce getter definition into static hash tables and use it for getters in RegExp.prototype.
+        https://bugs.webkit.org/show_bug.cgi?id=145705
+
+        Reviewed by Darin Adler.
+
+        In this patch, we introduce Accessor type into property tables.
+        With Accessor type, create_hash_table creates a static getter property.
+        This getter property is reified as the same to the static functions.
+
+        In the mean time, we only support getter because `putEntry` and `lookupPut`
+        only work with null setter currently. However, in the spec, there's
+        no need to add static setter properties. So we will add it if it becomes
+        necessary in the future.
+
+        And at the same time, this patch fixes the issue 145738. Before this patch,
+        `putEntry` in `JSObject::deleteProperty` adds `undefined` property if
+        `isValidOffset(...)` is false (deleted). As the result, deleting twice
+        revives the property with `undefined` value.
+
+        If the static functions are reified and the entry is
+        `BuiltinOrFunctionOrAccessor`, there's no need to execute `putEntry` with
+        static hash table entry. They should be handled in the normal structure's
+        looking up because they should be already reified. So added guard for this.
+
+        * CMakeLists.txt:
+        * DerivedSources.make:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * create_hash_table:
+        * runtime/JSObject.cpp:
+        (JSC::getClassPropertyNames):
+        (JSC::JSObject::put):
+        (JSC::JSObject::deleteProperty):
+        (JSC::JSObject::reifyStaticFunctionsForDelete):
+        * runtime/Lookup.cpp:
+        (JSC::reifyStaticAccessor):
+        (JSC::setUpStaticFunctionSlot):
+        * runtime/Lookup.h:
+        (JSC::HashTableValue::propertyGetter):
+        (JSC::HashTableValue::propertyPutter):
+        (JSC::HashTableValue::accessorGetter):
+        (JSC::HashTableValue::accessorSetter):
+        (JSC::getStaticPropertySlot):
+        (JSC::getStaticValueSlot):
+        (JSC::putEntry):
+        (JSC::reifyStaticProperties):
+        * runtime/PropertySlot.h:
+        * runtime/RegExpObject.cpp:
+        (JSC::RegExpObject::getOwnPropertySlot):
+        (JSC::regExpObjectGlobal): Deleted.
+        (JSC::regExpObjectIgnoreCase): Deleted.
+        (JSC::regExpObjectMultiline): Deleted.
+        (JSC::appendLineTerminatorEscape<LChar>): Deleted.
+        (JSC::appendLineTerminatorEscape<UChar>): Deleted.
+        (JSC::regExpObjectSourceInternal): Deleted.
+        (JSC::regExpObjectSource): Deleted.
+        * runtime/RegExpPrototype.cpp:
+        (JSC::RegExpPrototype::getOwnPropertySlot):
+        (JSC::regExpProtoGetterGlobal):
+        (JSC::regExpProtoGetterIgnoreCase):
+        (JSC::regExpProtoGetterMultiline):
+        (JSC::appendLineTerminatorEscape<LChar>):
+        (JSC::appendLineTerminatorEscape<UChar>):
+        (JSC::regExpProtoGetterSourceInternal):
+        (JSC::regExpProtoGetterSource):
+        * tests/stress/static-function-delete.js: Added.
+        (shouldBe):
+        * tests/stress/static-function-put.js: Added.
+        (shouldBe):
+        * tests/stress/static-getter-delete.js: Added.
+        (shouldBe):
+        (shouldThrow):
+        * tests/stress/static-getter-descriptors.js: Added.
+        (shouldBe):
+        * tests/stress/static-getter-enumeration.js: Added.
+        (shouldBe):
+        * tests/stress/static-getter-get.js: Added.
+        (shouldBe):
+        * tests/stress/static-getter-in-names.js: Added.
+        (shouldBe):
+        * tests/stress/static-getter-names.js: Added.
+        (shouldBe):
+        * tests/stress/static-getter-put.js: Added.
+        (shouldBe):
+        (shouldThrow):
+
+2015-06-09  Andreas Kling  <akling@apple.com>
+
+        [JSC] JSString::getIndex() should avoid reifying substrings.
+        <https://webkit.org/b/145803>
+
+        Reviewed by Darin Adler.
+
+        Implement getIndex() using JSString::view(), which cuts it down to a one-liner
+        and also avoids reifying substrings.
+
+        I saw 178 kB of reified substrings below operationGetByVal -> getIndex()
+        on cnet.com, so this should help.
+
+        * runtime/JSString.cpp:
+        (JSC::JSRopeString::getIndexSlowCase): Deleted.
+        * runtime/JSString.h:
+        (JSC::JSString::getIndex):
+
+2015-06-09  Andreas Kling  <akling@apple.com>
+
+        [JSC] String.prototype.indexOf() should use StringView.
+        <https://webkit.org/b/145351>
+
+        Reviewed by Darin Adler.
+
+        Use StringView::find() to implement String.prototype.indexOf().
+        This avoids reifying the needle and haystack JSStrings in case they
+        are substrings.
+
+        Reduces malloc memory by ~190 kB on cnet.com.
+
+        * runtime/StringPrototype.cpp:
+        (JSC::stringProtoFuncIndexOf):
+
+2015-06-09  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [cmake] Fix the style issues in cmake project files
+        https://bugs.webkit.org/show_bug.cgi?id=145755
+
+        Reviewed by Darin Adler.
+
+        * CMakeLists.txt:
+
 2015-06-08  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
 
         Purge PassRefPtr in JavaScriptCore

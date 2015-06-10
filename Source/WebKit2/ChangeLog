@@ -1,3 +1,228 @@
+2015-06-10  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Web Inspector is broken
+        https://bugs.webkit.org/show_bug.cgi?id=145836
+
+        Reviewed by Carlos Garcia Campos.
+
+        * PlatformGTK.cmake: Thread the InspectorBackendCommands.js file as a separate
+        dependency of InspectorGResourceBundle.xml. It can't be listed under the InspectorFiles
+        variable and then searched via the CMake glob command because it probably won't exist
+        at the time the command is run (since it's copied into the specified path), so it won't
+        be listed among the dependencies at all.
+
+2015-06-09  Anders Carlsson  <andersca@apple.com>
+
+        Fix build.
+
+        * UIProcess/Plugins/WebPluginSiteDataManager.cpp:
+        (WebKit::WebPluginSiteDataManager::GetSitesWithDataState::getSitesWithDataForNextPlugin):
+
+2015-06-09  Anders Carlsson  <andersca@apple.com>
+
+        Change the PluginProcessManager data fetching function to take a completion handler
+        https://bugs.webkit.org/show_bug.cgi?id=145821
+
+        Reviewed by Sam Weinig.
+
+        * UIProcess/Plugins/PluginProcessManager.cpp:
+        (WebKit::PluginProcessManager::fetchWebsiteData):
+        (WebKit::PluginProcessManager::getSitesWithData): Deleted.
+        * UIProcess/Plugins/PluginProcessManager.h:
+        * UIProcess/Plugins/PluginProcessProxy.cpp:
+        (WebKit::generateCallbackID):
+        (WebKit::PluginProcessProxy::~PluginProcessProxy):
+        (WebKit::PluginProcessProxy::fetchWebsiteData):
+        (WebKit::PluginProcessProxy::pluginProcessCrashedOrFailedToLaunch):
+        (WebKit::PluginProcessProxy::didFinishLaunching):
+        (WebKit::PluginProcessProxy::didGetSitesWithData):
+        (WebKit::PluginProcessProxy::getSitesWithData): Deleted.
+        * UIProcess/Plugins/PluginProcessProxy.h:
+        * UIProcess/Plugins/WebPluginSiteDataManager.cpp:
+        (WebKit::WebPluginSiteDataManager::GetSitesWithDataState::getSitesWithDataForNextPlugin):
+
+2015-06-09  Anders Carlsson  <andersca@apple.com>
+
+        Add code to keep track of plug-in data host names in website data records
+        https://bugs.webkit.org/show_bug.cgi?id=145818
+
+        Reviewed by Andreas Kling.
+
+        * Shared/WebsiteData/WebsiteData.cpp:
+        (WebKit::WebsiteData::encode):
+        (WebKit::WebsiteData::decode):
+        * Shared/WebsiteData/WebsiteData.h:
+        * UIProcess/WebsiteData/WebsiteDataRecord.cpp:
+        (WebKit::WebsiteDataRecord::displayNameForPluginDataHostName):
+        (WebKit::WebsiteDataRecord::addPluginDataHostName):
+        (WebKit::WebsiteDataRecord::displayNameForCookieHostName): Deleted.
+        * UIProcess/WebsiteData/WebsiteDataRecord.h:
+        * UIProcess/WebsiteData/WebsiteDataStore.cpp:
+        (WebKit::WebsiteDataStore::fetchData):
+
+2015-06-09  Anders Carlsson  <andersca@apple.com>
+
+        Add Plug-in type declarations to WKWebsiteDataRecord and friends
+        https://bugs.webkit.org/show_bug.cgi?id=145816
+
+        Reviewed by Andreas Kling.
+
+        * Shared/WebsiteData/WebsiteDataTypes.h:
+        * UIProcess/API/Cocoa/WKWebsiteDataRecord.mm:
+        (dataTypesToString):
+        * UIProcess/API/Cocoa/WKWebsiteDataRecordInternal.h:
+        (WebKit::toWebsiteDataTypes):
+        (WebKit::toWKWebsiteDataTypes):
+        * UIProcess/API/Cocoa/WKWebsiteDataRecordPrivate.h:
+
+2015-06-09  Antti Koivisto  <antti@apple.com>
+
+        REGRESSION(r185262): NetworkCache is in wrong location on OS X
+        https://bugs.webkit.org/show_bug.cgi?id=145812
+
+        Reviewed by Anders Carlsson.
+
+        * UIProcess/Cocoa/WebProcessPoolCocoa.mm:
+        (WebKit::WebProcessPool::legacyPlatformDefaultWebSQLDatabaseDirectory):
+        (WebKit::WebProcessPool::legacyPlatformDefaultLocalStorageDirectory):
+        (WebKit::WebProcessPool::legacyPlatformDefaultMediaKeysStorageDirectory):
+        (WebKit::WebProcessPool::isNetworkCacheEnabled):
+
+            Make sure static functions that use NSUserDefaults call registerUserDefaultsIfNeeded() first.
+
+2015-06-09  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Crash when passing Symbol to NPAPI plugin objects
+        https://bugs.webkit.org/show_bug.cgi?id=145798
+
+        Reviewed by Darin Adler.
+
+        When the symbol is passed, `propertyName.publicName()` becomes nullptr.
+        So dereferencing it causes null dereference errors.
+        At first, this bug appears in the https://bugs.webkit.org/show_bug.cgi?id=145556,
+        plugin[@@toStringTag] ("string" + plugin) causes SEGV in plugins/embed-inside-object.html test.
+
+        This patch avoids it by early returning when the symbols are passed.
+        Methods for symbols are not implemented in the NPObject side, so it works correctly.
+
+        * WebProcess/Plugins/Netscape/JSNPObject.cpp:
+        (WebKit::npIdentifierFromIdentifier):
+        (WebKit::JSNPObject::callMethod):
+        (WebKit::JSNPObject::getOwnPropertySlot):
+        (WebKit::JSNPObject::put):
+        (WebKit::JSNPObject::deleteProperty):
+        (WebKit::JSNPObject::propertyGetter):
+        (WebKit::JSNPObject::methodGetter):
+
+2015-06-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Network Cache: Give more priority to reads over writes in IO WorkQueue
+        https://bugs.webkit.org/show_bug.cgi?id=145791
+
+        Reviewed by Sergio Villar Senin.
+
+        Keep using G_PRIORITY_DEFAULT for reads, but use
+        G_PRIORITY_DEFAULT_IDLE for writes now.
+
+        * NetworkProcess/cache/NetworkCacheIOChannelSoup.cpp:
+        (WebKit::NetworkCache::outputStreamWriteReadyCallback): Use
+        G_PRIORITY_DEFAULT_IDLE for write async operations.
+        (WebKit::NetworkCache::IOChannel::write): Pass
+        G_PRIORITY_DEFAULT_IDLE to runTaskInQueue().
+
+2015-06-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [SOUP] Network Cache: run the IO completion handler in the given queue instead of the whole operation
+        https://bugs.webkit.org/show_bug.cgi?id=145797
+
+        Reviewed by Žan Doberšek.
+
+        I misunderstood what the WorkQueue parameter meant in the IO
+        channel operations. It's the queue where the completion handler
+        should be run, not the whole operation. Since our operations are
+        already non-blocking, we can just run the read/writes in the main
+        thread, and schedule the completion handler in the given work
+        queue when the operation finishes.
+
+        * NetworkProcess/cache/NetworkCacheIOChannel.h:
+        * NetworkProcess/cache/NetworkCacheIOChannelSoup.cpp:
+        (WebKit::NetworkCache::inputStreamReadReadyCallback):
+        (WebKit::NetworkCache::IOChannel::read):
+        (WebKit::NetworkCache::IOChannel::readSync):
+        (WebKit::NetworkCache::outputStreamWriteReadyCallback):
+        (WebKit::NetworkCache::IOChannel::write):
+
+2015-06-09  David Kilzer  <ddkilzer@apple.com>
+
+        REGRESSION (r185357): Fix build for iOS 8.x
+
+        * UIProcess/ios/forms/WKFileUploadPanel.mm:
+        (fallbackIconForFile): Add cast prior to iOS 9.
+
+2015-06-09  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Fix a crash on MiniBrowser when running on debug mode
+        https://bugs.webkit.org/show_bug.cgi?id=145793
+
+        Reviewed by Carlos Garcia Campos.
+
+        r185314 missed to initialize parameters.diskCacheDirectory with configuration's one.
+
+        * UIProcess/efl/WebProcessPoolEfl.cpp:
+        (WebKit::WebProcessPool::platformInitializeWebProcess):
+
+2015-06-09  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [cmake] Fix the style issues in cmake project files
+        https://bugs.webkit.org/show_bug.cgi?id=145755
+
+        Reviewed by Darin Adler.
+
+        * CMakeLists.txt:
+        * PlatformGTK.cmake:
+        * PlatformMac.cmake:
+
+2015-06-02  Jon Honeycutt  <jhoneycutt@apple.com>
+
+        [iOS] UI process memory spike, hang when uploading a very large JPEG
+
+        <https://bugs.webkit.org/show_bug.cgi?id=145567>
+        <rdar://problem/21206699>
+
+        When uploading an image, we generate a thumbnail to use for an icon
+        that sits next to the control. To do this, we load the image and draw
+        it into a thumbnail-sized canvas. This can be very expensive for large
+        images.
+
+        To fix this, we'll use CGImageSource API, which will allow us to get
+        any existing thumbnail that exists in the source file.
+
+        Reviewed by Darin Adler.
+
+        * UIProcess/ios/forms/WKFileUploadPanel.mm:
+        (squareCropRectForSize):
+        Use std::round, based on Darin's review feedback that a) rintf is
+        incorrect in 64-bit systems where CGFloat is a double, b) rintf uses a
+        variable rounding mode, which is undesirable.
+        (squareImage):
+        Changed to take a CGImageRef.
+        Use RetainPtr and +[UIImage imageWithCGImage:] to match other code in
+        this file.
+        (thumbnailSizedImageForImage):
+        Changed to take a CGImageRef and to use iconSideLength.
+        (iconForImageFile):
+        Create an image source for the file, then use CGImageSource API to
+        generate a thumbnail.
+        (-[_WKImageFileUploadItem initWithFileURL:originalImage:]): Deleted.
+        (-[_WKImageFileUploadItem displayImage]):
+        Use iconForImageFile() rather than trying to generate an icon from the
+        UIImage.
+        (-[WKFileUploadPanel _uploadItemForImageData:imageName:successBlock:failureBlock:]):
+        Removed originalImage parameter; _WKImageFileUploadItem no longer uses
+        it.
+        (-[WKFileUploadPanel _uploadItemForJPEGRepresentationOfImage:successBlock:failureBlock:]):
+        (-[WKFileUploadPanel _uploadItemForImage:withAssetURL:successBlock:failureBlock:]):
+
 2015-06-08  Dan Bernstein  <mitz@apple.com>
 
         [Cocoa] Use generics in framework headers
