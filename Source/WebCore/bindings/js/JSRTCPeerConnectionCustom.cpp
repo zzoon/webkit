@@ -77,10 +77,9 @@ EncodedJSValue JSC_HOST_CALL constructJSRTCPeerConnection(ExecState* exec)
     return JSValue::encode(CREATE_DOM_WRAPPER(jsConstructor->globalObject(), RTCPeerConnection, peerConnection.get()));
 }
 
-static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(const Dictionary&, RTCPeerConnection::OfferAnswerResolveCallback, RTCPeerConnection::RejectCallback, ExceptionCode&), JSDOMGlobalObject* globalObject, ExecState* exec)
+static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(const Dictionary&, RTCPeerConnection::OfferAnswerResolveCallback, RTCPeerConnection::RejectCallback), JSDOMGlobalObject* globalObject, ExecState* exec)
 {
     Dictionary options;
-    ExceptionCode ec = 0;
 
     if (exec->argumentCount() > 1 && exec->argument(0).isFunction() && exec->argument(1).isFunction()) {
         // legacy callbacks mode
@@ -109,8 +108,8 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnect
             });
         };
 
-        (impl.*implFunction)(options, WTF::move(resolveCallback), WTF::move(rejectCallback), ec);
-        setDOMException(exec, ec);
+        (impl.*implFunction)(options, WTF::move(resolveCallback), WTF::move(rejectCallback));
+
         return jsUndefined();
     }
 
@@ -123,7 +122,9 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnect
         }
     }
 
-    DeferredWrapper wrapper(exec, globalObject);
+    JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(exec, globalObject);
+    DeferredWrapper wrapper(exec, globalObject, promiseDeferred);
+
     auto resolveCallback = [wrapper](RTCSessionDescription &description) mutable {
         wrapper.resolve(&description);
     };
@@ -131,13 +132,9 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnect
         wrapper.reject(&error);
     };
 
-    (impl.*implFunction)(options, WTF::move(resolveCallback), WTF::move(rejectCallback), ec);
-    if (ec) {
-        setDOMException(exec, ec);
-        return jsUndefined();
-    }
+    (impl.*implFunction)(options, WTF::move(resolveCallback), WTF::move(rejectCallback));
 
-    return wrapper.promise();
+    return promiseDeferred->promise();
 }
 
 JSValue JSRTCPeerConnection::createOffer(ExecState* exec)
@@ -150,10 +147,8 @@ JSValue JSRTCPeerConnection::createAnswer(ExecState* exec)
     return createOfferOrAnswer(impl(), &RTCPeerConnection::createAnswer, globalObject(), exec);
 }
 
-static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(RTCSessionDescription*, RTCPeerConnection::VoidResolveCallback, RTCPeerConnection::RejectCallback, ExceptionCode&), JSDOMGlobalObject* globalObject, ExecState* exec)
+static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(RTCSessionDescription*, RTCPeerConnection::VoidResolveCallback, RTCPeerConnection::RejectCallback), JSDOMGlobalObject* globalObject, ExecState* exec)
 {
-    ExceptionCode ec = 0;
-
     RefPtr<RTCSessionDescription> description = JSRTCSessionDescription::toWrapped(exec->argument(0));
     if (!description) {
         throwVMError(exec, createTypeError(exec, "First argument must be a RTCSessionDescription"));
@@ -178,13 +173,15 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPee
             });
         };
 
-        (impl.*implFunction)(description.get() , WTF::move(resolveCallback), WTF::move(rejectCallback), ec);
-        setDOMException(exec, ec);
+        (impl.*implFunction)(description.get() , WTF::move(resolveCallback), WTF::move(rejectCallback));
+
         return jsUndefined();
     }
 
     // Promised-based mode
-    DeferredWrapper wrapper(exec, globalObject);
+    JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(exec, globalObject);
+    DeferredWrapper wrapper(exec, globalObject, promiseDeferred);
+
     auto resolveCallback = [wrapper]() mutable {
         wrapper.resolve(false);
     };
@@ -192,13 +189,9 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPee
         wrapper.reject(&error);
     };
 
-    (impl.*implFunction)(description.get(), WTF::move(resolveCallback), WTF::move(rejectCallback), ec);
-    if (ec) {
-        setDOMException(exec, ec);
-        return jsUndefined();
-    }
+    (impl.*implFunction)(description.get(), WTF::move(resolveCallback), WTF::move(rejectCallback));
 
-    return wrapper.promise();
+    return promiseDeferred->promise();
 }
 
 JSValue JSRTCPeerConnection::setLocalDescription(ExecState* exec)
@@ -213,8 +206,6 @@ JSValue JSRTCPeerConnection::setRemoteDescription(ExecState* exec)
 
 JSValue JSRTCPeerConnection::addIceCandidate(ExecState* exec)
 {
-    ExceptionCode ec = 0;
-
     RefPtr<RTCIceCandidate> candidate = JSRTCIceCandidate::toWrapped(exec->argument(0));
     if (!candidate) {
         throwVMError(exec, createTypeError(exec, "First argument must be a RTCIceCandidate"));
@@ -239,13 +230,15 @@ JSValue JSRTCPeerConnection::addIceCandidate(ExecState* exec)
             });
         };
 
-        impl().addIceCandidate(candidate.get() , WTF::move(resolveCallback), WTF::move(rejectCallback), ec);
-        setDOMException(exec, ec);
+        impl().addIceCandidate(candidate.get() , WTF::move(resolveCallback), WTF::move(rejectCallback));
+
         return jsUndefined();
     }
 
     // Promised-based mode
-    DeferredWrapper wrapper(exec, globalObject());
+    JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(exec, globalObject());
+    DeferredWrapper wrapper(exec, globalObject(), promiseDeferred);
+
     auto resolveCallback = [wrapper]() mutable {
         wrapper.resolve(false);
     };
@@ -253,13 +246,9 @@ JSValue JSRTCPeerConnection::addIceCandidate(ExecState* exec)
         wrapper.reject(&error);
     };
 
-    impl().addIceCandidate(candidate.get(), WTF::move(resolveCallback), WTF::move(rejectCallback), ec);
-    if (ec) {
-        setDOMException(exec, ec);
-        return jsUndefined();
-    }
+    impl().addIceCandidate(candidate.get(), WTF::move(resolveCallback), WTF::move(rejectCallback));
 
-    return wrapper.promise();
+    return promiseDeferred->promise();
 }
 
 } // namespace WebCore

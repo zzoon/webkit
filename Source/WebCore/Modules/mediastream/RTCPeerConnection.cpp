@@ -283,13 +283,15 @@ static Vector<RefPtr<MediaPayload>> createDefaultPayloads(const String& type)
     return payloads;
 }
 
-void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
+void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     if (m_signalingState == SignalingStateClosed) {
-        ec = INVALID_STATE_ERR;
+        RefPtr<DOMError> error = DOMError::create("InvalidStateError");
+        rejectCallback(*error);
         return;
     }
 
+    ExceptionCode ec = 0;
     RefPtr<RTCOfferOptions> options = RTCOfferOptions::create(offerOptions, ec);
     if (ec) {
         RefPtr<DOMError> error = DOMError::create("Invalid createOffer argument.");
@@ -341,13 +343,15 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerR
     resolveCallback(*offer);
 }
 
-void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
+void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     if (m_signalingState == SignalingStateClosed) {
-        ec = INVALID_STATE_ERR;
+        RefPtr<DOMError> error = DOMError::create("InvalidStateError");
+        rejectCallback(*error);
         return;
     }
 
+    ExceptionCode ec = 0;
     RefPtr<RTCAnswerOptions> options = RTCAnswerOptions::create(answerOptions, ec);
     if (ec) {
         RefPtr<DOMError> error = DOMError::create("Invalid createAnswer argument.");
@@ -398,10 +402,11 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, OfferAnswe
     resolveCallback(*answer);
 }
 
-void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
+void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     if (m_signalingState == SignalingStateClosed) {
-        ec = INVALID_STATE_ERR;
+        RefPtr<DOMError> error = DOMError::create("InvalidStateError");
+        rejectCallback(*error);
         return;
     }
 
@@ -479,10 +484,11 @@ static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayl
     return filteredPayloads;
 }
 
-void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
+void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     if (m_signalingState == SignalingStateClosed) {
-        ec = INVALID_STATE_ERR;
+        RefPtr<DOMError> error = DOMError::create("InvalidStateError");
+        rejectCallback(*error);
         return;
     }
 
@@ -556,10 +562,11 @@ void RTCPeerConnection::updateIce(const Dictionary& rtcConfiguration, ExceptionC
     m_mediaEndpoint->setConfiguration(createMediaEndpointInit(*m_configuration));
 }
 
-void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback, ExceptionCode& ec)
+void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     if (m_signalingState == SignalingStateClosed) {
-        ec = INVALID_STATE_ERR;
+        RefPtr<DOMError> error = DOMError::create("InvalidStateError");
+        rejectCallback(*error);
         return;
     }
 

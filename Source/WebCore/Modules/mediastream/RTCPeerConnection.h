@@ -73,19 +73,19 @@ public:
     RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, const MediaStream* stream, ExceptionCode&);
     void removeTrack(RTCRtpSender*, ExceptionCode&);
 
-    void createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback, RejectCallback, ExceptionCode&);
-    void createAnswer(const Dictionary& answerOptions, OfferAnswerResolveCallback, RejectCallback, ExceptionCode&);
+    void createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback, RejectCallback);
+    void createAnswer(const Dictionary& answerOptions, OfferAnswerResolveCallback, RejectCallback);
 
-    void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback, ExceptionCode&);
+    void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
     RefPtr<RTCSessionDescription> localDescription() const;
 
-    void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback, ExceptionCode&);
+    void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
     RefPtr<RTCSessionDescription> remoteDescription() const;
 
     String signalingState() const;
 
     void updateIce(const Dictionary& rtcConfiguration, ExceptionCode&);
-    void addIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback, ExceptionCode&);
+    void addIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback);
 
     String iceGatheringState() const;
     String iceConnectionState() const;
