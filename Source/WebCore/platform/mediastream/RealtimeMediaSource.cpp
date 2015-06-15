@@ -99,18 +99,32 @@ bool RealtimeMediaSource::readonly() const
     return m_readonly;
 }
 
-void RealtimeMediaSource::stop()
+void RealtimeMediaSource::stop(Observer* callingObserver)
 {
     if (stopped())
         return;
 
     m_stopped = true;
 
-    for (auto& observer : m_observers)
-        observer->sourceReadyStateChanged();
+    for (auto observer : m_observers) {
+        if (observer != callingObserver)
+            observer->sourceReadyStateChanged();
+    }
 
     // There are no more consumers of this source's data, shut it down as appropriate.
     stopProducingData();
+}
+
+void RealtimeMediaSource::requestStop(Observer* callingObserver)
+{
+    if (stopped())
+        return;
+
+    for (auto observer : m_observers) {
+        if (observer->observerIsEnabled())
+            return;
+    }
+    stop(callingObserver);
 }
 
 } // namespace WebCore

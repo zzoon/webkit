@@ -50,47 +50,47 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& 
     : RefCounted()
     , m_source(other.source())
     , m_client(nullptr)
-    , m_type(other.type())
     , m_id(createCanonicalUUIDString())
-    , m_label(other.label())
     , m_enabled(other.enabled())
-    , m_isReadonly(other.readonly())
-    , m_isRemote(other.remote())
+    , m_isEnded(other.ended())
 {
-    // This constructor is only used by the clone() function and the cloned track (other) may have
-    // been detached from its source.
-    if (m_source)
-        m_source->addObserver(this);
+    m_source->addObserver(this);
 }
 
 MediaStreamTrackPrivate::MediaStreamTrackPrivate(RefPtr<RealtimeMediaSource>&& source, const String& id)
     : RefCounted()
     , m_source(source)
     , m_client(nullptr)
-    , m_type(m_source->type())
     , m_id(id)
-    , m_label(m_source->name())
     , m_enabled(true)
-    , m_isReadonly(m_source->readonly())
-    , m_isRemote(m_source->remote())
+    , m_isEnded(false)
 {
     m_source->addObserver(this);
 }
 
 MediaStreamTrackPrivate::~MediaStreamTrackPrivate()
 {
-    if (m_source)
-        m_source->removeObserver(this);
+    m_source->removeObserver(this);
 }
 
-bool MediaStreamTrackPrivate::ended() const
+const String& MediaStreamTrackPrivate::label() const
 {
-    return m_source ? m_source->stopped() : true;
+    return m_source->name();
 }
 
 bool MediaStreamTrackPrivate::muted() const
 {
-    return m_source ? m_source->muted() : true;
+    return m_source->muted();
+}
+
+bool MediaStreamTrackPrivate::readonly() const
+{
+    return m_source->readonly();
+}
+
+bool MediaStreamTrackPrivate::remote() const
+{
+    return m_source->remote();
 }
 
 void MediaStreamTrackPrivate::setEnabled(bool enabled)
@@ -99,19 +99,23 @@ void MediaStreamTrackPrivate::setEnabled(bool enabled)
     m_enabled = enabled;
 }
 
-void MediaStreamTrackPrivate::detachSource()
+void MediaStreamTrackPrivate::endTrack()
 {
-    if (!m_source)
+    if (ended())
         return;
 
-    // The source will stop itself when out of consumers (observers in this case).
-    m_source->removeObserver(this);
-    m_source = nullptr;
+    m_isEnded = true;
+    m_source->requestStop(this);
 }
 
 RefPtr<MediaStreamTrackPrivate> MediaStreamTrackPrivate::clone()
 {
     return adoptRef(new MediaStreamTrackPrivate(*this));
+}
+
+RealtimeMediaSource::Type MediaStreamTrackPrivate::type() const
+{
+    return m_source->type();
 }
 
 RefPtr<MediaConstraints> MediaStreamTrackPrivate::constraints() const
@@ -121,19 +125,11 @@ RefPtr<MediaConstraints> MediaStreamTrackPrivate::constraints() const
 
 const RealtimeMediaSourceStates& MediaStreamTrackPrivate::states() const
 {
-    if (!m_source) {
-        DEPRECATED_DEFINE_STATIC_LOCAL(const RealtimeMediaSourceStates, noState, ());
-        return noState;
-    }
-    
     return m_source->states();
 }
 
 RefPtr<RealtimeMediaSourceCapabilities> MediaStreamTrackPrivate::capabilities() const
 {
-    if (!m_source)
-        return 0;
-
     return m_source->capabilities();
 }
 
@@ -145,8 +141,10 @@ void MediaStreamTrackPrivate::applyConstraints(const MediaConstraints&)
 
 void MediaStreamTrackPrivate::sourceReadyStateChanged()
 {
-    // Don't depend on the client to detach the source.
-    detachSource();
+    if (ended())
+        return;
+
+    m_isEnded = true;
 
     if (m_client)
         m_client->trackEnded();
@@ -165,7 +163,7 @@ void MediaStreamTrackPrivate::sourceEnabledChanged()
 
 bool MediaStreamTrackPrivate::observerIsEnabled()
 {
-    return enabled();
+    return !m_isEnded;
 }
 
 } // namespace WebCore

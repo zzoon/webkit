@@ -134,12 +134,12 @@ void MediaStreamTrack::stopProducingData()
     // the "ImplementedAs" IDL attribute. This is done because ActiveDOMObject requires
     // a "stop" method.
 
-    if (remote())
+    if (remote() || ended())
         return;
 
     m_isEnded = true;
 
-    m_private->detachSource();
+    m_private->endTrack();
 }
 
 RefPtr<MediaTrackConstraints> MediaStreamTrack::getConstraints() const
@@ -201,9 +201,6 @@ void MediaStreamTrack::trackEnded()
         return;
 
     m_isEnded = true;
-
-    // The spec says "detach source" here, but the source is already detached by the
-    // platform object at this point.
 
     dispatchEvent(Event::create(eventNames().endedEvent, false, false));
 

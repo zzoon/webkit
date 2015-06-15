@@ -53,14 +53,14 @@ public:
     virtual ~MediaStreamTrackPrivate();
 
     const String& id() const { return m_id; }
-    const String& label() const { return m_label; }
+    const String& label() const;
 
-    bool ended() const;
+    bool ended() const { return m_isEnded; }
 
     bool muted() const;
 
-    bool readonly() const { return m_isReadonly; }
-    bool remote() const { return m_isRemote; }
+    bool readonly() const;
+    bool remote() const;
 
     bool enabled() const { return m_enabled; }
     void setEnabled(bool);
@@ -68,12 +68,11 @@ public:
     RefPtr<MediaStreamTrackPrivate> clone();
 
     RealtimeMediaSource* source() const { return m_source.get(); }
+    RealtimeMediaSource::Type type() const;
 
-    void detachSource();
-    
+    void endTrack();
+
     void setClient(MediaStreamTrackPrivateClient* client) { m_client = client; }
-
-    RealtimeMediaSource::Type type() const { return m_type; }
 
     const RealtimeMediaSourceStates& states() const;
     RefPtr<RealtimeMediaSourceCapabilities> capabilities() const;
@@ -99,12 +98,9 @@ private:
     MediaStreamTrackPrivateClient* m_client;
     RefPtr<MediaConstraints> m_constraints;
 
-    RealtimeMediaSource::Type m_type;
     String m_id;
-    String m_label;
     bool m_enabled;
-    bool m_isReadonly;
-    bool m_isRemote;
+    bool m_isEnded;
 };
 
 } // namespace WebCore

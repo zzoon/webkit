@@ -98,7 +98,8 @@ public:
     virtual void startProducingData() { }
     virtual void stopProducingData() { }
 
-    void stop();
+    void stop(Observer* callingObserver = nullptr);
+    void requestStop(Observer* callingObserver = nullptr);
 
     void reset();
 
