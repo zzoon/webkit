@@ -47,6 +47,7 @@ static EncodedJSValue JSC_HOST_CALL regExpProtoGetterGlobal(ExecState*);
 static EncodedJSValue JSC_HOST_CALL regExpProtoGetterIgnoreCase(ExecState*);
 static EncodedJSValue JSC_HOST_CALL regExpProtoGetterMultiline(ExecState*);
 static EncodedJSValue JSC_HOST_CALL regExpProtoGetterSource(ExecState*);
+static EncodedJSValue JSC_HOST_CALL regExpProtoGetterFlags(ExecState*);
 
 }
 
@@ -66,6 +67,7 @@ const ClassInfo RegExpPrototype::s_info = { "RegExp", &RegExpObject::s_info, &re
   ignoreCase    regExpProtoGetterIgnoreCase DontEnum|Accessor
   multiline     regExpProtoGetterMultiline  DontEnum|Accessor
   source        regExpProtoGetterSource     DontEnum|Accessor
+  flags         regExpProtoGetterFlags      DontEnum|Accessor
 @end
 */
 
@@ -135,29 +137,56 @@ EncodedJSValue JSC_HOST_CALL regExpProtoFuncCompile(ExecState* exec)
     return JSValue::encode(jsUndefined());
 }
 
+typedef std::array<char, 3 + 1> FlagsString; // 3 different flags and a null character terminator.
+
+static inline FlagsString flagsString(ExecState* exec, JSObject* regexp)
+{
+    FlagsString string;
+
+    JSValue globalValue = regexp->get(exec, exec->propertyNames().global);
+    if (exec->hadException())
+        return string;
+    JSValue ignoreCaseValue = regexp->get(exec, exec->propertyNames().ignoreCase);
+    if (exec->hadException())
+        return string;
+    JSValue multilineValue = regexp->get(exec, exec->propertyNames().multiline);
+
+    unsigned index = 0;
+    if (globalValue.toBoolean(exec))
+        string[index++] = 'g';
+    if (ignoreCaseValue.toBoolean(exec))
+        string[index++] = 'i';
+    if (multilineValue.toBoolean(exec))
+        string[index++] = 'm';
+    ASSERT(index < string.size());
+    string[index] = 0;
+    return string;
+}
+
 EncodedJSValue JSC_HOST_CALL regExpProtoFuncToString(ExecState* exec)
 {
     JSValue thisValue = exec->thisValue();
-    if (!thisValue.inherits(RegExpObject::info()))
+    if (!thisValue.isObject())
         return throwVMTypeError(exec);
 
-    RegExpObject* thisObject = asRegExpObject(thisValue);
+    JSObject* thisObject = asObject(thisValue);
 
     StringRecursionChecker checker(exec, thisObject);
     if (JSValue earlyReturnValue = checker.earlyReturnValue())
         return JSValue::encode(earlyReturnValue);
 
-    char postfix[5] = { '/', 0, 0, 0, 0 };
-    int index = 1;
-    if (thisObject->get(exec, exec->propertyNames().global).toBoolean(exec))
-        postfix[index++] = 'g';
-    if (thisObject->get(exec, exec->propertyNames().ignoreCase).toBoolean(exec))
-        postfix[index++] = 'i';
-    if (thisObject->get(exec, exec->propertyNames().multiline).toBoolean(exec))
-        postfix[index] = 'm';
-    String source = thisObject->get(exec, exec->propertyNames().source).toString(exec)->value(exec);
-    // If source is empty, use "/(?:)/" to avoid colliding with comment syntax
-    return JSValue::encode(jsMakeNontrivialString(exec, "/", source, postfix));
+    JSValue sourceValue = thisObject->get(exec, exec->propertyNames().source);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+    String source = sourceValue.toString(exec)->value(exec);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+
+    auto flags = flagsString(exec, thisObject);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+
+    return JSValue::encode(jsMakeNontrivialString(exec, '/', source, '/', flags.data()));
 }
 
 EncodedJSValue JSC_HOST_CALL regExpProtoGetterGlobal(ExecState* exec)
@@ -185,6 +214,19 @@ EncodedJSValue JSC_HOST_CALL regExpProtoGetterMultiline(ExecState* exec)
         return throwVMTypeError(exec);
 
     return JSValue::encode(jsBoolean(asRegExpObject(thisValue)->regExp()->multiline()));
+}
+
+EncodedJSValue JSC_HOST_CALL regExpProtoGetterFlags(ExecState* exec)
+{
+    JSValue thisValue = exec->thisValue();
+    if (!thisValue.isObject())
+        return throwVMTypeError(exec);
+
+    auto flags = flagsString(exec, asObject(thisValue));
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+
+    return JSValue::encode(jsString(exec, flags.data()));
 }
 
 template <typename CharacterType>

@@ -28,11 +28,11 @@
 
 #if ENABLE(NETWORK_CACHE)
 
-#include "NetworkCacheFileSystemPosix.h"
+#include "NetworkCacheFileSystem.h"
 #include <wtf/MainThread.h>
-#include <wtf/gobject/GMainLoopSource.h>
-#include <wtf/gobject/GMutexLocker.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GMainLoopSource.h>
+#include <wtf/glib/GMutexLocker.h>
+#include <wtf/glib/GUniquePtr.h>
 
 namespace WebKit {
 namespace NetworkCache {

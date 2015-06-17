@@ -56,6 +56,9 @@ public:
     State currentState() const { return m_currentState; }
 
     void releaseSession();
+    
+    // Runs the media session invocation algorithm and returns true on success.
+    bool invoke();
 
     void togglePlayback();
 
@@ -65,10 +68,12 @@ private:
     void addMediaElement(HTMLMediaElement&);
     void removeMediaElement(HTMLMediaElement&);
 
-    Vector<HTMLMediaElement*> activeParticipatingElements() const;
+    void addActiveMediaElement(HTMLMediaElement&);
 
     State m_currentState { State::Idle };
     Vector<HTMLMediaElement*> m_participatingElements;
+    HashSet<HTMLMediaElement*> m_activeParticipatingElements;
+    HashSet<HTMLMediaElement*>* m_iteratedActiveParticipatingElements { nullptr };
 
     const String m_kind;
     RefPtr<MediaRemoteControls> m_controls;

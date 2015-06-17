@@ -134,6 +134,7 @@ list(APPEND WebCore_SOURCES
     platform/graphics/efl/GraphicsContext3DEfl.cpp
     platform/graphics/efl/GraphicsContext3DPrivate.cpp
     platform/graphics/efl/IconEfl.cpp
+    platform/graphics/efl/ImageBufferEfl.cpp
     platform/graphics/efl/ImageEfl.cpp
     platform/graphics/efl/IntPointEfl.cpp
     platform/graphics/efl/IntRectEfl.cpp
@@ -199,6 +200,8 @@ list(APPEND WebCore_SOURCES
     platform/graphics/x11/PlatformDisplayX11.cpp
     platform/graphics/x11/XUniqueResource.cpp
 
+    platform/image-encoders/JPEGImageEncoder.cpp
+
     platform/image-decoders/ImageDecoder.cpp
 
     platform/image-decoders/bmp/BMPImageDecoder.cpp
@@ -240,6 +243,7 @@ list(APPEND WebCore_SOURCES
     platform/network/soup/SocketStreamHandleSoup.cpp
     platform/network/soup/SoupNetworkSession.cpp
     platform/network/soup/SynchronousLoaderClientSoup.cpp
+    platform/network/soup/WebKitSoupRequestGeneric.cpp
 
     platform/posix/FileSystemPOSIX.cpp
     platform/posix/SharedBufferPOSIX.cpp

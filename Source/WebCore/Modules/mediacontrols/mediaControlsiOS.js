@@ -125,9 +125,9 @@ ControllerIOS.prototype = {
         this.listenFor(this.controls.fullscreenButton, 'touchstart', this.handleFullscreenTouchStart);
         this.listenFor(this.controls.fullscreenButton, 'touchend', this.handleFullscreenTouchEnd);
         this.listenFor(this.controls.fullscreenButton, 'touchcancel', this.handleFullscreenTouchCancel);
-        this.listenFor(this.controls.optimizedFullscreenButton, 'touchstart', this.handleOptimizedFullscreenTouchStart);
-        this.listenFor(this.controls.optimizedFullscreenButton, 'touchend', this.handleOptimizedFullscreenTouchEnd);
-        this.listenFor(this.controls.optimizedFullscreenButton, 'touchcancel', this.handleOptimizedFullscreenTouchCancel);
+        this.listenFor(this.controls.pictureInPictureButton, 'touchstart', this.handlePictureInPictureTouchStart);
+        this.listenFor(this.controls.pictureInPictureButton, 'touchend', this.handlePictureInPictureTouchEnd);
+        this.listenFor(this.controls.pictureInPictureButton, 'touchcancel', this.handlePictureInPictureTouchCancel);
         this.listenFor(this.controls.timeline, 'touchstart', this.handleTimelineTouchStart);
         this.stopListeningFor(this.controls.playButton, 'click', this.handlePlayButtonClicked);
 
@@ -179,8 +179,8 @@ ControllerIOS.prototype = {
             // Hide the scrubber on audio until the user starts playing.
             this.controls.timelineBox.classList.add(this.ClassNames.hidden);
         } else {
-            if (Controller.gSimulateOptimizedFullscreenAvailable || ('webkitSupportsPresentationMode' in this.video && this.video.webkitSupportsPresentationMode('optimized')))
-                this.controls.panel.appendChild(this.controls.optimizedFullscreenButton);
+            if (Controller.gSimulatePictureInPictureAvailable || ('webkitSupportsPresentationMode' in this.video && this.video.webkitSupportsPresentationMode('picture-in-picture')))
+                this.controls.panel.appendChild(this.controls.pictureInPictureButton);
             this.controls.panel.appendChild(this.controls.fullscreenButton);
         }
     },
@@ -353,8 +353,6 @@ ControllerIOS.prototype = {
             this.hideTimer = setTimeout(this.hideControls.bind(this), this.HideControlsDelay);
         } else if (!this.canPlay())
             this.hideControls();
-
-        return true;
     },
 
     handlePanelTouchStart: function(event) {
@@ -394,7 +392,7 @@ ControllerIOS.prototype = {
 
     isFullScreen: function()
     {
-        return this.video.webkitDisplayingFullscreen && this.presentationMode() != 'optimized';
+        return this.video.webkitDisplayingFullscreen && this.presentationMode() != 'picture-in-picture';
     },
 
     handleFullscreenButtonClicked: function(event) {
@@ -430,30 +428,30 @@ ControllerIOS.prototype = {
         return true;
     },
 
-    handleOptimizedFullscreenButtonClicked: function(event) {
+    handlePictureInPictureButtonClicked: function(event) {
         if (!('webkitSetPresentationMode' in this.video))
             return;
 
-        if (this.presentationMode() === 'optimized')
+        if (this.presentationMode() === 'picture-in-picture')
             this.video.webkitSetPresentationMode('inline');
         else
-            this.video.webkitSetPresentationMode('optimized');
+            this.video.webkitSetPresentationMode('picture-in-picture');
     },
 
-    handleOptimizedFullscreenTouchStart: function() {
-        this.controls.optimizedFullscreenButton.classList.add('active');
+    handlePictureInPictureTouchStart: function() {
+        this.controls.pictureInPictureButton.classList.add('active');
     },
 
-    handleOptimizedFullscreenTouchEnd: function(event) {
-        this.controls.optimizedFullscreenButton.classList.remove('active');
+    handlePictureInPictureTouchEnd: function(event) {
+        this.controls.pictureInPictureButton.classList.remove('active');
 
-        this.handleOptimizedFullscreenButtonClicked();
+        this.handlePictureInPictureButtonClicked();
 
         return true;
     },
 
-    handleOptimizedFullscreenTouchCancel: function(event) {
-        this.controls.optimizedFullscreenButton.classList.remove('active');
+    handlePictureInPictureTouchCancel: function(event) {
+        this.controls.pictureInPictureButton.classList.remove('active');
         return true;
     },
 
@@ -564,35 +562,30 @@ ControllerIOS.prototype = {
 
         switch (presentationMode) {
             case 'inline':
-                this.controls.inlinePlaybackPlaceholder.style.backgroundImage = "";
                 this.controls.inlinePlaybackPlaceholder.classList.add(this.ClassNames.hidden);
-                this.controls.inlinePlaybackPlaceholder.classList.remove(this.ClassNames.optimized);
-                this.controls.inlinePlaybackPlaceholderTextTop.classList.remove(this.ClassNames.optimized);
-                this.controls.inlinePlaybackPlaceholderTextBottom.classList.remove(this.ClassNames.optimized);
+                this.controls.inlinePlaybackPlaceholder.classList.remove(this.ClassNames.pictureInPicture);
+                this.controls.inlinePlaybackPlaceholderTextTop.classList.remove(this.ClassNames.pictureInPicture);
+                this.controls.inlinePlaybackPlaceholderTextBottom.classList.remove(this.ClassNames.pictureInPicture);
 
-                this.controls.optimizedFullscreenButton.classList.remove(this.ClassNames.returnFromOptimized);
+                this.controls.pictureInPictureButton.classList.remove(this.ClassNames.returnFromPictureInPicture);
                 break;
-            case 'optimized':
-                var backgroundImage = "url('" + this.host.mediaUIImageData("optimized-fullscreen-placeholder") + "')";
-                this.controls.inlinePlaybackPlaceholder.style.backgroundImage = backgroundImage;
-                this.controls.inlinePlaybackPlaceholder.setAttribute('aria-label', "video playback placeholder");
-                this.controls.inlinePlaybackPlaceholder.classList.add(this.ClassNames.optimized);
+            case 'picture-in-picture':
+                this.controls.inlinePlaybackPlaceholder.classList.add(this.ClassNames.pictureInPicture);
                 this.controls.inlinePlaybackPlaceholder.classList.remove(this.ClassNames.hidden);
 
-                this.controls.inlinePlaybackPlaceholderTextTop.innerText = this.host.mediaUIImageData("optimized-fullscreen-placeholder-text");
-                this.controls.inlinePlaybackPlaceholderTextTop.classList.add(this.ClassNames.optimized);
+                this.controls.inlinePlaybackPlaceholderTextTop.innerText = this.UIString('This video is playing in Picture in Picture');
+                this.controls.inlinePlaybackPlaceholderTextTop.classList.add(this.ClassNames.pictureInPicture);
                 this.controls.inlinePlaybackPlaceholderTextBottom.innerText = "";
-                this.controls.inlinePlaybackPlaceholderTextBottom.classList.add(this.ClassNames.optimized);
+                this.controls.inlinePlaybackPlaceholderTextBottom.classList.add(this.ClassNames.pictureInPicture);
 
-                this.controls.optimizedFullscreenButton.classList.add(this.ClassNames.returnFromOptimized);
+                this.controls.pictureInPictureButton.classList.add(this.ClassNames.returnFromPictureInPicture);
                 break;
             default:
-                this.controls.inlinePlaybackPlaceholder.style.backgroundImage = "";
-                this.controls.inlinePlaybackPlaceholder.classList.remove(this.ClassNames.optimized);
-                this.controls.inlinePlaybackPlaceholderTextTop.classList.remove(this.ClassNames.optimized);
-                this.controls.inlinePlaybackPlaceholderTextBottom.classList.remove(this.ClassNames.optimized);
+                this.controls.inlinePlaybackPlaceholder.classList.remove(this.ClassNames.pictureInPicture);
+                this.controls.inlinePlaybackPlaceholderTextTop.classList.remove(this.ClassNames.pictureInPicture);
+                this.controls.inlinePlaybackPlaceholderTextBottom.classList.remove(this.ClassNames.pictureInPicture);
 
-                this.controls.optimizedFullscreenButton.classList.remove(this.ClassNames.returnFromOptimized);
+                this.controls.pictureInPictureButton.classList.remove(this.ClassNames.returnFromPictureInPicture);
                 break;
         }
 
@@ -610,7 +603,7 @@ ControllerIOS.prototype = {
 
     controlsAlwaysVisible: function()
     {
-        if (this.presentationMode() === 'optimized')
+        if (this.presentationMode() === 'picture-in-picture')
             return true;
 
         return Controller.prototype.controlsAlwaysVisible.call(this);

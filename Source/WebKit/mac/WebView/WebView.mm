@@ -722,8 +722,7 @@ static String webKitBundleVersionString()
     if (!toJSDOMWindow(execState->lexicalGlobalObject()))
         return;
 
-    Exception* vmException = Exception::cast(toJS(execState, exception));
-    reportException(execState, vmException);
+    reportException(execState, toJS(execState, exception));
 }
 
 static void WebKitInitializeApplicationCachePathIfNecessary()
@@ -1233,6 +1232,9 @@ static void WebKitInitializeGamepadProviderIfNecessary()
     
     // FIXME: this is a workaround for <rdar://problem/11820090> Quoted text changes in size when replying to certain email
     _private->page->settings().setMinimumFontSize([_private->preferences minimumFontSize]);
+
+    // This is a workaround for <rdar://problem/21309911>.
+    _private->page->settings().setMetaRefreshEnabled([_private->preferences metaRefreshEnabled]);
 
     _private->page->setGroupName(groupName);
 
