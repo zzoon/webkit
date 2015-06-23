@@ -55,7 +55,6 @@ Ref<MediaStreamTrack> MediaStreamTrack::create(ScriptExecutionContext& context, 
 MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext& context, MediaStreamTrackPrivate& privateTrack)
     : RefCounted()
     , ActiveDOMObject(&context)
-    , m_eventDispatchScheduled(false)
     , m_private(privateTrack)
     , m_isMuted(m_private->muted())
     , m_isEnded(m_private->ended())
@@ -243,33 +242,6 @@ bool MediaStreamTrack::canSuspendForPageCache() const
 {
     // FIXME: We should try and do better here.
     return false;
-}
-
-void MediaStreamTrack::scheduleEventDispatch(RefPtr<Event>&& event)
-{
-    {
-        MutexLocker locker(m_mutex);
-        m_scheduledEvents.append(event);
-        if (m_eventDispatchScheduled)
-            return;
-        m_eventDispatchScheduled = true;
-    }
-
-    RefPtr<MediaStreamTrack> protectedThis(this);
-    callOnMainThread([protectedThis] {
-        Vector<RefPtr<Event>> events;
-        {
-            MutexLocker locker(protectedThis->m_mutex);
-            protectedThis->m_eventDispatchScheduled = false;
-            events = WTF::move(protectedThis->m_scheduledEvents);
-        }
-
-        if (!protectedThis->scriptExecutionContext())
-            return;
-
-        for (auto& event : events)
-            protectedThis->dispatchEvent(event.release());
-    });
 }
 
 } // namespace WebCore

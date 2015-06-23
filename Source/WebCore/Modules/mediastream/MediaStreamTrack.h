@@ -101,7 +101,6 @@ private:
     explicit MediaStreamTrack(MediaStreamTrack&);
 
     void configureTrackRendering();
-    void scheduleEventDispatch(RefPtr<Event>&&);
 
     // ActiveDOMObject API.
     void stop() override final;
@@ -115,10 +114,6 @@ private:
     // MediaStreamTrackPrivateClient
     void trackEnded();
     void trackMutedChanged();
-
-    Vector<RefPtr<Event>> m_scheduledEvents;
-    bool m_eventDispatchScheduled;
-    Mutex m_mutex;
 
     Vector<Observer*> m_observers;
     Ref<MediaStreamTrackPrivate> m_private;
