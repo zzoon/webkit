@@ -659,6 +659,9 @@ public:
     void scaleViewAndUpdateGeometryFenced(double scale, WebCore::IntSize viewSize, std::function<void (const WebCore::MachSendRight&, CallbackBase::Error)>);
 #endif
     void setShouldScaleViewToFitDocument(bool);
+    
+    bool userContentExtensionsEnabled() { return m_userContentExtensionsEnabled; }
+    void setUserContentExtensionsEnabled(bool);
 
     float deviceScaleFactor() const;
     void setIntrinsicDeviceScaleFactor(float);
@@ -1141,7 +1144,6 @@ private:
     void runJavaScriptAlert(uint64_t frameID, const String&, RefPtr<Messages::WebPageProxy::RunJavaScriptAlert::DelayedReply>);
     void runJavaScriptConfirm(uint64_t frameID, const String&, RefPtr<Messages::WebPageProxy::RunJavaScriptConfirm::DelayedReply>);
     void runJavaScriptPrompt(uint64_t frameID, const String&, const String&, RefPtr<Messages::WebPageProxy::RunJavaScriptPrompt::DelayedReply>);
-    void shouldInterruptJavaScript(bool& result);
     void setStatusText(const String&);
     void mouseDidMoveOverElement(const WebHitTestResult::Data& hitTestResultData, uint32_t modifiers, const UserData&);
 
@@ -1447,6 +1449,9 @@ private:
     void didPerformImmediateActionHitTest(const WebHitTestResult::Data&, bool contentPreventsDefault, const UserData&);
 #endif
 
+    void useFixedLayoutDidChange(bool useFixedLayout) { m_useFixedLayout = useFixedLayout; }
+    void fixedLayoutSizeDidChange(WebCore::IntSize fixedLayoutSize) { m_fixedLayoutSize = fixedLayoutSize; }
+
     void handleAutoFillButtonClick(const UserData&);
 
     void handleMessage(IPC::Connection&, const String& messageName, const UserData& messageBody);
@@ -1743,6 +1748,7 @@ private:
     bool m_requiresTargetMonitoring { false };
 #endif
 
+    bool m_userContentExtensionsEnabled { true };
 };
 
 } // namespace WebKit

@@ -736,6 +736,9 @@ webkit.org/b/122038 animations/transform-non-accelerated.html [ Pass Failure ]
 
 webkit.org/b/122490 [ Debug ] mathml/very-large-stretchy-operators.html [ Skip ]
 
+# rdar://problem/21443002
+[ Release ElCapitan+ ] mathml/very-large-stretchy-operators.html [ Slow ]
+
 webkit.org/b/123220 compositing/regions/floated-region-with-transformed-child.html [ Pass ImageOnlyFailure ]
 webkit.org/b/138179 compositing/regions/propagate-region-box-shadow-border-padding-for-video.html [ Skip ]
 
@@ -1289,5 +1292,7 @@ webkit.org/b/145432 media/video-transformed-by-javascript.html [ Failure ]
 [ ElCapitan+ ] http/tests/media/video-throttled-load-metadata.html [ Failure ]
 [ ElCapitan+ ] http/tests/security/contentSecurityPolicy/media-src-allowed.html [ Skip ]
 
-# rdar://problem/20575487, rdar://problem/21409769
-[ Mavericks Yosemite ] fast/canvas/canvas-too-large-to-draw.html [ Skip ]
+# <rdar://problem/21486062>
+[ ElCapitan+ Debug ] fast/text/justify-ideograph-complex.html [ Pass Failure ]
+[ ElCapitan+ Debug ] fast/text/justify-ideograph-simple.html [ Pass Failure ]
+[ ElCapitan+ Debug ] fast/text/justify-ideograph-vertical.html [ Pass Failure ]

@@ -351,6 +351,11 @@ void WKPageSetCustomUserAgent(WKPageRef pageRef, WKStringRef userAgentRef)
     toImpl(pageRef)->setCustomUserAgent(toWTFString(userAgentRef));
 }
 
+void WKPageSetUserContentExtensionsEnabled(WKPageRef pageRef, bool enabled)
+{
+    toImpl(pageRef)->setUserContentExtensionsEnabled(enabled);
+}
+
 bool WKPageSupportsTextEncoding(WKPageRef pageRef)
 {
     return toImpl(pageRef)->supportsTextEncoding();
@@ -1727,14 +1732,6 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
                 return;
 
             m_client.saveDataToFileInDownloadsFolder(toAPI(page), toAPI(suggestedFilename.impl()), toAPI(mimeType.impl()), toURLRef(originatingURLString.impl()), toAPI(data), m_client.base.clientInfo);
-        }
-
-        virtual bool shouldInterruptJavaScript(WebPageProxy* page) override
-        {
-            if (!m_client.shouldInterruptJavaScript)
-                return false;
-
-            return m_client.shouldInterruptJavaScript(toAPI(page), m_client.base.clientInfo);
         }
 
         virtual void pinnedStateDidChange(WebPageProxy& page) override

@@ -1372,7 +1372,7 @@ void WebPageProxy::dispatchViewStateChange()
     ViewState::Flags changed = m_viewState ^ previousViewState;
 
     // We always want to wait for the Web process to reply if we've been in-window before and are coming back in-window.
-    if (m_viewWasEverInWindow && (changed & ViewState::IsInWindow) && isInWindow())
+    if (m_viewWasEverInWindow && (changed & ViewState::IsInWindow) && isInWindow() && m_drawingArea->hasVisibleContent())
         m_viewStateChangeWantsSynchronousReply = true;
 
     // Don't wait synchronously if the view state is not visible. (This matters in particular on iOS, where a hidden page may be suspended.)
@@ -2941,11 +2941,11 @@ void WebPageProxy::didCommitLoadForFrame(uint64_t frameID, uint64_t navigationID
 #endif
 
     auto transaction = m_pageLoadState.transaction();
-
-    if (frame->isMainFrame()) {
-        bool hasInsecureCertificateChain = m_treatsSHA1CertificatesAsInsecure && certificateInfo.containsNonRootSHA1SignedCertificate();
-        m_pageLoadState.didCommitLoad(transaction, hasInsecureCertificateChain);
-    }
+    bool markPageInsecure = m_treatsSHA1CertificatesAsInsecure && certificateInfo.containsNonRootSHA1SignedCertificate();
+    if (frame->isMainFrame())
+        m_pageLoadState.didCommitLoad(transaction, markPageInsecure);
+    else if (markPageInsecure)
+        m_pageLoadState.didDisplayOrRunInsecureContent(transaction);
 
 #if USE(APPKIT)
     // FIXME (bug 59111): didCommitLoadForFrame comes too late when restoring a page from b/f cache, making us disable secure event mode in password fields.
@@ -3495,14 +3495,6 @@ void WebPageProxy::runJavaScriptPrompt(uint64_t frameID, const String& message, 
     m_process->responsivenessTimer()->stop();
 
     m_uiClient->runJavaScriptPrompt(this, message, defaultValue, frame, [reply](const String& result) { reply->send(result); });
-}
-
-void WebPageProxy::shouldInterruptJavaScript(bool& result)
-{
-    // Since shouldInterruptJavaScript() can spin a nested run loop we need to turn off the responsiveness timer.
-    m_process->responsivenessTimer()->stop();
-
-    result = m_uiClient->shouldInterruptJavaScript(this);
 }
 
 void WebPageProxy::setStatusText(const String& text)
@@ -5055,6 +5047,7 @@ WebPageCreationParameters WebPageProxy::creationParameters()
     parameters.appleMailPaginationQuirkEnabled = false;
 #endif
     parameters.shouldScaleViewToFitDocument = m_shouldScaleViewToFitDocument;
+    parameters.userContentExtensionsEnabled = m_userContentExtensionsEnabled;
 
     return parameters;
 }
@@ -5911,6 +5904,19 @@ void WebPageProxy::setShouldScaleViewToFitDocument(bool shouldScaleViewToFitDocu
         return;
 
     m_process->send(Messages::WebPage::SetShouldScaleViewToFitDocument(shouldScaleViewToFitDocument), m_pageID);
+}
+
+void WebPageProxy::setUserContentExtensionsEnabled(bool userContentExtensionsEnabled)
+{
+    if (m_userContentExtensionsEnabled == userContentExtensionsEnabled)
+        return;
+
+    m_userContentExtensionsEnabled = userContentExtensionsEnabled;
+
+    if (!isValid())
+        return;
+
+    m_process->send(Messages::WebPage::SetUserContentExtensionsEnabled(userContentExtensionsEnabled), m_pageID);
 }
 
 } // namespace WebKit

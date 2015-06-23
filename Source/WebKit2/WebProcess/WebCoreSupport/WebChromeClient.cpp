@@ -30,6 +30,7 @@
 #include "APIArray.h"
 #include "APISecurityOrigin.h"
 #include "DrawingArea.h"
+#include "HangDetectionDisabler.h"
 #include "InjectedBundleNavigationAction.h"
 #include "InjectedBundleNodeHandle.h"
 #include "LayerTreeHost.h"
@@ -334,6 +335,8 @@ bool WebChromeClient::runBeforeUnloadConfirmPanel(const String& message, Frame* 
 
     bool shouldClose = false;
 
+    HangDetectionDisabler hangDetectionDisabler;
+
     unsigned syncSendFlags = IPC::InformPlatformProcessWillSuspend;
     if (WebPage::synchronousMessagesShouldSpinRunLoop())
         syncSendFlags |= IPC::SpinRunLoopWhileWaitingForReply;
@@ -371,6 +374,8 @@ void WebChromeClient::runJavaScriptAlert(Frame* frame, const String& alertText)
     // Notify the bundle client.
     m_page->injectedBundleUIClient().willRunJavaScriptAlert(m_page, alertText, webFrame);
 
+    HangDetectionDisabler hangDetectionDisabler;
+
     unsigned syncSendFlags = IPC::InformPlatformProcessWillSuspend;
     if (WebPage::synchronousMessagesShouldSpinRunLoop())
         syncSendFlags |= IPC::SpinRunLoopWhileWaitingForReply;
@@ -384,6 +389,8 @@ bool WebChromeClient::runJavaScriptConfirm(Frame* frame, const String& message)
 
     // Notify the bundle client.
     m_page->injectedBundleUIClient().willRunJavaScriptConfirm(m_page, message, webFrame);
+
+    HangDetectionDisabler hangDetectionDisabler;
 
     unsigned syncSendFlags = IPC::InformPlatformProcessWillSuspend;
     if (WebPage::synchronousMessagesShouldSpinRunLoop())
@@ -403,6 +410,8 @@ bool WebChromeClient::runJavaScriptPrompt(Frame* frame, const String& message, c
     // Notify the bundle client.
     m_page->injectedBundleUIClient().willRunJavaScriptPrompt(m_page, message, defaultValue, webFrame);
 
+    HangDetectionDisabler hangDetectionDisabler;
+
     unsigned syncSendFlags = IPC::InformPlatformProcessWillSuspend;
     if (WebPage::synchronousMessagesShouldSpinRunLoop())
         syncSendFlags |= IPC::SpinRunLoopWhileWaitingForReply;
@@ -419,15 +428,6 @@ void WebChromeClient::setStatusbarText(const String& statusbarText)
     m_page->injectedBundleUIClient().willSetStatusbarText(m_page, statusbarText);
 
     m_page->send(Messages::WebPageProxy::SetStatusText(statusbarText));
-}
-
-bool WebChromeClient::shouldInterruptJavaScript()
-{
-    bool shouldInterrupt = false;
-    if (!WebProcess::singleton().parentProcessConnection()->sendSync(Messages::WebPageProxy::ShouldInterruptJavaScript(), Messages::WebPageProxy::ShouldInterruptJavaScript::Reply(shouldInterrupt), m_page->pageID()))
-        return false;
-
-    return shouldInterrupt;
 }
 
 KeyboardUIMode WebChromeClient::keyboardUIMode()

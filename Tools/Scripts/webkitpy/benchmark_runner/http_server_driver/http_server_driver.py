@@ -4,6 +4,7 @@ from abc import abstractmethod
 
 
 class HTTPServerDriver(object):
+    name = None
     @abstractmethod
     def serve(self, webRoot):
         pass
@@ -18,4 +19,8 @@ class HTTPServerDriver(object):
 
     @abstractmethod
     def getReturnCode(self):
+        pass
+
+    @abstractmethod
+    def setDeviceID(self, deviceID):
         pass

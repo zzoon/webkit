@@ -1295,6 +1295,7 @@ set(WebCore_SOURCES
     css/CSSKeyframesRule.cpp
     css/CSSLineBoxContainValue.cpp
     css/CSSMediaRule.cpp
+    css/CSSNamedImageValue.cpp
     css/CSSOMUtils.cpp
     css/CSSPageRule.cpp
     css/CSSParser.cpp
@@ -2169,6 +2170,7 @@ set(WebCore_SOURCES
     platform/graphics/LayoutRect.cpp
     platform/graphics/MaskImageOperation.cpp
     platform/graphics/MediaPlayer.cpp
+    platform/graphics/NamedImageGeneratedImage.cpp
     platform/graphics/Path.cpp
     platform/graphics/PathTraversalState.cpp
     platform/graphics/Pattern.cpp
@@ -3053,8 +3055,6 @@ if (ENABLE_GRAPHICS_CONTEXT_3D)
     endif ()
 
     list(APPEND WebCore_INCLUDE_DIRECTORIES
-        "${THIRDPARTY_DIR}/ANGLE/"
-        "${THIRDPARTY_DIR}/ANGLE/include/KHR"
         "${WEBCORE_DIR}/platform/graphics/gpu"
     )
 
@@ -3153,6 +3153,11 @@ if (ENABLE_GRAPHICS_CONTEXT_3D)
         platform/graphics/GraphicsContext3D.cpp
     )
 endif ()
+
+list(APPEND WebCore_INCLUDE_DIRECTORIES
+    "${THIRDPARTY_DIR}/ANGLE/"
+    "${THIRDPARTY_DIR}/ANGLE/include/KHR"
+)
 
 if (ENABLE_WEB_REPLAY)
     list(APPEND WebCore_INCLUDE_DIRECTORIES
@@ -3588,6 +3593,12 @@ endif ()
 if (ENABLE_GRAPHICS_CONTEXT_3D)
     add_library(ANGLESupport STATIC ${ANGLESupport_SOURCES})
     set_target_properties(ANGLESupport PROPERTIES FOLDER "WebCore")
+
+    # Suppress null conversion warnings for sources in Source/ThirdParty/ANGLE
+    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+        ADD_TARGET_PROPERTIES(ANGLESupport COMPILE_FLAGS "-Wno-null-conversion")
+    endif ()
+
     target_include_directories(ANGLESupport PRIVATE
         "${THIRDPARTY_DIR}/ANGLE/include"
         "${THIRDPARTY_DIR}/ANGLE/src"

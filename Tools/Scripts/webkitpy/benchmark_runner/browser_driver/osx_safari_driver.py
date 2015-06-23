@@ -15,10 +15,11 @@ _log = logging.getLogger(__name__)
 
 class OSXSafariDriver(OSXBrowserDriver):
     bundleIdentifier = 'com.apple.Safari'
+    browser_name = 'safari'
 
-    def prepareEnv(self):
+    def prepareEnv(self, deviceID):
         self.safariProcess = None
-        super(OSXSafariDriver, self).prepareEnv()
+        super(OSXSafariDriver, self).prepareEnv(deviceID)
         forceRemove(os.path.join(os.path.expanduser('~'), 'Library/Saved Application State/com.apple.Safari.savedState'))
         forceRemove(os.path.join(os.path.expanduser('~'), 'Library/Safari/LastSession.plist'))
         self.maximizeWindow()

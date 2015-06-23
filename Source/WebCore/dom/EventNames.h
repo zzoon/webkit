@@ -141,6 +141,7 @@ namespace WebCore {
     macro(mousewheel) \
     macro(mute) \
     macro(negotiationneeded) \
+    macro(nexttrack) \
     macro(nomatch) \
     macro(noupdate) \
     macro(obsolete) \
@@ -159,6 +160,7 @@ namespace WebCore {
     macro(pointerlockchange) \
     macro(pointerlockerror) \
     macro(popstate) \
+    macro(previoustrack) \
     macro(progress) \
     macro(ratechange) \
     macro(readystatechange) \

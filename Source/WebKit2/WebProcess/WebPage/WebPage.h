@@ -104,8 +104,6 @@ OBJC_CLASS CALayer;
 OBJC_CLASS NSDictionary;
 OBJC_CLASS NSObject;
 OBJC_CLASS WKAccessibilityWebPageObject;
-
-#define ENABLE_PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC 1
 #endif
 
 namespace API {
@@ -1138,6 +1136,7 @@ private:
     void clearWheelEventTestTrigger();
 
     void setShouldScaleViewToFitDocument(bool);
+    void setUserContentExtensionsEnabled(bool);
 
     uint64_t m_pageID;
 

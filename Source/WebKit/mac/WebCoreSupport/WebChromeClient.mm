@@ -109,6 +109,7 @@ NSString *WebConsoleMessageAppCacheMessageSource = @"AppCacheMessageSource";
 NSString *WebConsoleMessageRenderingMessageSource = @"RenderingMessageSource";
 NSString *WebConsoleMessageCSSMessageSource = @"CSSMessageSource";
 NSString *WebConsoleMessageSecurityMessageSource = @"SecurityMessageSource";
+NSString *WebConsoleMessageContentBlockerMessageSource = @"ContentBlockerMessageSource";
 NSString *WebConsoleMessageOtherMessageSource = @"OtherMessageSource";
 
 NSString *WebConsoleMessageDebugMessageLevel = @"DebugMessageLevel";
@@ -387,6 +388,8 @@ inline static NSString *stringForMessageSource(MessageSource source)
         return WebConsoleMessageCSSMessageSource;
     case MessageSource::Security:
         return WebConsoleMessageSecurityMessageSource;
+    case MessageSource::ContentBlocker:
+        return WebConsoleMessageContentBlockerMessageSource;
     case MessageSource::Other:
         return WebConsoleMessageOtherMessageSource;
     }
@@ -543,11 +546,6 @@ bool WebChromeClient::runJavaScriptPrompt(Frame* frame, const String& prompt, co
 
     result = [[WebDefaultUIDelegate sharedUIDelegate] webView:m_webView runJavaScriptTextInputPanelWithPrompt:prompt defaultText:defaultString initiatedByFrame:kit(frame)];
     return !result.isNull();
-}
-
-bool WebChromeClient::shouldInterruptJavaScript()
-{
-    return CallUIDelegateReturningBoolean(NO, m_webView, @selector(webViewShouldInterruptJavaScript:));
 }
 
 void WebChromeClient::setStatusbarText(const String& status)

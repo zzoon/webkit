@@ -1169,7 +1169,7 @@ void HTMLMediaElement::loadResource(const URL& initialURL, ContentType& contentT
     DocumentLoader* documentLoader = frame->loader().documentLoader();
 
     if (page->userContentController() && documentLoader)
-        page->userContentController()->processContentExtensionRulesForLoad(request, ResourceType::Media, *documentLoader);
+        page->userContentController()->processContentExtensionRulesForLoad(*page, request, ResourceType::Media, *documentLoader);
 
     if (request.isNull()) {
         mediaLoadingFailed(MediaPlayer::FormatError);
@@ -6214,7 +6214,7 @@ PlatformMediaSession::DisplayType HTMLMediaElement::displayType() const
 {
     if (m_videoFullscreenMode == VideoFullscreenModeStandard)
         return PlatformMediaSession::Fullscreen;
-    if (m_videoFullscreenMode & VideoFullscreenModeOptimized)
+    if (m_videoFullscreenMode & VideoFullscreenModePictureInPicture)
         return PlatformMediaSession::Optimized;
     if (m_videoFullscreenMode == VideoFullscreenModeNone)
         return PlatformMediaSession::Normal;
@@ -6287,7 +6287,7 @@ bool HTMLMediaElement::overrideBackgroundPlaybackRestriction() const
     if (m_player && m_player->isCurrentPlaybackTargetWireless())
         return true;
 #endif
-    if (m_videoFullscreenMode & VideoFullscreenModeOptimized)
+    if (m_videoFullscreenMode & VideoFullscreenModePictureInPicture)
         return true;
 #if PLATFORM(IOS)
     if (m_videoFullscreenMode == VideoFullscreenModeStandard && wkIsOptimizedFullscreenSupported() && isPlaying())
