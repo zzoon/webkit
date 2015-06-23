@@ -1,5 +1,6 @@
 /*
  *  Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
+ *  Copyright (C) 2015 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
