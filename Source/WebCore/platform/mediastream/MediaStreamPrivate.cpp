@@ -114,7 +114,7 @@ void MediaStreamPrivate::addTrack(RefPtr<MediaStreamTrackPrivate>&& track, Notif
     if (m_trackSet.contains(track->id()))
         return;
 
-    m_trackSet.add(track->id(), WTF::move(track));
+    m_trackSet.add(track->id(), track);
 
     if (m_client && notifyClientOption == NotifyClient)
         m_client->didAddTrackToPrivate(*track.get());
