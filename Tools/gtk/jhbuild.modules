@@ -25,6 +25,7 @@
       <dep package="at-spi2-core"/>
       <dep package="at-spi2-atk"/>
       <dep package="libsrtp"/>
+      <dep package="orc"/>
       <dep package="gstreamer"/>
       <dep package="gst-plugins-base"/>
       <dep package="gst-plugins-good"/>
@@ -303,6 +304,12 @@
     </branch>
   </autotools>
 
+  <autotools id="orc"
+             autogen-sh="autogen.sh"
+             autogenargs=" --disable-gtk-doc">
+    <branch repo="freedesktop-git" module="gstreamer/orc" version="0.4.24" checkoutdir="orc" tag="orc-0.4.24"/>
+  </autotools>
+
   <autotools id="gstreamer" autogenargs="--disable-gtk-doc">
     <branch repo="freedesktop-git" module="gstreamer/gstreamer" version="1.5" checkoutdir="gstreamer" tag="1.5.2"/>
   </autotools>
@@ -312,6 +319,7 @@
              autogenargs="--disable-examples --disable-gtk-doc">
     <dependencies>
       <dep package="gstreamer"/>
+      <dep package="orc"/>
     </dependencies>
     <branch repo="freedesktop-git" module="gstreamer/gst-plugins-base" version="1.5" checkoutdir="gst-plugins-base" tag="1.5.2"/>
   </autotools>
