@@ -124,7 +124,7 @@ void MediaStream::addTrack(RefPtr<MediaStreamTrack>&& track)
 
 void MediaStream::removeTrack(MediaStreamTrack* track)
 {
-    if (!internalRemoveTrack(track, StreamModifier::DOMAPI))
+    if (!internalRemoveTrack(track, StreamModifier::DomAPI))
         return;
 
     for (auto& observer : m_observers)

@@ -275,9 +275,9 @@ void MediaPlayerPrivateGStreamerOwr::createGSTAudioSinkBin()
     m_audioRenderer = owr_gst_audio_renderer_new(m_audioSink.get());
 }
 
-void MediaPlayerPrivateGStreamerOwr::sourceReadyStateChanged()
+void MediaPlayerPrivateGStreamerOwr::sourceStopped()
 {
-    LOG_MEDIA_MESSAGE("Source state changed");
+    LOG_MEDIA_MESSAGE("Source stopped");
 
     if (!m_streamPrivate || !m_streamPrivate->active())
         stop();
@@ -298,14 +298,10 @@ void MediaPlayerPrivateGStreamerOwr::sourceMutedChanged()
     LOG_MEDIA_MESSAGE("Source muted state changed");
 }
 
-void MediaPlayerPrivateGStreamerOwr::sourceEnabledChanged()
+bool MediaPlayerPrivateGStreamerOwr::preventSourceFromStopping()
 {
-    LOG_MEDIA_MESSAGE("Source enabled state changed");
-}
-
-bool MediaPlayerPrivateGStreamerOwr::observerIsEnabled()
-{
-    return true;
+    LOG_MEDIA_MESSAGE("Prevent source from stopping");
+    return false;
 }
 
 GstElement* MediaPlayerPrivateGStreamerOwr::createVideoSink()

@@ -82,10 +82,9 @@ public:
     virtual bool isLiveStream() const { return true; }
 
     // RealtimeMediaSource::Observer implementation
-    virtual void sourceReadyStateChanged() override final;
+    virtual void sourceStopped() override final;
     virtual void sourceMutedChanged() override final;
-    virtual void sourceEnabledChanged() override final;
-    virtual bool observerIsEnabled() override final;
+    virtual bool preventSourceFromStopping() override final;
 
 protected:
     virtual GstElement* createVideoSink();
