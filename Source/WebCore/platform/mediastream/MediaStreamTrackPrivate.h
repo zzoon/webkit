@@ -63,7 +63,7 @@ public:
     bool readonly() const;
     bool remote() const;
 
-    bool enabled() const { return m_enabled; }
+    bool enabled() const { return m_isEnabled; }
     void setEnabled(bool);
 
     RefPtr<MediaStreamTrackPrivate> clone();
@@ -90,17 +90,16 @@ private:
     MediaStreamTrackPrivateClient* client() const { return m_client; }
 
     // RealtimeMediaSourceObserver
-    virtual void sourceReadyStateChanged() override final;
+    virtual void sourceStopped() override final;
     virtual void sourceMutedChanged() override final;
-    virtual void sourceEnabledChanged() override final;
-    virtual bool observerIsEnabled() override final;
+    virtual bool preventSourceFromStopping() override final;
     
     RefPtr<RealtimeMediaSource> m_source;
     MediaStreamTrackPrivateClient* m_client;
     RefPtr<MediaConstraints> m_constraints;
 
     String m_id;
-    bool m_enabled;
+    bool m_isEnabled;
     bool m_isEnded;
 };
 

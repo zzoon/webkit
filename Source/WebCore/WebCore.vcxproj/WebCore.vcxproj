@@ -7584,8 +7584,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Production|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\platform\graphics\MaskImageOperation.cpp" />
-    <ClCompile Include="..\platform\graphics\OpenGLShims.cpp" />
-    <ClCompile Include="..\platform\graphics\opengl\Extensions3DOpenGL.cpp" />
     <ClCompile Include="..\platform\graphics\opengl\Extensions3DOpenGLCommon.cpp" />
     <ClCompile Include="..\platform\graphics\opengl\Extensions3DOpenGLES.cpp" />
     <ClCompile Include="..\platform\graphics\opengl\GLPlatformContext.cpp" />
@@ -17898,7 +17896,6 @@
     <ClCompile Include="..\plugins\DOMPlugin.cpp" />
     <ClCompile Include="..\plugins\DOMPluginArray.cpp" />
     <ClCompile Include="..\plugins\PluginData.cpp" />
-    <ClCompile Include="..\plugins\PluginMainThreadScheduler.cpp" />
     <ClCompile Include="..\svg\SVGAllInOne.cpp" />
     <ClCompile Include="..\svg\SVGFontFaceElement.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -19818,8 +19815,6 @@
     <ClInclude Include="..\platform\graphics\gstreamer\WebKitWebSourceGStreamer.h" />
     <ClInclude Include="..\platform\graphics\MaskImageOperation.h" />
     <ClInclude Include="..\platform\graphics\MediaPlayerPrivate.h" />
-    <ClInclude Include="..\platform\graphics\OpenGLShims.h" />
-    <ClInclude Include="..\platform\graphics\opengl\Extensions3DOpenGL.h" />
     <ClInclude Include="..\platform\graphics\opengl\Extensions3DOpenGLCommon.h" />
     <ClInclude Include="..\platform\graphics\opengl\Extensions3DOpenGLES.h" />
     <ClInclude Include="..\platform\graphics\opengl\GLDefs.h" />
@@ -19909,7 +19904,6 @@
     <ClInclude Include="..\platform\ScrollAnimatorNone.h" />
     <ClInclude Include="..\platform\Scrollbar.h" />
     <ClInclude Include="..\platform\ScrollbarTheme.h" />
-    <ClInclude Include="..\platform\ScrollbarThemeClient.h" />
     <ClInclude Include="..\platform\ScrollbarThemeComposite.h" />
     <ClInclude Include="..\platform\ScrollTypes.h" />
     <ClInclude Include="..\platform\ScrollView.h" />
@@ -21401,7 +21395,6 @@
     <ClInclude Include="..\plugins\npfunctions.h" />
     <ClInclude Include="..\plugins\npruntime.h" />
     <ClInclude Include="..\plugins\PluginData.h" />
-    <ClInclude Include="..\plugins\PluginMainThreadScheduler.h" />
     <ClInclude Include="..\svg\ColorDistance.h" />
     <ClInclude Include="..\svg\SVGAElement.h" />
     <ClInclude Include="..\svg\SVGAltGlyphDefElement.h" />

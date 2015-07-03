@@ -76,16 +76,14 @@ MediaStreamPrivate::MediaStreamPrivate(const String& id, const Vector<RefPtr<Med
     for (auto& track : tracks)
         m_trackSet.add(track->id(), track);
 
-    updateActiveState(DontNotifyClient);
+    updateActiveState(NotifyClientOption::DontNotify);
 }
 
 Vector<RefPtr<MediaStreamTrackPrivate>> MediaStreamPrivate::tracks() const
 {
     Vector<RefPtr<MediaStreamTrackPrivate>> tracks;
     tracks.reserveCapacity(m_trackSet.size());
-
-    for (auto& track : m_trackSet.values())
-        tracks.append(track);
+    copyValuesToVector(m_trackSet, tracks);
 
     return tracks;
 }
@@ -105,7 +103,7 @@ void MediaStreamPrivate::updateActiveState(NotifyClientOption notifyClientOption
         return;
     m_isActive = newActiveState;
 
-    if (m_client && notifyClientOption == NotifyClient)
+    if (m_client && notifyClientOption == NotifyClientOption::Notify)
         m_client->activeStatusChanged();
 }
 
@@ -116,10 +114,10 @@ void MediaStreamPrivate::addTrack(RefPtr<MediaStreamTrackPrivate>&& track, Notif
 
     m_trackSet.add(track->id(), track);
 
-    if (m_client && notifyClientOption == NotifyClient)
+    if (m_client && notifyClientOption == NotifyClientOption::Notify)
         m_client->didAddTrackToPrivate(*track.get());
 
-    updateActiveState(NotifyClient);
+    updateActiveState(NotifyClientOption::Notify);
 }
 
 void MediaStreamPrivate::removeTrack(MediaStreamTrackPrivate& track, NotifyClientOption notifyClientOption)
@@ -127,10 +125,10 @@ void MediaStreamPrivate::removeTrack(MediaStreamTrackPrivate& track, NotifyClien
     if (!m_trackSet.remove(track.id()))
         return;
 
-    if (m_client && notifyClientOption == NotifyClient)
+    if (m_client && notifyClientOption == NotifyClientOption::Notify)
         m_client->didRemoveTrackFromPrivate(track);
 
-    updateActiveState(NotifyClient);
+    updateActiveState(NotifyClientOption::Notify);
 }
 
 } // namespace WebCore

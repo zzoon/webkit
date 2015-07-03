@@ -102,11 +102,6 @@ MediaStream::~MediaStream()
     m_private->setClient(nullptr);
 }
 
-bool MediaStream::active() const
-{
-    return m_isActive;
-}
-
 RefPtr<MediaStream> MediaStream::clone()
 {
     Vector<RefPtr<MediaStreamTrack>> clonedTracks;
@@ -120,7 +115,7 @@ RefPtr<MediaStream> MediaStream::clone()
 
 void MediaStream::addTrack(RefPtr<MediaStreamTrack>&& track)
 {
-    if (!internalAddTrack(WTF::move(track), StreamModifiedByDOMAPI))
+    if (!internalAddTrack(WTF::move(track), StreamModifier::DomAPI))
         return;
 
     for (auto& observer : m_observers)
@@ -129,7 +124,7 @@ void MediaStream::addTrack(RefPtr<MediaStreamTrack>&& track)
 
 void MediaStream::removeTrack(MediaStreamTrack* track)
 {
-    if (!internalRemoveTrack(track, StreamModifiedByDOMAPI))
+    if (!internalRemoveTrack(track, StreamModifier::DOMAPI))
         return;
 
     for (auto& observer : m_observers)
@@ -157,7 +152,11 @@ Vector<RefPtr<MediaStreamTrack>> MediaStream::getVideoTracks() const
 
 Vector<RefPtr<MediaStreamTrack>> MediaStream::getTracks() const
 {
-    return trackVectorForType();
+    Vector<RefPtr<MediaStreamTrack>> tracks;
+    tracks.reserveCapacity(m_trackSet.size());
+    copyValuesToVector(m_trackSet, tracks);
+
+    return tracks;
 }
 
 void MediaStream::contextDestroyed()
@@ -167,7 +166,7 @@ void MediaStream::contextDestroyed()
 
 void MediaStream::trackDidEnd()
 {
-    m_private->updateActiveState(MediaStreamPrivate::NotifyClient);
+    m_private->updateActiveState(MediaStreamPrivate::NotifyClientOption::Notify);
 }
 
 void MediaStream::activeStatusChanged()
@@ -183,13 +182,13 @@ void MediaStream::didAddTrackToPrivate(MediaStreamTrackPrivate& trackPrivate)
     if (!context)
         return;
 
-    internalAddTrack(MediaStreamTrack::create(*context, trackPrivate), StreamModifiedByPlatform);
+    internalAddTrack(MediaStreamTrack::create(*context, trackPrivate), StreamModifier::Platform);
 }
 
 void MediaStream::didRemoveTrackFromPrivate(MediaStreamTrackPrivate& trackPrivate)
 {
     RefPtr<MediaStreamTrack> track = getTrackById(trackPrivate.id());
-    internalRemoveTrack(WTF::move(track), StreamModifiedByPlatform);
+    internalRemoveTrack(WTF::move(track), StreamModifier::Platform);
 }
 
 bool MediaStream::internalAddTrack(RefPtr<MediaStreamTrack>&& track, StreamModifier streamModifier)
@@ -200,8 +199,8 @@ bool MediaStream::internalAddTrack(RefPtr<MediaStreamTrack>&& track, StreamModif
     m_trackSet.add(track->id(), track);
     track->addObserver(this);
 
-    if (streamModifier == StreamModifiedByDOMAPI)
-        m_private->addTrack(&track->privateTrack(), MediaStreamPrivate::DontNotifyClient);
+    if (streamModifier == StreamModifier::DomAPI)
+        m_private->addTrack(&track->privateTrack(), MediaStreamPrivate::NotifyClientOption::DontNotify);
     else
         dispatchEvent(MediaStreamTrackEvent::create(eventNames().addtrackEvent, false, false, WTF::move(track)));
 
@@ -215,8 +214,8 @@ bool MediaStream::internalRemoveTrack(RefPtr<MediaStreamTrack>&& track, StreamMo
 
     track->removeObserver(this);
 
-    if (streamModifier == StreamModifiedByDOMAPI)
-        m_private->removeTrack(track->privateTrack(), MediaStreamPrivate::DontNotifyClient);
+    if (streamModifier == StreamModifier::DomAPI)
+        m_private->removeTrack(track->privateTrack(), MediaStreamPrivate::NotifyClientOption::DontNotify);
     else
         dispatchEvent(MediaStreamTrackEvent::create(eventNames().removetrackEvent, false, false, WTF::move(track)));
 
@@ -254,9 +253,7 @@ Vector<RefPtr<MediaStreamTrack>> MediaStream::trackVectorForType(RealtimeMediaSo
 {
     Vector<RefPtr<MediaStreamTrack>> tracks;
     for (auto& track : m_trackSet.values()) {
-        if (filterType == RealtimeMediaSource::None)
-            tracks.append(track);
-        else if (track->source()->type() == filterType)
+        if (track->source()->type() == filterType)
             tracks.append(track);
     }
 

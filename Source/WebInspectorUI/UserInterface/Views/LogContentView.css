@@ -50,11 +50,13 @@
     border-top: 1px solid rgb(240, 240, 240);
 }
 
-.console-error-level + .console-item {
+.console-error-level:not(.filtered-out, .filtered-out-by-search),
+.console-error-level:not(.filtered-out, .filtered-out-by-search) + .console-item {
     border-top-color: hsl(0, 100%, 92%);
 }
 
-.console-warning-level + .console-item {
+.console-warning-level:not(.filtered-out, .filtered-out-by-search),
+.console-warning-level:not(.filtered-out, .filtered-out-by-search) + .console-item {
     border-top-color: hsl(40, 100%, 90%);
 }
 
@@ -107,12 +109,13 @@
 }
 
 .console-group-title::before {
+    content: "";
     background-image: -webkit-canvas(disclosure-triangle-small-open-normal);
     background-size: 13px 13px;
-    top: 6px;
+    top: 4px;
+    left: 4px;
     width: 13px;
     height: 13px;
-    left: 3px;
 }
 
 .console-group.collapsed .console-group-title::before {

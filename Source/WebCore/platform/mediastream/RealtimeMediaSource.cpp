@@ -109,10 +109,9 @@ void RealtimeMediaSource::stop(Observer* callingObserver)
 
     for (auto observer : m_observers) {
         if (observer != callingObserver)
-            observer->sourceReadyStateChanged();
+            observer->sourceStopped();
     }
 
-    // There are no more consumers of this source's data, shut it down as appropriate.
     stopProducingData();
 }
 
@@ -122,7 +121,7 @@ void RealtimeMediaSource::requestStop(Observer* callingObserver)
         return;
 
     for (auto observer : m_observers) {
-        if (observer->observerIsEnabled())
+        if (observer->preventSourceFromStopping())
             return;
     }
     stop(callingObserver);

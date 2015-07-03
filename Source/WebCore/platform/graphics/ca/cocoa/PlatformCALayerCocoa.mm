@@ -43,6 +43,7 @@
 #import "WebCoreCALayerExtras.h"
 #import "WebGLLayer.h"
 #import "WebLayer.h"
+#import "WebSystemBackdropLayer.h"
 #import "WebTiledBackingLayer.h"
 #import <AVFoundation/AVFoundation.h>
 #import <QuartzCore/QuartzCore.h>
@@ -62,6 +63,7 @@
 
 #if ENABLE(FILTERS_LEVEL_2)
 @interface CABackdropLayer : CALayer
+@property BOOL windowServerAware;
 @end
 #endif
 
@@ -225,16 +227,24 @@ PlatformCALayerCocoa::PlatformCALayerCocoa(LayerType layerType, PlatformCALayerC
     case LayerTypeTransformLayer:
         layerClass = [CATransformLayer class];
         break;
+#if ENABLE(FILTERS_LEVEL_2)
+    case LayerTypeBackdropLayer:
+        layerClass = [CABackdropLayer class];
+        break;
+    case LayerTypeLightSystemBackdropLayer:
+        layerClass = [WebLightSystemBackdropLayer class];
+        break;
+    case LayerTypeDarkSystemBackdropLayer:
+        layerClass = [WebDarkSystemBackdropLayer class];
+        break;
+#else
     case LayerTypeBackdropLayer:
     case LayerTypeLightSystemBackdropLayer:
     case LayerTypeDarkSystemBackdropLayer:
-#if ENABLE(FILTERS_LEVEL_2)
-        layerClass = [CABackdropLayer class];
-#else
         ASSERT_NOT_REACHED();
         layerClass = [CALayer class];
-#endif
         break;
+#endif
     case LayerTypeWebTiledLayer:
         ASSERT_NOT_REACHED();
         break;
@@ -259,6 +269,11 @@ PlatformCALayerCocoa::PlatformCALayerCocoa(LayerType layerType, PlatformCALayerC
 
     if (layerClass)
         m_layer = adoptNS([(CALayer *)[layerClass alloc] init]);
+
+#if ENABLE(FILTERS_LEVEL_2) && PLATFORM(MAC)
+    if (layerType == LayerTypeBackdropLayer)
+        [(CABackdropLayer*)m_layer.get() setWindowServerAware:NO];
+#endif
 
     commonInit();
 }

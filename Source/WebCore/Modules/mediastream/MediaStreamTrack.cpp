@@ -56,8 +56,6 @@ MediaStreamTrack::MediaStreamTrack(ScriptExecutionContext& context, MediaStreamT
     : RefCounted()
     , ActiveDOMObject(&context)
     , m_private(privateTrack)
-    , m_isMuted(m_private->muted())
-    , m_isEnded(m_private->ended())
 {
     suspendIfNeeded();
 
@@ -101,7 +99,7 @@ void MediaStreamTrack::setEnabled(bool enabled)
 
 bool MediaStreamTrack::muted() const
 {
-    return m_isMuted;
+    return m_private->muted();
 }
 
 bool MediaStreamTrack::readonly() const
@@ -122,6 +120,11 @@ const AtomicString& MediaStreamTrack::readyState() const
     return ended() ? endedState : liveState;
 }
 
+bool MediaStreamTrack::ended() const
+{
+    return m_private->ended();
+}
+
 RefPtr<MediaStreamTrack> MediaStreamTrack::clone()
 {
     return MediaStreamTrack::create(*scriptExecutionContext(), *m_private->clone());
@@ -135,8 +138,6 @@ void MediaStreamTrack::stopProducingData()
 
     if (remote() || ended())
         return;
-
-    m_isEnded = true;
 
     m_private->endTrack();
 }
@@ -177,11 +178,6 @@ void MediaStreamTrack::applyConstraints(const MediaConstraints&)
     // https://bugs.webkit.org/show_bug.cgi?id=122428
 }
 
-bool MediaStreamTrack::ended() const
-{
-    return m_isEnded;
-}
-
 void MediaStreamTrack::addObserver(MediaStreamTrack::Observer* observer)
 {
     m_observers.append(observer);
@@ -196,11 +192,6 @@ void MediaStreamTrack::removeObserver(MediaStreamTrack::Observer* observer)
 
 void MediaStreamTrack::trackEnded()
 {
-    if (ended())
-        return;
-
-    m_isEnded = true;
-
     dispatchEvent(Event::create(eventNames().endedEvent, false, false));
 
     for (auto& observer : m_observers)
@@ -211,13 +202,8 @@ void MediaStreamTrack::trackEnded()
     
 void MediaStreamTrack::trackMutedChanged()
 {
-    if (muted()) {
-        m_isMuted = false;
-        dispatchEvent(Event::create(eventNames().unmuteEvent, false, false));
-    } else {
-        m_isMuted = true;
-        dispatchEvent(Event::create(eventNames().muteEvent, false, false));
-    }
+    AtomicString eventType = muted() ? eventNames().muteEvent : eventNames().unmuteEvent;
+    dispatchEvent(Event::create(eventType, false, false));
 
     configureTrackRendering();
 }

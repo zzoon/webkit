@@ -2323,20 +2323,6 @@ void WebPage::setInitialFocus(bool forward, bool isKeyboardEventValid, const Web
     send(Messages::WebPageProxy::VoidCallback(callbackID));
 }
 
-void WebPage::setWindowResizerSize(const IntSize& windowResizerSize)
-{
-    if (m_windowResizerSize == windowResizerSize)
-        return;
-
-    m_windowResizerSize = windowResizerSize;
-
-    for (Frame* coreFrame = m_mainFrame->coreFrame(); coreFrame; coreFrame = coreFrame->tree().traverseNext()) {
-        FrameView* view = coreFrame->view();
-        if (view)
-            view->windowResizerRectChanged();
-    }
-}
-
 void WebPage::setCanStartMediaTimerFired()
 {
     if (m_page)
@@ -2506,21 +2492,6 @@ IntRect WebPage::rootViewToAccessibilityScreen(const IntRect& rect)
     return screenRect;
 }
 #endif
-
-IntRect WebPage::windowResizerRect() const
-{
-    if (m_windowResizerSize.isEmpty())
-        return IntRect();
-
-    IntSize frameViewSize;
-    if (Frame* coreFrame = m_mainFrame->coreFrame()) {
-        if (FrameView* view = coreFrame->view())
-            frameViewSize = view->size();
-    }
-
-    return IntRect(frameViewSize.width() - m_windowResizerSize.width(), frameViewSize.height() - m_windowResizerSize.height(), 
-                   m_windowResizerSize.width(), m_windowResizerSize.height());
-}
 
 KeyboardUIMode WebPage::keyboardUIMode()
 {
@@ -2802,6 +2773,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setRequiresUserGestureForMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::requiresUserGestureForMediaPlaybackKey()));
     settings.setAllowsInlineMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::allowsInlineMediaPlaybackKey()));
     settings.setAllowsPictureInPictureMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::allowsPictureInPictureMediaPlaybackKey()));
+    settings.setMediaControlsScaleWithPageZoom(store.getBoolValueForKey(WebPreferencesKey::mediaControlsScaleWithPageZoomKey()));
     settings.setMockScrollbarsEnabled(store.getBoolValueForKey(WebPreferencesKey::mockScrollbarsEnabledKey()));
     settings.setHyperlinkAuditingEnabled(store.getBoolValueForKey(WebPreferencesKey::hyperlinkAuditingEnabledKey()));
     settings.setRequestAnimationFrameEnabled(store.getBoolValueForKey(WebPreferencesKey::requestAnimationFrameEnabledKey()));
@@ -2812,7 +2784,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setInteractiveFormValidationEnabled(store.getBoolValueForKey(WebPreferencesKey::interactiveFormValidationEnabledKey()));
     settings.setSpatialNavigationEnabled(store.getBoolValueForKey(WebPreferencesKey::spatialNavigationEnabledKey()));
 
-    settings.setMetaRefreshEnabled(store.getBoolValueForKey(WebPreferencesKey::metaRefreshEnabledKey()));
+    settings.setHttpEquivEnabled(store.getBoolValueForKey(WebPreferencesKey::httpEquivEnabledKey()));
 
     DatabaseManager::singleton().setIsAvailable(store.getBoolValueForKey(WebPreferencesKey::databasesEnabledKey()));
 

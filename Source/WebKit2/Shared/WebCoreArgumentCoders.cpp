@@ -84,7 +84,11 @@
 #endif // PLATFORM(IOS)
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-#import <WebCore/MediaPlaybackTargetContext.h>
+#include <WebCore/MediaPlaybackTargetContext.h>
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+#include <WebCore/MediaSessionMetadata.h>
 #endif
 
 using namespace WebCore;
@@ -1445,6 +1449,32 @@ bool ArgumentCoder<UserStyleSheet>::decode(ArgumentDecoder& decoder, UserStyleSh
     userStyleSheet = UserStyleSheet(source, url, WTF::move(whitelist), WTF::move(blacklist), injectedFrames, level);
     return true;
 }
+
+#if ENABLE(MEDIA_SESSION)
+void ArgumentCoder<MediaSessionMetadata>::encode(ArgumentEncoder& encoder, const MediaSessionMetadata& result)
+{
+    encoder << result.artist();
+    encoder << result.album();
+    encoder << result.title();
+    encoder << result.artworkURL();
+}
+
+bool ArgumentCoder<MediaSessionMetadata>::decode(ArgumentDecoder& decoder, MediaSessionMetadata& result)
+{
+    String artist, album, title;
+    URL artworkURL;
+    if (!decoder.decode(artist))
+        return false;
+    if (!decoder.decode(album))
+        return false;
+    if (!decoder.decode(title))
+        return false;
+    if (!decoder.decode(artworkURL))
+        return false;
+    result = MediaSessionMetadata(title, artist, album, artworkURL);
+    return true;
+}
+#endif
 
 void ArgumentCoder<UserScript>::encode(ArgumentEncoder& encoder, const UserScript& userScript)
 {

@@ -72,6 +72,8 @@ public:
 
     const AtomicString& readyState() const;
 
+    bool ended() const;
+
     RefPtr<MediaStreamTrack> clone();
     void stopProducingData();
 
@@ -83,8 +85,6 @@ public:
 
     RealtimeMediaSource* source() const { return m_private->source(); }
     MediaStreamTrackPrivate& privateTrack() { return m_private.get(); }
-
-    bool ended() const;
 
     void addObserver(Observer*);
     void removeObserver(Observer*);
@@ -112,16 +112,13 @@ private:
     virtual void derefEventTarget() override final { deref(); }
 
     // MediaStreamTrackPrivateClient
-    void trackEnded();
-    void trackMutedChanged();
+    void trackEnded() override;
+    void trackMutedChanged() override;
 
     Vector<Observer*> m_observers;
     Ref<MediaStreamTrackPrivate> m_private;
 
     RefPtr<MediaConstraintsImpl> m_constraints;
-
-    bool m_isMuted;
-    bool m_isEnded;
 };
 
 } // namespace WebCore

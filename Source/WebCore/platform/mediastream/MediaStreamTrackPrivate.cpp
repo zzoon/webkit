@@ -52,7 +52,7 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(const MediaStreamTrackPrivate& 
     , m_source(other.source())
     , m_client(nullptr)
     , m_id(createCanonicalUUIDString())
-    , m_enabled(other.enabled())
+    , m_isEnabled(other.enabled())
     , m_isEnded(other.ended())
 {
     m_source->addObserver(this);
@@ -63,7 +63,7 @@ MediaStreamTrackPrivate::MediaStreamTrackPrivate(RefPtr<RealtimeMediaSource>&& s
     , m_source(source)
     , m_client(nullptr)
     , m_id(id)
-    , m_enabled(true)
+    , m_isEnabled(true)
     , m_isEnded(false)
 {
     m_source->addObserver(this);
@@ -97,7 +97,7 @@ bool MediaStreamTrackPrivate::remote() const
 void MediaStreamTrackPrivate::setEnabled(bool enabled)
 {
     // Always update the enabled state regardless of the track being ended.
-    m_enabled = enabled;
+    m_isEnabled = enabled;
 }
 
 void MediaStreamTrackPrivate::endTrack()
@@ -140,7 +140,7 @@ void MediaStreamTrackPrivate::applyConstraints(const MediaConstraints&)
     // https://bugs.webkit.org/show_bug.cgi?id=122428
 }
 
-void MediaStreamTrackPrivate::sourceReadyStateChanged()
+void MediaStreamTrackPrivate::sourceStopped()
 {
     if (ended())
         return;
@@ -157,12 +157,7 @@ void MediaStreamTrackPrivate::sourceMutedChanged()
         m_client->trackMutedChanged();
 }
 
-void MediaStreamTrackPrivate::sourceEnabledChanged()
-{
-    // FIXME: remove this function
-}
-
-bool MediaStreamTrackPrivate::observerIsEnabled()
+bool MediaStreamTrackPrivate::preventSourceFromStopping()
 {
     return !m_isEnded;
 }

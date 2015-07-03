@@ -37,6 +37,7 @@
 #import "CompletionHandlerCallChecker.h"
 #import "NavigationActionData.h"
 #import "PageLoadState.h"
+#import "SecurityOriginData.h"
 #import "WKBackForwardListInternal.h"
 #import "WKBackForwardListItemInternal.h"
 #import "WKFrameInfoInternal.h"
@@ -62,6 +63,7 @@
 #import "_WKRenderingProgressEventsInternal.h"
 #import "_WKSameDocumentNavigationTypeInternal.h"
 #import <WebCore/Credential.h>
+#import <WebCore/URL.h>
 #import <wtf/NeverDestroyed.h>
 
 #if HAVE(APP_LINKS)
@@ -71,6 +73,8 @@
 #if USE(QUICK_LOOK)
 #import "QuickLookDocumentData.h"
 #endif
+
+using namespace WebCore;
 
 namespace WebKit {
 
@@ -229,33 +233,44 @@ NavigationState::NavigationClient::~NavigationClient()
 {
 }
 
-static void tryAppLink(RefPtr<API::NavigationAction> navigationAction, std::function<void (bool)> completionHandler)
+static void tryAppLink(RefPtr<API::NavigationAction> navigationAction, const String& currentMainFrameURL, std::function<void (bool)> completionHandler)
 {
 #if HAVE(APP_LINKS)
     bool mainFrameNavigation = !navigationAction->targetFrame() || navigationAction->targetFrame()->isMainFrame();
-    bool isProcessingUserGesture = navigationAction->isProcessingUserGesture();
-    if (mainFrameNavigation && isProcessingUserGesture) {
-        auto* localCompletionHandler = new std::function<void (bool)>(WTF::move(completionHandler));
-        [LSAppLink openWithURL:navigationAction->request().url() completionHandler:[localCompletionHandler](BOOL success, NSError *) {
-            dispatch_async(dispatch_get_main_queue(), [localCompletionHandler, success] {
-                (*localCompletionHandler)(success);
-                delete localCompletionHandler;
-            });
-        }];
+    bool shouldOpenExternalURLs = navigationAction->shouldOpenExternalURLs();
+    if (!mainFrameNavigation || !shouldOpenExternalURLs) {
+        completionHandler(false);
         return;
     }
-#endif
 
+    // If the new URL is within the same origin as the current URL, do not try to open it externally.
+    URL currentURL = URL(ParsedURLString, currentMainFrameURL);
+    if (protocolHostAndPortAreEqual(currentURL, navigationAction->request().url())) {
+        completionHandler(false);
+        return;
+    }
+
+    auto* localCompletionHandler = new std::function<void (bool)>(WTF::move(completionHandler));
+    [LSAppLink openWithURL:navigationAction->request().url() completionHandler:[localCompletionHandler](BOOL success, NSError *) {
+        dispatch_async(dispatch_get_main_queue(), [localCompletionHandler, success] {
+            (*localCompletionHandler)(success);
+            delete localCompletionHandler;
+        });
+    }];
+#else
     completionHandler(false);
+#endif
 }
 
-void NavigationState::NavigationClient::decidePolicyForNavigationAction(WebPageProxy&, API::NavigationAction& navigationAction, Ref<WebFramePolicyListenerProxy>&& listener, API::Object* userData)
+void NavigationState::NavigationClient::decidePolicyForNavigationAction(WebPageProxy& webPageProxy, API::NavigationAction& navigationAction, Ref<WebFramePolicyListenerProxy>&& listener, API::Object* userData)
 {
+    String mainFrameURLString = webPageProxy.mainFrame()->url();
+
     if (!m_navigationState.m_navigationDelegateMethods.webViewDecidePolicyForNavigationActionDecisionHandler) {
         RefPtr<API::NavigationAction> localNavigationAction = &navigationAction;
         RefPtr<WebFramePolicyListenerProxy> localListener = WTF::move(listener);
 
-        tryAppLink(localNavigationAction, [localListener, localNavigationAction] (bool followedLinkToApp) {
+        tryAppLink(localNavigationAction, mainFrameURLString, [localListener, localNavigationAction] (bool followedLinkToApp) {
             if (followedLinkToApp) {
                 localListener->ignore();
                 return;
@@ -291,12 +306,12 @@ void NavigationState::NavigationClient::decidePolicyForNavigationAction(WebPageP
     RefPtr<API::NavigationAction> localNavigationAction = &navigationAction;
     RefPtr<WebFramePolicyListenerProxy> localListener = WTF::move(listener);
     RefPtr<CompletionHandlerCallChecker> checker = CompletionHandlerCallChecker::create(navigationDelegate.get(), @selector(webView:decidePolicyForNavigationAction:decisionHandler:));
-    [navigationDelegate webView:m_navigationState.m_webView decidePolicyForNavigationAction:wrapper(navigationAction) decisionHandler:[localListener, localNavigationAction, checker](WKNavigationActionPolicy actionPolicy) {
+    [navigationDelegate webView:m_navigationState.m_webView decidePolicyForNavigationAction:wrapper(navigationAction) decisionHandler:[localListener, localNavigationAction, checker, mainFrameURLString](WKNavigationActionPolicy actionPolicy) {
         checker->didCallCompletionHandler();
 
         switch (actionPolicy) {
         case WKNavigationActionPolicyAllow:
-            tryAppLink(localNavigationAction, [localListener](bool followedLinkToApp) {
+            tryAppLink(localNavigationAction, mainFrameURLString, [localListener](bool followedLinkToApp) {
                 if (followedLinkToApp) {
                     localListener->ignore();
                     return;
@@ -449,7 +464,7 @@ void NavigationState::NavigationClient::didFailProvisionalNavigationWithError(We
 }
 
 // FIXME: Shouldn't need to pass the WebFrameProxy in here. At most, a FrameHandle.
-void NavigationState::NavigationClient::didFailProvisionalLoadInSubframeWithError(WebPageProxy& page, WebFrameProxy& webFrameProxy, API::Navigation* navigation, const WebCore::ResourceError& error, API::Object*)
+void NavigationState::NavigationClient::didFailProvisionalLoadInSubframeWithError(WebPageProxy& page, WebFrameProxy& webFrameProxy, const SecurityOriginData& securityOrigin, API::Navigation* navigation, const WebCore::ResourceError& error, API::Object*)
 {
     // FIXME: We should assert that navigation is not null here, but it's currently null because WebPageProxy::didFailProvisionalLoadForFrame passes null.
     RetainPtr<WKNavigation> wkNavigation;
@@ -462,7 +477,7 @@ void NavigationState::NavigationClient::didFailProvisionalLoadInSubframeWithErro
     auto navigationDelegate = m_navigationState.m_navigationDelegate.get();
     auto errorWithRecoveryAttempter = createErrorWithRecoveryAttempter(m_navigationState.m_webView, webFrameProxy, error);
 
-    [(id <WKNavigationDelegatePrivate>)navigationDelegate _webView:m_navigationState.m_webView navigation:nil didFailProvisionalLoadInSubframe:wrapper(API::FrameInfo::create(webFrameProxy)) withError:errorWithRecoveryAttempter.get()];
+    [(id <WKNavigationDelegatePrivate>)navigationDelegate _webView:m_navigationState.m_webView navigation:nil didFailProvisionalLoadInSubframe:wrapper(API::FrameInfo::create(webFrameProxy, securityOrigin.securityOrigin())) withError:errorWithRecoveryAttempter.get()];
 }
 
 void NavigationState::NavigationClient::didCommitNavigation(WebPageProxy& page, API::Navigation* navigation, API::Object*)
@@ -714,7 +729,7 @@ void NavigationState::HistoryClient::didNavigateWithNavigationData(WebKit::WebPa
     if (!historyDelegate)
         return;
 
-    [historyDelegate _webView:m_navigationState.m_webView didNavigateWithNavigationData:wrapper(*API::NavigationData::create(navigationDataStore))];
+    [historyDelegate _webView:m_navigationState.m_webView didNavigateWithNavigationData:wrapper(API::NavigationData::create(navigationDataStore))];
 }
 
 void NavigationState::HistoryClient::didPerformClientRedirect(WebKit::WebPageProxy&, const WTF::String& sourceURL, const WTF::String& destinationURL)
@@ -838,6 +853,16 @@ void NavigationState::willChangeNetworkRequestsInProgress()
 void NavigationState::didChangeNetworkRequestsInProgress()
 {
     [m_webView didChangeValueForKey:@"_networkRequestsInProgress"];
+}
+
+void NavigationState::willChangeCertificateInfo()
+{
+    [m_webView willChangeValueForKey:@"certificateChain"];
+}
+
+void NavigationState::didChangeCertificateInfo()
+{
+    [m_webView didChangeValueForKey:@"certificateChain"];
 }
 
 } // namespace WebKit

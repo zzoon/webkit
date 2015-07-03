@@ -62,7 +62,7 @@ public:
 
     virtual ~MediaStreamPrivate() { }
 
-    enum NotifyClientOption { NotifyClient, DontNotifyClient };
+    enum class NotifyClientOption { Notify, DontNotify };
 
     MediaStreamPrivateClient* client() const { return m_client; }
     void setClient(MediaStreamPrivateClient* client) { m_client = client; }
@@ -82,10 +82,9 @@ private:
 
     MediaStreamPrivateClient* m_client;
     String m_id;
+    bool m_isActive;
 
     HashMap<String, RefPtr<MediaStreamTrackPrivate>> m_trackSet;
-
-    bool m_isActive;
 };
 
 typedef Vector<RefPtr<MediaStreamPrivate>> MediaStreamPrivateVector;

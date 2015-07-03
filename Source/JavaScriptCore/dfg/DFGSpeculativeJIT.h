@@ -2088,8 +2088,10 @@ public:
     void compilePeepHoleBooleanBranch(Node*, Node* branchNode, JITCompiler::RelationalCondition);
     void compilePeepHoleDoubleBranch(Node*, Node* branchNode, JITCompiler::DoubleCondition);
     void compilePeepHoleObjectEquality(Node*, Node* branchNode);
+    void compilePeepHoleObjectStrictEquality(Edge objectChild, Edge otherChild, Node* branchNode);
     void compilePeepHoleObjectToObjectOrOtherEquality(Edge leftChild, Edge rightChild, Node* branchNode);
     void compileObjectEquality(Node*);
+    void compileObjectStrictEquality(Edge objectChild, Edge otherChild);
     void compileObjectToObjectOrOtherEquality(Edge leftChild, Edge rightChild);
     void compileObjectOrOtherLogicalNot(Edge value);
     void compileLogicalNot(Node*);
@@ -2338,6 +2340,10 @@ public:
     void emitGetLength(CodeOrigin, GPRReg lengthGPR, bool includeThis = false);
     void emitGetCallee(CodeOrigin, GPRReg calleeGPR);
     void emitGetArgumentStart(CodeOrigin, GPRReg startGPR);
+    
+    // Generate an OSR exit fuzz check. Returns Jump() if OSR exit fuzz is not enabled, or if
+    // it's in training mode.
+    MacroAssembler::Jump emitOSRExitFuzzCheck();
     
     // Add a speculation check.
     void speculationCheck(ExitKind, JSValueSource, Node*, MacroAssembler::Jump jumpToFail);

@@ -545,7 +545,6 @@ void Cache::deleteDumpFile()
 void Cache::clear(std::chrono::system_clock::time_point modifiedSince, std::function<void ()>&& completionHandler)
 {
     LOG(NetworkCache, "(NetworkProcess) clearing cache");
-    deleteDumpFile();
 
     if (m_statistics)
         m_statistics->clear();
@@ -555,21 +554,13 @@ void Cache::clear(std::chrono::system_clock::time_point modifiedSince, std::func
         return;
     }
     m_storage->clear(modifiedSince, WTF::move(completionHandler));
+
+    deleteDumpFile();
 }
 
 void Cache::clear()
 {
     clear(std::chrono::system_clock::time_point::min(), nullptr);
-}
-
-void Cache::handleMemoryPressureNotification(WebCore::Critical critical)
-{
-    if (critical != WebCore::Critical::Yes)
-        return;
-    // There can be substantial amount of memory in the write queue and we don't know how long it will take to write it out.
-    // We may also be about to suspend the process.
-    if (m_storage)
-        m_storage->clearWriteQueue();
 }
 
 String Cache::recordsPath() const

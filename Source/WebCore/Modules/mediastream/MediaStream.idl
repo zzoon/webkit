@@ -38,9 +38,11 @@
     sequence<MediaStreamTrack> getVideoTracks();
     sequence<MediaStreamTrack> getTracks();
 
+    MediaStreamTrack getTrackById(DOMString trackId);
+
     void addTrack(MediaStreamTrack track);
     void removeTrack(MediaStreamTrack track);
-    MediaStreamTrack getTrackById(DOMString trackId);
+
     MediaStream clone();
 
     readonly attribute boolean active;

@@ -259,7 +259,6 @@ public:
     String userAgent(const WebCore::URL&) const;
     String userAgent(WebFrame*, const WebCore::URL&) const;
     String platformUserAgent(const WebCore::URL&) const;
-    WebCore::IntRect windowResizerRect() const;
     WebCore::KeyboardUIMode keyboardUIMode();
 
     WebUndoStep* webUndoStep(uint64_t);
@@ -616,6 +615,7 @@ public:
     void getCenterForZoomGesture(const WebCore::IntPoint& centerInViewCoordinates, WebCore::IntPoint& result);
 #endif
 
+    void didApplyStyle();
     void didChangeSelection();
     void discardedComposition();
 
@@ -959,7 +959,6 @@ private:
     void goToBackForwardItem(uint64_t navigationID, uint64_t);
     void tryRestoreScrollPosition();
     void setInitialFocus(bool forward, bool isKeyboardEventValid, const WebKeyboardEvent&, uint64_t callbackID);
-    void setWindowResizerSize(const WebCore::IntSize&);
     void updateIsInWindow(bool isInitialState = false);
     void setViewState(WebCore::ViewState::Flags, bool wantsDidUpdateViewState, const Vector<uint64_t>& callbackIDs);
     void validateCommand(const String&, uint64_t);
@@ -1083,7 +1082,7 @@ private:
     void didReceiveNotificationPermissionDecision(uint64_t notificationID, bool allowed);
 
 #if ENABLE(MEDIA_STREAM)
-    void didReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed);
+    WK_EXPORT void didReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed);
 #endif
 
     void advanceToNextMisspelling(bool startBeforeSelection);
@@ -1228,8 +1227,6 @@ private:
     bool m_mayStartMediaWhenInWindow;
 
     HashMap<uint64_t, RefPtr<WebUndoStep>> m_undoStepMap;
-
-    WebCore::IntSize m_windowResizerSize;
 
 #if ENABLE(CONTEXT_MENUS)
     std::unique_ptr<API::InjectedBundle::PageContextMenuClient> m_contextMenuClient;

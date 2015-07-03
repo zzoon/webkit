@@ -70,7 +70,7 @@ public:
 
     RefPtr<MediaStream> clone();
 
-    bool active() const;
+    bool active() const { return m_isActive; }
 
     MediaStreamPrivate* privateStream() const { return m_private.get(); }
 
@@ -95,7 +95,7 @@ protected:
     virtual void contextDestroyed() override final;
 
 private:
-    enum StreamModifier { StreamModifiedByDOMAPI, StreamModifiedByPlatform };
+    enum class StreamModifier { DomAPI, Platform };
 
     // EventTarget
     virtual void refEventTarget() override final { ref(); }
@@ -115,7 +115,7 @@ private:
     void scheduleActiveStateChange();
     void activityEventTimerFired();
 
-    Vector<RefPtr<MediaStreamTrack>> trackVectorForType(RealtimeMediaSource::Type filterType = RealtimeMediaSource::None) const;
+    Vector<RefPtr<MediaStreamTrack>> trackVectorForType(RealtimeMediaSource::Type) const;
 
     RefPtr<MediaStreamPrivate> m_private;
 

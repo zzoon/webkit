@@ -345,6 +345,7 @@ webkit.org/b/42435 http/tests/misc/webtiming-cross-origin-and-back1.html [ Skip 
 webkit.org/b/42435 http/tests/misc/webtiming-cross-origin-redirect.php [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-no-origin.html [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-one-redirect.php [ Skip ]
+webkit.org/b/42435 http/tests/misc/webtiming-resolution.html [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-slow-load.php [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-ssl.php [ Skip ]
 webkit.org/b/42435 http/tests/misc/webtiming-two-redirects.php [ Skip ]
@@ -509,9 +510,6 @@ fast/events/constructors/device-proximity-event-constructor.html
 
 # TODO Fail until SUBPIXEL_LAYOUT is enabled
 webkit.org/b/85532 fast/sub-pixel [ Skip ]
-
-# These tests reference specific fonts on Mac port.
-fast/text/font-weights-zh.html [ WontFix ]
 
 # TODO LAYER_TREE_INCLUDES_VISIBLE_RECTS option to layerTreeAsText is only applicable to Mac.
 compositing/visible-rect/  [ Skip ]
@@ -1324,16 +1322,16 @@ webkit.org/b/140798 [ Release ] accessibility/html-html-element-is-ignored.html 
 webkit.org/b/140798 [ Debug ] accessibility/html-html-element-is-ignored.html [ Skip ] # Debug assertion
 webkit.org/b/140798 [ Release ] accessibility/inline-block-assertion.html [ Failure ]
 webkit.org/b/140798 [ Debug ] accessibility/inline-block-assertion.html [ Skip ] # Debug assertion
-webkit.org/b/140798 [ Release ] accessibility/input-auto-fill-button.html [ Failure ]
-webkit.org/b/140798 [ Debug ] accessibility/input-auto-fill-button.html [ Failure ]
 webkit.org/b/140798 [ Release ] accessibility/input-type-hidden-in-aria-hidden-false.html [ Failure ]
 webkit.org/b/140798 [ Debug ] accessibility/input-type-hidden-in-aria-hidden-false.html [ Skip ] # Debug assertion
 webkit.org/b/140798 [ Release ] accessibility/legend-children-are-visible.html [ Failure ]
 webkit.org/b/140798 [ Debug ] accessibility/legend-children-are-visible.html [ Skip ] # Debug assertion
 webkit.org/b/140798 [ Release ] accessibility/link-inside-button-accessible-text.html [ Failure ]
 webkit.org/b/140798 [ Debug ] accessibility/link-inside-button-accessible-text.html [ Skip ] # Debug assertion
-webkit.org/b/140798 [ Release ] accessibility/list-detection.html [ Failure ]
-webkit.org/b/140798 [ Debug ] accessibility/list-detection.html [ Skip ] # Debug assertion
+webkit.org/b/145271 [ Release ] accessibility/list-detection.html [ Failure ]
+webkit.org/b/145271 [ Debug ] accessibility/list-detection.html [ Skip ] # Debug assertion
+webkit.org/b/145271 [ Release ] accessibility/list-detection2.html [ Failure ]
+webkit.org/b/145271 [ Debug ] accessibility/list-detection2.html [ Failure ]
 webkit.org/b/140798 [ Release ] accessibility/listitem-title.html [ Failure ]
 webkit.org/b/140798 [ Debug ] accessibility/listitem-title.html [ Skip ] # Debug assertion
 webkit.org/b/140798 [ Release ] accessibility/math-multiscript-attributes.html [ Failure ]
@@ -1525,6 +1523,9 @@ webkit.org/b/140867 [ Debug ] accessibility/focusable-div.html [ Skip ]
 [ Debug ] accessibility/hang-in-isignored.html [ Skip ] # Crash (Debug Assertion)
 [ Debug ] accessibility/heading-title-includes-links.html [ Skip ]
 webkit.org/b/140867 [ Debug ] accessibility/spinbutton-value.html [ Skip ]
+
+# Apparently missing support for roleDescription on Windows.
+accessibility/aria-roledescription.html [ Failure ]
 
 # Attempt to add a text element that claims NOT to be an accessibility element:
 webkit.org/b/140870 [ Debug ] accessibility/canvas-fallback-content.html [ Skip ]
@@ -3108,3 +3109,7 @@ loader/navigation-policy [ Skip ]
 
 #Subpixel difference
 fast/text/decorations-vertical-underline.html [ Skip ]
+
+# Test requires hardcoded font names, which I do not have for this port.
+fast/text/han-generic-font-families.html [ WontFix ]
+fast/text/hangul-generic-font-families.html [ WontFix ]

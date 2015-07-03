@@ -56,14 +56,11 @@ public:
         virtual ~Observer() { }
         
         // Source state changes.
-        // FIXME: rename the below callback to sourceStopped()
-        virtual void sourceReadyStateChanged() = 0;
+        virtual void sourceStopped() = 0;
         virtual void sourceMutedChanged() = 0;
-        // FIMXE: remove the below callback
-        virtual void sourceEnabledChanged() = 0;
 
         // Observer state queries.
-        virtual bool observerIsEnabled() = 0;
+        virtual bool preventSourceFromStopping() = 0;
     };
 
     virtual ~RealtimeMediaSource() { }
@@ -94,7 +91,7 @@ public:
 
     void addObserver(Observer*);
     void removeObserver(Observer*);
-    
+
     virtual void startProducingData() { }
     virtual void stopProducingData() { }
 

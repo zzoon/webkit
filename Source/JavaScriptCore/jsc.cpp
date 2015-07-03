@@ -458,6 +458,7 @@ static EncodedJSValue JSC_HOST_CALL functionFullGC(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionEdenGC(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionHeapSize(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDeleteAllCompiledCode(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionAddressOf(ExecState*);
 #ifndef NDEBUG
 static EncodedJSValue JSC_HOST_CALL functionReleaseExecutableMemory(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDumpCallFrame(ExecState*);
@@ -599,6 +600,7 @@ protected:
         addFunction(vm, "edenGC", functionEdenGC, 0);
         addFunction(vm, "gcHeapSize", functionHeapSize, 0);
         addFunction(vm, "deleteAllCompiledCode", functionDeleteAllCompiledCode, 0);
+        addFunction(vm, "addressOf", functionAddressOf, 1);
 #ifndef NDEBUG
         addFunction(vm, "dumpCallFrame", functionDumpCallFrame, 0);
         addFunction(vm, "releaseExecutableMemory", functionReleaseExecutableMemory, 0);
@@ -699,7 +701,7 @@ EncodedJSValue JSC_HOST_CALL functionPrint(ExecState* exec)
         if (i)
             putchar(' ');
 
-        printf("%s", exec->uncheckedArgument(i).toString(exec)->view(exec).utf8().data());
+        printf("%s", exec->uncheckedArgument(i).toString(exec)->view(exec).get().utf8().data());
     }
 
     putchar('\n');
@@ -720,7 +722,7 @@ EncodedJSValue JSC_HOST_CALL functionDumpCallFrame(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL functionDebug(ExecState* exec)
 {
-    fprintf(stderr, "--> %s\n", exec->argument(0).toString(exec)->view(exec).utf8().data());
+    fprintf(stderr, "--> %s\n", exec->argument(0).toString(exec)->view(exec).get().utf8().data());
     return JSValue::encode(jsUndefined());
 }
 
@@ -876,6 +878,21 @@ EncodedJSValue JSC_HOST_CALL functionDeleteAllCompiledCode(ExecState* exec)
     exec->heap()->deleteAllCompiledCode();
     return JSValue::encode(jsUndefined());
 }
+
+// This function is not generally very helpful in 64-bit code as the tag and payload
+// share a register. But in 32-bit JITed code the tag may not be checked if an
+// optimization removes type checking requirements, such as in ===.
+EncodedJSValue JSC_HOST_CALL functionAddressOf(ExecState* exec)
+{
+    JSValue value = exec->argument(0);
+    if (!value.isCell())
+        return JSValue::encode(jsUndefined());
+    // Need to cast to uint64_t so bitwise_cast will play along.
+    uint64_t asNumber = reinterpret_cast<uint64_t>(value.asCell());
+    EncodedJSValue returnValue = JSValue::encode(jsNumber(bitwise_cast<double>(asNumber)));
+    return returnValue;
+}
+
 
 #ifndef NDEBUG
 EncodedJSValue JSC_HOST_CALL functionReleaseExecutableMemory(ExecState* exec)
@@ -1534,6 +1551,8 @@ int jscmain(int argc, char** argv)
             Options::fireExecutableAllocationFuzzAt() || Options::fireExecutableAllocationFuzzAtOrAfter();
         if (Options::enableExecutableAllocationFuzz() && (!fireAtEnabled || Options::verboseExecutableAllocationFuzz()))
             printf("JSC EXECUTABLE ALLOCATION FUZZ: encountered %u checks.\n", numberOfExecutableAllocationFuzzChecks());
+        if (Options::enableOSRExitFuzz())
+            printf("JSC OSR EXIT FUZZ: encountered %u checks.\n", numberOfOSRExitFuzzChecks());
 #endif
     }
     
