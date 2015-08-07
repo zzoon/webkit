@@ -38,7 +38,7 @@
 #include "ActiveDOMObject.h"
 #include "Dictionary.h"
 #include "EventTarget.h"
-#include "MediaEndpoint.h"
+#include "PeerConnectionBackend.h"
 #include "ScriptWrappable.h"
 #include "Timer.h"
 #include <wtf/HashMap.h>
@@ -46,9 +46,9 @@
 
 namespace WebCore {
 
-class MediaEndpointConfiguration;
 class MediaStream;
 class MediaStreamTrack;
+class PeerConnectionBackend;
 class RTCConfiguration;
 class RTCDataChannel;
 class RTCIceCandidate;
@@ -58,7 +58,7 @@ class RTCRtpSender;
 class RTCSessionDescription;
 class RTCStatsCallback;
 
-class RTCPeerConnection final : public RefCounted<RTCPeerConnection>, public ScriptWrappable, public MediaEndpointClient, public EventTargetWithInlineData, public ActiveDOMObject {
+class RTCPeerConnection final : public RefCounted<RTCPeerConnection>, public ScriptWrappable, public PeerConnectionBackendClient, public EventTargetWithInlineData, public ActiveDOMObject {
 public:
     static RefPtr<RTCPeerConnection> create(ScriptExecutionContext&, const Dictionary& rtcConfiguration, ExceptionCode&);
     ~RTCPeerConnection();
@@ -98,13 +98,6 @@ public:
 
     void close();
 
-    // MediaEndpointClient
-    virtual void gotSendSSRC(unsigned mdescIndex, unsigned ssrc, const String& cname) override;
-    virtual void gotDtlsCertificate(unsigned mdescIndex, const String& certificate) override;
-    virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&, const String& ufrag, const String& password) override;
-    virtual void doneGatheringCandidates(unsigned mdescIndex) override;
-    virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) override;
-
     // EventTarget
     virtual EventTargetInterface eventTargetInterface() const override { return RTCPeerConnectionEventTargetInterfaceType; }
     virtual ScriptExecutionContext* scriptExecutionContext() const override { return ActiveDOMObject::scriptExecutionContext(); }
@@ -124,35 +117,9 @@ private:
         DescriptionTypeAnswer = 3
     };
 
-    enum SignalingState {
-        SignalingStateStable = 1,
-        SignalingStateHaveLocalOffer = 2,
-        SignalingStateHaveRemoteOffer = 3,
-        SignalingStateHaveLocalPrAnswer = 4,
-        SignalingStateHaveRemotePrAnswer = 5,
-        SignalingStateClosed = 6,
-        SignalingStateInvalid = 7
-    };
-
-    enum IceConnectionState {
-        IceConnectionStateNew = 1,
-        IceConnectionStateChecking = 2,
-        IceConnectionStateConnected = 3,
-        IceConnectionStateCompleted = 4,
-        IceConnectionStateFailed = 5,
-        IceConnectionStateDisconnected = 6,
-        IceConnectionStateClosed = 7
-    };
-
-    enum IceGatheringState {
-        IceGatheringStateNew = 1,
-        IceGatheringStateGathering = 2,
-        IceGatheringStateComplete = 3
-    };
-
     RTCPeerConnection(ScriptExecutionContext&, PassRefPtr<RTCConfiguration>, ExceptionCode&);
 
-    SignalingState targetSignalingState(SetterType, DescriptionType) const;
+    PeerConnectionStates::SignalingState targetSignalingState(SetterType, DescriptionType) const;
     DescriptionType parseDescriptionType(const String& typeName) const;
 
     enum ResolveSetLocalDescriptionResult {
@@ -160,16 +127,6 @@ private:
         SetLocalDescriptionResolvedSuccessfully,
         SetLocalDescriptionAlreadyResolved
     };
-
-    bool isLocalConfigurationComplete() const;
-    ResolveSetLocalDescriptionResult maybeResolveSetLocalDescription();
-    void maybeDispatchGatheringDone();
-
-    String toSDP(const String& json) const;
-    String fromSDP(const String& sdp) const;
-    String iceCandidateToSDP(const String& json) const;
-    String iceCandidateFromSDP(const String& sdpFragment) const;
-    String sdpConversion(const String& functionName, const String& argument) const;
 
     void scheduleDispatchEvent(PassRefPtr<Event>);
     void scheduledEventTimerFired();
@@ -183,30 +140,24 @@ private:
     const char* activeDOMObjectName() const override;
     bool canSuspendForPageCache() const override;
 
-    void changeSignalingState(SignalingState);
-    void changeIceGatheringState(IceGatheringState);
-    void changeIceConnectionState(IceConnectionState);
+    void changeSignalingState(PeerConnectionStates::SignalingState);
+    void changeIceGatheringState(PeerConnectionStates::IceGatheringState);
+    void changeIceConnectionState(PeerConnectionStates::IceConnectionState);
 
-    SignalingState m_signalingState;
-    IceGatheringState m_iceGatheringState;
-    IceConnectionState m_iceConnectionState;
+    // PeerConnectionBackendClient
+    ScriptExecutionContext* context() const override { return scriptExecutionContext(); };
+    PeerConnectionStates::SignalingState internalSignalingState() const { return m_signalingState; }
+
+    PeerConnectionStates::SignalingState m_signalingState;
+    PeerConnectionStates::IceGatheringState m_iceGatheringState;
+    PeerConnectionStates::IceConnectionState m_iceConnectionState;
 
     HashMap<String, RefPtr<RTCRtpSender>> m_senderSet;
     HashMap<String, RefPtr<RTCRtpReceiver>> m_receiverSet;
 
-    RefPtr<MediaEndpointConfiguration> m_localConfiguration;
-    RefPtr<MediaEndpointConfiguration> m_remoteConfiguration;
-
-    String m_localConfigurationType;
-    String m_remoteConfigurationType;
-
-    std::function<void()> m_resolveSetLocalDescription;
-
     Vector<RefPtr<RTCDataChannel>> m_dataChannels;
 
-    std::unique_ptr<MediaEndpoint> m_mediaEndpoint;
-
-    mutable RefPtr<DOMWrapperWorld> m_isolatedWorld;
+    std::unique_ptr<PeerConnectionBackend> m_backend;
 
     Timer m_scheduledEventTimer;
     Vector<RefPtr<Event>> m_scheduledEvents;
