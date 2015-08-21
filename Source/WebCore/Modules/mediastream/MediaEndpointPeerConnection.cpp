@@ -71,6 +71,14 @@ static std::unique_ptr<PeerConnectionBackend> createMediaEndpointPeerConnection(
 
 CreatePeerConnectionBackend PeerConnectionBackend::create = createMediaEndpointPeerConnection;
 
+static String generateCname()
+{
+    static const size_t size = ceil(16 * 3 / 4);
+    unsigned char randomValues[size];
+    cryptographicallyRandomValues(randomValues, size);
+    return base64Encode(randomValues, size);
+}
+
 static RefPtr<MediaEndpointInit> createMediaEndpointInit(RTCConfiguration& rtcConfig)
 {
     Vector<RefPtr<IceServerInfo>> iceServers;
@@ -82,6 +90,7 @@ static RefPtr<MediaEndpointInit> createMediaEndpointInit(RTCConfiguration& rtcCo
 
 MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendClient* client)
     : m_client(client)
+    , m_cname(generateCname())
 {
     m_mediaEndpoint = MediaEndpoint::create(this);
     ASSERT(m_mediaEndpoint);
@@ -173,6 +182,7 @@ static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDesc
         if (!foundSender) {
             mdesc->setMediaStreamId(emptyString());
             mdesc->setMediaStreamTrackId(emptyString());
+            mdesc->clearSsrcs();
         }
     }
 
@@ -184,8 +194,10 @@ static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDesc
 
         RefPtr<RTCRtpSender> sender = takeFirstSenderOfType(senders, mdesc->type());
         if (sender) {
+            // FIXME: what else needs to be updated to reuse a media description?
             mdesc->setMediaStreamId(sender->mediaStreamId());
             mdesc->setMediaStreamTrackId(sender->track()->id());
+            mdesc->addSsrc(cryptographicallyRandomNumber());
             mdesc->setMode("sendrecv");
         } else
             mdesc->setMode("recvonly");
@@ -212,6 +224,8 @@ void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& opt
         mediaDescription->setPayloads(createDefaultPayloads(track->kind()));
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
+        mediaDescription->setCname(m_cname);
+        mediaDescription->addSsrc(cryptographicallyRandomNumber());
 
         configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
     }
@@ -250,6 +264,7 @@ void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>&, 
             localMediaDescription = PeerMediaDescription::create();
             localMediaDescription->setType(remoteMediaDescription->type());
             localMediaDescription->setDtlsSetup(remoteMediaDescription->dtlsSetup() == "active" ? "passive" : "active");
+            localMediaDescription->setCname(m_cname);
 
             configurationSnapshot->addMediaDescription(localMediaDescription.copyRef());
         }
@@ -257,6 +272,9 @@ void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>&, 
         localMediaDescription->setPayloads(remoteMediaDescription->payloads());
 
         localMediaDescription->setRtcpMux(remoteMediaDescription->rtcpMux());
+
+        if (!localMediaDescription->ssrcs().size())
+            localMediaDescription->addSsrc(cryptographicallyRandomNumber());
 
         if (localMediaDescription->dtlsSetup() == "actpass")
             localMediaDescription->setDtlsSetup("passive");
@@ -426,10 +444,6 @@ bool MediaEndpointPeerConnection::isLocalConfigurationComplete() const
         // Test: No trickle
         if (!mdesc->iceCandidateGatheringDone())
             return false;
-        if (mdesc->type() == "audio" || mdesc->type() == "video") {
-            if (!mdesc->ssrcs().size() || mdesc->cname().isEmpty())
-                return false;
-        }
     }
 
     return true;
@@ -462,16 +476,6 @@ void MediaEndpointPeerConnection::maybeDispatchGatheringDone()
     }
 
     m_client->scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, nullptr));
-}
-
-void MediaEndpointPeerConnection::gotSendSSRC(unsigned mdescIndex, unsigned ssrc, const String& cname)
-{
-    printf("-> gotSendSSRC()\n");
-
-    m_localConfiguration->mediaDescriptions()[mdescIndex]->addSsrc(ssrc);
-    m_localConfiguration->mediaDescriptions()[mdescIndex]->setCname(cname);
-
-    maybeResolveSetLocalDescription();
 }
 
 void MediaEndpointPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const String& certificate)

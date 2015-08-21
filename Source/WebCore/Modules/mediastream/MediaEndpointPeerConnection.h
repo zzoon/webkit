@@ -74,7 +74,6 @@ private:
     void maybeDispatchGatheringDone();
 
     // MediaEndpointClient
-    virtual void gotSendSSRC(unsigned mdescIndex, unsigned ssrc, const String& cname) override;
     virtual void gotDtlsCertificate(unsigned mdescIndex, const String& certificate) override;
     virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&, const String& ufrag, const String& password) override;
     virtual void doneGatheringCandidates(unsigned mdescIndex) override;
@@ -90,6 +89,8 @@ private:
     std::unique_ptr<MediaEndpoint> m_mediaEndpoint;
 
     mutable RefPtr<DOMWrapperWorld> m_isolatedWorld;
+
+    String m_cname;
 
     RefPtr<MediaEndpointConfiguration> m_localConfiguration;
     RefPtr<MediaEndpointConfiguration> m_remoteConfiguration;

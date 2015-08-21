@@ -61,7 +61,6 @@ public:
     void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&, const String& ufrag, const String& password);
     void dispatchGatheringDone(unsigned sessionIndex);
     void dispatchDtlsCertificate(unsigned sessionIndex, const String& certificate);
-    void dispatchSendSSRC(unsigned sessionIndex, unsigned ssrc, const String& cname);
     void dispatchRemoteSource(unsigned sessionIndex, RefPtr<RealtimeMediaSource>&&);
 
 private:

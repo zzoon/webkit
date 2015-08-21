@@ -95,6 +95,7 @@ public:
 
     const Vector<unsigned>& ssrcs() const { return m_ssrcs; }
     void addSsrc(unsigned ssrc) { m_ssrcs.append(ssrc); }
+    void clearSsrcs() { m_ssrcs.clear(); }
 
     const String& iceUfrag() const { return m_iceUfrag; }
     void setIceUfrag(const String& iceUfrag) { m_iceUfrag = iceUfrag; }
