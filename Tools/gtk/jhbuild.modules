@@ -392,14 +392,14 @@
        <dep package="gst-plugins-base"/>
        <dep package="libusrsctp"/>
      </dependencies>
-    <branch repo="github.com" module="EricssonResearch/openwebrtc-gst-plugins.git" checkoutdir="gst-plugins-openwebrtc" tag="e359b67484af90f416ea35e301205d2b53c77a14"/>
+    <branch repo="github.com" module="EricssonResearch/openwebrtc-gst-plugins.git" checkoutdir="gst-plugins-openwebrtc" tag="8becd45812122ae53ff130d92aade1075082705a"/>
    </autotools>
 
    <autotools id="libnice">
     <dependencies>
       <dep package="gstreamer"/>
     </dependencies>
-    <branch repo="freedesktop-git" module="libnice/libnice.git" tag="0.1.10" checkoutdir="libnice"/>
+    <branch repo="freedesktop-git" module="libnice/libnice.git" tag="0.1.13" checkoutdir="libnice"/>
   </autotools>
 
   <autotools id="libvpx"
@@ -412,7 +412,7 @@
       <dep package="gst-plugins-openwebrtc"/>
       <dep package="libnice"/>
      </dependencies>
-    <branch repo="github.com" module="EricssonResearch/openwebrtc.git" checkoutdir="openwebrtc" tag="13516c7f79a0c48bb411464f7613d4b426c70f5b"/>
+    <branch repo="github.com" module="EricssonResearch/openwebrtc.git" checkoutdir="openwebrtc" tag="3c1a0e667c9962343af3c1ae6eb71c8734e3ce0e"/>
   </autotools>
 
 </moduleset>
