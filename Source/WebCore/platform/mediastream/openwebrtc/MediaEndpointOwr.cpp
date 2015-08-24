@@ -195,9 +195,9 @@ unsigned MediaEndpointOwr::sessionIndex(OwrSession* session) const
     return index;
 }
 
-void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate, const String& ufrag, const String& password)
+void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate)
 {
-    m_client->gotIceCandidate(sessionIndex, WTF::move(iceCandidate), ufrag, password);
+    m_client->gotIceCandidate(sessionIndex, WTF::move(iceCandidate));
 }
 
 void MediaEndpointOwr::dispatchGatheringDone(unsigned sessionIndex)
@@ -215,8 +215,11 @@ void MediaEndpointOwr::dispatchRemoteSource(unsigned sessionIndex, RefPtr<Realti
     m_client->gotRemoteSource(sessionIndex, WTF::move(source));
 }
 
-void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription*)
+void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription* mediaDescription)
 {
+    g_object_set_data_full(G_OBJECT(session), "ice-ufrag", g_strdup(mediaDescription->iceUfrag().ascii().data()), g_free);
+    g_object_set_data_full(G_OBJECT(session), "ice-password", g_strdup(mediaDescription->icePassword().ascii().data()), g_free);
+
     g_signal_connect(session, "on-new-candidate", G_CALLBACK(gotCandidate), this);
     g_signal_connect(session, "on-candidate-gathering-done", G_CALLBACK(candidateGatheringDone), this);
     g_signal_connect(session, "notify::dtls-certificate", G_CALLBACK(gotDtlsCertificate), this);
@@ -323,8 +326,6 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
     guint port;
     gchar* relatedAddress;
     guint relatedPort;
-    gchar* ufrag;
-    gchar* password;
 
     g_object_get(candidate, "type", &candidateType,
         "foundation", &foundation,
@@ -335,8 +336,6 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
         "port", &port,
         "base-address", &relatedAddress,
         "base-port", &relatedPort,
-        "ufrag", &ufrag,
-        "password", &password,
         nullptr);
 
     ASSERT(candidateType >= 0 && candidateType < candidateTypes.size());
@@ -362,13 +361,15 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
         iceCandidate->setRelatedPort(relatedPort ? relatedPort : 9);
     }
 
-    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionIndex(session), WTF::move(iceCandidate), String(ufrag), String(password));
+    g_object_set(G_OBJECT(candidate), "ufrag", g_object_get_data(G_OBJECT(session), "ice-ufrag"),
+        "password", g_object_get_data(G_OBJECT(session), "ice-password"),
+        nullptr);
+
+    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionIndex(session), WTF::move(iceCandidate));
 
     g_free(foundation);
     g_free(address);
     g_free(relatedAddress);
-    g_free(ufrag);
-    g_free(password);
 }
 
 static void candidateGatheringDone(OwrSession* session, MediaEndpointOwr* mediaEndpoint)

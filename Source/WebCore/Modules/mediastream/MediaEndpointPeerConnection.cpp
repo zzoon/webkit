@@ -71,9 +71,9 @@ static std::unique_ptr<PeerConnectionBackend> createMediaEndpointPeerConnection(
 
 CreatePeerConnectionBackend PeerConnectionBackend::create = createMediaEndpointPeerConnection;
 
-static String generateCname()
+static String randomString(size_t length)
 {
-    static const size_t size = ceil(16 * 3 / 4);
+    const size_t size = ceil(length * 3 / 4);
     unsigned char randomValues[size];
     cryptographicallyRandomValues(randomValues, size);
     return base64Encode(randomValues, size);
@@ -90,7 +90,9 @@ static RefPtr<MediaEndpointInit> createMediaEndpointInit(RTCConfiguration& rtcCo
 
 MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendClient* client)
     : m_client(client)
-    , m_cname(generateCname())
+    , m_cname(randomString(16))
+    , m_iceUfrag(randomString(4))
+    , m_icePassword(randomString(22))
 {
     m_mediaEndpoint = MediaEndpoint::create(this);
     ASSERT(m_mediaEndpoint);
@@ -226,6 +228,8 @@ void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& opt
         mediaDescription->setDtlsSetup("actpass");
         mediaDescription->setCname(m_cname);
         mediaDescription->addSsrc(cryptographicallyRandomNumber());
+        mediaDescription->setIceUfrag(m_iceUfrag);
+        mediaDescription->setIcePassword(m_icePassword);
 
         configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
     }
@@ -240,6 +244,8 @@ void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& opt
         mediaDescription->setPayloads(createDefaultPayloads(type));
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
+        mediaDescription->setIceUfrag(m_iceUfrag);
+        mediaDescription->setIcePassword(m_icePassword);
 
         configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
     }
@@ -265,6 +271,8 @@ void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>&, 
             localMediaDescription->setType(remoteMediaDescription->type());
             localMediaDescription->setDtlsSetup(remoteMediaDescription->dtlsSetup() == "active" ? "passive" : "active");
             localMediaDescription->setCname(m_cname);
+            localMediaDescription->setIceUfrag(m_iceUfrag);
+            localMediaDescription->setIcePassword(m_icePassword);
 
             configurationSnapshot->addMediaDescription(localMediaDescription.copyRef());
         }
@@ -439,7 +447,7 @@ void MediaEndpointPeerConnection::stop()
 bool MediaEndpointPeerConnection::isLocalConfigurationComplete() const
 {
     for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
-        if (mdesc->dtlsFingerprint().isEmpty() || mdesc->iceUfrag().isEmpty())
+        if (mdesc->dtlsFingerprint().isEmpty())
             return false;
         // Test: No trickle
         if (!mdesc->iceCandidateGatheringDone())
@@ -518,18 +526,13 @@ void MediaEndpointPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const 
         maybeDispatchGatheringDone();
 }
 
-void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate, const String& ufrag, const String& password)
+void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate)
 {
     printf("-> gotIceCandidate()\n");
 
     ASSERT(scriptExecutionContext()->isContextThread());
 
     PeerMediaDescription& mdesc = *m_localConfiguration->mediaDescriptions()[mdescIndex];
-    if (mdesc.iceUfrag().isEmpty()) {
-        mdesc.setIceUfrag(ufrag);
-        mdesc.setIcePassword(password);
-    }
-
     mdesc.addIceCandidate(candidate.copyRef());
 
     if (!candidate->address().contains(':')) { // not IPv6

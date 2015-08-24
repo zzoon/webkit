@@ -75,7 +75,7 @@ private:
 
     // MediaEndpointClient
     virtual void gotDtlsCertificate(unsigned mdescIndex, const String& certificate) override;
-    virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&, const String& ufrag, const String& password) override;
+    virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) override;
     virtual void doneGatheringCandidates(unsigned mdescIndex) override;
     virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) override;
 
@@ -91,6 +91,8 @@ private:
     mutable RefPtr<DOMWrapperWorld> m_isolatedWorld;
 
     String m_cname;
+    String m_iceUfrag;
+    String m_icePassword;
 
     RefPtr<MediaEndpointConfiguration> m_localConfiguration;
     RefPtr<MediaEndpointConfiguration> m_remoteConfiguration;
