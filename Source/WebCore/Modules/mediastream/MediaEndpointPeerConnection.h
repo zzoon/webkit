@@ -69,6 +69,17 @@ private:
         SetLocalDescriptionAlreadyResolved
     };
 
+    void enqueueOperation(std::function<void ()>);
+    void completeQueuedOperation();
+
+    void queuedCreateOffer(const RefPtr<RTCOfferOptions>&, OfferAnswerResolveCallback, RejectCallback);
+    void queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback, RejectCallback);
+
+    void queuedSetLocalDescription(RTCSessionDescription*, PeerConnectionStates::SignalingState targetState, VoidResolveCallback, RejectCallback);
+    void queuedSetRemoteDescription(RTCSessionDescription*, PeerConnectionStates::SignalingState targetState, VoidResolveCallback, RejectCallback);
+
+    void queuedAddIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback);
+
     bool isLocalConfigurationComplete() const;
     ResolveSetLocalDescriptionResult maybeResolveSetLocalDescription();
     void maybeDispatchGatheringDone();
@@ -87,6 +98,8 @@ private:
 
     PeerConnectionBackendClient* m_client;
     std::unique_ptr<MediaEndpoint> m_mediaEndpoint;
+
+    Vector<std::function<void ()>> m_operationsQueue;
 
     mutable RefPtr<DOMWrapperWorld> m_isolatedWorld;
 

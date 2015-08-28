@@ -206,7 +206,29 @@ static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDesc
     }
 }
 
-void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& options, OfferAnswerResolveCallback resolveCallback, RejectCallback)
+void MediaEndpointPeerConnection::enqueueOperation(std::function<void ()> operation)
+{
+    m_operationsQueue.append(operation);
+    if (m_operationsQueue.size() == 1)
+        callOnMainThread(m_operationsQueue[0]);
+}
+
+void MediaEndpointPeerConnection::completeQueuedOperation()
+{
+    m_operationsQueue.remove(0);
+    if (!m_operationsQueue.isEmpty())
+        callOnMainThread(m_operationsQueue[0]);
+}
+
+void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& options, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback)
+{
+    RefPtr<RTCOfferOptions> protectedOptions = options;
+    enqueueOperation([this, protectedOptions, resolveCallback, rejectCallback]() {
+        queuedCreateOffer(protectedOptions, resolveCallback, rejectCallback);
+    });
+}
+
+void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions>& options, OfferAnswerResolveCallback resolveCallback, RejectCallback)
 {
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localConfiguration ?
         MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get())) : MediaEndpointConfiguration::create();
@@ -252,10 +274,20 @@ void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& opt
 
     String json = MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get());
     RefPtr<RTCSessionDescription> offer = RTCSessionDescription::create("offer", toSDP(json));
+
     resolveCallback(*offer);
+    completeQueuedOperation();
 }
 
-void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback resolveCallback, RejectCallback)
+void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>& options, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback)
+{
+    RefPtr<RTCAnswerOptions> protectedOptions = options;
+    enqueueOperation([this, protectedOptions, resolveCallback, rejectCallback]() {
+        queuedCreateAnswer(protectedOptions, resolveCallback, rejectCallback);
+    });
+}
+
+void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback resolveCallback, RejectCallback)
 {
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localConfiguration ?
         MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get())) : MediaEndpointConfiguration::create();
@@ -293,10 +325,20 @@ void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>&, 
 
     String json = MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get());
     RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", toSDP(json));
+
     resolveCallback(*answer);
+    completeQueuedOperation();
 }
 
 void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* description, PeerConnectionStates::SignalingState targetState, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+{
+    RefPtr<RTCSessionDescription> protectedDescription = description;
+    enqueueOperation([this, protectedDescription, targetState, resolveCallback, rejectCallback]() {
+        queuedSetLocalDescription(protectedDescription.get(), targetState, resolveCallback, rejectCallback);
+    });
+}
+
+void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, PeerConnectionStates::SignalingState targetState, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     unsigned previousNumberOfMediaDescriptions = m_localConfiguration ? m_localConfiguration->mediaDescriptions().size() : 0;
 
@@ -308,6 +350,7 @@ void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* des
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
         rejectCallback(*error);
+        completeQueuedOperation();
         return;
     }
 
@@ -317,6 +360,7 @@ void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* des
     m_resolveSetLocalDescription = [this, targetState, resolveCallback]() mutable {
         m_client->changeSignalingState(targetState);
         resolveCallback();
+        completeQueuedOperation();
     };
 
     if (hasNewMediaDescriptions)
@@ -363,6 +407,14 @@ static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayl
 
 void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* description, PeerConnectionStates::SignalingState targetState, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
+    RefPtr<RTCSessionDescription> protectedDescription = description;
+    enqueueOperation([this, protectedDescription, targetState, resolveCallback, rejectCallback]() {
+        queuedSetRemoteDescription(protectedDescription.get(), targetState, resolveCallback, rejectCallback);
+    });
+}
+
+void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* description, PeerConnectionStates::SignalingState targetState, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+{
     String json = fromSDP(description->sdp());
     m_remoteConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
     m_remoteConfigurationType = description->type();
@@ -371,6 +423,7 @@ void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* de
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
         rejectCallback(*error);
+        completeQueuedOperation();
         return;
     }
 
@@ -394,6 +447,7 @@ void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* de
     m_client->changeSignalingState(targetState);
 
     resolveCallback();
+    completeQueuedOperation();
 }
 
 RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::remoteDescription() const
@@ -414,12 +468,21 @@ void MediaEndpointPeerConnection::setConfiguration(RTCConfiguration& configurati
 
 void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
+    RefPtr<RTCIceCandidate> protectedCandidate = rtcCandidate;
+    enqueueOperation([this, protectedCandidate, resolveCallback, rejectCallback]() {
+        queuedAddIceCandidate(protectedCandidate.get(), resolveCallback, rejectCallback);
+    });
+}
+
+void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+{
     String json = iceCandidateFromSDP(rtcCandidate->candidate());
     RefPtr<IceCandidate> candidate = MediaEndpointConfigurationConversions::iceCandidateFromJSON(json);
     if (!candidate) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("SyntaxError (malformed candidate)");
         rejectCallback(*error);
+        completeQueuedOperation();
         return;
     }
 
@@ -428,6 +491,7 @@ void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate,
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSdpMlineIndex (sdpMLineIndex out of range");
         rejectCallback(*error);
+        completeQueuedOperation();
         return;
     }
 
@@ -437,6 +501,7 @@ void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate,
     m_mediaEndpoint->addRemoteCandidate(*candidate, mdescIndex, mdesc.iceUfrag(), mdesc.icePassword());
 
     resolveCallback();
+    completeQueuedOperation();
 }
 
 void MediaEndpointPeerConnection::stop()
