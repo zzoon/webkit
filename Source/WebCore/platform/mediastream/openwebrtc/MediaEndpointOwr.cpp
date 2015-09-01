@@ -45,12 +45,64 @@ namespace WebCore {
 
 static void gotCandidate(OwrSession*, OwrCandidate*, MediaEndpointOwr*);
 static void candidateGatheringDone(OwrSession*, MediaEndpointOwr*);
-static void gotDtlsCertificate(OwrSession*, GParamSpec*, MediaEndpointOwr*);
 static void gotIncomingSource(OwrMediaSession*, OwrMediaSource*, MediaEndpointOwr*);
 
 static const Vector<String> candidateTypes = { "host", "srflx", "prflx", "relay" };
 static const Vector<String> candidateTcpTypes = { "", "active", "passive", "so" };
 static const Vector<String> codecTypes = { "NONE", "PCMU", "PCMA", "OPUS", "H264", "VP8" };
+
+static const gchar* dtlsKey =
+    "-----BEGIN RSA PRIVATE KEY-----\n"
+    "MIIEpAIBAAKCAQEAx4npCHPrreO5YSUYrZXjN/JTiLaaqbq9h8sSaF5lke64r8JO\n"
+    "apGWXaLbMcUXfLkFtL4hydo0fyki8iN+oPuMJjEu0c/DX/N1N57wjnHFNY9mXJNx\n"
+    "hL4Ev64PKxBrjTx/3CKMR6u8ssi0lIcnRjw9/bMKvedWl1S9wEbJeszd1rhLwAwD\n"
+    "5euqYkzLUtlRthkines86E1zHKVofr0NED22RkL+WgC2q1Y6Ic09wjAqCK+4QVsX\n"
+    "4XqFmOqYT/I1sb+JPZaIFOaowWWXaBxdKXQ4WbLqm25wA1ilyy1tMUsbnl8Sxouq\n"
+    "F0dj5MdsKtNBckueV3Ex38fgCyz7EGhyMtqqzQIDAQABAoIBAGXcCcCN5F6FJEnp\n"
+    "9PoPzMjvhCMDDFregAgE6yWqInFnipH2P695GGg+TWTPttitXrNQZ9Ex+aB8MGGp\n"
+    "Kugk4PtSGhNy2sptboXxNd2RSFm6FUfm4IkhsyziPs39+NlFbAPFAxVHHvGpMT2s\n"
+    "7KiW8hJDRpWAtZxU3vR7bjiowgnsbbtJ/ngmJ56wEgVr/t0fjimPdY7rGmX+o/mc\n"
+    "QbY5+aN29EJiLtVqcQx7DujObHnDCs8Y1WxWChd4Ai3hFpCgfRMGBN7e3rUzZNTf\n"
+    "GZmIiABOW/SKwS9Kjz9rZJLlYtbCZsl+/XGwpMEBISnnvKK07VZA6DIbrCKlk9Hb\n"
+    "sIVHRgUCgYEA5nRghJHljO933LooUurF1kwPw6XigcFlwq9mOSk1USseEgEhooeS\n"
+    "L4V6BuaQ6j3RhRJTb4kr22KqRNRWEB2Mk0eb71s0+ZdGT5hakbSWKQgtm9z0Zuup\n"
+    "QJk+dle4TRN5zJMWT1o6hKH9GwwlkifHfvJoK0rzY4RsMn5uDt+N24cCgYEA3ag7\n"
+    "QEI+TF1W55dOZWxCsOHjMZZXMLzfmWGLpcOyq3qPnj9fDtEi+iTcMOXhhYgxB3tO\n"
+    "+I16XNKY/FWTvc2/979dh/AEospk3kHCEQ4NnvrKFw2UD/LL5SczSiXrIQfgAWMA\n"
+    "n2FHQQbEsu+cgG8eioO9u8o4Mt138Jo+/llS5AsCgYEA1okseP2hJuyfNvqOI3Kv\n"
+    "remtG0PIc2bpJq5GiZwVKHTtT3GCMF3o9xhZGyd1bLsT27/NsJ2QGHHndJ//Zo07\n"
+    "mrglMFRGIrxzFhIM7muhBp24Z8rwMwfbzmlavqy2w/oHfyzGriSfKW3rxEwwhblG\n"
+    "fKWJ2BO0NMbIOtF7/5iZ5O0CgYEAlmQ4n2bSwhlqh4O/q00DCuSYs+Jfki/0PitT\n"
+    "Bst7BKIJo8M3ieQYKUStKXgvxdwb+AmQEVBcv3IcXsjpjxR0tXHf0gXl/1X3jl1r\n"
+    "gQrZ7w4V5AJQfWmtMfOg9yQ3HpgrQoWbvIfSQqqG9ylgNDwwqqasKygPbWOap2Lg\n"
+    "bs7IUPUCgYAof3hkkYeNJg2YpIStWDhun6tMoh3bZaoK/9wM+CGzBAHBOPjY8JvA\n"
+    "iegtYEMN3IQ5F0i93YpIxLIr0GY8zu4UjamipNs85PLAFKHgcwk5FJuwbJc08qbK\n"
+    "DoL7VGw0Qie5XKqicpoYMq981k2kcvFBqcG1UNhzflus3687odSQ4A==\n"
+    "-----END RSA PRIVATE KEY-----\n";
+
+static const gchar* dtlsCertificate =
+    "-----BEGIN CERTIFICATE-----\n"
+    "MIIDtTCCAp2gAwIBAgIJAPp7zXaiL2IeMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV\n"
+    "BAYTAkFVMRMwEQYDVQQIEwpTb21lLVN0YXRlMSEwHwYDVQQKExhJbnRlcm5ldCBX\n"
+    "aWRnaXRzIFB0eSBMdGQwHhcNMTUwNjI2MDU1MjQ4WhcNMTYwNjI1MDU1MjQ4WjBF\n"
+    "MQswCQYDVQQGEwJBVTETMBEGA1UECBMKU29tZS1TdGF0ZTEhMB8GA1UEChMYSW50\n"
+    "ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB\n"
+    "CgKCAQEAx4npCHPrreO5YSUYrZXjN/JTiLaaqbq9h8sSaF5lke64r8JOapGWXaLb\n"
+    "McUXfLkFtL4hydo0fyki8iN+oPuMJjEu0c/DX/N1N57wjnHFNY9mXJNxhL4Ev64P\n"
+    "KxBrjTx/3CKMR6u8ssi0lIcnRjw9/bMKvedWl1S9wEbJeszd1rhLwAwD5euqYkzL\n"
+    "UtlRthkines86E1zHKVofr0NED22RkL+WgC2q1Y6Ic09wjAqCK+4QVsX4XqFmOqY\n"
+    "T/I1sb+JPZaIFOaowWWXaBxdKXQ4WbLqm25wA1ilyy1tMUsbnl8SxouqF0dj5Mds\n"
+    "KtNBckueV3Ex38fgCyz7EGhyMtqqzQIDAQABo4GnMIGkMB0GA1UdDgQWBBSZi+/v\n"
+    "10ihdTH3w3S5rOpPOaj4MDB1BgNVHSMEbjBsgBSZi+/v10ihdTH3w3S5rOpPOaj4\n"
+    "MKFJpEcwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgTClNvbWUtU3RhdGUxITAfBgNV\n"
+    "BAoTGEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZIIJAPp7zXaiL2IeMAwGA1UdEwQF\n"
+    "MAMBAf8wDQYJKoZIhvcNAQELBQADggEBAD+T4YTxIMOirPMP7pol1hRO6NANX7UF\n"
+    "Crx3pbGYe3B5oer1HczKgRAWGBWVwgkH+zN4cJGsHWkCToh2n8JKIrUYb3qem7ET\n"
+    "KBMEFMKaSkKN6VKzAz8pp1zt2gm/cPSN+uJhI7a763sLqR9apWXBuKfkWD4Z4YOi\n"
+    "3s/8+E/aTrAPwDAt3ipOewqs1zCCIQSXNCZ7D1cCQGuEt6u7nlFotQx/28gkrz+2\n"
+    "TuDoAwaEuZfpaZKqHHIqNBFExwUDc0KdAFogniq2YaRwcSq9/xUaReCKLG5XoopT\n"
+    "Rc3p8yIIO7cpNt1VW1J3hwsZpc61CCQu4dlTIfqKJ8zkJFa0RjVvz28=\n"
+    "-----END CERTIFICATE-----\n";
 
 static std::unique_ptr<MediaEndpoint> createMediaEndpointOwr(MediaEndpointClient* client)
 {
@@ -77,6 +129,21 @@ MediaEndpointOwr::~MediaEndpointOwr()
 void MediaEndpointOwr::setConfiguration(RefPtr<MediaEndpointInit>&& configuration)
 {
     m_configuration = configuration;
+}
+
+static gboolean generateDtlsCertificate(gpointer data)
+{
+    MediaEndpointOwr* mediaEndpoint = (MediaEndpointOwr*) data;
+
+    // FIXME: use hard coded cert and key until the crypto utils have landed
+    // in OpenWebRTC
+    mediaEndpoint->dispatchDtlsCertificate(String(dtlsCertificate));
+    return false;
+}
+
+void MediaEndpointOwr::getDtlsCertificate()
+{
+    g_idle_add(generateDtlsCertificate, this);
 }
 
 void MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuration, bool isInitiator)
@@ -205,9 +272,9 @@ void MediaEndpointOwr::dispatchGatheringDone(unsigned sessionIndex)
     m_client->doneGatheringCandidates(sessionIndex);
 }
 
-void MediaEndpointOwr::dispatchDtlsCertificate(unsigned sessionIndex, const String& certificate)
+void MediaEndpointOwr::dispatchDtlsCertificate(const String& certificate)
 {
-    m_client->gotDtlsCertificate(sessionIndex, certificate);
+    m_client->gotDtlsCertificate(certificate);
 }
 
 void MediaEndpointOwr::dispatchRemoteSource(unsigned sessionIndex, RefPtr<RealtimeMediaSource>&& source)
@@ -222,7 +289,6 @@ void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription*
 
     g_signal_connect(session, "on-new-candidate", G_CALLBACK(gotCandidate), this);
     g_signal_connect(session, "on-candidate-gathering-done", G_CALLBACK(candidateGatheringDone), this);
-    g_signal_connect(session, "notify::dtls-certificate", G_CALLBACK(gotDtlsCertificate), this);
 }
 
 void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMediaDescription* mediaDescription, bool isInitiator)
@@ -273,8 +339,14 @@ void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const V
 
     g_object_set(m_transportAgent, "ice-controlling-mode", isInitiator, nullptr);
 
-    for (auto& config : sessionConfigs)
-        m_sessions.append(OWR_SESSION(owr_media_session_new(config.isDtlsClient)));
+    for (auto& config : sessionConfigs) {
+        OwrSession* session = OWR_SESSION(owr_media_session_new(config.isDtlsClient));
+        g_object_set(session, "dtls-certificate", dtlsCertificate,
+            "dtls-key", dtlsKey,
+            nullptr);
+
+        m_sessions.append(session);
+    }
 }
 
 void MediaEndpointOwr::internalAddRemoteCandidate(OwrSession* session, IceCandidate& candidate, const String& ufrag, const String& password)
@@ -375,17 +447,6 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
 static void candidateGatheringDone(OwrSession* session, MediaEndpointOwr* mediaEndpoint)
 {
     mediaEndpoint->dispatchGatheringDone(mediaEndpoint->sessionIndex(session));
-}
-
-static void gotDtlsCertificate(OwrSession* session, GParamSpec*, MediaEndpointOwr* mediaEndpoint)
-{
-    gchar* pem;
-    g_object_get(session, "dtls-certificate", &pem, nullptr);
-
-    String certificate(pem);
-    g_free(pem);
-
-    mediaEndpoint->dispatchDtlsCertificate(mediaEndpoint->sessionIndex(session), certificate);
 }
 
 static void gotIncomingSource(OwrMediaSession* mediaSession, OwrMediaSource* source, MediaEndpointOwr* mediaEndpoint)

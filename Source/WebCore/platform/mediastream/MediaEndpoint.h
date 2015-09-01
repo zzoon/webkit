@@ -46,7 +46,7 @@ class RealtimeMediaSource;
 
 class MediaEndpointClient {
 public:
-    virtual void gotDtlsCertificate(unsigned mdescIndex, const String& certificate) = 0;
+    virtual void gotDtlsCertificate(const String& certificate) = 0;
     virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) = 0;
     virtual void doneGatheringCandidates(unsigned mdescIndex) = 0;
     virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) = 0;
@@ -63,6 +63,8 @@ public:
 
     // FIMXE: look over naming
     virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) = 0;
+
+    virtual void getDtlsCertificate() = 0;
 
     virtual void prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) = 0;
     virtual void prepareToSend(MediaEndpointConfiguration*, bool isInitiator) = 0;

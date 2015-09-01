@@ -93,9 +93,14 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     , m_cname(randomString(16))
     , m_iceUfrag(randomString(4))
     , m_icePassword(randomString(22))
+    , m_resolveSetLocalDescription(nullptr)
 {
     m_mediaEndpoint = MediaEndpoint::create(this);
     ASSERT(m_mediaEndpoint);
+
+    enqueueOperation([this]() {
+        m_mediaEndpoint->getDtlsCertificate();
+    });
 }
 
 MediaEndpointPeerConnection::~MediaEndpointPeerConnection()
@@ -215,6 +220,7 @@ void MediaEndpointPeerConnection::enqueueOperation(std::function<void ()> operat
 
 void MediaEndpointPeerConnection::completeQueuedOperation()
 {
+    ASSERT( m_operationsQueue.size());
     m_operationsQueue.remove(0);
     if (!m_operationsQueue.isEmpty())
         callOnMainThread(m_operationsQueue[0]);
@@ -230,6 +236,8 @@ void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& opt
 
 void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions>& options, OfferAnswerResolveCallback resolveCallback, RejectCallback)
 {
+    ASSERT(!m_dtlsFingerprint.isEmpty());
+
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localConfiguration ?
         MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get())) : MediaEndpointConfiguration::create();
 
@@ -248,6 +256,8 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
         mediaDescription->setPayloads(createDefaultPayloads(track->kind()));
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
+        mediaDescription->setDtlsFingerprintHashFunction("sha-256");
+        mediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
         mediaDescription->setCname(m_cname);
         mediaDescription->addSsrc(cryptographicallyRandomNumber());
         mediaDescription->setIceUfrag(m_iceUfrag);
@@ -266,6 +276,8 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
         mediaDescription->setPayloads(createDefaultPayloads(type));
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
+        mediaDescription->setDtlsFingerprintHashFunction("sha-256");
+        mediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
         mediaDescription->setIceUfrag(m_iceUfrag);
         mediaDescription->setIcePassword(m_icePassword);
 
@@ -289,6 +301,8 @@ void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>& o
 
 void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback resolveCallback, RejectCallback)
 {
+    ASSERT(!m_dtlsFingerprint.isEmpty());
+
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localConfiguration ?
         MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get())) : MediaEndpointConfiguration::create();
 
@@ -302,6 +316,8 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptio
             localMediaDescription = PeerMediaDescription::create();
             localMediaDescription->setType(remoteMediaDescription->type());
             localMediaDescription->setDtlsSetup(remoteMediaDescription->dtlsSetup() == "active" ? "passive" : "active");
+            localMediaDescription->setDtlsFingerprintHashFunction("sha-256");
+            localMediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
             localMediaDescription->setCname(m_cname);
             localMediaDescription->setIceUfrag(m_iceUfrag);
             localMediaDescription->setIcePassword(m_icePassword);
@@ -443,9 +459,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
     bool isInitiator = m_remoteConfigurationType == "answer";
     m_mediaEndpoint->prepareToSend(m_remoteConfiguration.get(), isInitiator);
 
-    // FIXME: event firing task should update state
     m_client->changeSignalingState(targetState);
-
     resolveCallback();
     completeQueuedOperation();
 }
@@ -509,49 +523,23 @@ void MediaEndpointPeerConnection::stop()
     m_mediaEndpoint->stop();
 }
 
-bool MediaEndpointPeerConnection::isLocalConfigurationComplete() const
-{
-    for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
-        if (mdesc->dtlsFingerprint().isEmpty())
-            return false;
-        // Test: No trickle
-        if (!mdesc->iceCandidateGatheringDone())
-            return false;
-    }
-
-    return true;
-}
-
-MediaEndpointPeerConnection::ResolveSetLocalDescriptionResult MediaEndpointPeerConnection::maybeResolveSetLocalDescription()
-{
-    if (!m_resolveSetLocalDescription) {
-        ASSERT(isLocalConfigurationComplete());
-        return SetLocalDescriptionAlreadyResolved;
-    }
-
-    if (isLocalConfigurationComplete()) {
-        m_resolveSetLocalDescription();
-        m_resolveSetLocalDescription = nullptr;
-        return SetLocalDescriptionResolvedSuccessfully;
-    }
-
-    return LocalConfigurationIncomplete;
-}
-
 void MediaEndpointPeerConnection::maybeDispatchGatheringDone()
 {
-    if (!isLocalConfigurationComplete())
-        return;
-
     for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
         if (!mdesc->iceCandidateGatheringDone())
             return;
     }
 
+    // FIXME: disable candidate trickling
+    if (m_resolveSetLocalDescription) {
+        m_resolveSetLocalDescription();
+        m_resolveSetLocalDescription = nullptr;
+    }
+
     m_client->scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, nullptr));
 }
 
-void MediaEndpointPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const String& certificate)
+static String generateFingerprint(const String& certificate)
 {
     Vector<String> certificateRows;
     Vector<uint8_t> der;
@@ -566,7 +554,7 @@ void MediaEndpointPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const 
         Vector<uint8_t> decodedRow;
         if (!base64Decode(row, decodedRow, Base64FailOnInvalidCharacterOrExcessPadding)) {
             ASSERT_NOT_REACHED();
-            return;
+            return emptyString();
         }
         der.appendVector(decodedRow);
     }
@@ -574,7 +562,7 @@ void MediaEndpointPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const 
     std::unique_ptr<CryptoDigest> digest = CryptoDigest::create(CryptoAlgorithmIdentifier::SHA_256);
     if (!digest) {
         ASSERT_NOT_REACHED();
-        return;
+        return emptyString();
     }
 
     digest->addBytes(der.data(), der.size());
@@ -584,11 +572,13 @@ void MediaEndpointPeerConnection::gotDtlsCertificate(unsigned mdescIndex, const 
     for (unsigned i = 0; i < fingerprintVector.size(); ++i)
         fingerprint.append(String::format(i ? ":%02X" : "%02X", fingerprintVector[i]));
 
-    m_localConfiguration->mediaDescriptions()[mdescIndex]->setDtlsFingerprintHashFunction("sha-256");
-    m_localConfiguration->mediaDescriptions()[mdescIndex]->setDtlsFingerprint(fingerprint.toString());
+    return fingerprint.toString();
+}
 
-    if (maybeResolveSetLocalDescription() == SetLocalDescriptionResolvedSuccessfully)
-        maybeDispatchGatheringDone();
+void MediaEndpointPeerConnection::gotDtlsCertificate(const String& certificate)
+{
+    m_dtlsFingerprint = generateFingerprint(certificate);
+    completeQueuedOperation();
 }
 
 void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate)
@@ -614,10 +604,7 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
         }
     }
 
-    ResolveSetLocalDescriptionResult result = maybeResolveSetLocalDescription();
-    if (result == SetLocalDescriptionResolvedSuccessfully)
-        maybeDispatchGatheringDone();
-    else if (result == SetLocalDescriptionAlreadyResolved) {
+    if (!m_resolveSetLocalDescription) {
         String candidateString = MediaEndpointConfigurationConversions::iceCandidateToJSON(candidate.get());
         String sdpFragment = iceCandidateToSDP(candidateString);
         RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(sdpFragment, "", mdescIndex);
@@ -632,8 +619,7 @@ void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
     ASSERT(scriptExecutionContext()->isContextThread());
 
     m_localConfiguration->mediaDescriptions()[mdescIndex]->setIceCandidateGatheringDone(true);
-    // Test: No trickle
-    maybeResolveSetLocalDescription();
+
     maybeDispatchGatheringDone();
 }
 

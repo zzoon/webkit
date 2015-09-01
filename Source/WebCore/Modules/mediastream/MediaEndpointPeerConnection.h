@@ -80,12 +80,10 @@ private:
 
     void queuedAddIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback);
 
-    bool isLocalConfigurationComplete() const;
-    ResolveSetLocalDescriptionResult maybeResolveSetLocalDescription();
     void maybeDispatchGatheringDone();
 
     // MediaEndpointClient
-    virtual void gotDtlsCertificate(unsigned mdescIndex, const String& certificate) override;
+    virtual void gotDtlsCertificate(const String& certificate) override;
     virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) override;
     virtual void doneGatheringCandidates(unsigned mdescIndex) override;
     virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) override;
@@ -106,6 +104,7 @@ private:
     String m_cname;
     String m_iceUfrag;
     String m_icePassword;
+    String m_dtlsFingerprint;
 
     RefPtr<MediaEndpointConfiguration> m_localConfiguration;
     RefPtr<MediaEndpointConfiguration> m_remoteConfiguration;

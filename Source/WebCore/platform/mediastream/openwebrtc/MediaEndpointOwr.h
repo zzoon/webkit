@@ -49,6 +49,8 @@ public:
 
     virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) override;
 
+    virtual void getDtlsCertificate() override;
+
     virtual void prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) override;
     virtual void prepareToSend(MediaEndpointConfiguration*, bool isInitiator) override;
 
@@ -60,7 +62,7 @@ public:
 
     void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&);
     void dispatchGatheringDone(unsigned sessionIndex);
-    void dispatchDtlsCertificate(unsigned sessionIndex, const String& certificate);
+    void dispatchDtlsCertificate(const String& certificate);
     void dispatchRemoteSource(unsigned sessionIndex, RefPtr<RealtimeMediaSource>&&);
 
 private:
