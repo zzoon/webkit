@@ -588,12 +588,17 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
         }
     }
 
-    if (!m_resolveSetLocalDescription) {
-        String candidateString = MediaEndpointConfigurationConversions::iceCandidateToJSON(candidate.get());
-        String sdpFragment = iceCandidateToSDP(candidateString);
-        RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(sdpFragment, "", mdescIndex);
-        m_client->scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
+    // FIXME: not trickling properly yet (wait for one candidate before resolving)
+    if (m_resolveSetLocalDescription) {
+        m_resolveSetLocalDescription();
+        m_resolveSetLocalDescription = nullptr;
+        return;
     }
+
+    String candidateString = MediaEndpointConfigurationConversions::iceCandidateToJSON(candidate.get());
+    String sdpFragment = iceCandidateToSDP(candidateString);
+    RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(sdpFragment, "", mdescIndex);
+    m_client->scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
 }
 
 void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
@@ -607,12 +612,6 @@ void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
     for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
         if (!mdesc->iceCandidateGatheringDone())
             return;
-    }
-
-    // FIXME: disable candidate trickling
-    if (m_resolveSetLocalDescription) {
-        m_resolveSetLocalDescription();
-        m_resolveSetLocalDescription = nullptr;
     }
 
     m_client->scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, nullptr));
