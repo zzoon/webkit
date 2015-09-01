@@ -523,22 +523,6 @@ void MediaEndpointPeerConnection::stop()
     m_mediaEndpoint->stop();
 }
 
-void MediaEndpointPeerConnection::maybeDispatchGatheringDone()
-{
-    for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
-        if (!mdesc->iceCandidateGatheringDone())
-            return;
-    }
-
-    // FIXME: disable candidate trickling
-    if (m_resolveSetLocalDescription) {
-        m_resolveSetLocalDescription();
-        m_resolveSetLocalDescription = nullptr;
-    }
-
-    m_client->scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, nullptr));
-}
-
 static String generateFingerprint(const String& certificate)
 {
     Vector<String> certificateRows;
@@ -620,7 +604,18 @@ void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
 
     m_localConfiguration->mediaDescriptions()[mdescIndex]->setIceCandidateGatheringDone(true);
 
-    maybeDispatchGatheringDone();
+    for (auto& mdesc : m_localConfiguration->mediaDescriptions()) {
+        if (!mdesc->iceCandidateGatheringDone())
+            return;
+    }
+
+    // FIXME: disable candidate trickling
+    if (m_resolveSetLocalDescription) {
+        m_resolveSetLocalDescription();
+        m_resolveSetLocalDescription = nullptr;
+    }
+
+    m_client->scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, nullptr));
 }
 
 void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&& source)

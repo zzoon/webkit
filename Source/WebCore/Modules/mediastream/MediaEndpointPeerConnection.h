@@ -80,8 +80,6 @@ private:
 
     void queuedAddIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback);
 
-    void maybeDispatchGatheringDone();
-
     // MediaEndpointClient
     virtual void gotDtlsCertificate(const String& certificate) override;
     virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) override;
