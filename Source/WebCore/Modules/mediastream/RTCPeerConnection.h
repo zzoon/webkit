@@ -122,12 +122,6 @@ private:
     PeerConnectionStates::SignalingState targetSignalingState(SetterType, DescriptionType) const;
     DescriptionType parseDescriptionType(const String& typeName) const;
 
-    enum ResolveSetLocalDescriptionResult {
-        LocalConfigurationIncomplete,
-        SetLocalDescriptionResolvedSuccessfully,
-        SetLocalDescriptionAlreadyResolved
-    };
-
     void scheduleDispatchEvent(PassRefPtr<Event>);
     void scheduledEventTimerFired();
 

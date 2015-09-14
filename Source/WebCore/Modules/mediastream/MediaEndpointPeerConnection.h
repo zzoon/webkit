@@ -63,12 +63,6 @@ public:
     void stop() override;
 
 private:
-    enum ResolveSetLocalDescriptionResult {
-        LocalConfigurationIncomplete,
-        SetLocalDescriptionResolvedSuccessfully,
-        SetLocalDescriptionAlreadyResolved
-    };
-
     void enqueueOperation(std::function<void ()>);
     void completeQueuedOperation();
 
