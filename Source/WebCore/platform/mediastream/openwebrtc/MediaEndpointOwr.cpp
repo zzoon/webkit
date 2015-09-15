@@ -34,6 +34,7 @@
 #include "MediaEndpointOwr.h"
 
 #include "MediaEndpointConfiguration.h"
+#include "MediaPayload.h"
 #include "OpenWebRTCUtilities.h"
 #include "RealtimeMediaSourceOwr.h"
 #include <owr/owr.h>
@@ -144,6 +145,67 @@ static gboolean generateDtlsCertificate(gpointer data)
 void MediaEndpointOwr::getDtlsCertificate()
 {
     g_idle_add(generateDtlsCertificate, this);
+}
+
+Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultAudioPayloads()
+{
+    Vector<RefPtr<MediaPayload>> payloads;
+
+    RefPtr<MediaPayload> payload = MediaPayload::create();
+    payload->setType(111);
+    payload->setEncodingName("OPUS");
+    payload->setClockRate(48000);
+    payload->setChannels(2);
+    payloads.append(payload);
+
+    payload = MediaPayload::create();
+    payload->setType(8);
+    payload->setEncodingName("PCMA");
+    payload->setClockRate(8000);
+    payload->setChannels(1);
+    payloads.append(payload);
+
+    payload = MediaPayload::create();
+    payload->setType(0);
+    payload->setEncodingName("PCMU");
+    payload->setClockRate(8000);
+    payload->setChannels(1);
+    payloads.append(payload);
+
+    return payloads;
+}
+
+Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultVideoPayloads()
+{
+    Vector<RefPtr<MediaPayload>> payloads;
+
+    // RefPtr<MediaPayload> payload = MediaPayload::create();
+    // payload->setType(103);
+    // payload->setEncodingName("H264");
+    // payload->setClockRate(90000);
+    // payload->setCcmfir(true);
+    // payload->setNackpli(true);
+    // payload->addParameter("packetizationMode", 1);
+    // payloads.append(payload);
+
+    RefPtr<MediaPayload> payload = MediaPayload::create();
+    payload->setType(100);
+    payload->setEncodingName("VP8");
+    payload->setClockRate(90000);
+    payload->setCcmfir(true);
+    payload->setNackpli(true);
+    payload->setNack(true);
+    payloads.append(payload);
+
+    payload = MediaPayload::create();
+    payload->setType(120);
+    payload->setEncodingName("RTX");
+    payload->setClockRate(90000);
+    payload->addParameter("apt", 100);
+    payload->addParameter("rtxTime", 200);
+    payloads.append(payload);
+
+    return payloads;
 }
 
 MediaEndpointPrepareResult MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuration, bool isInitiator)

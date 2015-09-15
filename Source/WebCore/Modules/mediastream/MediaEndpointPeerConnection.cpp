@@ -100,6 +100,9 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     enqueueOperation([this]() {
         m_mediaEndpoint->getDtlsCertificate();
     });
+
+    m_defaultAudioPayloads = m_mediaEndpoint->getDefaultAudioPayloads();
+    m_defaultVideoPayloads = m_mediaEndpoint->getDefaultVideoPayloads();
 }
 
 MediaEndpointPeerConnection::~MediaEndpointPeerConnection()
@@ -116,64 +119,6 @@ static RefPtr<RTCRtpSender> takeFirstSenderOfType(Vector<RefPtr<RTCRtpSender>>& 
         }
     }
     return nullptr;
-}
-
-// FIXME: This information should be fetched from the platform
-static Vector<RefPtr<MediaPayload>> createDefaultPayloads(const String& type)
-{
-    Vector<RefPtr<MediaPayload>> payloads;
-    RefPtr<MediaPayload> payload;
-
-    if (type == "audio") {
-        payload = MediaPayload::create();
-        payload->setType(111);
-        payload->setEncodingName("OPUS");
-        payload->setClockRate(48000);
-        payload->setChannels(2);
-        payloads.append(payload);
-
-        payload = MediaPayload::create();
-        payload->setType(8);
-        payload->setEncodingName("PCMA");
-        payload->setClockRate(8000);
-        payload->setChannels(1);
-        payloads.append(payload);
-
-        payload = MediaPayload::create();
-        payload->setType(0);
-        payload->setEncodingName("PCMU");
-        payload->setClockRate(8000);
-        payload->setChannels(1);
-        payloads.append(payload);
-    } else {
-        // payload = MediaPayload::create();
-        // payload->setType(103);
-        // payload->setEncodingName("H264");
-        // payload->setClockRate(90000);
-        // payload->setCcmfir(true);
-        // payload->setNackpli(true);
-        // payload->addParameter("packetizationMode", 1);
-        // payloads.append(payload);
-
-        payload = MediaPayload::create();
-        payload->setType(100);
-        payload->setEncodingName("VP8");
-        payload->setClockRate(90000);
-        payload->setCcmfir(true);
-        payload->setNackpli(true);
-        payload->setNack(true);
-        payloads.append(payload);
-
-        payload = MediaPayload::create();
-        payload->setType(120);
-        payload->setEncodingName("RTX");
-        payload->setClockRate(90000);
-        payload->addParameter("apt", 100);
-        payload->addParameter("rtxTime", 200);
-        payloads.append(payload);
-    }
-
-    return payloads;
 }
 
 static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions, Vector<RefPtr<RTCRtpSender>>& senders)
@@ -254,7 +199,7 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
         mediaDescription->setPort(9);
         mediaDescription->setAddress("0.0.0.0");
         mediaDescription->setMode("sendrecv");
-        mediaDescription->setPayloads(createDefaultPayloads(track->kind()));
+        mediaDescription->setPayloads(track->kind() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads);
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
         mediaDescription->setDtlsFingerprintHashFunction("sha-256");
@@ -276,7 +221,7 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
         mediaDescription->setPort(9);
         mediaDescription->setAddress("0.0.0.0");
         mediaDescription->setMode("recvonly");
-        mediaDescription->setPayloads(createDefaultPayloads(type));
+        mediaDescription->setPayloads(type == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads);
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
         mediaDescription->setDtlsFingerprintHashFunction("sha-256");
@@ -447,9 +392,8 @@ RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::localDescription() co
     return RTCSessionDescription::create(m_localConfigurationType, toSDP(json));
 }
 
-static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayload>>& remotePayloads, const String& type)
+static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayload>>& remotePayloads, const Vector<RefPtr<MediaPayload>>& defaultPayloads)
 {
-    Vector<RefPtr<MediaPayload>> defaultPayloads = createDefaultPayloads(type);
     Vector<RefPtr<MediaPayload>> filteredPayloads;
 
     for (auto& remotePayload : remotePayloads) {
@@ -513,7 +457,8 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
         if (mediaDescription->type() != "audio" && mediaDescription->type() != "video")
             continue;
 
-        mediaDescription->setPayloads(filterPayloads(mediaDescription->payloads(), mediaDescription->type()));
+        mediaDescription->setPayloads(filterPayloads(mediaDescription->payloads(),
+            mediaDescription->type() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads));
 
         RefPtr<RTCRtpSender> sender = takeFirstSenderOfType(senders, mediaDescription->type());
         if (sender)

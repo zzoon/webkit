@@ -107,6 +107,9 @@ private:
 
     mutable RefPtr<DOMWrapperWorld> m_isolatedWorld;
 
+    Vector<RefPtr<MediaPayload>> m_defaultAudioPayloads;
+    Vector<RefPtr<MediaPayload>> m_defaultVideoPayloads;
+
     String m_cname;
     String m_iceUfrag;
     String m_icePassword;

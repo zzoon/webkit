@@ -50,6 +50,8 @@ public:
     virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) override;
 
     virtual void getDtlsCertificate() override;
+    virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;
+    virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() override;
 
     virtual MediaEndpointPrepareResult prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) override;
     virtual MediaEndpointPrepareResult prepareToSend(MediaEndpointConfiguration*, bool isInitiator) override;

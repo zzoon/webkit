@@ -42,6 +42,7 @@ namespace WebCore {
 class IceCandidate;
 class MediaEndpoint;
 class MediaEndpointConfiguration;
+class MediaPayload;
 class RealtimeMediaSource;
 
 class MediaEndpointClient {
@@ -71,6 +72,8 @@ public:
     virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) = 0;
 
     virtual void getDtlsCertificate() = 0;
+    virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() = 0;
+    virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() = 0;
 
     virtual MediaEndpointPrepareResult prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) = 0;
     virtual MediaEndpointPrepareResult prepareToSend(MediaEndpointConfiguration*, bool isInitiator) = 0;
