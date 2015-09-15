@@ -684,8 +684,6 @@ void MediaEndpointPeerConnection::gotDtlsCertificate(const String& certificate)
 
 void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate)
 {
-    printf("-> gotIceCandidate()\n");
-
     ASSERT(scriptExecutionContext()->isContextThread());
 
     PeerMediaDescription& mdesc = *m_localConfiguration->mediaDescriptions()[mdescIndex];
@@ -714,8 +712,6 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
 
 void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
 {
-    printf("-> doneGatheringCandidates()\n");
-
     ASSERT(scriptExecutionContext()->isContextThread());
 
     m_localConfiguration->mediaDescriptions()[mdescIndex]->setIceCandidateGatheringDone(true);
