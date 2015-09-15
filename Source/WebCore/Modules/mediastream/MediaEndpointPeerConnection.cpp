@@ -709,7 +709,7 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
     String candidateString = MediaEndpointConfigurationConversions::iceCandidateToJSON(candidate.get());
     String sdpFragment = iceCandidateToSDP(candidateString);
     RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(sdpFragment, "", mdescIndex);
-    m_client->scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
+    m_client->fireEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
 }
 
 void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
@@ -725,11 +725,13 @@ void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
             return;
     }
 
-    m_client->scheduleDispatchEvent(RTCIceCandidateEvent::create(false, false, nullptr));
+    m_client->fireEvent(RTCIceCandidateEvent::create(false, false, nullptr));
 }
 
 void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&& source)
 {
+    ASSERT(scriptExecutionContext()->isContextThread());
+
     if (m_client->internalSignalingState() == SignalingState::Closed)
         return;
 
@@ -753,7 +755,7 @@ void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<Re
     RefPtr<MediaStreamTrack> track = MediaStreamTrack::create(*m_client->context(), *trackPrivate);
     RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create(track.copyRef());
 
-    m_client->scheduleDispatchEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false, WTF::move(receiver), WTF::move(track)));
+    m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false, WTF::move(receiver), WTF::move(track)));
 }
 
 String MediaEndpointPeerConnection::toSDP(const String& json) const

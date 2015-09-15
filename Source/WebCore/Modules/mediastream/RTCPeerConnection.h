@@ -40,7 +40,6 @@
 #include "EventTarget.h"
 #include "PeerConnectionBackend.h"
 #include "ScriptWrappable.h"
-#include "Timer.h"
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
 
@@ -108,9 +107,6 @@ public:
 private:
     RTCPeerConnection(ScriptExecutionContext&, PassRefPtr<RTCConfiguration>, ExceptionCode&);
 
-    void scheduleDispatchEvent(PassRefPtr<Event>);
-    void scheduledEventTimerFired();
-
     // EventTarget implementation.
     virtual void refEventTarget() override { ref(); }
     virtual void derefEventTarget() override { deref(); }
@@ -141,9 +137,6 @@ private:
     Vector<RefPtr<RTCDataChannel>> m_dataChannels;
 
     std::unique_ptr<PeerConnectionBackend> m_backend;
-
-    Timer m_scheduledEventTimer;
-    Vector<RefPtr<Event>> m_scheduledEvents;
 
     RefPtr<RTCConfiguration> m_configuration;
 

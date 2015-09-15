@@ -51,7 +51,6 @@ class ScriptExecutionContext;
 class PeerConnectionBackendClient {
 public:
     virtual Vector<RefPtr<RTCRtpSender>> getSenders() const = 0;
-    virtual void scheduleDispatchEvent(PassRefPtr<Event>) = 0;
     virtual void fireEvent(PassRefPtr<Event>) = 0;
 
     virtual void setSignalingState(PeerConnectionStates::SignalingState) = 0;

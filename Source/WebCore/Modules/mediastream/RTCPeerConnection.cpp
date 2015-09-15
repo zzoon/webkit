@@ -83,7 +83,6 @@ RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, PassRefPtr
     , m_signalingState(SignalingState::Stable)
     , m_iceGatheringState(IceGatheringState::New)
     , m_iceConnectionState(IceConnectionState::New)
-    , m_scheduledEventTimer(*this, &RTCPeerConnection::scheduledEventTimerFired)
     , m_configuration(configuration)
     , m_stopped(false)
 {
@@ -405,29 +404,6 @@ void RTCPeerConnection::updateIceConnectionState(IceConnectionState newState)
 void RTCPeerConnection::fireEvent(PassRefPtr<Event> event)
 {
     dispatchEvent(event);
-}
-
-void RTCPeerConnection::scheduleDispatchEvent(PassRefPtr<Event> event)
-{
-    m_scheduledEvents.append(event);
-
-    if (!m_scheduledEventTimer.isActive())
-        m_scheduledEventTimer.startOneShot(0);
-}
-
-void RTCPeerConnection::scheduledEventTimerFired()
-{
-    if (m_stopped)
-        return;
-
-    Vector<RefPtr<Event>> events;
-    events.swap(m_scheduledEvents);
-
-    Vector<RefPtr<Event>>::iterator it = events.begin();
-    for (; it != events.end(); ++it)
-        dispatchEvent((*it).release());
-
-    events.clear();
 }
 
 } // namespace WebCore
