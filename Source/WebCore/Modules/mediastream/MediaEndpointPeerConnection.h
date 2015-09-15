@@ -51,10 +51,10 @@ public:
     void createOffer(const RefPtr<RTCOfferOptions>&, OfferAnswerResolveCallback, RejectCallback) override;
     void createAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback, RejectCallback) override;
 
-    void setLocalDescription(RTCSessionDescription*, PeerConnectionStates::SignalingState targetState, VoidResolveCallback, RejectCallback) override;
+    void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) override;
     RefPtr<RTCSessionDescription> localDescription() const override;
 
-    void setRemoteDescription(RTCSessionDescription*, PeerConnectionStates::SignalingState targetState, VoidResolveCallback, RejectCallback) override;
+    void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) override;
     RefPtr<RTCSessionDescription> remoteDescription() const override;
 
     void setConfiguration(RTCConfiguration&) override;
@@ -63,16 +63,30 @@ public:
     void stop() override;
 
 private:
+    enum SetterType {
+        SetterTypeLocal = 1,
+        SetterTypeRemote = 2
+    };
+
+    enum DescriptionType {
+        DescriptionTypeOffer = 1,
+        DescriptionTypePranswer = 2,
+        DescriptionTypeAnswer = 3
+    };
+
     void enqueueOperation(std::function<void ()>);
     void completeQueuedOperation();
 
     void queuedCreateOffer(const RefPtr<RTCOfferOptions>&, OfferAnswerResolveCallback, RejectCallback);
     void queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback, RejectCallback);
 
-    void queuedSetLocalDescription(RTCSessionDescription*, PeerConnectionStates::SignalingState targetState, VoidResolveCallback, RejectCallback);
-    void queuedSetRemoteDescription(RTCSessionDescription*, PeerConnectionStates::SignalingState targetState, VoidResolveCallback, RejectCallback);
+    void queuedSetLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
+    void queuedSetRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
 
     void queuedAddIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback);
+
+    PeerConnectionStates::SignalingState targetSignalingState(SetterType, DescriptionType) const;
+    DescriptionType parseDescriptionType(const String& typeName) const;
 
     // MediaEndpointClient
     virtual void gotDtlsCertificate(const String& certificate) override;

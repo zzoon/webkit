@@ -213,17 +213,7 @@ void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, 
         return;
     }
 
-    DescriptionType descriptionType = parseDescriptionType(description->type());
-
-    SignalingState targetState = targetSignalingState(SetterTypeLocal, descriptionType);
-    if (targetState == SignalingState::Invalid) {
-        // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError");
-        rejectCallback(*error);
-        return;
-    }
-
-    m_backend->setLocalDescription(description, targetState, resolveCallback, rejectCallback);
+    m_backend->setLocalDescription(description, resolveCallback, rejectCallback);
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
@@ -239,17 +229,7 @@ void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description,
         return;
     }
 
-    DescriptionType descriptionType = parseDescriptionType(description->type());
-
-    SignalingState targetState = targetSignalingState(SetterTypeRemote, descriptionType);
-    if (targetState == SignalingState::Invalid) {
-        // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError");
-        rejectCallback(*error);
-        return;
-    }
-
-    m_backend->setRemoteDescription(description, targetState, resolveCallback, rejectCallback);
+    m_backend->setRemoteDescription(description, resolveCallback, rejectCallback);
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::remoteDescription() const
@@ -387,45 +367,6 @@ void RTCPeerConnection::stop()
     m_signalingState = SignalingState::Closed;
 }
 
-SignalingState RTCPeerConnection::targetSignalingState(SetterType setter, DescriptionType description) const
-{
-    // "map" describing the valid state transitions
-    switch (m_signalingState) {
-    case SignalingState::Stable:
-        if (setter == SetterTypeLocal && description == DescriptionTypeOffer)
-            return SignalingState::HaveLocalOffer;
-        if (setter == SetterTypeRemote && description == DescriptionTypeOffer)
-            return SignalingState::HaveRemoteOffer;
-        break;
-    case SignalingState::HaveLocalOffer:
-        if (setter == SetterTypeLocal && description == DescriptionTypeOffer)
-            return SignalingState::HaveLocalOffer;
-        if (setter == SetterTypeRemote && description == DescriptionTypeAnswer)
-            return SignalingState::Stable;
-        break;
-    case SignalingState::HaveRemoteOffer:
-        if (setter == SetterTypeLocal && description == DescriptionTypeAnswer)
-            return SignalingState::Stable;
-        if (setter == SetterTypeRemote && description == DescriptionTypeOffer)
-            return SignalingState::HaveRemoteOffer;
-        break;
-    default:
-        break;
-    };
-    return SignalingState::Invalid;
-}
-
-RTCPeerConnection::DescriptionType RTCPeerConnection::parseDescriptionType(const String& typeName) const
-{
-    if (typeName == "offer")
-        return DescriptionTypeOffer;
-    if (typeName == "pranswer")
-        return DescriptionTypePranswer;
-
-    ASSERT(typeName == "answer");
-    return DescriptionTypeAnswer;
-}
-
 const char* RTCPeerConnection::activeDOMObjectName() const
 {
     return "RTCPeerConnection";
@@ -437,25 +378,33 @@ bool RTCPeerConnection::canSuspendForPageCache() const
     return false;
 }
 
-void RTCPeerConnection::changeSignalingState(SignalingState signalingState)
+void RTCPeerConnection::setSignalingState(SignalingState newState)
 {
-    if (m_signalingState != SignalingState::Closed && m_signalingState != signalingState) {
-        m_signalingState = signalingState;
-        scheduleDispatchEvent(Event::create(eventNames().signalingstatechangeEvent, false, false));
-    }
+    m_signalingState = newState;
 }
 
-void RTCPeerConnection::changeIceGatheringState(IceGatheringState iceGatheringState)
+void RTCPeerConnection::updateIceGatheringState(IceGatheringState newState)
 {
-    m_iceGatheringState = iceGatheringState;
+    scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
+        m_iceGatheringState = newState;
+
+        // FIXME: add icegatheringstatechange to event names
+        dispatchEvent(Event::create(eventNames().statechangeEvent, false, false));
+    });
 }
 
-void RTCPeerConnection::changeIceConnectionState(IceConnectionState iceConnectionState)
+void RTCPeerConnection::updateIceConnectionState(IceConnectionState newState)
 {
-    if (m_iceConnectionState != IceConnectionState::Closed && m_iceConnectionState != iceConnectionState) {
-        m_iceConnectionState = iceConnectionState;
-        scheduleDispatchEvent(Event::create(eventNames().iceconnectionstatechangeEvent, false, false));
-    }
+    scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
+        m_iceConnectionState = newState;
+
+        dispatchEvent(Event::create(eventNames().iceconnectionstatechangeEvent, false, false));
+    });
+}
+
+void RTCPeerConnection::fireEvent(PassRefPtr<Event> event)
+{
+    dispatchEvent(event);
 }
 
 void RTCPeerConnection::scheduleDispatchEvent(PassRefPtr<Event> event)

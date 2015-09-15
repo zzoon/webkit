@@ -56,6 +56,12 @@ public:
 
 typedef std::unique_ptr<MediaEndpoint> (*CreateMediaEndpoint)(MediaEndpointClient*);
 
+enum class MediaEndpointPrepareResult {
+    Success,
+    SuccessWithIceRestart,
+    Failed
+};
+
 class MediaEndpoint {
 public:
     WEBCORE_EXPORT static CreateMediaEndpoint create;
@@ -66,8 +72,8 @@ public:
 
     virtual void getDtlsCertificate() = 0;
 
-    virtual void prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) = 0;
-    virtual void prepareToSend(MediaEndpointConfiguration*, bool isInitiator) = 0;
+    virtual MediaEndpointPrepareResult prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) = 0;
+    virtual MediaEndpointPrepareResult prepareToSend(MediaEndpointConfiguration*, bool isInitiator) = 0;
 
     virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) = 0;
 

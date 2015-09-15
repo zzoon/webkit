@@ -346,23 +346,34 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptio
     completeQueuedOperation();
 }
 
-void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* description, PeerConnectionStates::SignalingState targetState, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     RefPtr<RTCSessionDescription> protectedDescription = description;
-    enqueueOperation([this, protectedDescription, targetState, resolveCallback, rejectCallback]() {
-        queuedSetLocalDescription(protectedDescription.get(), targetState, resolveCallback, rejectCallback);
+    enqueueOperation([this, protectedDescription, resolveCallback, rejectCallback]() {
+        queuedSetLocalDescription(protectedDescription.get(), resolveCallback, rejectCallback);
     });
 }
 
-void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, PeerConnectionStates::SignalingState targetState, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
-    unsigned previousNumberOfMediaDescriptions = m_localConfiguration ? m_localConfiguration->mediaDescriptions().size() : 0;
+    if (m_client->internalSignalingState() == SignalingState::Closed)
+        return;
+
+    DescriptionType descriptionType = parseDescriptionType(description->type());
+
+    SignalingState targetState = targetSignalingState(SetterTypeLocal, descriptionType);
+    if (targetState == SignalingState::Invalid) {
+        // FIXME: Error type?
+        RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (bad description type for current state)");
+        rejectCallback(*error);
+        completeQueuedOperation();
+        return;
+    }
 
     String json = fromSDP(description->sdp());
-    m_localConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
-    m_localConfigurationType = description->type();
+    RefPtr<MediaEndpointConfiguration> parsedConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
 
-    if (!m_localConfiguration) {
+    if (!parsedConfiguration) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
         rejectCallback(*error);
@@ -370,20 +381,60 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         return;
     }
 
-    bool hasNewMediaDescriptions = m_localConfiguration->mediaDescriptions().size() > previousNumberOfMediaDescriptions;
+    unsigned previousNumberOfMediaDescriptions = m_localConfiguration ? m_localConfiguration->mediaDescriptions().size() : 0;
+    unsigned numberOfMediaDescriptions = parsedConfiguration->mediaDescriptions().size();
+    bool hasNewMediaDescriptions = numberOfMediaDescriptions > previousNumberOfMediaDescriptions;
     bool isInitiator = m_localConfigurationType == "offer";
 
+    if (hasNewMediaDescriptions) {
+        MediaEndpointPrepareResult prepareResult = m_mediaEndpoint->prepareToReceive(parsedConfiguration.get(), isInitiator);
+
+        if (prepareResult == MediaEndpointPrepareResult::SuccessWithIceRestart) {
+            if (m_client->internalIceGatheringState() != IceGatheringState::Gathering)
+                m_client->updateIceGatheringState(IceGatheringState::Gathering);
+
+            if (m_client->internalIceConnectionState() != IceConnectionState::Completed)
+                m_client->updateIceConnectionState(IceConnectionState::Connected);
+
+            printf("ICE restart not implemented\n");
+
+        } else if (prepareResult == MediaEndpointPrepareResult::Failed) {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("IncompatibleSessionDescriptionError (receive configuration)");
+            rejectCallback(*error);
+            completeQueuedOperation();
+            return;
+        }
+    }
+
+    if (m_remoteConfiguration) {
+        if (m_mediaEndpoint->prepareToSend(m_remoteConfiguration.get(), isInitiator) == MediaEndpointPrepareResult::Failed) {
+            // FIXME: Error type?
+            RefPtr<DOMError> error = DOMError::create("IncompatibleSessionDescriptionError (send configuration)");
+            rejectCallback(*error);
+            completeQueuedOperation();
+            return;
+        }
+    }
+
+    m_localConfiguration = parsedConfiguration;
+    m_localConfigurationType = description->type();
+
+    if (m_client->internalSignalingState() != targetState) {
+        m_client->setSignalingState(targetState);
+        m_client->fireEvent(Event::create(eventNames().signalingstatechangeEvent, false, false));
+    }
+
+    // FIXME: do this even if an ice start was done?
+    if (m_client->internalIceGatheringState() == IceGatheringState::New && numberOfMediaDescriptions)
+        m_client->updateIceGatheringState(IceGatheringState::Gathering);
+
+    // FIXME: implement negotiation needed
+
     m_resolveSetLocalDescription = [this, targetState, resolveCallback]() mutable {
-        m_client->changeSignalingState(targetState);
         resolveCallback();
         completeQueuedOperation();
     };
-
-    if (hasNewMediaDescriptions)
-        m_mediaEndpoint->prepareToReceive(m_localConfiguration.get(), isInitiator);
-
-    if (m_remoteConfiguration)
-        m_mediaEndpoint->prepareToSend(m_remoteConfiguration.get(), isInitiator);
 }
 
 RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::localDescription() const
@@ -421,21 +472,33 @@ static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayl
     return filteredPayloads;
 }
 
-void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* description, PeerConnectionStates::SignalingState targetState, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     RefPtr<RTCSessionDescription> protectedDescription = description;
-    enqueueOperation([this, protectedDescription, targetState, resolveCallback, rejectCallback]() {
-        queuedSetRemoteDescription(protectedDescription.get(), targetState, resolveCallback, rejectCallback);
+    enqueueOperation([this, protectedDescription, resolveCallback, rejectCallback]() {
+        queuedSetRemoteDescription(protectedDescription.get(), resolveCallback, rejectCallback);
     });
 }
 
-void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* description, PeerConnectionStates::SignalingState targetState, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
-    String json = fromSDP(description->sdp());
-    m_remoteConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
-    m_remoteConfigurationType = description->type();
+    if (m_client->internalSignalingState() == SignalingState::Closed)
+        return;
 
-    if (!m_remoteConfiguration) {
+    DescriptionType descriptionType = parseDescriptionType(description->type());
+
+    SignalingState targetState = targetSignalingState(SetterTypeRemote, descriptionType);
+    if (targetState == SignalingState::Invalid) {
+        // FIXME: Error type?
+        RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (bad description type for current state)");
+        rejectCallback(*error);
+        return;
+    }
+
+    String json = fromSDP(description->sdp());
+    RefPtr<MediaEndpointConfiguration> parsedConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
+
+    if (!parsedConfiguration) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
         rejectCallback(*error);
@@ -445,7 +508,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
 
     Vector<RefPtr<RTCRtpSender>> senders = m_client->getSenders();
 
-    for (auto& mediaDescription : m_remoteConfiguration->mediaDescriptions()) {
+    for (auto& mediaDescription : parsedConfiguration->mediaDescriptions()) {
         if (mediaDescription->type() != "audio" && mediaDescription->type() != "video")
             continue;
 
@@ -457,9 +520,23 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
     }
 
     bool isInitiator = m_remoteConfigurationType == "answer";
-    m_mediaEndpoint->prepareToSend(m_remoteConfiguration.get(), isInitiator);
 
-    m_client->changeSignalingState(targetState);
+    if (m_mediaEndpoint->prepareToSend(parsedConfiguration.get(), isInitiator) == MediaEndpointPrepareResult::Failed) {
+        // FIXME: Error type?
+        RefPtr<DOMError> error = DOMError::create("IncompatibleSessionDescriptionError (send configuration)");
+        rejectCallback(*error);
+        completeQueuedOperation();
+        return;
+    }
+
+    m_remoteConfiguration = parsedConfiguration;
+    m_remoteConfigurationType = description->type();
+
+    if (m_client->internalSignalingState() != targetState) {
+        m_client->setSignalingState(targetState);
+        m_client->fireEvent(Event::create(eventNames().signalingstatechangeEvent, false, false));
+    }
+
     resolveCallback();
     completeQueuedOperation();
 }
@@ -521,6 +598,45 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
 void MediaEndpointPeerConnection::stop()
 {
     m_mediaEndpoint->stop();
+}
+
+SignalingState MediaEndpointPeerConnection::targetSignalingState(SetterType setter, DescriptionType description) const
+{
+    // "map" describing the valid state transitions
+    switch (m_client->internalSignalingState()) {
+    case SignalingState::Stable:
+        if (setter == SetterTypeLocal && description == DescriptionTypeOffer)
+            return SignalingState::HaveLocalOffer;
+        if (setter == SetterTypeRemote && description == DescriptionTypeOffer)
+            return SignalingState::HaveRemoteOffer;
+        break;
+    case SignalingState::HaveLocalOffer:
+        if (setter == SetterTypeLocal && description == DescriptionTypeOffer)
+            return SignalingState::HaveLocalOffer;
+        if (setter == SetterTypeRemote && description == DescriptionTypeAnswer)
+            return SignalingState::Stable;
+        break;
+    case SignalingState::HaveRemoteOffer:
+        if (setter == SetterTypeLocal && description == DescriptionTypeAnswer)
+            return SignalingState::Stable;
+        if (setter == SetterTypeRemote && description == DescriptionTypeOffer)
+            return SignalingState::HaveRemoteOffer;
+        break;
+    default:
+        break;
+    };
+    return SignalingState::Invalid;
+}
+
+MediaEndpointPeerConnection::DescriptionType MediaEndpointPeerConnection::parseDescriptionType(const String& typeName) const
+{
+    if (typeName == "offer")
+        return DescriptionTypeOffer;
+    if (typeName == "pranswer")
+        return DescriptionTypePranswer;
+
+    ASSERT(typeName == "answer");
+    return DescriptionTypeAnswer;
 }
 
 static String generateFingerprint(const String& certificate)

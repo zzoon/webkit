@@ -52,13 +52,16 @@ class PeerConnectionBackendClient {
 public:
     virtual Vector<RefPtr<RTCRtpSender>> getSenders() const = 0;
     virtual void scheduleDispatchEvent(PassRefPtr<Event>) = 0;
+    virtual void fireEvent(PassRefPtr<Event>) = 0;
 
-    virtual void changeSignalingState(PeerConnectionStates::SignalingState) = 0;
-    virtual void changeIceGatheringState(PeerConnectionStates::IceGatheringState) = 0;
-    virtual void changeIceConnectionState(PeerConnectionStates::IceConnectionState) = 0;
+    virtual void setSignalingState(PeerConnectionStates::SignalingState) = 0;
+    virtual void updateIceGatheringState(PeerConnectionStates::IceGatheringState) = 0;
+    virtual void updateIceConnectionState(PeerConnectionStates::IceConnectionState) = 0;
 
     virtual ScriptExecutionContext* context() const = 0;
     virtual PeerConnectionStates::SignalingState internalSignalingState() const = 0;
+    virtual PeerConnectionStates::IceGatheringState internalIceGatheringState() const = 0;
+    virtual PeerConnectionStates::IceConnectionState internalIceConnectionState() const = 0;
 
     virtual ~PeerConnectionBackendClient() { }
 };
@@ -77,10 +80,10 @@ public:
     virtual void createOffer(const RefPtr<RTCOfferOptions>&, OfferAnswerResolveCallback, RejectCallback) = 0;
     virtual void createAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback, RejectCallback) = 0;
 
-    virtual void setLocalDescription(RTCSessionDescription*, PeerConnectionStates::SignalingState targetState, VoidResolveCallback, RejectCallback) = 0;
+    virtual void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) = 0;
     virtual RefPtr<RTCSessionDescription> localDescription() const = 0;
 
-    virtual void setRemoteDescription(RTCSessionDescription*, PeerConnectionStates::SignalingState targetState, VoidResolveCallback, RejectCallback) = 0;
+    virtual void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) = 0;
     virtual RefPtr<RTCSessionDescription> remoteDescription() const = 0;
 
     virtual void setConfiguration(RTCConfiguration&) = 0;

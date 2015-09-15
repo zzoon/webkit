@@ -106,21 +106,7 @@ public:
     using RefCounted<RTCPeerConnection>::deref;
 
 private:
-    enum SetterType {
-        SetterTypeLocal = 1,
-        SetterTypeRemote = 2
-    };
-
-    enum DescriptionType {
-        DescriptionTypeOffer = 1,
-        DescriptionTypePranswer = 2,
-        DescriptionTypeAnswer = 3
-    };
-
     RTCPeerConnection(ScriptExecutionContext&, PassRefPtr<RTCConfiguration>, ExceptionCode&);
-
-    PeerConnectionStates::SignalingState targetSignalingState(SetterType, DescriptionType) const;
-    DescriptionType parseDescriptionType(const String& typeName) const;
 
     void scheduleDispatchEvent(PassRefPtr<Event>);
     void scheduledEventTimerFired();
@@ -134,13 +120,16 @@ private:
     const char* activeDOMObjectName() const override;
     bool canSuspendForPageCache() const override;
 
-    void changeSignalingState(PeerConnectionStates::SignalingState);
-    void changeIceGatheringState(PeerConnectionStates::IceGatheringState);
-    void changeIceConnectionState(PeerConnectionStates::IceConnectionState);
+    void setSignalingState(PeerConnectionStates::SignalingState);
+    void updateIceGatheringState(PeerConnectionStates::IceGatheringState);
+    void updateIceConnectionState(PeerConnectionStates::IceConnectionState);
 
     // PeerConnectionBackendClient
     ScriptExecutionContext* context() const override { return scriptExecutionContext(); };
+    void fireEvent(PassRefPtr<Event>) override;
     PeerConnectionStates::SignalingState internalSignalingState() const { return m_signalingState; }
+    PeerConnectionStates::IceGatheringState internalIceGatheringState() const { return m_iceGatheringState; }
+    PeerConnectionStates::IceConnectionState internalIceConnectionState() const { return m_iceConnectionState; }
 
     PeerConnectionStates::SignalingState m_signalingState;
     PeerConnectionStates::IceGatheringState m_iceGatheringState;

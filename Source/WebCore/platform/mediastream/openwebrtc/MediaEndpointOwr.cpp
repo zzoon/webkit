@@ -146,7 +146,7 @@ void MediaEndpointOwr::getDtlsCertificate()
     g_idle_add(generateDtlsCertificate, this);
 }
 
-void MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuration, bool isInitiator)
+MediaEndpointPrepareResult MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuration, bool isInitiator)
 {
     Vector<SessionConfig> sessionConfigs;
     for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {
@@ -165,6 +165,8 @@ void MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuratio
     }
 
     m_numberOfReceivePreparedSessions = m_sessions.size();
+
+    return MediaEndpointPrepareResult::Success;
 }
 
 static RefPtr<MediaPayload> findRtxPayload(Vector<RefPtr<MediaPayload>> payloads, unsigned apt)
@@ -177,7 +179,7 @@ static RefPtr<MediaPayload> findRtxPayload(Vector<RefPtr<MediaPayload>> payloads
     return nullptr;
 }
 
-void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, bool isInitiator)
+MediaEndpointPrepareResult MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, bool isInitiator)
 {
     Vector<SessionConfig> sessionConfigs;
     for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {
@@ -220,7 +222,7 @@ void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, 
 
         if (!payload) {
             printf("prepareToSend: no payloads\n");
-            return;
+            return MediaEndpointPrepareResult::Failed;
         }
 
         RefPtr<MediaPayload> rtxPayload = findRtxPayload(mdesc.payloads(), payload->type());
@@ -243,6 +245,8 @@ void MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, 
 
         m_numberOfSendPreparedSessions = i + 1;
     }
+
+    return MediaEndpointPrepareResult::Success;
 }
 
 void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, unsigned mdescIndex, const String& ufrag, const String& password)
