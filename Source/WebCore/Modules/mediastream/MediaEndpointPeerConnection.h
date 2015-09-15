@@ -118,8 +118,6 @@ private:
     String m_localConfigurationType;
     String m_remoteConfigurationType;
 
-    std::function<void()> m_resolveSetLocalDescription;
-
     RefPtr<RTCConfiguration> m_configuration;
 };
 

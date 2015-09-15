@@ -93,7 +93,6 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     , m_cname(randomString(16))
     , m_iceUfrag(randomString(4))
     , m_icePassword(randomString(22))
-    , m_resolveSetLocalDescription(nullptr)
 {
     m_mediaEndpoint = MediaEndpoint::create(this);
     ASSERT(m_mediaEndpoint);
@@ -252,6 +251,8 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
         mediaDescription->setMediaStreamId(sender->mediaStreamId());
         mediaDescription->setMediaStreamTrackId(track->id());
         mediaDescription->setType(track->kind());
+        mediaDescription->setPort(9);
+        mediaDescription->setAddress("0.0.0.0");
         mediaDescription->setMode("sendrecv");
         mediaDescription->setPayloads(createDefaultPayloads(track->kind()));
         mediaDescription->setRtcpMux(true);
@@ -272,6 +273,8 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
         RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
 
         mediaDescription->setType(type);
+        mediaDescription->setPort(9);
+        mediaDescription->setAddress("0.0.0.0");
         mediaDescription->setMode("recvonly");
         mediaDescription->setPayloads(createDefaultPayloads(type));
         mediaDescription->setRtcpMux(true);
@@ -431,10 +434,8 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
 
     // FIXME: implement negotiation needed
 
-    m_resolveSetLocalDescription = [this, targetState, resolveCallback]() mutable {
-        resolveCallback();
-        completeQueuedOperation();
-    };
+    resolveCallback();
+    completeQueuedOperation();
 }
 
 RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::localDescription() const
@@ -690,6 +691,7 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
     PeerMediaDescription& mdesc = *m_localConfiguration->mediaDescriptions()[mdescIndex];
     mdesc.addIceCandidate(candidate.copyRef());
 
+    // FIXME: should we still do this?
     if (!candidate->address().contains(':')) { // not IPv6
         if (candidate->componentId() == 1) { // RTP
             if (mdesc.address().isEmpty() || mdesc.address() == "0.0.0.0") {
@@ -702,13 +704,6 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
                 mdesc.setRtcpPort(candidate->port());
             }
         }
-    }
-
-    // FIXME: not trickling properly yet (wait for one candidate before resolving)
-    if (m_resolveSetLocalDescription) {
-        m_resolveSetLocalDescription();
-        m_resolveSetLocalDescription = nullptr;
-        return;
     }
 
     String candidateString = MediaEndpointConfigurationConversions::iceCandidateToJSON(candidate.get());
