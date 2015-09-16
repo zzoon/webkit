@@ -314,7 +314,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
 
     DescriptionType descriptionType = parseDescriptionType(description->type());
 
-    SignalingState targetState = targetSignalingState(SetterTypeLocal, descriptionType);
+    SignalingState targetState = targetSignalingState(SetterType::Local, descriptionType);
     if (targetState == SignalingState::Invalid) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (bad description type for current state)");
@@ -437,7 +437,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
 
     DescriptionType descriptionType = parseDescriptionType(description->type());
 
-    SignalingState targetState = targetSignalingState(SetterTypeRemote, descriptionType);
+    SignalingState targetState = targetSignalingState(SetterType::Remote, descriptionType);
     if (targetState == SignalingState::Invalid) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (bad description type for current state)");
@@ -556,21 +556,21 @@ SignalingState MediaEndpointPeerConnection::targetSignalingState(SetterType sett
     // "map" describing the valid state transitions
     switch (m_client->internalSignalingState()) {
     case SignalingState::Stable:
-        if (setter == SetterTypeLocal && description == DescriptionTypeOffer)
+        if (setter == SetterType::Local && description == DescriptionType::Offer)
             return SignalingState::HaveLocalOffer;
-        if (setter == SetterTypeRemote && description == DescriptionTypeOffer)
+        if (setter == SetterType::Remote && description == DescriptionType::Offer)
             return SignalingState::HaveRemoteOffer;
         break;
     case SignalingState::HaveLocalOffer:
-        if (setter == SetterTypeLocal && description == DescriptionTypeOffer)
+        if (setter == SetterType::Local && description == DescriptionType::Offer)
             return SignalingState::HaveLocalOffer;
-        if (setter == SetterTypeRemote && description == DescriptionTypeAnswer)
+        if (setter == SetterType::Remote && description == DescriptionType::Answer)
             return SignalingState::Stable;
         break;
     case SignalingState::HaveRemoteOffer:
-        if (setter == SetterTypeLocal && description == DescriptionTypeAnswer)
+        if (setter == SetterType::Local && description == DescriptionType::Answer)
             return SignalingState::Stable;
-        if (setter == SetterTypeRemote && description == DescriptionTypeOffer)
+        if (setter == SetterType::Remote && description == DescriptionType::Offer)
             return SignalingState::HaveRemoteOffer;
         break;
     default:
@@ -582,12 +582,12 @@ SignalingState MediaEndpointPeerConnection::targetSignalingState(SetterType sett
 MediaEndpointPeerConnection::DescriptionType MediaEndpointPeerConnection::parseDescriptionType(const String& typeName) const
 {
     if (typeName == "offer")
-        return DescriptionTypeOffer;
+        return DescriptionType::Offer;
     if (typeName == "pranswer")
-        return DescriptionTypePranswer;
+        return DescriptionType::Pranswer;
 
     ASSERT(typeName == "answer");
-    return DescriptionTypeAnswer;
+    return DescriptionType::Answer;
 }
 
 static String generateFingerprint(const String& certificate)

@@ -63,15 +63,15 @@ public:
     void stop() override;
 
 private:
-    enum SetterType {
-        SetterTypeLocal = 1,
-        SetterTypeRemote = 2
+    enum class SetterType {
+        Local = 1,
+        Remote = 2
     };
 
-    enum DescriptionType {
-        DescriptionTypeOffer = 1,
-        DescriptionTypePranswer = 2,
-        DescriptionTypeAnswer = 3
+    enum class DescriptionType {
+        Offer = 1,
+        Pranswer = 2,
+        Answer = 3
     };
 
     void enqueueOperation(std::function<void ()>);
