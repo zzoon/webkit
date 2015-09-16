@@ -36,6 +36,7 @@
 #include "MediaEndpoint.h"
 #include "MediaEndpointConfiguration.h"
 #include "PeerConnectionBackend.h"
+#include "SessionDescription.h"
 #include <wtf/RefPtr.h>
 #include <wtf/RefCounted.h>
 
@@ -68,12 +69,6 @@ private:
         Remote = 2
     };
 
-    enum class DescriptionType {
-        Offer = 1,
-        Pranswer = 2,
-        Answer = 3
-    };
-
     void enqueueOperation(std::function<void ()>);
     void completeQueuedOperation();
 
@@ -85,8 +80,10 @@ private:
 
     void queuedAddIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback);
 
-    PeerConnectionStates::SignalingState targetSignalingState(SetterType, DescriptionType) const;
-    DescriptionType parseDescriptionType(const String& typeName) const;
+    PeerConnectionStates::SignalingState targetSignalingState(SetterType, SessionDescription::Type) const;
+    SessionDescription::Type parseDescriptionType(const String& typeName) const;
+
+    RefPtr<RTCSessionDescription> createRTCSessionDescription(SessionDescription*) const;
 
     // MediaEndpointClient
     virtual void gotDtlsCertificate(const String& certificate) override;
@@ -116,11 +113,8 @@ private:
     String m_dtlsFingerprint;
     unsigned m_sdpSessionVersion;
 
-    RefPtr<MediaEndpointConfiguration> m_localConfiguration;
-    RefPtr<MediaEndpointConfiguration> m_remoteConfiguration;
-
-    String m_localConfigurationType;
-    String m_remoteConfigurationType;
+    RefPtr<SessionDescription> m_localDescription;
+    RefPtr<SessionDescription> m_remoteDescription;
 
     RefPtr<RTCConfiguration> m_configuration;
 };
