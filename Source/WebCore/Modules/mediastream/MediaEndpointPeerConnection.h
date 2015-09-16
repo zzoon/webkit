@@ -114,6 +114,7 @@ private:
     String m_iceUfrag;
     String m_icePassword;
     String m_dtlsFingerprint;
+    unsigned m_sdpSessionVersion;
 
     RefPtr<MediaEndpointConfiguration> m_localConfiguration;
     RefPtr<MediaEndpointConfiguration> m_remoteConfiguration;

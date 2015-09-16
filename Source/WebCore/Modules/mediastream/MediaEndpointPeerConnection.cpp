@@ -93,6 +93,7 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     , m_cname(randomString(16))
     , m_iceUfrag(randomString(4))
     , m_icePassword(randomString(22))
+    , m_sdpSessionVersion(0)
 {
     m_mediaEndpoint = MediaEndpoint::create(this);
     ASSERT(m_mediaEndpoint);
@@ -185,6 +186,8 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localConfiguration ?
         MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get())) : MediaEndpointConfiguration::create();
 
+    configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
+
     Vector<RefPtr<RTCRtpSender>> senders = m_client->getSenders();
     updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
 
@@ -253,6 +256,8 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptio
 
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localConfiguration ?
         MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localConfiguration.get())) : MediaEndpointConfiguration::create();
+
+    configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
     for (unsigned i = 0; i < m_remoteConfiguration->mediaDescriptions().size(); ++i) {
         RefPtr<PeerMediaDescription> remoteMediaDescription = m_remoteConfiguration->mediaDescriptions()[i];
