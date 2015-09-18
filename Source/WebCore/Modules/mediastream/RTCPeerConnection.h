@@ -77,9 +77,13 @@ public:
 
     void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
     RefPtr<RTCSessionDescription> localDescription() const;
+    RefPtr<RTCSessionDescription> currentLocalDescription() const;
+    RefPtr<RTCSessionDescription> pendingLocalDescription() const;
 
     void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
     RefPtr<RTCSessionDescription> remoteDescription() const;
+    RefPtr<RTCSessionDescription> currentRemoteDescription() const;
+    RefPtr<RTCSessionDescription> pendingRemoteDescription() const;
 
     String signalingState() const;
 

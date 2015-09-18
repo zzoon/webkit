@@ -45,7 +45,8 @@ public:
     enum class Type {
         Offer = 1,
         Pranswer = 2,
-        Answer = 3
+        Answer = 3,
+        Rollback = 4
     };
 
     static RefPtr<SessionDescription> create(Type type, RefPtr<MediaEndpointConfiguration>&& configuration)
@@ -56,6 +57,8 @@ public:
 
     Type type() const { return m_type; }
     MediaEndpointConfiguration* configuration() const { return m_configuration.get(); }
+
+    bool isLaterThan(SessionDescription* other) { return !other || configuration()->sessionVersion() > other->configuration()->sessionVersion(); }
 
 private:
     SessionDescription(Type type, RefPtr<MediaEndpointConfiguration>&& configuration)

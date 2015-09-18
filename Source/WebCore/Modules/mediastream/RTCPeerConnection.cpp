@@ -220,6 +220,16 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
     return m_backend->localDescription();
 }
 
+RefPtr<RTCSessionDescription> RTCPeerConnection::currentLocalDescription() const
+{
+    return m_backend->currentLocalDescription();
+}
+
+RefPtr<RTCSessionDescription> RTCPeerConnection::pendingLocalDescription() const
+{
+    return m_backend->pendingLocalDescription();
+}
+
 void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     if (m_signalingState == SignalingState::Closed) {
@@ -234,6 +244,16 @@ void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description,
 RefPtr<RTCSessionDescription> RTCPeerConnection::remoteDescription() const
 {
     return m_backend->remoteDescription();
+}
+
+RefPtr<RTCSessionDescription> RTCPeerConnection::currentRemoteDescription() const
+{
+    return m_backend->currentRemoteDescription();
+}
+
+RefPtr<RTCSessionDescription> RTCPeerConnection::pendingRemoteDescription() const
+{
+    return m_backend->pendingRemoteDescription();
 }
 
 void RTCPeerConnection::updateIce(const Dictionary& rtcConfiguration, ExceptionCode& ec)

@@ -81,9 +81,13 @@ public:
 
     virtual void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) = 0;
     virtual RefPtr<RTCSessionDescription> localDescription() const = 0;
+    virtual RefPtr<RTCSessionDescription> currentLocalDescription() const = 0;
+    virtual RefPtr<RTCSessionDescription> pendingLocalDescription() const = 0;
 
     virtual void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) = 0;
     virtual RefPtr<RTCSessionDescription> remoteDescription() const = 0;
+    virtual RefPtr<RTCSessionDescription> currentRemoteDescription() const = 0;
+    virtual RefPtr<RTCSessionDescription> pendingRemoteDescription() const = 0;
 
     virtual void setConfiguration(RTCConfiguration&) = 0;
     virtual void addIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback) = 0;

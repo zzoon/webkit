@@ -50,9 +50,13 @@
 
     [Custom, RaisesException] Promise setLocalDescription(RTCSessionDescription description);
     readonly attribute RTCSessionDescription localDescription;
+    readonly attribute RTCSessionDescription currentLocalDescription;
+    readonly attribute RTCSessionDescription pendingLocalDescription;
 
     [Custom, RaisesException] Promise setRemoteDescription(RTCSessionDescription description);
     readonly attribute RTCSessionDescription remoteDescription;
+    readonly attribute RTCSessionDescription currentRemoteDescription;
+    readonly attribute RTCSessionDescription pendingRemoteDescription;
 
     readonly attribute DOMString signalingState;
 

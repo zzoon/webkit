@@ -183,8 +183,8 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
-    RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localDescription ?
-        MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localDescription->configuration())) : MediaEndpointConfiguration::create();
+    RefPtr<MediaEndpointConfiguration> configurationSnapshot = internalLocalDescription() ?
+        MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(internalLocalDescription()->configuration())) : MediaEndpointConfiguration::create();
 
     configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
@@ -254,12 +254,12 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptio
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
-    RefPtr<MediaEndpointConfiguration> configurationSnapshot = m_localDescription ?
-        MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(m_localDescription->configuration())) : MediaEndpointConfiguration::create();
+    RefPtr<MediaEndpointConfiguration> configurationSnapshot = internalLocalDescription() ?
+        MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(internalLocalDescription()->configuration())) : MediaEndpointConfiguration::create();
 
     configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
-    const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions = m_remoteDescription->configuration()->mediaDescriptions();
+    const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
     for (unsigned i = 0; i < remoteMediaDescriptions.size(); ++i) {
         RefPtr<PeerMediaDescription> remoteMediaDescription = remoteMediaDescriptions[i];
         RefPtr<PeerMediaDescription> localMediaDescription;
@@ -335,7 +335,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         return;
     }
 
-    unsigned previousNumberOfMediaDescriptions = m_localDescription ? m_localDescription->configuration()->mediaDescriptions().size() : 0;
+    unsigned previousNumberOfMediaDescriptions = internalLocalDescription() ? internalLocalDescription()->configuration()->mediaDescriptions().size() : 0;
     unsigned numberOfMediaDescriptions = parsedConfiguration->mediaDescriptions().size();
     bool hasNewMediaDescriptions = numberOfMediaDescriptions > previousNumberOfMediaDescriptions;
     bool isInitiator = descriptionType == SessionDescription::Type::Offer;
@@ -361,8 +361,8 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         }
     }
 
-    if (m_remoteDescription) {
-        if (m_mediaEndpoint->prepareToSend(m_remoteDescription->configuration(), isInitiator) == MediaEndpointPrepareResult::Failed) {
+    if (internalRemoteDescription()) {
+        if (m_mediaEndpoint->prepareToSend(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpointPrepareResult::Failed) {
             // FIXME: Error type?
             RefPtr<DOMError> error = DOMError::create("IncompatibleSessionDescriptionError (send configuration)");
             rejectCallback(*error);
@@ -371,10 +371,41 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         }
     }
 
-    m_localDescription = SessionDescription::create(descriptionType, WTF::move(parsedConfiguration));
+    RefPtr<SessionDescription> newDescription = SessionDescription::create(descriptionType, WTF::move(parsedConfiguration));
+    SignalingState newSignalingState;
 
-    if (m_client->internalSignalingState() != targetState) {
-        m_client->setSignalingState(targetState);
+    // Update state and local descriptions according to setLocal/RemoteDescription processing model
+    switch (newDescription->type()) {
+    case SessionDescription::Type::Offer:
+        if (newDescription->isLaterThan(m_currentLocalDescription.get())) {
+            m_pendingLocalDescription = newDescription;
+            newSignalingState = SignalingState::HaveLocalOffer;
+        }
+
+        break;
+
+    case SessionDescription::Type::Answer:
+        m_currentLocalDescription = newDescription;
+        m_currentRemoteDescription = m_pendingRemoteDescription;
+        m_pendingLocalDescription = nullptr;
+        m_pendingRemoteDescription = nullptr;
+        newSignalingState = SignalingState::Stable;
+        break;
+
+    case SessionDescription::Type::Rollback:
+        // FIXME: rollback is not supported in the platform yet
+        m_pendingLocalDescription = nullptr;
+        newSignalingState = SignalingState::Stable;
+        break;
+
+    case SessionDescription::Type::Pranswer:
+        m_pendingLocalDescription = newDescription;
+        newSignalingState = SignalingState::HaveLocalPrAnswer;
+        break;
+    }
+
+    if (newSignalingState != m_client->internalSignalingState()) {
+        m_client->setSignalingState(newSignalingState);
         m_client->fireEvent(Event::create(eventNames().signalingstatechangeEvent, false, false));
     }
 
@@ -390,7 +421,17 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
 
 RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::localDescription() const
 {
-    return createRTCSessionDescription(m_localDescription.get());
+    return createRTCSessionDescription(internalLocalDescription());
+}
+
+RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::currentLocalDescription() const
+{
+    return createRTCSessionDescription(m_currentLocalDescription.get());
+}
+
+RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::pendingLocalDescription() const
+{
+    return createRTCSessionDescription(m_pendingLocalDescription.get());
 }
 
 static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayload>>& remotePayloads, const Vector<RefPtr<MediaPayload>>& defaultPayloads)
@@ -476,10 +517,40 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
         return;
     }
 
-    m_remoteDescription = SessionDescription::create(descriptionType, WTF::move(parsedConfiguration));
+    RefPtr<SessionDescription> newDescription = SessionDescription::create(descriptionType, WTF::move(parsedConfiguration));
+    SignalingState newSignalingState;
 
-    if (m_client->internalSignalingState() != targetState) {
-        m_client->setSignalingState(targetState);
+    // Update state and local descriptions according to setLocal/RemoteDescription processing model
+    switch (newDescription->type()) {
+    case SessionDescription::Type::Offer:
+        if (newDescription->isLaterThan(m_currentRemoteDescription.get())) {
+            m_pendingRemoteDescription = newDescription;
+            newSignalingState = SignalingState::HaveRemoteOffer;
+        }
+        break;
+
+    case SessionDescription::Type::Answer:
+        m_currentRemoteDescription = newDescription;
+        m_currentLocalDescription = m_pendingLocalDescription;
+        m_pendingRemoteDescription = nullptr;
+        m_pendingLocalDescription = nullptr;
+        newSignalingState = SignalingState::Stable;
+        break;
+
+    case SessionDescription::Type::Rollback:
+        // FIXME: rollback is not supported in the platform yet
+        m_pendingRemoteDescription = nullptr;
+        newSignalingState = SignalingState::Stable;
+        break;
+
+    case SessionDescription::Type::Pranswer:
+        m_pendingRemoteDescription = newDescription;
+        newSignalingState = SignalingState::HaveRemotePrAnswer;
+        break;
+    }
+
+    if (newSignalingState != m_client->internalSignalingState()) {
+        m_client->setSignalingState(newSignalingState);
         m_client->fireEvent(Event::create(eventNames().signalingstatechangeEvent, false, false));
     }
 
@@ -489,7 +560,17 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
 
 RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::remoteDescription() const
 {
-    return createRTCSessionDescription(m_remoteDescription.get());
+    return createRTCSessionDescription(internalRemoteDescription());
+}
+
+RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::currentRemoteDescription() const
+{
+    return createRTCSessionDescription(m_currentRemoteDescription.get());
+}
+
+RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::pendingRemoteDescription() const
+{
+    return createRTCSessionDescription(m_pendingRemoteDescription.get());
 }
 
 void MediaEndpointPeerConnection::setConfiguration(RTCConfiguration& configuration)
@@ -519,7 +600,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
         return;
     }
 
-    const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions = m_remoteDescription->configuration()->mediaDescriptions();
+    const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
     unsigned mdescIndex = rtcCandidate->sdpMLineIndex();
 
     if (mdescIndex >= remoteMediaDescriptions.size()) {
@@ -592,10 +673,22 @@ static String descriptionTypeToString(SessionDescription::Type type)
         return ASCIILiteral("pranswer");
     case SessionDescription::Type::Answer:
         return ASCIILiteral("answer");
+    case SessionDescription::Type::Rollback:
+        return ASCIILiteral("rollback");
     }
 
     ASSERT_NOT_REACHED();
     return emptyString();
+}
+
+SessionDescription* MediaEndpointPeerConnection::internalLocalDescription() const
+{
+    return m_pendingLocalDescription ? m_pendingLocalDescription.get() : m_currentLocalDescription.get();
+}
+
+SessionDescription* MediaEndpointPeerConnection::internalRemoteDescription() const
+{
+    return m_pendingRemoteDescription ? m_pendingRemoteDescription.get() : m_currentRemoteDescription.get();
 }
 
 RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::createRTCSessionDescription(SessionDescription* description) const
@@ -653,7 +746,7 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
 {
     ASSERT(scriptExecutionContext()->isContextThread());
 
-    PeerMediaDescription& mdesc = *m_localDescription->configuration()->mediaDescriptions()[mdescIndex];
+    PeerMediaDescription& mdesc = *internalLocalDescription()->configuration()->mediaDescriptions()[mdescIndex];
     mdesc.addIceCandidate(candidate.copyRef());
 
     // FIXME: should we still do this?
@@ -681,7 +774,7 @@ void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
 {
     ASSERT(scriptExecutionContext()->isContextThread());
 
-    const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions = m_localDescription->configuration()->mediaDescriptions();
+    const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions = internalLocalDescription()->configuration()->mediaDescriptions();
     mediaDescriptions[mdescIndex]->setIceCandidateGatheringDone(true);
 
     for (auto& mdesc : mediaDescriptions) {
@@ -699,7 +792,7 @@ void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<Re
     if (m_client->internalSignalingState() == SignalingState::Closed)
         return;
 
-    const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions = m_remoteDescription->configuration()->mediaDescriptions();
+    const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
 
     if (mdescIndex >= remoteMediaDescriptions.size()) {
         printf("Warning: No remote configuration for incoming source.\n");

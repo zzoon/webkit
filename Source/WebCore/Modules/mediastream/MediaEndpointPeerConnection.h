@@ -54,9 +54,13 @@ public:
 
     void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) override;
     RefPtr<RTCSessionDescription> localDescription() const override;
+    RefPtr<RTCSessionDescription> currentLocalDescription() const override;
+    RefPtr<RTCSessionDescription> pendingLocalDescription() const override;
 
     void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) override;
     RefPtr<RTCSessionDescription> remoteDescription() const override;
+    RefPtr<RTCSessionDescription> currentRemoteDescription() const override;
+    RefPtr<RTCSessionDescription> pendingRemoteDescription() const override;
 
     void setConfiguration(RTCConfiguration&) override;
     void addIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback) override;
@@ -83,6 +87,8 @@ private:
     PeerConnectionStates::SignalingState targetSignalingState(SetterType, SessionDescription::Type) const;
     SessionDescription::Type parseDescriptionType(const String& typeName) const;
 
+    SessionDescription* internalLocalDescription() const;
+    SessionDescription* internalRemoteDescription() const;
     RefPtr<RTCSessionDescription> createRTCSessionDescription(SessionDescription*) const;
 
     // MediaEndpointClient
@@ -113,8 +119,11 @@ private:
     String m_dtlsFingerprint;
     unsigned m_sdpSessionVersion;
 
-    RefPtr<SessionDescription> m_localDescription;
-    RefPtr<SessionDescription> m_remoteDescription;
+    RefPtr<SessionDescription> m_currentLocalDescription;
+    RefPtr<SessionDescription> m_pendingLocalDescription;
+
+    RefPtr<SessionDescription> m_currentRemoteDescription;
+    RefPtr<SessionDescription> m_pendingRemoteDescription;
 
     RefPtr<RTCConfiguration> m_configuration;
 };
