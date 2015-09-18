@@ -303,8 +303,6 @@ String RTCPeerConnection::signalingState() const
         return ASCIILiteral("have-remote-pranswer");
     case SignalingState::Closed:
         return ASCIILiteral("closed");
-    case SignalingState::Invalid:
-        break;
     }
 
     ASSERT_NOT_REACHED();

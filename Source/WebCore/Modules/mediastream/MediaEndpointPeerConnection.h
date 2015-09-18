@@ -68,11 +68,6 @@ public:
     void stop() override;
 
 private:
-    enum class SetterType {
-        Local = 1,
-        Remote = 2
-    };
-
     void enqueueOperation(std::function<void ()>);
     void completeQueuedOperation();
 
@@ -84,7 +79,8 @@ private:
 
     void queuedAddIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback);
 
-    PeerConnectionStates::SignalingState targetSignalingState(SetterType, SessionDescription::Type) const;
+    bool localDescriptionTypeValidForState(SessionDescription::Type) const;
+    bool remoteDescriptionTypeValidForState(SessionDescription::Type) const;
     SessionDescription::Type parseDescriptionType(const String& typeName) const;
 
     SessionDescription* internalLocalDescription() const;

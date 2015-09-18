@@ -43,8 +43,7 @@ enum class SignalingState {
     HaveRemoteOffer = 3,
     HaveLocalPrAnswer = 4,
     HaveRemotePrAnswer = 5,
-    Closed = 6,
-    Invalid = 7
+    Closed = 6
 };
 
 enum class IceConnectionState {

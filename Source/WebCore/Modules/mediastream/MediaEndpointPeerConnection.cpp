@@ -315,8 +315,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
 
     SessionDescription::Type descriptionType = parseDescriptionType(description->type());
 
-    SignalingState targetState = targetSignalingState(SetterType::Local, descriptionType);
-    if (targetState == SignalingState::Invalid) {
+    if (!localDescriptionTypeValidForState(descriptionType)) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (bad description type for current state)");
         rejectCallback(*error);
@@ -474,8 +473,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
 
     SessionDescription::Type descriptionType = parseDescriptionType(description->type());
 
-    SignalingState targetState = targetSignalingState(SetterType::Remote, descriptionType);
-    if (targetState == SignalingState::Invalid) {
+    if (!remoteDescriptionTypeValidForState(descriptionType)) {
         // FIXME: Error type?
         RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (bad description type for current state)");
         rejectCallback(*error);
@@ -625,32 +623,42 @@ void MediaEndpointPeerConnection::stop()
     m_mediaEndpoint->stop();
 }
 
-SignalingState MediaEndpointPeerConnection::targetSignalingState(SetterType setter, SessionDescription::Type description) const
+bool MediaEndpointPeerConnection::localDescriptionTypeValidForState(SessionDescription::Type type) const
 {
-    // "map" describing the valid state transitions
     switch (m_client->internalSignalingState()) {
     case SignalingState::Stable:
-        if (setter == SetterType::Local && description == SessionDescription::Type::Offer)
-            return SignalingState::HaveLocalOffer;
-        if (setter == SetterType::Remote && description == SessionDescription::Type::Offer)
-            return SignalingState::HaveRemoteOffer;
-        break;
+        return type == SessionDescription::Type::Offer;
     case SignalingState::HaveLocalOffer:
-        if (setter == SetterType::Local && description == SessionDescription::Type::Offer)
-            return SignalingState::HaveLocalOffer;
-        if (setter == SetterType::Remote && description == SessionDescription::Type::Answer)
-            return SignalingState::Stable;
-        break;
+        return type == SessionDescription::Type::Offer;
     case SignalingState::HaveRemoteOffer:
-        if (setter == SetterType::Local && description == SessionDescription::Type::Answer)
-            return SignalingState::Stable;
-        if (setter == SetterType::Remote && description == SessionDescription::Type::Offer)
-            return SignalingState::HaveRemoteOffer;
-        break;
+        return type == SessionDescription::Type::Answer || type == SessionDescription::Type::Pranswer;
+    case SignalingState::HaveLocalPrAnswer:
+        return type == SessionDescription::Type::Answer || type == SessionDescription::Type::Pranswer;
     default:
-        break;
+        return false;
     };
-    return SignalingState::Invalid;
+
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+bool MediaEndpointPeerConnection::remoteDescriptionTypeValidForState(SessionDescription::Type type) const
+{
+    switch (m_client->internalSignalingState()) {
+    case SignalingState::Stable:
+        return type == SessionDescription::Type::Offer;
+    case SignalingState::HaveLocalOffer:
+        return type == SessionDescription::Type::Answer || type == SessionDescription::Type::Pranswer;
+    case SignalingState::HaveRemoteOffer:
+        return type == SessionDescription::Type::Offer;
+    case SignalingState::HaveRemotePrAnswer:
+        return type == SessionDescription::Type::Answer || type == SessionDescription::Type::Pranswer;
+    default:
+        return false;
+    };
+
+    ASSERT_NOT_REACHED();
+    return false;
 }
 
 SessionDescription::Type MediaEndpointPeerConnection::parseDescriptionType(const String& typeName) const
