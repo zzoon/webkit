@@ -112,6 +112,43 @@ public:
     RealtimeMediaSource* source() const { return m_source.get(); }
     void setSource(RefPtr<RealtimeMediaSource>&& source) { m_source = source; }
 
+    RefPtr<PeerMediaDescription> clone() const
+    {
+        RefPtr<PeerMediaDescription> copy = create();
+
+        copy->m_type = String(m_type);
+        copy->m_port = m_port;
+        copy->m_address = String(m_address);
+        copy->m_mode = String(m_mode);
+
+        for (auto& payload : m_payloads)
+            copy->m_payloads.append(payload->clone());
+
+        copy->m_rtcpMux = m_rtcpMux;
+        copy->m_rtcpAddress = String(m_rtcpAddress);
+        copy->m_rtcpPort = m_rtcpPort;
+
+        copy->m_mediaStreamId = String(m_mediaStreamId);
+        copy->m_mediaStreamTrackId = String(m_mediaStreamTrackId);
+
+        copy->m_dtlsSetup = String(m_dtlsSetup);
+        copy->m_dtlsFingerprintHashFunction = String(m_dtlsFingerprintHashFunction);
+        copy->m_dtlsFingerprint = String(m_dtlsFingerprint);
+
+        for (auto ssrc : m_ssrcs)
+            copy->m_ssrcs.append(ssrc);
+
+        copy->m_cname = String(m_cname);
+
+        copy->m_iceUfrag = String(m_iceUfrag);
+        copy->m_icePassword = String(m_icePassword);
+
+        for (auto& candidate : m_iceCandidates)
+            copy->m_iceCandidates.append(candidate->clone());
+
+        return copy;
+    }
+
 private:
     PeerMediaDescription()
         : m_port(0)

@@ -77,6 +77,24 @@ public:
     unsigned relatedPort() const { return m_relatedPort; }
     void setRelatedPort(unsigned relatedPort) { m_relatedPort = relatedPort; }
 
+    RefPtr<IceCandidate> clone() const
+    {
+        RefPtr<IceCandidate> copy = create();
+
+        copy->m_type = String(m_type);
+        copy->m_foundation = String(m_foundation);
+        copy->m_componentId = m_componentId;
+        copy->m_transport = String(m_transport);
+        copy->m_priority = m_priority;
+        copy->m_address = String(m_address);
+        copy->m_port = m_port;
+        copy->m_tcpType = String(m_tcpType);
+        copy->m_relatedAddress = String(m_relatedAddress);
+        copy->m_relatedPort = m_relatedPort;
+
+        return copy;
+    }
+
 private:
     IceCandidate()
         : m_componentId(0)

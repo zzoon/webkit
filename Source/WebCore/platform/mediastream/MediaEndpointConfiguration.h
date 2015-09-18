@@ -55,6 +55,18 @@ public:
     const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions() const { return m_mediaDescriptions; }
     void addMediaDescription(RefPtr<PeerMediaDescription>&& description) { m_mediaDescriptions.append(WTF::move(description)); }
 
+    RefPtr<MediaEndpointConfiguration> clone() const
+    {
+        RefPtr<MediaEndpointConfiguration> copy = create();
+        copy->m_sessionId = m_sessionId;
+        copy->m_sessionVersion = m_sessionVersion;
+
+        for (auto& mdesc : m_mediaDescriptions)
+            copy->m_mediaDescriptions.append(mdesc->clone());
+
+        return copy;
+    }
+
 private:
     MediaEndpointConfiguration()
         : m_sessionId(cryptographicallyRandomNumber()) // FIXME: should be 64 bits

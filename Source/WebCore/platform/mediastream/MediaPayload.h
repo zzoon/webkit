@@ -72,6 +72,26 @@ public:
     const HashMap<String, unsigned>& parameters() const { return m_parameters; }
     void addParameter(const String& name, unsigned value) { m_parameters.set(name, value); }
 
+    RefPtr<MediaPayload> clone() const
+    {
+        RefPtr<MediaPayload> copy = create();
+
+        copy->m_type = m_type;
+        copy->m_encodingName = String(m_encodingName);
+        copy->m_clockRate = m_clockRate;
+
+        copy->m_channels = m_channels;
+
+        copy->m_ccmfir = m_ccmfir;
+        copy->m_nackpli = m_nackpli;
+        copy->m_nack = m_nack;
+
+        for (auto& key : m_parameters.keys())
+            copy->m_parameters.add(key, m_parameters.get(key));
+
+        return copy;
+    }
+
 private:
     MediaPayload()
         : m_type(0)

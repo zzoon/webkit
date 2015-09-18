@@ -184,7 +184,7 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = internalLocalDescription() ?
-        MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(internalLocalDescription()->configuration())) : MediaEndpointConfiguration::create();
+        internalLocalDescription()->configuration()->clone() : MediaEndpointConfiguration::create();
 
     configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
@@ -255,7 +255,7 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptio
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = internalLocalDescription() ?
-        MediaEndpointConfigurationConversions::fromJSON(MediaEndpointConfigurationConversions::toJSON(internalLocalDescription()->configuration())) : MediaEndpointConfiguration::create();
+        internalLocalDescription()->configuration()->clone() : MediaEndpointConfiguration::create();
 
     configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
