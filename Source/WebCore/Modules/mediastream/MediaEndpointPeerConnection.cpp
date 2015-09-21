@@ -94,6 +94,7 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     , m_iceUfrag(randomString(4))
     , m_icePassword(randomString(22))
     , m_sdpSessionVersion(0)
+    , m_negotiationNeeded(false)
 {
     m_mediaEndpoint = MediaEndpoint::create(this);
     ASSERT(m_mediaEndpoint);
@@ -308,6 +309,22 @@ void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* des
     });
 }
 
+static bool allSendersRepresented(const Vector<RefPtr<RTCRtpSender>>& senders, const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions)
+{
+    for (auto& sender : senders) {
+        bool senderIsRepresented = false;
+        for (auto& mdesc : mediaDescriptions) {
+            if (mdesc->mediaStreamTrackId() == sender->track()->id()) {
+                senderIsRepresented = true;
+                break;
+            }
+        }
+        if (!senderIsRepresented)
+            return false;
+    }
+    return true;
+}
+
 void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
     if (m_client->internalSignalingState() == SignalingState::Closed)
@@ -370,6 +387,9 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         }
     }
 
+    if (allSendersRepresented(m_client->getSenders(), parsedConfiguration->mediaDescriptions()))
+        clearNegotiationNeededState();
+
     RefPtr<SessionDescription> newDescription = SessionDescription::create(descriptionType, WTF::move(parsedConfiguration));
     SignalingState newSignalingState;
 
@@ -412,7 +432,8 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
     if (m_client->internalIceGatheringState() == IceGatheringState::New && numberOfMediaDescriptions)
         m_client->updateIceGatheringState(IceGatheringState::Gathering);
 
-    // FIXME: implement negotiation needed
+    if (m_client->internalSignalingState() == SignalingState::Stable && m_negotiationNeeded)
+        m_client->scheduleNegotiationNeededEvent();
 
     resolveCallback();
     completeQueuedOperation();
@@ -621,6 +642,17 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
 void MediaEndpointPeerConnection::stop()
 {
     m_mediaEndpoint->stop();
+}
+
+void MediaEndpointPeerConnection::markAsNeedingNegotiation()
+{
+    if (m_negotiationNeeded)
+        return;
+
+    m_negotiationNeeded = true;
+
+    if (m_client->internalSignalingState() == SignalingState::Stable)
+        m_client->scheduleNegotiationNeededEvent();
 }
 
 bool MediaEndpointPeerConnection::localDescriptionTypeValidForState(SessionDescription::Type type) const

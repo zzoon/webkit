@@ -57,6 +57,8 @@ public:
     virtual void updateIceGatheringState(PeerConnectionStates::IceGatheringState) = 0;
     virtual void updateIceConnectionState(PeerConnectionStates::IceConnectionState) = 0;
 
+    virtual void scheduleNegotiationNeededEvent() const = 0;
+
     virtual ScriptExecutionContext* context() const = 0;
     virtual PeerConnectionStates::SignalingState internalSignalingState() const = 0;
     virtual PeerConnectionStates::IceGatheringState internalIceGatheringState() const = 0;
@@ -93,6 +95,10 @@ public:
     virtual void addIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback) = 0;
 
     virtual void stop() = 0;
+
+    virtual bool isNegotiationNeeded() const = 0;
+    virtual void markAsNeedingNegotiation() = 0;
+    virtual void clearNegotiationNeededState() = 0;
 };
 
 } // namespace WebCore

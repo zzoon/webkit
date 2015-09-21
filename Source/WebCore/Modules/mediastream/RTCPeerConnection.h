@@ -124,6 +124,8 @@ private:
     void updateIceGatheringState(PeerConnectionStates::IceGatheringState);
     void updateIceConnectionState(PeerConnectionStates::IceConnectionState);
 
+    void scheduleNegotiationNeededEvent() const;
+
     // PeerConnectionBackendClient
     ScriptExecutionContext* context() const override { return scriptExecutionContext(); };
     void fireEvent(PassRefPtr<Event>) override;

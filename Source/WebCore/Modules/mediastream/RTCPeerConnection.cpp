@@ -143,6 +143,8 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
     RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track), stream->id());
     m_senderSet.add(track->id(), sender);
 
+    m_backend->markAsNeedingNegotiation();
+
     return sender;
 }
 
@@ -156,7 +158,7 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
     if (!m_senderSet.remove(sender->track()->id()))
         return;
 
-    // FIXME: Mark connection as needing negotiation.
+    m_backend->markAsNeedingNegotiation();
 }
 
 void RTCPeerConnection::createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback)
@@ -416,6 +418,16 @@ void RTCPeerConnection::updateIceConnectionState(IceConnectionState newState)
         m_iceConnectionState = newState;
 
         dispatchEvent(Event::create(eventNames().iceconnectionstatechangeEvent, false, false));
+    });
+}
+
+void RTCPeerConnection::scheduleNegotiationNeededEvent() const
+{
+    scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
+        if (m_backend->isNegotiationNeeded()) {
+            dispatchEvent(Event::create(eventNames().negotiationneededEvent, false, false));
+            m_backend->clearNegotiationNeededState();
+        }
     });
 }
 

@@ -67,6 +67,10 @@ public:
 
     void stop() override;
 
+    bool isNegotiationNeeded() const override { return m_negotiationNeeded; };
+    void markAsNeedingNegotiation();
+    void clearNegotiationNeededState() override { m_negotiationNeeded = false; };
+
 private:
     void enqueueOperation(std::function<void ()>);
     void completeQueuedOperation();
@@ -122,6 +126,8 @@ private:
     RefPtr<SessionDescription> m_pendingRemoteDescription;
 
     RefPtr<RTCConfiguration> m_configuration;
+
+    bool m_negotiationNeeded;
 };
 
 } // namespace WebCore
