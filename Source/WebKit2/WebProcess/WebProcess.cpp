@@ -36,6 +36,7 @@
 #include "EventDispatcher.h"
 #include "InjectedBundle.h"
 #include "Logging.h"
+#include "NetworkConnectionToWebProcessMessages.h"
 #include "PluginProcessConnectionManager.h"
 #include "SessionTracker.h"
 #include "StatisticsData.h"
@@ -67,6 +68,7 @@
 #include <WebCore/ApplicationCacheStorage.h>
 #include <WebCore/AuthenticationChallenge.h>
 #include <WebCore/CrossOriginPreflightResultCache.h>
+#include <WebCore/DNS.h>
 #include <WebCore/FontCache.h>
 #include <WebCore/FontCascade.h>
 #include <WebCore/Frame.h>
@@ -82,6 +84,7 @@
 #include <WebCore/Page.h>
 #include <WebCore/PageCache.h>
 #include <WebCore/PageGroup.h>
+#include <WebCore/PlatformMediaSessionManager.h>
 #include <WebCore/ResourceHandle.h>
 #include <WebCore/RuntimeEnabledFeatures.h>
 #include <WebCore/SchemeRegistry.h>
@@ -656,7 +659,13 @@ void WebProcess::didClose(IPC::Connection&)
     GCController::singleton().garbageCollectSoon();
     FontCache::singleton().invalidate();
     MemoryCache::singleton().setDisabled(true);
-#endif    
+#endif
+
+#if ENABLE(VIDEO)
+    // FIXME(146657): This explicit media stop command should not be necessary
+    if (auto* platformMediaSessionManager = PlatformMediaSessionManager::sharedManagerIfExists())
+        platformMediaSessionManager->stopAllMediaPlaybackForProcess();
+#endif
 
     // The UI process closed this connection, shut down.
     stopRunLoop();
@@ -1034,7 +1043,7 @@ void WebProcess::networkProcessConnectionClosed(NetworkProcessConnection* connec
     ASSERT(m_networkProcessConnection);
     ASSERT_UNUSED(connection, m_networkProcessConnection == connection);
 
-    m_networkProcessConnection = 0;
+    m_networkProcessConnection = nullptr;
     
     m_webResourceLoadScheduler->networkProcessCrashed();
 }
@@ -1051,7 +1060,7 @@ void WebProcess::webToDatabaseProcessConnectionClosed(WebToDatabaseProcessConnec
     ASSERT(m_webToDatabaseProcessConnection);
     ASSERT(m_webToDatabaseProcessConnection == connection);
 
-    m_webToDatabaseProcessConnection = 0;
+    m_webToDatabaseProcessConnection = nullptr;
 }
 
 WebToDatabaseProcessConnection* WebProcess::webToDatabaseProcessConnection()
@@ -1180,7 +1189,7 @@ void WebProcess::deleteWebsiteData(SessionID sessionID, uint64_t websiteDataType
     parentProcessConnection()->send(Messages::WebProcessProxy::DidDeleteWebsiteData(callbackID), 0);
 }
 
-void WebProcess::deleteWebsiteDataForOrigins(WebCore::SessionID sessionID, uint64_t websiteDataTypes, const Vector<WebKit::SecurityOriginData>& originDatas, uint64_t callbackID)
+void WebProcess::deleteWebsiteDataForOrigins(WebCore::SessionID sessionID, uint64_t websiteDataTypes, const Vector<WebCore::SecurityOriginData>& originDatas, uint64_t callbackID)
 {
     if (websiteDataTypes & WebsiteDataTypeMemoryCache) {
         HashSet<RefPtr<SecurityOrigin>> origins;
@@ -1238,6 +1247,14 @@ void WebProcess::actualPrepareToSuspend(ShouldAcknowledgeWhenReadyToSuspend shou
 
 void WebProcess::processWillSuspendImminently(bool& handled)
 {
+    if (parentProcessConnection()->inSendSync()) {
+        // Avoid reentrency bugs such as rdar://problem/21605505 by just bailing
+        // if we get an incoming ProcessWillSuspendImminently message when waiting for a
+        // reply to a sync message.
+        // FIXME: ProcessWillSuspendImminently should not be a sync message.
+        return;
+    }
+
     supplement<WebDatabaseManager>()->closeAllDatabases();
     actualPrepareToSuspend(ShouldAcknowledgeWhenReadyToSuspend::No);
     handled = true;
@@ -1435,5 +1452,17 @@ void WebProcess::setEnabledServices(bool hasImageServices, bool hasSelectionServ
     m_hasRichContentServices = hasRichContentServices;
 }
 #endif
+
+void WebProcess::prefetchDNS(const String& hostname)
+{
+    if (!usesNetworkProcess()) {
+        WebCore::prefetchDNS(hostname);
+        return;
+    }
+
+#if ENABLE(NETWORK_PROCESS)
+    networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::PrefetchDNS(hostname), 0);
+#endif
+}
 
 } // namespace WebKit

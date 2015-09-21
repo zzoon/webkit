@@ -64,6 +64,7 @@ class UserContentExtension;
 class UserContentExtensionStore;
 class UserScript;
 class WebsiteDataStore;
+class WindowFeatures;
 }
 
 namespace WebKit {
@@ -92,6 +93,8 @@ class WebHitTestResult;
 class WebIconDatabase;
 class WebInspectorProxy;
 class WebMediaCacheManagerProxy;
+class WebMediaSessionFocusManager;
+class WebMediaSessionMetadata;
 class WebNotification;
 class WebNotificationManagerProxy;
 class WebNotificationProvider;
@@ -135,6 +138,8 @@ WK_ADD_API_MAPPING(WKHitTestResultRef, WebHitTestResult)
 WK_ADD_API_MAPPING(WKIconDatabaseRef, WebIconDatabase)
 WK_ADD_API_MAPPING(WKInspectorRef, WebInspectorProxy)
 WK_ADD_API_MAPPING(WKMediaCacheManagerRef, WebMediaCacheManagerProxy)
+WK_ADD_API_MAPPING(WKMediaSessionFocusManagerRef, WebMediaSessionFocusManager)
+WK_ADD_API_MAPPING(WKMediaSessionMetadataRef, WebMediaSessionMetadata)
 WK_ADD_API_MAPPING(WKNavigationActionRef, API::NavigationAction)
 WK_ADD_API_MAPPING(WKNavigationDataRef, API::NavigationData)
 WK_ADD_API_MAPPING(WKNavigationRef, API::Navigation)
@@ -162,6 +167,7 @@ WK_ADD_API_MAPPING(WKUserScriptRef, API::UserScript)
 WK_ADD_API_MAPPING(WKVibrationRef, WebVibrationProxy)
 WK_ADD_API_MAPPING(WKViewportAttributesRef, WebViewportAttributes)
 WK_ADD_API_MAPPING(WKWebsiteDataStoreRef, API::WebsiteDataStore)
+WK_ADD_API_MAPPING(WKWindowFeaturesRef, API::WindowFeatures)
 
 /* Enum conversions */
 
@@ -467,8 +473,10 @@ inline WKPluginLoadPolicy toWKPluginLoadPolicy(PluginModuleLoadPolicy pluginModu
         return kWKPluginLoadPolicyLoadNormally;
     case PluginModuleLoadUnsandboxed:
         return kWKPluginLoadPolicyLoadUnsandboxed;
-    case PluginModuleBlocked:
+    case PluginModuleBlockedForSecurity:
         return kWKPluginLoadPolicyBlocked;
+    case PluginModuleBlockedForCompatibility:
+        return kWKPluginLoadPolicyBlockedForCompatibility;
     }
     
     ASSERT_NOT_REACHED();
@@ -500,13 +508,15 @@ inline PluginModuleLoadPolicy toPluginModuleLoadPolicy(WKPluginLoadPolicy plugin
     case kWKPluginLoadPolicyLoadNormally:
         return PluginModuleLoadNormally;
     case kWKPluginLoadPolicyBlocked:
-        return PluginModuleBlocked;
+        return PluginModuleBlockedForSecurity;
+    case kWKPluginLoadPolicyBlockedForCompatibility:
+        return PluginModuleBlockedForCompatibility;
     case kWKPluginLoadPolicyLoadUnsandboxed:
         return PluginModuleLoadUnsandboxed;
     }
     
     ASSERT_NOT_REACHED();
-    return PluginModuleBlocked;
+    return PluginModuleBlockedForSecurity;
 }
 
 inline WebCore::PluginLoadClientPolicy toPluginLoadClientPolicy(WKPluginLoadClientPolicy pluginLoadClientPolicy)

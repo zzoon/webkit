@@ -10,7 +10,7 @@ _log = logging.getLogger(__name__)
 
 
 class OSXBrowserDriver(BrowserDriver):
-    bundle_identifier = None
+    process_name = None
     platform = 'osx'
 
     def prepare_env(self, device_id):
@@ -18,8 +18,11 @@ class OSXBrowserDriver(BrowserDriver):
         from Quartz import CGWarpMouseCursorPosition
         CGWarpMouseCursorPosition((10, 0))
 
+    def restore_env(self):
+        pass
+
     def close_browsers(self):
-        self._terminiate_processes(self.bundle_identifier)
+        self._terminiate_processes(self.process_name)
 
     @classmethod
     def _launch_process(cls, build_dir, app_name, url, args):
@@ -34,12 +37,9 @@ class OSXBrowserDriver(BrowserDriver):
         cls._launch_process_with_caffinate(args)
 
     @classmethod
-    def _terminiate_processes(cls, bundle_identifier):
-        _log.info('Closing all terminating all processes with the bundle identifier %s' % bundle_identifier)
-        from AppKit import NSRunningApplication
-        processes = NSRunningApplication.runningApplicationsWithBundleIdentifier_(bundle_identifier)
-        for process in processes:
-            process.terminate()
+    def _terminiate_processes(cls, process_name):
+        _log.info('Closing all terminating all processes with name %s' % process_name)
+        subprocess.call(['/usr/bin/killall', process_name])
 
     @classmethod
     def _launch_process_with_caffinate(cls, args, env=None):

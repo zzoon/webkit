@@ -27,18 +27,17 @@
 #define CopiedSpace_h
 
 #include "CopiedAllocator.h"
-#include "HeapBlock.h"
 #include "HeapOperation.h"
 #include "TinyBloomFilter.h"
 #include <wtf/Assertions.h>
 #include <wtf/CheckedBoolean.h>
+#include <wtf/Condition.h>
 #include <wtf/DoublyLinkedList.h>
 #include <wtf/HashSet.h>
+#include <wtf/Lock.h>
 #include <wtf/OSAllocator.h>
 #include <wtf/PageBlock.h>
-#include <wtf/SpinLock.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/ThreadingPrimitives.h>
 
 namespace JSC {
 
@@ -114,7 +113,7 @@ private:
 
     HashSet<CopiedBlock*> m_blockSet;
 
-    SpinLock m_toSpaceLock;
+    Lock m_toSpaceLock;
 
     struct CopiedGeneration {
         CopiedGeneration()
@@ -139,8 +138,8 @@ private:
     bool m_inCopyingPhase;
     bool m_shouldDoCopyPhase;
 
-    Mutex m_loanedBlocksLock; 
-    ThreadCondition m_loanedBlocksCondition;
+    Lock m_loanedBlocksLock; 
+    Condition m_loanedBlocksCondition;
     size_t m_numberOfLoanedBlocks;
     
     size_t m_bytesRemovedFromOldSpaceDueToReallocation;

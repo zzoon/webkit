@@ -36,6 +36,7 @@ caption-side: top
 clear: none
 clip: auto
 color: rgb(0, 0, 0)
+content: 
 cursor: auto
 direction: ltr
 display: block
@@ -134,7 +135,6 @@ zoom: 1
 -webkit-box-pack: start
 -webkit-box-reflect: none
 -webkit-box-shadow: none
--webkit-color-correction: default
 -webkit-column-break-after: auto
 -webkit-column-break-before: auto
 -webkit-column-break-inside: auto
@@ -150,6 +150,7 @@ column-width: auto
 align-content: auto
 align-items: auto
 align-self: auto
+filter: none
 flex-direction: row
 flex-wrap: nowrap
 justify-content: auto
@@ -235,7 +236,7 @@ stop-opacity: 1
 color-interpolation: srgb
 color-interpolation-filters: linearrgb
 color-rendering: auto
-fill: #000000
+fill: rgb(0, 0, 0)
 fill-opacity: 1
 fill-rule: nonzero
 marker-end: none

@@ -129,8 +129,21 @@ WebProcessProxy::~WebProcessProxy()
 void WebProcessProxy::getLaunchOptions(ProcessLauncher::LaunchOptions& launchOptions)
 {
     launchOptions.processType = ProcessLauncher::WebProcess;
+
     if (WebInspectorProxy::isInspectorProcessPool(m_processPool))
         launchOptions.extraInitializationData.add(ASCIILiteral("inspector-process"), ASCIILiteral("1"));
+
+    auto overrideLanguages = m_processPool->configuration().overrideLanguages();
+    if (overrideLanguages.size()) {
+        StringBuilder languageString;
+        for (size_t i = 0; i < overrideLanguages.size(); ++i) {
+            if (i)
+                languageString.append(',');
+            languageString.append(overrideLanguages[i]);
+        }
+        launchOptions.extraInitializationData.add(ASCIILiteral("OverrideLanguages"), languageString.toString());
+    }
+
     platformGetLaunchOptions(launchOptions);
 }
 
@@ -190,9 +203,9 @@ void WebProcessProxy::shutDown()
     if (m_downloadProxyMap)
         m_downloadProxyMap->processDidClose();
 
-    for (VisitedLinkProvider* visitedLinkProvider : m_visitedLinkProviders)
-        visitedLinkProvider->removeProcess(*this);
-    m_visitedLinkProviders.clear();
+    for (VisitedLinkStore* visitedLinkStore : m_visitedLinkStores)
+        visitedLinkStore->removeProcess(*this);
+    m_visitedLinkStores.clear();
 
     for (WebUserContentControllerProxy* webUserContentControllerProxy : m_webUserContentControllerProxies)
         webUserContentControllerProxy->removeProcess(*this);
@@ -206,10 +219,10 @@ WebPageProxy* WebProcessProxy::webPage(uint64_t pageID)
     return globalPageMap().get(pageID);
 }
 
-Ref<WebPageProxy> WebProcessProxy::createWebPage(PageClient& pageClient, const WebPageConfiguration& configuration)
+Ref<WebPageProxy> WebProcessProxy::createWebPage(PageClient& pageClient, Ref<API::PageConfiguration>&& pageConfiguration)
 {
     uint64_t pageID = generatePageID();
-    Ref<WebPageProxy> webPage = WebPageProxy::create(pageClient, *this, pageID, configuration);
+    Ref<WebPageProxy> webPage = WebPageProxy::create(pageClient, *this, pageID, WTF::move(pageConfiguration));
 
     m_pageMap.set(pageID, webPage.ptr());
     globalPageMap().set(pageID, webPage.ptr());
@@ -247,10 +260,10 @@ void WebProcessProxy::removeWebPage(uint64_t pageID)
     shutDown();
 }
 
-void WebProcessProxy::addVisitedLinkProvider(VisitedLinkProvider& provider)
+void WebProcessProxy::addVisitedLinkStore(VisitedLinkStore& store)
 {
-    m_visitedLinkProviders.add(&provider);
-    provider.addProcess(*this);
+    m_visitedLinkStores.add(&store);
+    store.addProcess(*this);
 }
 
 void WebProcessProxy::addWebUserContentControllerProxy(WebUserContentControllerProxy& proxy)
@@ -259,10 +272,10 @@ void WebProcessProxy::addWebUserContentControllerProxy(WebUserContentControllerP
     proxy.addProcess(*this);
 }
 
-void WebProcessProxy::didDestroyVisitedLinkProvider(VisitedLinkProvider& provider)
+void WebProcessProxy::didDestroyVisitedLinkStore(VisitedLinkStore& store)
 {
-    ASSERT(m_visitedLinkProviders.contains(&provider));
-    m_visitedLinkProviders.remove(&provider);
+    ASSERT(m_visitedLinkStores.contains(&store));
+    m_visitedLinkStores.remove(&store);
 }
 
 void WebProcessProxy::didDestroyWebUserContentControllerProxy(WebUserContentControllerProxy& proxy)
@@ -713,7 +726,11 @@ void WebProcessProxy::fetchWebsiteData(SessionID sessionID, WebsiteDataTypes dat
     ASSERT(canSendMessage());
 
     uint64_t callbackID = generateCallbackID();
-    m_pendingFetchWebsiteDataCallbacks.add(callbackID, WTF::move(completionHandler));
+    auto token = throttler().backgroundActivityToken();
+
+    m_pendingFetchWebsiteDataCallbacks.add(callbackID, [token, completionHandler](WebsiteData websiteData) {
+        completionHandler(WTF::move(websiteData));
+    });
 
     send(Messages::WebProcess::FetchWebsiteData(sessionID, dataTypes, callbackID), 0);
 }
@@ -723,8 +740,11 @@ void WebProcessProxy::deleteWebsiteData(SessionID sessionID, WebsiteDataTypes da
     ASSERT(canSendMessage());
 
     uint64_t callbackID = generateCallbackID();
+    auto token = throttler().backgroundActivityToken();
 
-    m_pendingDeleteWebsiteDataCallbacks.add(callbackID, WTF::move(completionHandler));
+    m_pendingDeleteWebsiteDataCallbacks.add(callbackID, [token, completionHandler] {
+        completionHandler();
+    });
     send(Messages::WebProcess::DeleteWebsiteData(sessionID, dataTypes, modifiedSince, callbackID), 0);
 }
 
@@ -733,7 +753,11 @@ void WebProcessProxy::deleteWebsiteDataForOrigins(SessionID sessionID, WebsiteDa
     ASSERT(canSendMessage());
 
     uint64_t callbackID = generateCallbackID();
-    m_pendingDeleteWebsiteDataForOriginsCallbacks.add(callbackID, WTF::move(completionHandler));
+    auto token = throttler().backgroundActivityToken();
+
+    m_pendingDeleteWebsiteDataForOriginsCallbacks.add(callbackID, [token, completionHandler] {
+        completionHandler();
+    });
 
     Vector<SecurityOriginData> originData;
     for (auto& origin : origins)
@@ -882,8 +906,7 @@ void WebProcessProxy::sendProcessWillSuspendImminently()
         return;
 
     bool handled = false;
-    sendSync(Messages::WebProcess::ProcessWillSuspendImminently(), Messages::WebProcess::ProcessWillSuspendImminently::Reply(handled),
-        0, std::chrono::seconds(1), IPC::InterruptWaitingIfSyncMessageArrives);
+    sendSync(Messages::WebProcess::ProcessWillSuspendImminently(), Messages::WebProcess::ProcessWillSuspendImminently::Reply(handled), 0, std::chrono::seconds(1));
 }
 
 void WebProcessProxy::sendPrepareToSuspend()
@@ -914,9 +937,28 @@ void WebProcessProxy::didCancelProcessSuspension()
     m_throttler.didCancelProcessSuspension();
 }
 
+#if ENABLE(NETWORK_PROCESS)
+void WebProcessProxy::reinstateNetworkProcessAssertionState(NetworkProcessProxy& newNetworkProcessProxy)
+{
+#if PLATFORM(IOS)
+    ASSERT(!m_backgroundTokenForNetworkProcess || !m_foregroundTokenForNetworkProcess);
+
+    // The network process crashed; take new tokens for the new network process.
+    if (m_backgroundTokenForNetworkProcess)
+        m_backgroundTokenForNetworkProcess = newNetworkProcessProxy.throttler().backgroundActivityToken();
+    else if (m_foregroundTokenForNetworkProcess)
+        m_foregroundTokenForNetworkProcess = newNetworkProcessProxy.throttler().foregroundActivityToken();
+#else
+    UNUSED_PARAM(newNetworkProcessProxy);
+#endif
+}
+#endif
+
 void WebProcessProxy::didSetAssertionState(AssertionState state)
 {
 #if PLATFORM(IOS) && ENABLE(NETWORK_PROCESS)
+    ASSERT(!m_backgroundTokenForNetworkProcess || !m_foregroundTokenForNetworkProcess);
+
     switch (state) {
     case AssertionState::Suspended:
         m_foregroundTokenForNetworkProcess = nullptr;
@@ -939,6 +981,8 @@ void WebProcessProxy::didSetAssertionState(AssertionState state)
             page->processWillBecomeForeground();
         break;
     }
+
+    ASSERT(!m_backgroundTokenForNetworkProcess || !m_foregroundTokenForNetworkProcess);
 #else
     UNUSED_PARAM(state);
 #endif

@@ -342,7 +342,7 @@ bool DOMPatchSupport::innerPatchChildren(ContainerNode* parentNode, const Vector
     }
 
     // Mark retained nodes as used, do not reuse node more than once.
-    HashSet<size_t, WTF::IntHash<size_t>, WTF::UnsignedWithZeroKeyHashTraits<size_t>>  usedOldOrdinals;
+    HashSet<size_t, WTF::IntHash<size_t>, WTF::UnsignedWithZeroKeyHashTraits<size_t>> usedOldOrdinals;
     for (size_t i = 0; i < newList.size(); ++i) {
         if (!newMap[i].first)
             continue;
@@ -374,11 +374,10 @@ bool DOMPatchSupport::innerPatchChildren(ContainerNode* parentNode, const Vector
     }
 
     // 3. Insert missing nodes.
-    Node* node = parentNode->firstChild();
-    for (unsigned i = 0; node && i < newMap.size(); ++i, node = node->nextSibling()) {
+    for (size_t i = 0; i < newMap.size(); ++i) {
         if (newMap[i].first || merges.contains(newList[i].get()))
             continue;
-        if (!insertBeforeAndMarkAsUsed(parentNode, newList[i].get(), node, ec))
+        if (!insertBeforeAndMarkAsUsed(parentNode, newList[i].get(), parentNode->traverseToChildAt(i), ec))
             return false;
     }
 
@@ -469,7 +468,7 @@ bool DOMPatchSupport::removeChildAndMoveToNew(Digest* oldDigest, ExceptionCode& 
     if (it != m_unusedNodesMap.end()) {
         Digest* newDigest = it->value;
         Node* newNode = newDigest->m_node;
-        if (!m_domEditor->replaceChild(newNode->parentNode(), oldNode, newNode, ec))
+        if (!m_domEditor->replaceChild(newNode->parentNode(), WTF::move(oldNode), newNode, ec))
             return false;
         newDigest->m_node = oldNode.get();
         markNodeAsUsed(newDigest);

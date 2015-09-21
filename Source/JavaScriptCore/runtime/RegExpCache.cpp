@@ -56,11 +56,10 @@ RegExpCache::RegExpCache(VM* vm)
 {
 }
 
-void RegExpCache::finalize(Handle<Unknown> handle, void*)
+void RegExpCache::finalize(JSCell*& cell, void*)
 {
-    RegExp* regExp = static_cast<RegExp*>(handle.get().asCell());
+    RegExp* regExp = jsCast<RegExp*>(cell);
     weakRemove(m_weakCache, regExp->key(), regExp);
-    regExp->invalidateCode();
 }
 
 void RegExpCache::addToStrongCache(RegExp* regExp)
@@ -74,7 +73,7 @@ void RegExpCache::addToStrongCache(RegExp* regExp)
         m_nextEntryInStrongCache = 0;
 }
 
-void RegExpCache::invalidateCode()
+void RegExpCache::deleteAllCode()
 {
     for (int i = 0; i < maxStrongCacheableEntries; i++)
         m_strongCache[i].clear();
@@ -85,7 +84,7 @@ void RegExpCache::invalidateCode()
         RegExp* regExp = it->value.get();
         if (!regExp) // Skip zombies.
             continue;
-        regExp->invalidateCode();
+        regExp->deleteCode();
     }
 }
 

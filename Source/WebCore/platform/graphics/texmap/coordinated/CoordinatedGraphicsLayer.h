@@ -62,6 +62,8 @@ public:
     explicit CoordinatedGraphicsLayer(Type, GraphicsLayerClient&);
     virtual ~CoordinatedGraphicsLayer();
 
+    PlatformLayerID primaryLayerID() const override { return id(); }
+
     // Reimplementations from GraphicsLayer.h.
     virtual bool setChildren(const Vector<GraphicsLayer*>&) override;
     virtual void addChild(GraphicsLayer*) override;
@@ -119,18 +121,17 @@ public:
     bool isScrollable() const { return !!m_scrollableArea; }
     void commitScrollOffset(const IntSize&);
 
-    CoordinatedLayerID id() const;
+    CoordinatedLayerID id() const { return m_id; }
 
     void setFixedToViewport(bool isFixed);
 
     IntRect coverRect() const { return m_mainBackingStore ? m_mainBackingStore->mapToContents(m_mainBackingStore->coverRect()) : IntRect(); }
+    IntRect transformedVisibleRect();
 
     // TiledBackingStoreClient
     virtual void tiledBackingStorePaint(GraphicsContext*, const IntRect&) override;
     virtual void didUpdateTileBuffers() override;
     virtual void tiledBackingStoreHasPendingTileCreation() override;
-    virtual IntRect tiledBackingStoreContentsRect() override;
-    virtual IntRect tiledBackingStoreVisibleRect() override;
     virtual void createTile(uint32_t tileID, float) override;
     virtual void updateTile(uint32_t tileID, const SurfaceUpdateInfo&, const IntRect&) override;
     virtual void removeTile(uint32_t tileID) override;

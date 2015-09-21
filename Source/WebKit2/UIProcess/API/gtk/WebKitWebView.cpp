@@ -35,12 +35,14 @@
 #include "WebKitContextMenuItemPrivate.h"
 #include "WebKitContextMenuPrivate.h"
 #include "WebKitDownloadPrivate.h"
+#include "WebKitEditorStatePrivate.h"
 #include "WebKitEnumTypes.h"
 #include "WebKitError.h"
 #include "WebKitFaviconDatabasePrivate.h"
 #include "WebKitFormClient.h"
 #include "WebKitFullscreenClient.h"
 #include "WebKitHitTestResultPrivate.h"
+#include "WebKitInstallMissingMediaPluginsPermissionRequestPrivate.h"
 #include "WebKitJavascriptResultPrivate.h"
 #include "WebKitLoaderClient.h"
 #include "WebKitMarshal.h"
@@ -185,6 +187,7 @@ struct _WebKitWebViewPrivate {
     GRefPtr<WebKitUserContentManager> userContentManager;
     GRefPtr<WebKitWebContext> context;
     GRefPtr<WebKitWindowProperties> windowProperties;
+    GRefPtr<WebKitEditorState> editorState;
 
     GRefPtr<GMainLoop> modalLoop;
 
@@ -1349,9 +1352,10 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      * request has not been handled, webkit_permission_request_deny()
      * will be the default action.
      *
-     * By default, if the signal is not handled,
-     * webkit_permission_request_deny() will be called over the
-     * #WebKitPermissionRequest.
+     * If the signal is not handled, the @request will be completed automatically
+     * by the specific #WebKitPermissionRequest that could allow or deny it. Check the
+     * documentation of classes implementing #WebKitPermissionRequest interface to know
+     * their default action.
      *
      * Returns: %TRUE to stop other handlers from being invoked for the event.
      *   %FALSE to propagate the event further.
@@ -2133,6 +2137,24 @@ bool webkitWebViewEmitRunColorChooser(WebKitWebView* webView, WebKitColorChooser
     gboolean handled;
     g_signal_emit(webView, signals[RUN_COLOR_CHOOSER], 0, request, &handled);
     return handled;
+}
+
+void webkitWebViewSelectionDidChange(WebKitWebView* webView)
+{
+    if (!webView->priv->editorState)
+        return;
+
+    webkitEditorStateChanged(webView->priv->editorState.get(), getPage(webView)->editorState());
+}
+
+void webkitWebViewRequestInstallMissingMediaPlugins(WebKitWebView* webView, InstallMissingMediaPluginsPermissionRequest& request)
+{
+#if ENABLE(VIDEO)
+    GRefPtr<WebKitInstallMissingMediaPluginsPermissionRequest> installMediaPluginsPermissionRequest = adoptGRef(webkitInstallMissingMediaPluginsPermissionRequestCreate(request));
+    webkitWebViewMakePermissionRequest(webView, WEBKIT_PERMISSION_REQUEST(installMediaPluginsPermissionRequest.get()));
+#else
+    ASSERT_NOT_REACHED();
+#endif
 }
 
 /**
@@ -2935,6 +2957,27 @@ void webkit_web_view_execute_editing_command(WebKitWebView* webView, const char*
 }
 
 /**
+ * webkit_web_view_execute_editing_command_with_argument:
+ * @web_view: a #WebKitWebView
+ * @command: the command to execute
+ * @argument: the command argument
+ *
+ * Request to execute the given @command with @argument for @web_view. You can use
+ * webkit_web_view_can_execute_editing_command() to check whether
+ * it's possible to execute the command.
+ *
+ * Since: 2.10
+ */
+void webkit_web_view_execute_editing_command_with_argument(WebKitWebView* webView, const char* command, const char* argument)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
+    g_return_if_fail(command);
+    g_return_if_fail(argument);
+
+    getPage(webView)->executeEditCommand(String::fromUTF8(command), String::fromUTF8(argument));
+}
+
+/**
  * webkit_web_view_get_find_controller:
  * @web_view: the #WebKitWebView
  *
@@ -3648,4 +3691,24 @@ void webkit_web_view_set_editable(WebKitWebView* webView, gboolean editable)
     getPage(webView)->setEditable(editable);
 
     g_object_notify(G_OBJECT(webView), "editable");
+}
+
+/**
+ * webkit_web_view_get_editor_state:
+ * @web_view: a #WebKitWebView
+ *
+ * Gets the web editor state of @web_view.
+ *
+ * Returns: (transfer none): the #WebKitEditorState of the view
+ *
+ * Since: 2.10
+ */
+WebKitEditorState* webkit_web_view_get_editor_state(WebKitWebView *webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), nullptr);
+
+    if (!webView->priv->editorState)
+        webView->priv->editorState = adoptGRef(webkitEditorStateCreate(getPage(webView)->editorState()));
+
+    return webView->priv->editorState.get();
 }

@@ -37,6 +37,7 @@
 #include "DFGCommon.h"
 #include "DFGEpoch.h"
 #include "DFGLazyJSValue.h"
+#include "DFGMultiGetByOffsetData.h"
 #include "DFGNodeFlags.h"
 #include "DFGNodeOrigin.h"
 #include "DFGNodeType.h"
@@ -63,11 +64,6 @@ struct BasicBlock;
 struct StorageAccessData {
     PropertyOffset offset;
     unsigned identifierNumber;
-};
-
-struct MultiGetByOffsetData {
-    unsigned identifierNumber;
-    Vector<GetByIdVariant, 2> variants;
 };
 
 struct MultiPutByOffsetData {
@@ -584,7 +580,7 @@ struct Node {
 
     void convertToPhantomNewFunction()
     {
-        ASSERT(m_op == NewFunction);
+        ASSERT(m_op == NewFunction || m_op == NewArrowFunction);
         m_op = PhantomNewFunction;
         m_flags |= NodeMustGenerate;
         m_opInfo = 0;
@@ -694,7 +690,12 @@ struct Node {
     {
         return constant()->value().asBoolean();
     }
-     
+
+    bool isUndefinedOrNullConstant()
+    {
+        return isConstant() && constant()->value().isUndefinedOrNull();
+    }
+
     bool isCellConstant()
     {
         return isConstant() && constant()->value() && constant()->value().isCell();
@@ -719,6 +720,12 @@ struct Node {
         T result = dynamicCastConstant<T>();
         RELEASE_ASSERT(result);
         return result;
+    }
+
+    JSValue initializationValueForActivation() const
+    {
+        ASSERT(op() == CreateActivation);
+        return bitwise_cast<FrozenValue*>(m_opInfo2)->value();
     }
      
     bool containsMovHint()
@@ -982,7 +989,7 @@ struct Node {
     
     bool hasRegisterPointer()
     {
-        return op() == GetGlobalVar || op() == PutGlobalVar;
+        return op() == GetGlobalVar || op() == GetGlobalLexicalVariable || op() == PutGlobalVariable;
     }
     
     WriteBarrier<Unknown>* variablePointer()
@@ -1246,8 +1253,6 @@ struct Node {
         case CallVarargs:
         case ConstructVarargs:
         case CallForwardVarargs:
-        case NativeCall:
-        case NativeConstruct:
         case GetByOffset:
         case MultiGetByOffset:
         case GetClosureVar:
@@ -1257,6 +1262,7 @@ struct Node {
         case RegExpExec:
         case RegExpTest:
         case GetGlobalVar:
+        case GetGlobalLexicalVariable:
             return true;
         default:
             return false;
@@ -1279,9 +1285,8 @@ struct Node {
     {
         switch (op()) {
         case CheckCell:
-        case NativeConstruct:
-        case NativeCall:
         case NewFunction:
+        case NewArrowFunction:
         case CreateActivation:
         case MaterializeCreateActivation:
             return true;
@@ -1293,13 +1298,7 @@ struct Node {
     FrozenValue* cellOperand()
     {
         ASSERT(hasCellOperand());
-        switch (op()) {
-        case MaterializeCreateActivation:
-            return reinterpret_cast<FrozenValue*>(m_opInfo2);
-        default:
-            return reinterpret_cast<FrozenValue*>(m_opInfo);
-        }
-        RELEASE_ASSERT_NOT_REACHED();
+        return reinterpret_cast<FrozenValue*>(m_opInfo);
     }
     
     template<typename T>
@@ -1336,6 +1335,17 @@ struct Node {
         return reinterpret_cast<void*>(m_opInfo);
     }
 
+    bool hasUidOperand()
+    {
+        return op() == CheckIdent;
+    }
+
+    UniquedStringImpl* uidOperand()
+    {
+        ASSERT(hasUidOperand());
+        return reinterpret_cast<UniquedStringImpl*>(m_opInfo);
+    }
+
     bool hasTransition()
     {
         switch (op()) {
@@ -1359,6 +1369,7 @@ struct Node {
         switch (op()) {
         case CheckStructure:
         case CheckStructureImmediate:
+        case MaterializeNewObject:
             return true;
         default:
             return false;
@@ -1444,7 +1455,7 @@ struct Node {
     ObjectMaterializationData& objectMaterializationData()
     {
         ASSERT(hasObjectMaterializationData());
-        return *reinterpret_cast<ObjectMaterializationData*>(m_opInfo);
+        return *reinterpret_cast<ObjectMaterializationData*>(m_opInfo2);
     }
 
     bool isObjectAllocation()
@@ -1492,6 +1503,7 @@ struct Node {
     bool isFunctionAllocation()
     {
         switch (op()) {
+        case NewArrowFunction:
         case NewFunction:
             return true;
         default:

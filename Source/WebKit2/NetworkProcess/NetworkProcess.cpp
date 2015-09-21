@@ -40,15 +40,16 @@
 #include "NetworkProcessProxyMessages.h"
 #include "NetworkResourceLoader.h"
 #include "RemoteNetworkingContext.h"
-#include "SecurityOriginData.h"
 #include "SessionTracker.h"
 #include "StatisticsData.h"
 #include "WebCookieManager.h"
 #include "WebProcessPoolMessages.h"
 #include "WebsiteData.h"
+#include <WebCore/DiagnosticLoggingClient.h>
 #include <WebCore/Logging.h>
 #include <WebCore/PlatformCookieJar.h>
 #include <WebCore/ResourceRequest.h>
+#include <WebCore/SecurityOriginData.h>
 #include <WebCore/SecurityOriginHash.h>
 #include <WebCore/SessionID.h>
 #include <wtf/RunLoop.h>
@@ -348,6 +349,13 @@ void NetworkProcess::fetchWebsiteData(SessionID sessionID, uint64_t websiteDataT
 
 void NetworkProcess::deleteWebsiteData(SessionID sessionID, uint64_t websiteDataTypes, std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID)
 {
+#if PLATFORM(COCOA)
+    if (websiteDataTypes & WebsiteDataTypeHSTSCache) {
+        if (auto* networkStorageSession = SessionTracker::session(sessionID))
+            clearHSTSCache(*networkStorageSession, modifiedSince);
+    }
+#endif
+
     if (websiteDataTypes & WebsiteDataTypeCookies) {
         if (auto* networkStorageSession = SessionTracker::session(sessionID))
             deleteAllCookiesModifiedSince(*networkStorageSession, modifiedSince);
@@ -409,10 +417,8 @@ static void clearDiskCacheEntries(const Vector<SecurityOriginData>& origins, std
 void NetworkProcess::deleteWebsiteDataForOrigins(SessionID sessionID, uint64_t websiteDataTypes, const Vector<SecurityOriginData>& origins, const Vector<String>& cookieHostNames, uint64_t callbackID)
 {
     if (websiteDataTypes & WebsiteDataTypeCookies) {
-        if (auto* networkStorageSession = SessionTracker::session(sessionID)) {
-            for (const auto& cookieHostName : cookieHostNames)
-                deleteCookiesForHostname(*networkStorageSession, cookieHostName);
-        }
+        if (auto* networkStorageSession = SessionTracker::session(sessionID))
+            deleteCookiesForHostnames(*networkStorageSession, cookieHostNames);
     }
 
     auto completionHandler = [this, callbackID] {
@@ -471,17 +477,26 @@ void NetworkProcess::getNetworkProcessStatistics(uint64_t callbackID)
 
 void NetworkProcess::logDiagnosticMessage(uint64_t webPageID, const String& message, const String& description, WebCore::ShouldSample shouldSample)
 {
-    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogDiagnosticMessage(webPageID, message, description, shouldSample == ShouldSample::Yes), 0);
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
+        return;
+
+    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogSampledDiagnosticMessage(webPageID, message, description), 0);
 }
 
 void NetworkProcess::logDiagnosticMessageWithResult(uint64_t webPageID, const String& message, const String& description, WebCore::DiagnosticLoggingResultType result, WebCore::ShouldSample shouldSample)
 {
-    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogDiagnosticMessageWithResult(webPageID, message, description, result, shouldSample == ShouldSample::Yes), 0);
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
+        return;
+
+    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogSampledDiagnosticMessageWithResult(webPageID, message, description, result), 0);
 }
 
 void NetworkProcess::logDiagnosticMessageWithValue(uint64_t webPageID, const String& message, const String& description, const String& value, WebCore::ShouldSample shouldSample)
 {
-    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogDiagnosticMessageWithValue(webPageID, message, description, value, shouldSample == ShouldSample::Yes), 0);
+    if (!DiagnosticLoggingClient::shouldLogAfterSampling(shouldSample))
+        return;
+
+    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogSampledDiagnosticMessageWithValue(webPageID, message, description, value), 0);
 }
 
 void NetworkProcess::terminate()
@@ -504,7 +519,10 @@ void NetworkProcess::prepareToSuspend()
 
 void NetworkProcess::cancelPrepareToSuspend()
 {
-    parentProcessConnection()->send(Messages::NetworkProcessProxy::DidCancelProcessSuspension(), 0);
+    // Although it is tempting to send a NetworkProcessProxy::DidCancelProcessSuspension message from here
+    // we do not because prepareToSuspend() already replied with a NetworkProcessProxy::ProcessReadyToSuspend
+    // message. And NetworkProcessProxy expects to receive either a NetworkProcessProxy::ProcessReadyToSuspend-
+    // or NetworkProcessProxy::DidCancelProcessSuspension- message, but not both.
 }
 
 void NetworkProcess::processDidResume()

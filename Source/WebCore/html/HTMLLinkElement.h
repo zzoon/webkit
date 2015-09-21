@@ -35,8 +35,8 @@
 
 namespace WebCore {
 
+class AttributeDOMTokenList;
 class HTMLLinkElement;
-class RelList;
 class URL;
 
 template<typename T> class EventSender;
@@ -65,7 +65,6 @@ public:
 
     bool isDisabled() const { return m_disabledState == Disabled; }
     bool isEnabledViaScript() const { return m_disabledState == EnabledViaScript; }
-    void setSizes(const String&);
     DOMSettableTokenList& sizes() { return m_sizes.get(); }
 
     void dispatchPendingEvent(LinkEventSender*);
@@ -140,7 +139,7 @@ private:
 
     PendingSheetType m_pendingSheetType;
 
-    std::unique_ptr<RelList> m_relList;
+    std::unique_ptr<AttributeDOMTokenList> m_relList;
 };
 
 } //namespace

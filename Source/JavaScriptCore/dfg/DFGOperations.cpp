@@ -48,7 +48,6 @@
 #include "JITExceptions.h"
 #include "JSCInlines.h"
 #include "JSLexicalEnvironment.h"
-#include "JSNameScope.h"
 #include "ObjectConstructor.h"
 #include "Repatch.h"
 #include "ScopedArguments.h"
@@ -762,11 +761,13 @@ char* JIT_OPERATION operationNewFloat64ArrayWithOneArgument(
     return newTypedArrayWithOneArgument<JSFloat64Array>(exec, structure, encodedValue);
 }
 
-JSCell* JIT_OPERATION operationCreateActivationDirect(ExecState* exec, Structure* structure, JSScope* scope, SymbolTable* table)
+JSCell* JIT_OPERATION operationCreateActivationDirect(ExecState* exec, Structure* structure, JSScope* scope, SymbolTable* table, EncodedJSValue initialValueEncoded)
 {
+    JSValue initialValue = JSValue::decode(initialValueEncoded);
+    ASSERT(initialValue == jsUndefined() || initialValue == jsTDZValue());
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
-    return JSLexicalEnvironment::create(vm, structure, scope, table);
+    return JSLexicalEnvironment::create(vm, structure, scope, table, initialValue);
 }
 
 JSCell* JIT_OPERATION operationCreateDirectArguments(ExecState* exec, Structure* structure, int32_t length, int32_t minCapacity)
@@ -1107,6 +1108,44 @@ JSCell* JIT_OPERATION operationMakeRope3(ExecState* exec, JSString* a, JSString*
     return JSRopeString::create(vm, a, b, c);
 }
 
+JSCell* JIT_OPERATION operationStrCat2(ExecState* exec, EncodedJSValue a, EncodedJSValue b)
+{
+    VM& vm = exec->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+
+    JSString* str1 = JSValue::decode(a).toString(exec);
+    ASSERT(!exec->hadException()); // Impossible, since we must have been given primitives.
+    JSString* str2 = JSValue::decode(b).toString(exec);
+    ASSERT(!exec->hadException());
+
+    if (sumOverflows<int32_t>(str1->length(), str2->length())) {
+        throwOutOfMemoryError(exec);
+        return nullptr;
+    }
+
+    return JSRopeString::create(vm, str1, str2);
+}
+    
+JSCell* JIT_OPERATION operationStrCat3(ExecState* exec, EncodedJSValue a, EncodedJSValue b, EncodedJSValue c)
+{
+    VM& vm = exec->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+
+    JSString* str1 = JSValue::decode(a).toString(exec);
+    ASSERT(!exec->hadException()); // Impossible, since we must have been given primitives.
+    JSString* str2 = JSValue::decode(b).toString(exec);
+    ASSERT(!exec->hadException());
+    JSString* str3 = JSValue::decode(c).toString(exec);
+    ASSERT(!exec->hadException());
+
+    if (sumOverflows<int32_t>(str1->length(), str2->length(), str3->length())) {
+        throwOutOfMemoryError(exec);
+        return nullptr;
+    }
+
+    return JSRopeString::create(vm, str1, str2, str3);
+}
+
 char* JIT_OPERATION operationFindSwitchImmTargetForDouble(
     ExecState* exec, EncodedJSValue encodedValue, size_t tableIndex)
 {
@@ -1201,15 +1240,6 @@ int64_t JIT_OPERATION operationConvertDoubleToInt52(double value)
 void JIT_OPERATION operationProcessTypeProfilerLogDFG(ExecState* exec) 
 {
     exec->vm().typeProfilerLog()->processLogEntries(ASCIILiteral("Log Full, called from inside DFG."));
-}
-
-size_t JIT_OPERATION dfgConvertJSValueToInt32(ExecState* exec, EncodedJSValue value)
-{
-    VM* vm = &exec->vm();
-    NativeCallFrameTracer tracer(vm, exec);
-    
-    // toInt32/toUInt32 return the same value; we want the value zero extended to fill the register.
-    return JSValue::decode(value).toUInt32(exec);
 }
 
 void JIT_OPERATION debugOperationPrintSpeculationFailure(ExecState* exec, void* debugInfoRaw, void* scratch)
@@ -1447,7 +1477,7 @@ char* JIT_OPERATION triggerOSREntryNow(
         
         // OSR entry failed. Oh no! This implies that we need to retry. We retry
         // without exponential backoff and we only do this for the entry code block.
-        jitCode->osrEntryBlock.clear();
+        jitCode->osrEntryBlock = nullptr;
         jitCode->osrEntryRetry = 0;
         return 0;
     }

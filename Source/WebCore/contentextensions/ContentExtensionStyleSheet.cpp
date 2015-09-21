@@ -32,6 +32,7 @@
 #include "ContentExtensionsBackend.h"
 #include "Document.h"
 #include "StyleSheetContents.h"
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 namespace ContentExtensions {
@@ -49,8 +50,12 @@ void ContentExtensionStyleSheet::addDisplayNoneSelector(const String& selector, 
     if (!m_addedSelectorIDs.add(selectorID).isNewEntry)
         return;
 
-    ExceptionCode ec;
-    m_styleSheet->addRule(selector, ContentExtensionsBackend::displayNoneCSSRule(), ec);
+    StringBuilder css;
+    css.append(selector);
+    css.append('{');
+    css.append(ContentExtensionsBackend::displayNoneCSSRule());
+    css.append('}');
+    m_styleSheet->contents().parseString(css.toString());
 }
 
 } // namespace ContentExtensions

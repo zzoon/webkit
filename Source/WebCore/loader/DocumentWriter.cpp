@@ -90,7 +90,7 @@ void DocumentWriter::replaceDocument(const String& source, Document* ownerDocume
 
 void DocumentWriter::clear()
 {
-    m_decoder = 0;
+    m_decoder = nullptr;
     m_hasReceivedSomeData = false;
     if (!m_encodingWasChosenByUser)
         m_encoding = String();
@@ -101,7 +101,7 @@ void DocumentWriter::begin()
     begin(URL());
 }
 
-PassRefPtr<Document> DocumentWriter::createDocument(const URL& url)
+Ref<Document> DocumentWriter::createDocument(const URL& url)
 {
     if (!m_frame->loader().stateMachine().isDisplayingInitialEmptyDocument() && m_frame->loader().client().shouldAlwaysUsePluginDocument(m_mimeType))
         return PluginDocument::create(m_frame, url);
@@ -123,7 +123,7 @@ void DocumentWriter::begin(const URL& urlReference, bool dispatch, Document* own
 
     // Create a new document before clearing the frame, because it may need to
     // inherit an aliased security context.
-    RefPtr<Document> document = createDocument(url);
+    Ref<Document> document = createDocument(url);
     
     // If the new document is for a Plugin but we're supposed to be sandboxed from Plugins,
     // then replace the document with one whose parser will ignore the incoming data (bug 39323)
@@ -138,7 +138,7 @@ void DocumentWriter::begin(const URL& urlReference, bool dispatch, Document* own
     else
         document->createDOMWindow();
 
-    m_frame->loader().clear(document.get(), !shouldReuseDefaultView, !shouldReuseDefaultView);
+    m_frame->loader().clear(document.ptr(), !shouldReuseDefaultView, !shouldReuseDefaultView);
     clear();
 
     if (!shouldReuseDefaultView)
@@ -189,7 +189,7 @@ TextResourceDecoder* DocumentWriter::createDecoderIfNeeded()
             m_decoder->setHintEncoding(parentFrame->document()->decoder());
         if (m_encoding.isEmpty()) {
             if (canReferToParentFrameEncoding(m_frame, parentFrame))
-                m_decoder->setEncoding(parentFrame->document()->inputEncoding(), TextResourceDecoder::EncodingFromParentFrame);
+                m_decoder->setEncoding(parentFrame->document()->textEncoding(), TextResourceDecoder::EncodingFromParentFrame);
         } else {
             m_decoder->setEncoding(m_encoding,
                 m_encodingWasChosenByUser ? TextResourceDecoder::UserChosenEncoding : TextResourceDecoder::EncodingFromHTTPHeader);
@@ -245,7 +245,7 @@ void DocumentWriter::end()
     if (!m_parser)
         return;
     m_parser->finish();
-    m_parser = 0;
+    m_parser = nullptr;
 }
 
 void DocumentWriter::setEncoding(const String& name, bool userChosen)

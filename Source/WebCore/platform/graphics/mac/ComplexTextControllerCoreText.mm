@@ -189,6 +189,11 @@ static const UniChar* provideStringAndAttributes(CFIndex stringIndex, CFIndex* c
     return info->cp + stringIndex;
 }
 
+static inline bool safeCFEqual(CFTypeRef a, CFTypeRef b)
+{
+    return (!a && !b) || (a && b && CFEqual(a, b));
+}
+
 void ComplexTextController::collectComplexTextRunsForCharacters(const UChar* cp, unsigned length, unsigned stringLocation, const Font* font)
 {
     if (!font) {
@@ -259,14 +264,14 @@ void ComplexTextController::collectComplexTextRunsForCharacters(const UChar* cp,
             CTFontRef runCTFont = static_cast<CTFontRef>(CFDictionaryGetValue(runAttributes, kCTFontAttributeName));
             ASSERT(CFGetTypeID(runCTFont) == CTFontGetTypeID());
             RetainPtr<CFTypeRef> runFontEqualityObject = FontPlatformData::objectForEqualityCheck(runCTFont);
-            if (!CFEqual(runFontEqualityObject.get(), font->platformData().objectForEqualityCheck().get())) {
+            if (!safeCFEqual(runFontEqualityObject.get(), font->platformData().objectForEqualityCheck().get())) {
                 // Begin trying to see if runFont matches any of the fonts in the fallback list.
 
                 for (unsigned i = 0; !m_font.fallbackRangesAt(i).isNull(); ++i) {
                     runFont = m_font.fallbackRangesAt(i).fontForCharacter(baseCharacter);
                     if (!runFont)
                         continue;
-                    if (CFEqual(runFont->platformData().objectForEqualityCheck().get(), runFontEqualityObject.get()))
+                    if (safeCFEqual(runFont->platformData().objectForEqualityCheck().get(), runFontEqualityObject.get()))
                         break;
                     runFont = nullptr;
                 }
@@ -282,17 +287,12 @@ void ComplexTextController::collectComplexTextRunsForCharacters(const UChar* cp,
                     }
                     auto& fontCache = FontCache::singleton();
                     runFont = fontCache.fontForFamily(m_font.fontDescription(), fontName.get(), false).get();
-#if !PLATFORM(IOS)
-                    // Core Text may have used a font that is not known to NSFontManager. In that case, fall back on
-                    // using the font as returned, even though it may not have the best NSFontRenderingMode.
+                    // Core Text may have used a font that our font lookup path cannot find. In that case, fall back on
+                    // using the font as returned.
                     if (!runFont) {
                         FontPlatformData runFontPlatformData(runCTFont, CTFontGetSize(runCTFont));
                         runFont = fontCache.fontForPlatformData(runFontPlatformData).ptr();
                     }
-#else
-                    // FIXME: Just assert for now, until we can devise a better fix that works with iOS.
-                    ASSERT(runFont);
-#endif
                 }
                 if (m_fallbackFonts && runFont != &m_font.primaryFont())
                     m_fallbackFonts->add(runFont);

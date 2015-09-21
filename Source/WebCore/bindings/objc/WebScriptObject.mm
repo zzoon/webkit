@@ -48,7 +48,7 @@
 #import <runtime/JSLock.h>
 #import <runtime/Completion.h>
 #import <runtime/Completion.h>
-#import <wtf/SpinLock.h>
+#import <wtf/Lock.h>
 #import <wtf/Threading.h>
 #import <wtf/spi/cocoa/NSMapTableSPI.h>
 #import <wtf/text/WTFString.h>
@@ -72,12 +72,12 @@ using JSC::makeSource;
 namespace WebCore {
 
 static NSMapTable* JSWrapperCache;
-static StaticSpinLock spinLock;
+static StaticLock spinLock;
 
 NSObject* getJSWrapper(JSObject* impl)
 {
     ASSERT(isMainThread());
-    SpinLockHolder holder(&spinLock);
+    LockHolder holder(&spinLock);
 
     if (!JSWrapperCache)
         return nil;
@@ -88,7 +88,7 @@ NSObject* getJSWrapper(JSObject* impl)
 void addJSWrapper(NSObject* wrapper, JSObject* impl)
 {
     ASSERT(isMainThread());
-    SpinLockHolder holder(&spinLock);
+    LockHolder holder(&spinLock);
 
     if (!JSWrapperCache)
         JSWrapperCache = createWrapperCache();
@@ -97,7 +97,7 @@ void addJSWrapper(NSObject* wrapper, JSObject* impl)
 
 void removeJSWrapper(JSObject* impl)
 {
-    SpinLockHolder holder(&spinLock);
+    LockHolder holder(&spinLock);
 
     if (!JSWrapperCache)
         return;
@@ -106,7 +106,7 @@ void removeJSWrapper(JSObject* impl)
 
 static void removeJSWrapperIfRetainCountOne(NSObject* wrapper, JSObject* impl)
 {
-    SpinLockHolder holder(&spinLock);
+    LockHolder holder(&spinLock);
 
     if (!JSWrapperCache)
         return;
@@ -672,11 +672,13 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     return self;
 }
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc
 {
     return;
-    [super dealloc]; // make -Wdealloc-check happy
 }
+#pragma clang diagnostic pop
 
 + (WebUndefined *)undefined
 {

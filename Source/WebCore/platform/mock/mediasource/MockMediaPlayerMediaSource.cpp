@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,7 @@
 #include "MediaSourcePrivateClient.h"
 #include "MockMediaSourcePrivate.h"
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -44,15 +45,15 @@ void MockMediaPlayerMediaSource::registerMediaEngine(MediaEngineRegistrar regist
         supportsType, 0, 0, 0, 0);
 }
 
-static HashSet<String> mimeTypeCache()
+static const HashSet<String>& mimeTypeCache()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<String>, cache, ());
+    static NeverDestroyed<HashSet<String>> cache;
     static bool isInitialized = false;
 
     if (!isInitialized) {
         isInitialized = true;
-        cache.add(ASCIILiteral("video/mock"));
-        cache.add(ASCIILiteral("audio/mock"));
+        cache.get().add(ASCIILiteral("video/mock"));
+        cache.get().add(ASCIILiteral("audio/mock"));
     }
 
     return cache;
@@ -68,7 +69,7 @@ MediaPlayer::SupportsType MockMediaPlayerMediaSource::supportsType(const MediaEn
     if (!parameters.isMediaSource)
         return MediaPlayer::IsNotSupported;
 
-    if (!mimeTypeCache().contains(parameters.type))
+    if (parameters.type.isEmpty() || !mimeTypeCache().contains(parameters.type))
         return MediaPlayer::IsNotSupported;
 
     if (parameters.codecs.isEmpty())
@@ -179,7 +180,7 @@ void MockMediaPlayerMediaSource::setSize(const IntSize&)
 {
 }
 
-void MockMediaPlayerMediaSource::paint(GraphicsContext*, const FloatRect&)
+void MockMediaPlayerMediaSource::paint(GraphicsContext&, const FloatRect&)
 {
 }
 

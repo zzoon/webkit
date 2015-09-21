@@ -27,6 +27,8 @@
 #define Watchpoint_h
 
 #include <wtf/Atomics.h>
+#include <wtf/FastMalloc.h>
+#include <wtf/Noncopyable.h>
 #include <wtf/PrintStream.h>
 #include <wtf/SentinelLinkedList.h>
 #include <wtf/ThreadSafeRefCounted.h>
@@ -61,7 +63,11 @@ private:
     const char* m_string;
 };
 
+class WatchpointSet;
+
 class Watchpoint : public BasicRawSentinelNode<Watchpoint> {
+    WTF_MAKE_NONCOPYABLE(Watchpoint);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     Watchpoint()
     {
@@ -69,10 +75,12 @@ public:
     
     virtual ~Watchpoint();
 
-    void fire(const FireDetail& detail) { fireInternal(detail); }
-    
 protected:
     virtual void fireInternal(const FireDetail&) = 0;
+
+private:
+    friend class WatchpointSet;
+    void fire(const FireDetail&);
 };
 
 enum WatchpointState {
@@ -180,7 +188,13 @@ public:
         invalidate(StringFireDetail(reason));
     }
     
+    bool isBeingWatched() const
+    {
+        return m_setIsNotEmpty;
+    }
+    
     int8_t* addressOfState() { return &m_state; }
+    static ptrdiff_t offsetOfState() { return OBJECT_OFFSETOF(WatchpointSet, m_state); }
     int8_t* addressOfSetIsNotEmpty() { return &m_setIsNotEmpty; }
     
     JS_EXPORT_PRIVATE void fireAllSlow(const FireDetail&); // Call only if you've checked isWatched.
@@ -321,6 +335,13 @@ public:
     void touch(const char* reason)
     {
         touch(StringFireDetail(reason));
+    }
+    
+    bool isBeingWatched() const
+    {
+        if (isFat())
+            return fat()->isBeingWatched();
+        return false;
     }
     
 private:

@@ -86,13 +86,11 @@ private:
 
     virtual void attachViewOverlayGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*) override;
 
-    virtual void replyWithFenceAfterNextFlush(uint64_t callbackID) override;
-
     // WebCore::LayerFlushSchedulerClient
     virtual bool flushLayers() override;
 
     // Message handlers.
-    virtual void updateGeometry(const WebCore::IntSize& viewSize, const WebCore::IntSize& layerPosition, bool flushSynchronously) override;
+    virtual void updateGeometry(const WebCore::IntSize& viewSize, const WebCore::IntSize& layerPosition, bool flushSynchronously, const WebCore::MachSendRight& fencePort) override;
     virtual void setDeviceScaleFactor(float) override;
     void suspendPainting();
     void resumePainting();
@@ -152,7 +150,6 @@ private:
 
     WebCore::GraphicsLayer* m_viewOverlayRootLayer;
 
-    Vector<uint64_t> m_fenceCallbacksForAfterNextFlush;
     bool m_shouldScaleViewToFitDocument { false };
     bool m_isScalingViewToFitDocument { false };
     WebCore::IntSize m_lastViewSizeForScaleToFit;

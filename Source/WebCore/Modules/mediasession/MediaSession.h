@@ -45,34 +45,6 @@ public:
         Interrupted
     };
 
-    static Ref<MediaSession> create(ScriptExecutionContext& context, const String& kind)
-    {
-        return adoptRef(*new MediaSession(context, kind));
-    }
-
-    explicit MediaSession(Document&);
-    MediaSession(ScriptExecutionContext&, const String&);
-    ~MediaSession();
-
-    String kind() const;
-    MediaRemoteControls* controls(bool& isNull);
-
-    State currentState() const { return m_currentState; }
-
-    void setMetadata(const Dictionary&);
-
-    void releaseSession();
-    
-    // Runs the media session invocation algorithm and returns true on success.
-    bool invoke();
-
-    void togglePlayback();
-    void skipToNextTrack();
-    void skipToPreviousTrack();
-
-private:
-    friend class HTMLMediaElement;
-
     enum class Kind {
         Default,
         Content,
@@ -81,15 +53,53 @@ private:
         Ambient
     };
 
-    static Kind parseKind(const String&);
+    static Ref<MediaSession> create(ScriptExecutionContext& context, const String& kind = String())
+    {
+        return adoptRef(*new MediaSession(context, kind));
+    }
+
+    ~MediaSession();
+
+    String kind() const;
     Kind kindEnum() const { return m_kind; }
+    MediaRemoteControls* controls(bool& isNull);
+
+    WEBCORE_EXPORT State currentState() const { return m_currentState; }
+    bool hasActiveMediaElements() const;
+
+    void setMetadata(const Dictionary&);
+
+    void deactivate();
+
+    // Runs the media session invocation algorithm and returns true on success.
+    bool invoke();
+
+    void handleDuckInterruption();
+    void handleIndefinitePauseInterruption();
+    void handlePauseInterruption();
+    void handleUnduckInterruption();
+    void handleUnpauseInterruption();
+
+    void togglePlayback();
+    void skipToNextTrack();
+    void skipToPreviousTrack();
+
+    void controlIsEnabledDidChange();
+
+private:
+    friend class HTMLMediaElement;
+
+    MediaSession(ScriptExecutionContext&, const String&);
+
+    static Kind parseKind(const String&);
 
     void addMediaElement(HTMLMediaElement&);
     void removeMediaElement(HTMLMediaElement&);
 
+    void safelyIterateActiveMediaElements(std::function<void(HTMLMediaElement*)>);
+    void changeActiveMediaElements(std::function<void(void)>);
     void addActiveMediaElement(HTMLMediaElement&);
     bool isMediaElementActive(HTMLMediaElement&);
-    bool hasActiveMediaElements();
 
     void releaseInternal();
 

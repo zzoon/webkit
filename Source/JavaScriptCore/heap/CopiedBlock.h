@@ -27,12 +27,11 @@
 #define CopiedBlock_h
 
 #include "CopyWorkList.h"
-#include "HeapBlock.h"
 #include "JSCJSValue.h"
 #include "Options.h"
 #include <wtf/Atomics.h>
 #include <wtf/DoublyLinkedList.h>
-#include <wtf/SpinLock.h>
+#include <wtf/Lock.h>
 
 namespace JSC {
 
@@ -55,8 +54,8 @@ public:
     void didPromote();
 
     unsigned liveBytes();
-    bool shouldReportLiveBytes(SpinLockHolder&, JSCell* owner);
-    void reportLiveBytes(SpinLockHolder&, JSCell*, CopyToken, unsigned);
+    bool shouldReportLiveBytes(LockHolder&, JSCell* owner);
+    void reportLiveBytes(LockHolder&, JSCell*, CopyToken, unsigned);
     void reportLiveBytesDuringCopying(unsigned);
     void didSurviveGC();
     void didEvacuateBytes(unsigned);
@@ -86,7 +85,7 @@ public:
 
     bool hasWorkList();
     CopyWorkList& workList();
-    SpinLock& workListLock() { return m_workListLock; }
+    Lock& workListLock() { return m_workListLock; }
 
 private:
     CopiedBlock(size_t);
@@ -99,7 +98,7 @@ private:
 
     size_t m_capacity;
 
-    SpinLock m_workListLock;
+    Lock m_workListLock;
     std::unique_ptr<CopyWorkList> m_workList;
 
     size_t m_remaining;

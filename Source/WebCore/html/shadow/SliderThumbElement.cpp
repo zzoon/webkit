@@ -121,6 +121,7 @@ public:
 
 private:
     virtual void layout() override;
+    bool isFlexibleBoxImpl() const override { return true; }
 };
 
 void RenderSliderContainer::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues& computedValues) const
@@ -190,6 +191,7 @@ void RenderSliderContainer::layout()
     else
         thumbLocation.setX(thumbLocation.x() - offset);
     thumb->setLocation(thumbLocation);
+    thumb->repaint();
 }
 
 // --------------------------------
@@ -610,7 +612,7 @@ const AtomicString& SliderThumbElement::shadowPseudoId() const
     }
 }
 
-RefPtr<Element> SliderThumbElement::cloneElementWithoutAttributesAndChildren(Document& targetDocument)
+Ref<Element> SliderThumbElement::cloneElementWithoutAttributesAndChildren(Document& targetDocument)
 {
     return create(targetDocument);
 }

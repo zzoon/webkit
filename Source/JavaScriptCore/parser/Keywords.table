@@ -19,6 +19,7 @@ for		FOR
 instanceof	INSTANCEOF
 new		NEW
 var		VAR
+let		LET
 continue	CONTINUE
 function	FUNCTION
 return		RETURN
@@ -40,13 +41,12 @@ debugger	DEBUGGER
 
 # Reserved for future use.
 enum            RESERVED
-export          RESERVED
-import          RESERVED
+export          EXPORT
+import          IMPORT
 
 # Reserved for future use in strict code.
 implements      RESERVED_IF_STRICT
 interface       RESERVED_IF_STRICT
-let             RESERVED_IF_STRICT
 package         RESERVED_IF_STRICT
 private         RESERVED_IF_STRICT
 protected       RESERVED_IF_STRICT

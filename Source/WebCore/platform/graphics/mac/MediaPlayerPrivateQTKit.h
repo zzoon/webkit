@@ -87,7 +87,7 @@ private:
     virtual void load(const String&, MediaSourcePrivateClient*) override;
 #endif
 #if ENABLE(MEDIA_STREAM)
-    void load(MediaStreamPrivate*) override { }
+    void load(MediaStreamPrivate&) override { }
 #endif
     void cancelLoad() override;
     void loadInternal(const String& url);
@@ -127,8 +127,8 @@ private:
     
     virtual bool hasAvailableVideoFrame() const override;
 
-    void paint(GraphicsContext*, const FloatRect&) override;
-    void paintCurrentFrameInContext(GraphicsContext*, const FloatRect&) override;
+    void paint(GraphicsContext&, const FloatRect&) override;
+    void paintCurrentFrameInContext(GraphicsContext&, const FloatRect&) override;
     virtual void prepareForRendering() override;
 
     bool supportsAcceleratedRendering() const override;

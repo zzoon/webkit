@@ -136,7 +136,7 @@ void UniqueIDBDatabase::shutdown(UniqueIDBDatabaseShutdownType type)
     ref();
 
     {
-        MutexLocker locker(m_databaseTaskMutex);
+        LockHolder locker(m_databaseTaskMutex);
         m_databaseTasks.clear();
     }
 
@@ -147,7 +147,7 @@ void UniqueIDBDatabase::shutdownBackingStore(UniqueIDBDatabaseShutdownType type,
 {
     ASSERT(!RunLoop::isMain());
 
-    m_backingStore.clear();
+    m_backingStore = nullptr;
 
     if (type == UniqueIDBDatabaseShutdownType::DeleteShutdown) {
         String dbFilename = UniqueIDBDatabase::calculateAbsoluteDatabaseFilename(databaseDirectory);
@@ -875,7 +875,7 @@ void UniqueIDBDatabase::putRecordInBackingStore(uint64_t requestID, const IDBIde
 
     m_backingStore->notifyCursorsOfChanges(transaction, objectStoreMetadata.id);
 
-    if (putMode != IDBDatabaseBackend::CursorUpdate && objectStoreMetadata.autoIncrement && key.type == IDBKey::NumberType) {
+    if (putMode != IDBDatabaseBackend::CursorUpdate && objectStoreMetadata.autoIncrement && key.type == KeyType::Number) {
         if (!m_backingStore->updateKeyGeneratorNumber(transaction, objectStoreMetadata.id, keyNumber, keyWasGenerated)) {
             postMainThreadTask(createAsyncTask(*this, &UniqueIDBDatabase::didPutRecordInBackingStore, requestID, IDBKeyData(), IDBDatabaseException::UnknownError, ASCIILiteral("Internal backing store error updating key generator")));
             return;
@@ -1125,7 +1125,7 @@ void UniqueIDBDatabase::postMainThreadTask(std::unique_ptr<AsyncTask> task, Data
     if (!m_acceptingNewRequests && taskType == DatabaseTaskType::Normal)
         return;
 
-    MutexLocker locker(m_mainThreadTaskMutex);
+    LockHolder locker(m_mainThreadTaskMutex);
 
     m_mainThreadTasks.append(WTF::move(task));
 
@@ -1143,7 +1143,7 @@ bool UniqueIDBDatabase::performNextMainThreadTask()
 
     std::unique_ptr<AsyncTask> task;
     {
-        MutexLocker locker(m_mainThreadTaskMutex);
+        LockHolder locker(m_mainThreadTaskMutex);
 
         // This database might be shutting down, in which case the task queue might be empty.
         if (m_mainThreadTasks.isEmpty())
@@ -1165,7 +1165,7 @@ void UniqueIDBDatabase::postDatabaseTask(std::unique_ptr<AsyncTask> task, Databa
     if (!m_acceptingNewRequests && taskType == DatabaseTaskType::Normal)
         return;
 
-    MutexLocker locker(m_databaseTaskMutex);
+    LockHolder locker(m_databaseTaskMutex);
 
     m_databaseTasks.append(WTF::move(task));
 
@@ -1186,7 +1186,7 @@ void UniqueIDBDatabase::performNextDatabaseTask()
 
     std::unique_ptr<AsyncTask> task;
     {
-        MutexLocker locker(m_databaseTaskMutex);
+        LockHolder locker(m_databaseTaskMutex);
 
         // This database might be shutting down on the main thread, in which case the task queue might be empty.
         if (m_databaseTasks.isEmpty())

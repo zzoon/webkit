@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -47,14 +47,18 @@
 
 #define SECTION_NAME(NAME) (SECTION_NAME_PREFIX NAME)
 
-namespace JSC { namespace FTL {
+namespace JSC {
+
+class TrackedReferences;
+
+namespace FTL {
 
 class JITCode : public JSC::JITCode {
 public:
     JITCode();
     ~JITCode();
     
-    CodePtr addressForCall(VM&, ExecutableBase*, ArityCheckMode, RegisterPreservationMode) override;
+    CodePtr addressForCall(ArityCheckMode) override;
     void* executableAddressAtOffset(size_t offset) override;
     void* dataAddressAtOffset(size_t offset) override;
     unsigned offsetOf(void* pointerIntoCode) override;
@@ -67,6 +71,8 @@ public:
     void initializeArityCheckEntrypoint(CodeRef);
     void initializeAddressForCall(CodePtr);
     
+    void validateReferences(const TrackedReferences&) override;
+    
     const Vector<RefPtr<ExecutableMemoryHandle>>& handles() const { return m_handles; }
     const Vector<RefPtr<DataSection>>& dataSections() const { return m_dataSections; }
     
@@ -78,7 +84,6 @@ public:
     DFG::CommonData common;
     SegmentedVector<OSRExit, 8> osrExit;
     StackMaps stackmaps;
-    UnwindInfo unwindInfo;
     
 private:
     Vector<RefPtr<DataSection>> m_dataSections;

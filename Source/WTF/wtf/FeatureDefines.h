@@ -134,6 +134,10 @@
 #define ENABLE_RESPECT_EXIF_ORIENTATION 1
 #endif
 
+#if !defined(ENABLE_SHADOW_DOM)
+#define ENABLE_SHADOW_DOM 1
+#endif
+
 #if !defined(ENABLE_TEXT_CARET)
 #define ENABLE_TEXT_CARET 0
 #endif
@@ -154,6 +158,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_VIEW_MODE_CSS_MEDIA)
 #define ENABLE_VIEW_MODE_CSS_MEDIA 0
+#endif
+
+#if !defined(ENABLE_WEBASSEMBLY)
+#define ENABLE_WEBASSEMBLY 0
 #endif
 
 #if !defined(ENABLE_WEBGL)
@@ -254,6 +262,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC 1
 #endif
 
+#if !defined(ENABLE_SHADOW_DOM)
+#define ENABLE_SHADOW_DOM 1
+#endif
+
 #endif /* PLATFORM(MAC) */
 
 /* --------- Apple Windows port --------- */
@@ -268,12 +280,7 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #endif
 
 #if !defined(ENABLE_WEBGL)
-// FIXME: Get WebGL working on Windows with CMake. https://bugs.webkit.org/show_bug.cgi?id=143311
-#if defined(BUILDING_WITH_CMAKE)
 #define ENABLE_WEBGL 0
-#else
-#define ENABLE_WEBGL 0
-#endif
 #endif
 
 #if !defined(ENABLE_GEOLOCATION)
@@ -296,12 +303,7 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #endif
 
 #if !defined(ENABLE_WEBGL)
-// FIXME: Get WebGL working on Windows with CMake. https://bugs.webkit.org/show_bug.cgi?id=143311
-#if defined(BUILDING_WITH_CMAKE)
-#define ENABLE_WEBGL 0
-#else
 #define ENABLE_WEBGL 1
-#endif
 #endif
 
 #if !defined(ENABLE_GEOLOCATION)
@@ -359,6 +361,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_ES6_CLASS_SYNTAX)
 #define ENABLE_ES6_CLASS_SYNTAX 1
+#endif
+
+#if !defined(ENABLE_ES6_MODULES)
+#define ENABLE_ES6_MODULES 0
 #endif
 
 #if !defined(ENABLE_ES6_TEMPLATE_LITERAL_SYNTAX)
@@ -653,10 +659,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_POINTER_LOCK 0
 #endif
 
-#if !defined(ENABLE_PROMISES)
-#define ENABLE_PROMISES 0
-#endif
-
 #if !defined(ENABLE_PROXIMITY_EVENTS)
 #define ENABLE_PROXIMITY_EVENTS 0
 #endif
@@ -683,6 +685,10 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_SATURATED_LAYOUT_ARITHMETIC)
 #define ENABLE_SATURATED_LAYOUT_ARITHMETIC 1
+#endif
+
+#if !defined(ENABLE_SHADOW_DOM)
+#define ENABLE_SHADOW_DOM 0
 #endif
 
 #if !defined(ENABLE_SMOOTH_SCROLLING)
@@ -795,10 +801,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_WILL_REVEAL_EDGE_EVENTS)
 #define ENABLE_WILL_REVEAL_EDGE_EVENTS 1
-#endif
-
-#if !defined(ENABLE_XHR_TIMEOUT)
-#define ENABLE_XHR_TIMEOUT 0
 #endif
 
 #if !defined(ENABLE_XSLT)

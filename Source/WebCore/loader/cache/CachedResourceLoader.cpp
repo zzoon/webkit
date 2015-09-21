@@ -125,7 +125,7 @@ CachedResourceLoader::CachedResourceLoader(DocumentLoader* documentLoader)
     : m_document(0)
     , m_documentLoader(documentLoader)
     , m_requestCount(0)
-    , m_garbageCollectDocumentResourcesTimer(*this, &CachedResourceLoader::garbageCollectDocumentResourcesTimerFired)
+    , m_garbageCollectDocumentResourcesTimer(*this, &CachedResourceLoader::garbageCollectDocumentResources)
     , m_autoLoadImages(true)
     , m_imagesEnabled(true)
     , m_allowStaleResources(false)
@@ -233,7 +233,7 @@ CachedResourceHandle<CachedCSSStyleSheet> CachedResourceLoader::requestUserCSSSt
     memoryCache.add(*userSheet);
     // FIXME: loadResource calls setOwningCachedResourceLoader() if the resource couldn't be added to cache. Does this function need to call it, too?
 
-    userSheet->load(*this, ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, SkipSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo));
+    userSheet->load(*this, ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, SkipSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::SkipPolicyCheck, DefersLoadingPolicy::AllowDefersLoading));
     
     return userSheet;
 }
@@ -366,14 +366,20 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const URL& url,
         return 0;
     }
 
-    // FIXME: Convert this to check the isolated world's Content Security Policy once webkit.org/b/104520 is solved.
-    bool shouldBypassMainWorldContentSecurityPolicy = (frame() && frame()->script().shouldBypassMainWorldContentSecurityPolicy());
+    bool skipContentSecurityPolicyCheck = options.contentSecurityPolicyImposition() == ContentSecurityPolicyImposition::SkipPolicyCheck;
 
     // Some types of resources can be loaded only from the same origin.  Other
     // types of resources, like Images, Scripts, and CSS, can be loaded from
     // any URL.
     switch (type) {
     case CachedResource::MainResource:
+        if (HTMLFrameOwnerElement* ownerElement = frame() ? frame()->ownerElement() : nullptr) {
+            if (ownerElement->document().shouldEnforceContentDispositionAttachmentSandbox() && !ownerElement->document().securityOrigin()->canRequest(url)) {
+                printAccessDeniedMessage(url);
+                return false;
+            }
+        }
+        FALLTHROUGH;
     case CachedResource::ImageResource:
     case CachedResource::CSSStyleSheet:
     case CachedResource::Script:
@@ -408,30 +414,30 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const URL& url,
     switch (type) {
 #if ENABLE(XSLT)
     case CachedResource::XSLStyleSheet:
-        if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowScriptFromSource(url))
+        if (!m_document->contentSecurityPolicy()->allowScriptFromSource(url, skipContentSecurityPolicyCheck))
             return false;
         break;
 #endif
     case CachedResource::Script:
-        if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowScriptFromSource(url))
+        if (!m_document->contentSecurityPolicy()->allowScriptFromSource(url, skipContentSecurityPolicyCheck))
             return false;
         if (frame() && !frame()->settings().isScriptEnabled())
             return false;
         break;
     case CachedResource::CSSStyleSheet:
-        if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowStyleFromSource(url))
+        if (!m_document->contentSecurityPolicy()->allowStyleFromSource(url, skipContentSecurityPolicyCheck))
             return false;
         break;
     case CachedResource::SVGDocumentResource:
     case CachedResource::ImageResource:
-        if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowImageFromSource(url))
+        if (!m_document->contentSecurityPolicy()->allowImageFromSource(url, skipContentSecurityPolicyCheck))
             return false;
         break;
 #if ENABLE(SVG_FONTS)
     case CachedResource::SVGFontResource:
 #endif
     case CachedResource::FontResource: {
-        if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowFontFromSource(url))
+        if (!m_document->contentSecurityPolicy()->allowFontFromSource(url, skipContentSecurityPolicyCheck))
             return false;
         break;
     }
@@ -444,7 +450,7 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const URL& url,
         break;
 #if ENABLE(VIDEO_TRACK)
     case CachedResource::TextTrackResource:
-        if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowMediaFromSource(url))
+        if (!m_document->contentSecurityPolicy()->allowMediaFromSource(url, skipContentSecurityPolicyCheck))
             return false;
         break;
 #endif
@@ -565,9 +571,6 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
         resource->setLoadPriority(request.priority());
 
     if ((policy != Use || resource->stillNeedsLoad()) && CachedResourceRequest::NoDefer == request.defer()) {
-        if (request.acceptOverride())
-            resource->setAccept(request.acceptOverride().value());
-
         resource->load(*this, request.options());
 
         // We don't support immediate loads, but we do support immediate failure.
@@ -602,7 +605,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::revalidateResource(co
     ASSERT(resource->sessionID() == sessionID());
 
     CachedResourceHandle<CachedResource> newResource = createResource(resource->type(), resource->resourceRequest(), resource->encoding(), resource->sessionID());
-    
+
     LOG(ResourceLoading, "Resource %p created to revalidate %p", newResource.get(), resource);
     newResource->setResourceToRevalidate(resource);
     
@@ -693,8 +696,14 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
         return Reload;
     }
 
-    if (!existingResource->canReuse(request))
-        return Reload;
+    // FIXME: We should use the same cache policy for all resource types. The raw resource policy is overly strict
+    //        while the normal subresource policy is too loose.
+    if (existingResource->isMainOrRawResource()) {
+        bool strictPolicyDisabled = frame()->loader().isStrictRawResourceValidationPolicyDisabledForTesting();
+        bool canReuseRawResource = strictPolicyDisabled || downcast<CachedRawResource>(*existingResource).canReuse(request);
+        if (!canReuseRawResource)
+            return Reload;
+    }
 
     // Conditional requests should have failed canReuse check.
     ASSERT(!request.isConditional());
@@ -708,9 +717,14 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
     if (m_allowStaleResources)
         return Use;
     
-    // Alwaus use preloads.
+    // Always use preloads.
     if (existingResource->isPreloaded())
         return Use;
+
+    // We can find resources that are being validated from cache only when validation is just successfully completing.
+    if (existingResource->validationCompleting())
+        return Use;
+    ASSERT(!existingResource->validationInProgress());
 
     // Validate the redirect chain.
     bool cachePolicyIsHistoryBuffer = cachePolicy(type) == CachePolicyHistoryBuffer;
@@ -887,14 +901,6 @@ void CachedResourceLoader::removeCachedResource(CachedResource& resource)
     m_documentResources.remove(resource.url());
 }
 
-void CachedResourceLoader::addCachedResource(CachedResource& resource)
-{
-    m_documentResources.set(resource.url(), &resource);
-
-    if (!MemoryCache::singleton().add(resource))
-        resource.setOwningCachedResourceLoader(this);
-}
-
 void CachedResourceLoader::loadDone(CachedResource* resource, bool shouldPerformPostLoadActions)
 {
     RefPtr<DocumentLoader> protectDocumentLoader(m_documentLoader);
@@ -934,11 +940,6 @@ void CachedResourceLoader::loadDone(CachedResource* resource, bool shouldPerform
 // bookkeeping on CachedResources, so instead pseudo-GC them -- when the
 // reference count reaches 1, m_documentResources is the only reference, so
 // remove it from the map.
-void CachedResourceLoader::garbageCollectDocumentResourcesTimerFired()
-{
-    garbageCollectDocumentResources();
-}
-
 void CachedResourceLoader::garbageCollectDocumentResources()
 {
     typedef Vector<String, 10> StringVector;
@@ -1138,7 +1139,7 @@ void CachedResourceLoader::printPreloadStats()
 
 const ResourceLoaderOptions& CachedResourceLoader::defaultCachedResourceOptions()
 {
-    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo);
+    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck, DefersLoadingPolicy::AllowDefersLoading);
     return options;
 }
 

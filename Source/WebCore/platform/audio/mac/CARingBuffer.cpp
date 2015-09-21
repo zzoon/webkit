@@ -86,7 +86,7 @@ void CARingBuffer::allocate(uint32_t channelCount, size_t bytesPerFrame, size_t 
 void CARingBuffer::deallocate()
 {
     if (m_buffers)
-        m_buffers.clear();
+        m_buffers = nullptr;
 
     m_channelCount = 0;
     m_capacityBytes = 0;
@@ -200,7 +200,7 @@ CARingBuffer::Error CARingBuffer::store(const AudioBufferList* list, size_t fram
 
 void CARingBuffer::setCurrentFrameBounds(uint64_t startTime, uint64_t endTime)
 {
-    ByteSpinLocker locker(m_currentFrameBoundsLock);
+    LockHolder locker(m_currentFrameBoundsLock);
     uint32_t nextPtr = m_timeBoundsQueuePtr + 1;
     uint32_t index = nextPtr & kGeneralRingTimeBoundsQueueMask;
 
@@ -212,7 +212,7 @@ void CARingBuffer::setCurrentFrameBounds(uint64_t startTime, uint64_t endTime)
 
 void CARingBuffer::getCurrentFrameBounds(uint64_t &startTime, uint64_t &endTime)
 {
-    ByteSpinLocker locker(m_currentFrameBoundsLock);
+    LockHolder locker(m_currentFrameBoundsLock);
     uint32_t curPtr = m_timeBoundsQueuePtr;
     uint32_t index = curPtr & kGeneralRingTimeBoundsQueueMask;
     CARingBuffer::TimeBounds& bounds = m_timeBoundsQueue[index];

@@ -29,9 +29,7 @@
 #if ENABLE(PDFKIT_PLUGIN)
 
 #import "ArgumentCoders.h"
-#import "AttributedString.h"
 #import "DataReference.h"
-#import "DictionaryPopupInfo.h"
 #import "PDFAnnotationTextWidgetDetails.h"
 #import "PDFKitImports.h"
 #import "PDFLayerControllerDetails.h"
@@ -503,9 +501,9 @@ namespace WebKit {
 
 using namespace HTMLNames;
 
-PassRefPtr<PDFPlugin> PDFPlugin::create(WebFrame* frame)
+Ref<PDFPlugin> PDFPlugin::create(WebFrame* frame)
 {
-    return adoptRef(new PDFPlugin(frame));
+    return adoptRef(*new PDFPlugin(frame));
 }
 
 PDFPlugin::PDFPlugin(WebFrame* frame)
@@ -527,11 +525,11 @@ PDFPlugin::PDFPlugin(WebFrame* frame)
         m_annotationContainer = document->createElement(divTag, false);
         m_annotationContainer->setAttribute(idAttr, "annotationContainer");
 
-        RefPtr<Element> m_annotationStyle = document->createElement(styleTag, false);
-        m_annotationStyle->setTextContent(annotationStyle, ASSERT_NO_EXCEPTION);
+        Ref<Element> annotationStyleElement = document->createElement(styleTag, false);
+        annotationStyleElement->setTextContent(annotationStyle, ASSERT_NO_EXCEPTION);
 
-        m_annotationContainer->appendChild(m_annotationStyle.get());
-        document->bodyOrFrameset()->appendChild(m_annotationContainer.get());
+        m_annotationContainer->appendChild(WTF::move(annotationStyleElement));
+        document->bodyOrFrameset()->appendChild(*m_annotationContainer);
     }
 
     m_accessibilityObject = adoptNS([[WKPDFPluginAccessibilityObject alloc] initWithPDFPlugin:this]);
@@ -1103,8 +1101,8 @@ void PDFPlugin::destroy()
             frameView->removeScrollableArea(this);
     }
 
-    m_activeAnnotation = 0;
-    m_annotationContainer = 0;
+    m_activeAnnotation = nullptr;
+    m_annotationContainer = nullptr;
 
     destroyScrollbar(HorizontalScrollbar);
     destroyScrollbar(VerticalScrollbar);
@@ -1113,9 +1111,9 @@ void PDFPlugin::destroy()
     [m_contentLayer removeFromSuperlayer];
 }
 
-void PDFPlugin::updateControlTints(GraphicsContext* graphicsContext)
+void PDFPlugin::updateControlTints(GraphicsContext& graphicsContext)
 {
-    ASSERT(graphicsContext->updatingControlTints());
+    ASSERT(graphicsContext.updatingControlTints());
 
     if (m_horizontalScrollbar)
         m_horizontalScrollbar->invalidate();
@@ -1134,7 +1132,7 @@ void PDFPlugin::paintControlForLayerInContext(CALayer *layer, CGContextRef conte
     if (layer == m_scrollCornerLayer) {
         IntRect scrollCornerRect = this->scrollCornerRect();
         graphicsContext.translate(-scrollCornerRect.x(), -scrollCornerRect.y());
-        ScrollbarTheme::theme()->paintScrollCorner(0, &graphicsContext, scrollCornerRect);
+        ScrollbarTheme::theme().paintScrollCorner(nullptr, graphicsContext, scrollCornerRect);
         return;
     }
     
@@ -1149,10 +1147,10 @@ void PDFPlugin::paintControlForLayerInContext(CALayer *layer, CGContextRef conte
         return;
     
     graphicsContext.translate(-scrollbar->x(), -scrollbar->y());
-    scrollbar->paint(&graphicsContext, scrollbar->frameRect());
+    scrollbar->paint(graphicsContext, scrollbar->frameRect());
 }
 
-PassRefPtr<ShareableBitmap> PDFPlugin::snapshot()
+RefPtr<ShareableBitmap> PDFPlugin::snapshot()
 {
     if (size().isEmpty())
         return nullptr;
@@ -1169,7 +1167,7 @@ PassRefPtr<ShareableBitmap> PDFPlugin::snapshot()
 
     [m_pdfLayerController snapshotInContext:context->platformContext()];
 
-    return bitmap.release();
+    return bitmap;
 }
 
 PlatformLayer* PDFPlugin::pluginLayer()
@@ -1604,14 +1602,14 @@ void PDFPlugin::setActiveAnnotation(PDFAnnotation *annotation)
 
     if (annotation) {
         if ([annotation isKindOfClass:pdfAnnotationTextWidgetClass()] && static_cast<PDFAnnotationTextWidget *>(annotation).isReadOnly) {
-            m_activeAnnotation = 0;
+            m_activeAnnotation = nullptr;
             return;
         }
 
         m_activeAnnotation = PDFPluginAnnotation::create(annotation, m_pdfLayerController.get(), this);
         m_activeAnnotation->attach(m_annotationContainer.get());
     } else
-        m_activeAnnotation = 0;
+        m_activeAnnotation = nullptr;
 }
 
 bool PDFPlugin::supportsForms()
@@ -1635,12 +1633,12 @@ void PDFPlugin::notifyDisplayModeChanged(int)
     updateScrollbars();
 }
 
-PassRefPtr<SharedBuffer> PDFPlugin::liveResourceData() const
+RefPtr<SharedBuffer> PDFPlugin::liveResourceData() const
 {
     NSData *pdfData = liveData();
 
     if (!pdfData)
-        return 0;
+        return nullptr;
 
     return SharedBuffer::wrapNSData(pdfData);
 }
@@ -1720,7 +1718,7 @@ void PDFPlugin::showDefinitionForAttributedString(NSAttributedString *string, CG
 {
     DictionaryPopupInfo dictionaryPopupInfo;
     dictionaryPopupInfo.origin = convertFromPDFViewToRootView(IntPoint(point));
-    dictionaryPopupInfo.attributedString.string = string;
+    dictionaryPopupInfo.attributedString = string;
 
     webFrame()->page()->send(Messages::WebPageProxy::DidPerformDictionaryLookup(dictionaryPopupInfo));
 }
@@ -1937,7 +1935,7 @@ String PDFPlugin::lookupTextAtLocation(const WebCore::FloatPoint& locationInView
         return selection.string;
     }
     
-    NSString *lookupText = dictionaryLookupForPDFSelection(selection, options);
+    NSString *lookupText = DictionaryLookup::stringForPDFSelection(selection, options);
     if (!lookupText || !lookupText.length)
         return @"";
 

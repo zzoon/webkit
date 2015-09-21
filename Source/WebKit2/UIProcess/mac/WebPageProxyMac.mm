@@ -32,7 +32,6 @@
 #import "AttributedString.h"
 #import "ColorSpaceData.h"
 #import "DataReference.h"
-#import "DictionaryPopupInfo.h"
 #import "EditingRange.h"
 #import "EditorState.h"
 #import "MenuUtilities.h"
@@ -48,6 +47,7 @@
 #import "WebPageMessages.h"
 #import "WebProcessProxy.h"
 #import <WebCore/DictationAlternative.h>
+#import <WebCore/DictionaryLookup.h>
 #import <WebCore/GraphicsLayer.h>
 #import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/SharedBuffer.h>
@@ -57,7 +57,7 @@
 #import <wtf/NeverDestroyed.h>
 #import <wtf/text/StringConcatenate.h>
 
-@interface NSApplication (Details)
+@interface NSApplication ()
 - (void)speakString:(NSString *)string;
 @end
 
@@ -368,17 +368,17 @@ String WebPageProxy::stringSelectionForPasteboard()
     return value;
 }
 
-PassRefPtr<WebCore::SharedBuffer> WebPageProxy::dataSelectionForPasteboard(const String& pasteboardType)
+RefPtr<WebCore::SharedBuffer> WebPageProxy::dataSelectionForPasteboard(const String& pasteboardType)
 {
     if (!isValid())
-        return 0;
+        return nullptr;
     SharedMemory::Handle handle;
     uint64_t size = 0;
     const auto messageTimeout = std::chrono::seconds(20);
     process().sendSync(Messages::WebPage::GetDataSelectionForPasteboard(pasteboardType),
                                                 Messages::WebPage::GetDataSelectionForPasteboard::Reply(handle, size), m_pageID, messageTimeout);
     if (handle.isNull())
-        return 0;
+        return nullptr;
     RefPtr<SharedMemory> sharedMemoryBuffer = SharedMemory::map(handle, SharedMemory::Protection::ReadOnly);
     return SharedBuffer::create(static_cast<unsigned char *>(sharedMemoryBuffer->data()), size);
 }
@@ -748,9 +748,25 @@ void WebPageProxy::editorStateChanged(const EditorState& editorState)
 #endif
 }
 
-void WebPageProxy::platformInitializeShareMenuItem(ContextMenuItem& item)
-{
 #if ENABLE(SERVICE_CONTROLS)
+ContextMenuItem WebPageProxy::platformInitializeShareMenuItem(const ContextMenuContextData& contextMenuContextData)
+{
+    const WebHitTestResult::Data& hitTestData = contextMenuContextData.webHitTestResultData();
+
+    URL absoluteLinkURL;
+    if (!hitTestData.absoluteLinkURL.isEmpty())
+        absoluteLinkURL = URL(ParsedURLString, hitTestData.absoluteLinkURL);
+
+    URL downloadableMediaURL;
+    if (!hitTestData.absoluteMediaURL.isEmpty() && hitTestData.isDownloadableMedia)
+        downloadableMediaURL = URL(ParsedURLString, hitTestData.absoluteMediaURL);
+
+    RetainPtr<NSImage> image;
+    if (hitTestData.imageSharedMemory && hitTestData.imageSize)
+        image = adoptNS([[NSImage alloc] initWithData:[NSData dataWithBytes:(unsigned char*)hitTestData.imageSharedMemory->data() length:hitTestData.imageSize]]);
+
+    ContextMenuItem item = ContextMenuItem::shareMenuItem(absoluteLinkURL, downloadableMediaURL, image.get(), contextMenuContextData.selectedText());
+
     NSMenuItem *nsItem = item.platformDescription();
 
     NSSharingServicePicker *sharingServicePicker = [nsItem representedObject];
@@ -762,9 +778,11 @@ void WebPageProxy::platformInitializeShareMenuItem(ContextMenuItem& item)
 
     // Setting the picker lets the delegate retain it to keep it alive, but this picker is kept alive by the menu item.
     [[WKSharingServicePickerDelegate sharedSharingServicePickerDelegate] setPicker:nil];
-#endif
+
+    return item;
 }
-    
+#endif
+
 } // namespace WebKit
 
 #endif // PLATFORM(MAC)

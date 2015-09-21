@@ -60,9 +60,9 @@ void BaseChooserOnlyDateAndTimeInputType::createShadowSubtree()
 {
     DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, valueContainerPseudo, ("-webkit-date-and-time-value", AtomicString::ConstructFromLiteral));
 
-    RefPtr<HTMLDivElement> valueContainer = HTMLDivElement::create(element().document());
+    Ref<HTMLDivElement> valueContainer = HTMLDivElement::create(element().document());
     valueContainer->setPseudo(valueContainerPseudo);
-    element().userAgentShadowRoot()->appendChild(valueContainer.get());
+    element().userAgentShadowRoot()->appendChild(WTF::move(valueContainer));
     updateAppearance();
 }
 
@@ -98,7 +98,7 @@ void BaseChooserOnlyDateAndTimeInputType::didChooseValue(const String& value)
 
 void BaseChooserOnlyDateAndTimeInputType::didEndChooser()
 {
-    m_dateTimeChooser.clear();
+    m_dateTimeChooser = nullptr;
 }
 
 void BaseChooserOnlyDateAndTimeInputType::closeDateTimeChooser()

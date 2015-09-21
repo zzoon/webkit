@@ -40,21 +40,15 @@
 #import "WKViewInternal.h"
 #import "WKWebViewConfigurationPrivate.h"
 #import "WKWebViewInternal.h"
-#import "WebInspectorMessages.h"
 #import "WebInspectorUIMessages.h"
 #import "WebPageGroup.h"
 #import "WebPageProxy.h"
 #import "WebPreferences.h"
 #import "WebProcessProxy.h"
-#import <QuartzCore/CoreAnimation.h>
 #import <WebCore/InspectorFrontendClientLocal.h>
 #import <WebCore/LocalizedStrings.h>
 #import <WebCore/SoftLinking.h>
-#import <WebKitSystemInterface.h>
-#import <algorithm>
-#import <mach-o/dyld.h>
 #import <wtf/text/Base64.h>
-#import <wtf/text/WTFString.h>
 
 SOFT_LINK_STAGED_FRAMEWORK(WebInspectorUI, PrivateFrameworks, A)
 
@@ -106,16 +100,6 @@ static const unsigned webViewCloseTimeout = 60;
     return self;
 }
 
-- (IBAction)attachRight:(id)sender
-{
-    static_cast<WebInspectorProxy*>(_inspectorProxy)->attach(AttachmentSide::Right);
-}
-
-- (IBAction)attachBottom:(id)sender
-{
-    static_cast<WebInspectorProxy*>(_inspectorProxy)->attach(AttachmentSide::Bottom);
-}
-
 - (void)close
 {
     _inspectorProxy = nullptr;
@@ -151,18 +135,8 @@ static const unsigned webViewCloseTimeout = 60;
     static_cast<WebInspectorProxy*>(_inspectorProxy)->windowFullScreenDidChange();
 }
 
-- (void)ignoreNextInspectedViewFrameDidChange
-{
-    _ignoreNextInspectedViewFrameDidChange = YES;
-}
-
 - (void)inspectedViewFrameDidChange:(NSNotification *)notification
 {
-    if (_ignoreNextInspectedViewFrameDidChange) {
-        _ignoreNextInspectedViewFrameDidChange = NO;
-        return;
-    }
-
     // Resizing the views while inside this notification can lead to bad results when entering
     // or exiting full screen. To avoid that we need to perform the work after a delay. We only
     // depend on this for enforcing the height constraints, so a small delay isn't terrible. Most
@@ -234,8 +208,7 @@ static void runOpenPanel(WKPageRef page, WKFrameRef frame, WKOpenPanelParameters
 
     WKRetain(listener);
 
-    // If the inspector is detached, then openPanel will be window-modal; otherwise, openPanel is opened in a new window.
-    [openPanel beginSheetModalForWindow:webInspectorProxy->inspectorWindow() completionHandler:^(NSInteger result) {
+    auto completionHandler = ^(NSInteger result) {
         if (result == NSFileHandlingPanelOKButton) {
             WKMutableArrayRef fileURLs = WKMutableArrayCreate();
 
@@ -252,7 +225,12 @@ static void runOpenPanel(WKPageRef page, WKFrameRef frame, WKOpenPanelParameters
             WKOpenPanelResultListenerCancel(listener);
 
         WKRelease(listener);
-    }];
+    };
+
+    if (webInspectorProxy->inspectorWindow())
+        [openPanel beginSheetModalForWindow:webInspectorProxy->inspectorWindow() completionHandler:completionHandler];
+    else
+        completionHandler([openPanel runModal]);
 }
 
 void WebInspectorProxy::attachmentViewDidChange(NSView *oldView, NSView *newView)
@@ -400,6 +378,11 @@ WebPageProxy* WebInspectorProxy::platformCreateInspectorPage()
 #endif
     preferences._allowFileAccessFromFileURLs = YES;
     preferences._javaScriptRuntimeFlags = 0;
+    if (isUnderTest()) {
+        preferences._hiddenPageDOMTimerThrottlingEnabled = NO;
+        preferences._pageVisibilityBasedProcessSuppressionEnabled = NO;
+    }
+
     [configuration setProcessPool: ::WebKit::wrapper(inspectorProcessPool())];
     [configuration _setGroupIdentifier:inspectorPageGroupIdentifier()];
 
@@ -490,7 +473,7 @@ bool WebInspectorProxy::platformCanAttach(bool webProcessCanAttach)
 
     static const float minimumAttachedHeight = 250;
     static const float maximumAttachedHeightRatio = 0.75;
-    static const float minimumAttachedWidth = 750;
+    static const float minimumAttachedWidth = 500;
 
     NSRect inspectedViewFrame = inspectedView.frame;
 
@@ -512,7 +495,7 @@ void WebInspectorProxy::platformDidClose()
 {
     if (m_inspectorWindow) {
         [m_inspectorWindow setDelegate:nil];
-        [m_inspectorWindow orderOut:nil];
+        [m_inspectorWindow close];
         m_inspectorWindow = nil;
     }
 
@@ -535,7 +518,7 @@ void WebInspectorProxy::platformHide()
 
     if (m_inspectorWindow) {
         [m_inspectorWindow setDelegate:nil];
-        [m_inspectorWindow orderOut:nil];
+        [m_inspectorWindow close];
         m_inspectorWindow = nil;
     }
 }
@@ -552,7 +535,7 @@ void WebInspectorProxy::platformBringToFront()
 
     // FIXME <rdar://problem/10937688>: this will not bring a background tab in Safari to the front, only its window.
     [m_inspectorView.get().window makeKeyAndOrderFront:nil];
-    [m_inspectorView.get().window makeFirstResponder:m_inspectorView->_page->wkView()];
+    [m_inspectorView.get().window makeFirstResponder:m_inspectorView.get()];
 }
 
 bool WebInspectorProxy::platformIsFront()
@@ -618,12 +601,17 @@ void WebInspectorProxy::platformSave(const String& suggestedURL, const String& c
     panel.nameFieldStringValue = platformURL.lastPathComponent;
     panel.directoryURL = [platformURL URLByDeletingLastPathComponent];
 
-    [panel beginSheetModalForWindow:m_inspectorWindow.get() completionHandler:^(NSInteger result) {
+    auto completionHandler = ^(NSInteger result) {
         if (result == NSFileHandlingPanelCancelButton)
             return;
         ASSERT(result == NSFileHandlingPanelOKButton);
         saveToURL(panel.URL);
-    }];
+    };
+
+    if (m_inspectorWindow)
+        [panel beginSheetModalForWindow:m_inspectorWindow.get() completionHandler:completionHandler];
+    else
+        completionHandler([panel runModal]);
 }
 
 void WebInspectorProxy::platformAppend(const String& suggestedURL, const String& content)
@@ -721,8 +709,6 @@ void WebInspectorProxy::inspectedViewFrameDidChange(CGFloat currentDimension)
     if (NSEqualRects([m_inspectorView frame], inspectorFrame) && NSEqualRects([inspectedView frame], inspectedViewFrame))
         return;
 
-    [m_inspectorProxyObjCAdapter ignoreNextInspectedViewFrameDidChange];
-
     // Disable screen updates to make sure the layers for both views resize in sync.
     [[m_inspectorView window] disableScreenUpdatesUntilFlush];
 
@@ -750,7 +736,7 @@ void WebInspectorProxy::platformAttach()
 
     if (m_inspectorWindow) {
         [m_inspectorWindow setDelegate:nil];
-        [m_inspectorWindow orderOut:nil];
+        [m_inspectorWindow close];
         m_inspectorWindow = nil;
     }
 
@@ -772,7 +758,7 @@ void WebInspectorProxy::platformAttach()
     inspectedViewFrameDidChange(currentDimension);
 
     [[inspectedView superview] addSubview:m_inspectorView.get() positioned:NSWindowBelow relativeTo:inspectedView];
-    [m_inspectorView.get().window makeFirstResponder:m_inspectorView->_page->wkView()];
+    [m_inspectorView.get().window makeFirstResponder:m_inspectorView.get()];
 }
 
 void WebInspectorProxy::platformDetach()
@@ -826,7 +812,7 @@ void WebInspectorProxy::platformStartWindowDrag()
 #endif
 }
 
-String WebInspectorProxy::inspectorPageURL() const
+String WebInspectorProxy::inspectorPageURL()
 {
     // Call the soft link framework function to dlopen it, then [NSBundle bundleWithIdentifier:] will work.
     WebInspectorUILibrary();
@@ -837,7 +823,7 @@ String WebInspectorProxy::inspectorPageURL() const
     return [[NSURL fileURLWithPath:path] absoluteString];
 }
 
-String WebInspectorProxy::inspectorTestPageURL() const
+String WebInspectorProxy::inspectorTestPageURL()
 {
     // Call the soft link framework function to dlopen it, then [NSBundle bundleWithIdentifier:] will work.
     WebInspectorUILibrary();
@@ -851,7 +837,7 @@ String WebInspectorProxy::inspectorTestPageURL() const
     return [[NSURL fileURLWithPath:path] absoluteString];
 }
 
-String WebInspectorProxy::inspectorBaseURL() const
+String WebInspectorProxy::inspectorBaseURL()
 {
     // Call the soft link framework function to dlopen it, then [NSBundle bundleWithIdentifier:] will work.
     WebInspectorUILibrary();

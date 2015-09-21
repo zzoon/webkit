@@ -32,6 +32,9 @@ namespace WebCore {
 class CSSValue;
 class QualifiedName;
 
+// This can't be a StringView for 2 reasons:
+// 1. lower() clobbers the data we point to.
+// 2. We are an element of a union (in CSSParserValue) so we need to have a trivial destructor.
 struct CSSParserString {
     void init(LChar* characters, unsigned length)
     {
@@ -181,7 +184,9 @@ public:
 enum class CSSParserSelectorCombinator {
     Child,
     DescendantSpace,
+#if ENABLE(CSS_SELECTORS_LEVEL4)
     DescendantDoubleChild,
+#endif
     DirectAdjacent,
     IndirectAdjacent
 };
@@ -236,7 +241,9 @@ public:
     void prependTagSelector(const QualifiedName&, bool tagIsForNamespaceRule = false);
 
 private:
+#if ENABLE(CSS_SELECTORS_LEVEL4)
     void setDescendantUseDoubleChildSyntax() { m_selector->setDescendantUseDoubleChildSyntax(); }
+#endif
 
     std::unique_ptr<CSSSelector> m_selector;
     std::unique_ptr<CSSParserSelector> m_tagHistory;

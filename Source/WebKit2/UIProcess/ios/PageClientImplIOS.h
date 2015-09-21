@@ -33,7 +33,6 @@
 #import <wtf/RetainPtr.h>
 
 OBJC_CLASS WKContentView;
-OBJC_CLASS WKView;
 OBJC_CLASS WKWebView;
 OBJC_CLASS WKEditorUndoTargetObjC;
 
@@ -46,7 +45,6 @@ class PageClientImpl : public PageClient
     {
 public:
     PageClientImpl(WKContentView *, WKWebView *);
-    PageClientImpl(WKContentView *, WKView *);
     virtual ~PageClientImpl();
     
 private:
@@ -56,7 +54,7 @@ private:
     virtual void displayView() override;
     virtual bool canScrollView() override;
     virtual void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset) override;
-    virtual void requestScroll(const WebCore::FloatPoint& scrollPosition, bool isProgrammaticScroll) override;
+    virtual void requestScroll(const WebCore::FloatPoint& scrollPosition, const WebCore::IntPoint& scrollOrigin, bool isProgrammaticScroll) override;
     virtual WebCore::IntSize viewSize() override;
     virtual bool isViewWindowActive() override;
     virtual bool isViewFocused() override;
@@ -97,10 +95,10 @@ private:
 #if ENABLE(TOUCH_EVENTS)
     virtual void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled) override;
 #endif
-    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) override;
-    virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) override;
-    virtual void setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorLifetime = WebCore::TextIndicatorLifetime::Permanent) override;
-    virtual void clearTextIndicator(WebCore::TextIndicatorDismissalAnimation = WebCore::TextIndicatorDismissalAnimation::FadeOut) override;
+    virtual RefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) override;
+    virtual RefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) override;
+    virtual void setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorWindowLifetime) override;
+    virtual void clearTextIndicator(WebCore::TextIndicatorWindowDismissalAnimation) override;
     virtual void setTextIndicatorAnimationProgress(float) override;
 
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&) override;
@@ -135,7 +133,7 @@ private:
     virtual bool handleRunOpenPanel(WebPageProxy*, WebFrameProxy*, WebOpenPanelParameters*, WebOpenPanelResultListenerProxy*) override;
     virtual void didChangeViewportMetaTagWidth(float) override;
     virtual double minimumZoomScale() const override;
-    virtual WebCore::FloatSize contentsSize() const override;
+    virtual WebCore::FloatRect documentRect() const override;
 
     virtual void showInspectorHighlight(const WebCore::Highlight&) override;
     virtual void hideInspectorHighlight() override;
@@ -178,6 +176,7 @@ private:
     virtual void navigationGestureDidEnd(bool willNavigate, WebBackForwardListItem&) override;
     virtual void navigationGestureDidEnd() override;
     virtual void willRecordNavigationSnapshot(WebBackForwardListItem&) override;
+    virtual void didRemoveNavigationGestureSnapshot() override;
 
     virtual void didFirstVisuallyNonEmptyLayoutForMainFrame() override;
     virtual void didFinishLoadForMainFrame() override;
@@ -186,9 +185,11 @@ private:
 
     virtual void didChangeBackgroundColor() override;
 
+    virtual void refView() override;
+    virtual void derefView() override;
+
     WKContentView *m_contentView;
     WKWebView *m_webView;
-    WKView *m_wkView;
     RetainPtr<WKEditorUndoTargetObjC> m_undoTarget;
 };
 } // namespace WebKit

@@ -15,9 +15,12 @@ configure_file(webkit2gtk-web-extension.pc.in ${WebKit2WebExtension_PKGCONFIG_FI
 
 add_definitions(-DBUILDING_WEBKIT)
 add_definitions(-DWEBKIT2_COMPILATION)
-add_definitions(-DLIBEXECDIR="${LIBEXEC_INSTALL_DIR}")
-add_definitions(-DPACKAGE_LOCALE_DIR="${CMAKE_INSTALL_FULL_LOCALEDIR}")
+
+add_definitions(-DLIBEXECDIR="${CMAKE_INSTALL_FULL_LIBEXECDIR}")
+add_definitions(-DPKGLIBEXECDIR="${LIBEXEC_INSTALL_DIR}")
+add_definitions(-DLOCALEDIR="${CMAKE_INSTALL_FULL_LOCALEDIR}")
 add_definitions(-DLIBDIR="${LIB_INSTALL_DIR}")
+add_definitions(-DDATADIR="${CMAKE_INSTALL_FULL_DATADIR}")
 
 set(WebKit2_USE_PREFIX_HEADER ON)
 
@@ -55,11 +58,11 @@ list(APPEND WebKit2_SOURCES
 
     Shared/Plugins/Netscape/x11/NetscapePluginModuleX11.cpp
 
+    Shared/Plugins/unix/PluginSearchPath.cpp
+
     Shared/cairo/ShareableBitmapCairo.cpp
 
     Shared/gtk/ArgumentCodersGtk.cpp
-    Shared/gtk/KeyedDecoder.cpp
-    Shared/gtk/KeyedEncoder.cpp
     Shared/gtk/NativeContextMenuItemGtk.cpp
     Shared/gtk/NativeWebKeyboardEventGtk.cpp
     Shared/gtk/NativeWebMouseEventGtk.cpp
@@ -78,6 +81,7 @@ list(APPEND WebKit2_SOURCES
     Shared/linux/SeccompFilters/SigprocmaskSyscall.cpp
     Shared/linux/SeccompFilters/Syscall.cpp
     Shared/linux/SeccompFilters/SyscallPolicy.cpp
+    Shared/linux/SeccompFilters/XDGBaseDirectoryGLib.cpp
 
     Shared/soup/WebCoreArgumentCodersSoup.cpp
 
@@ -134,6 +138,7 @@ list(APPEND WebKit2_SOURCES
     UIProcess/API/gtk/WebKitDownloadClient.h
     UIProcess/API/gtk/WebKitDownloadPrivate.h
     UIProcess/API/gtk/WebKitEditingCommands.h
+    UIProcess/API/gtk/WebKitEditorState.cpp
     UIProcess/API/gtk/WebKitError.cpp
     UIProcess/API/gtk/WebKitError.h
     UIProcess/API/gtk/WebKitFaviconDatabase.cpp
@@ -162,6 +167,9 @@ list(APPEND WebKit2_SOURCES
     UIProcess/API/gtk/WebKitHitTestResultPrivate.h
     UIProcess/API/gtk/WebKitInjectedBundleClient.cpp
     UIProcess/API/gtk/WebKitInjectedBundleClient.h
+    UIProcess/API/gtk/WebKitInstallMissingMediaPluginsPermissionRequest.cpp
+    UIProcess/API/gtk/WebKitInstallMissingMediaPluginsPermissionRequest.h
+    UIProcess/API/gtk/WebKitInstallMissingMediaPluginsPermissionRequestPrivate.h
     UIProcess/API/gtk/WebKitJavascriptResult.cpp
     UIProcess/API/gtk/WebKitJavascriptResult.h
     UIProcess/API/gtk/WebKitJavascriptResultPrivate.h
@@ -283,6 +291,9 @@ list(APPEND WebKit2_SOURCES
 
     UIProcess/cairo/BackingStoreCairo.cpp
 
+    UIProcess/gstreamer/InstallMissingMediaPluginsPermissionRequest.cpp
+    UIProcess/gstreamer/WebPageProxyGStreamer.cpp
+
     UIProcess/gtk/DragAndDropHandler.cpp
     UIProcess/gtk/ExperimentalFeatures.cpp
     UIProcess/gtk/GestureController.cpp
@@ -309,6 +320,7 @@ list(APPEND WebKit2_SOURCES
 
     WebProcess/InjectedBundle/API/gtk/WebKitFrame.cpp
     WebProcess/InjectedBundle/API/gtk/WebKitScriptWorld.cpp
+    WebProcess/InjectedBundle/API/gtk/WebKitWebEditor.cpp
     WebProcess/InjectedBundle/API/gtk/WebKitWebExtension.cpp
     WebProcess/InjectedBundle/API/gtk/WebKitWebHitTestResult.cpp
     WebProcess/InjectedBundle/API/gtk/WebKitWebPage.cpp
@@ -333,11 +345,15 @@ list(APPEND WebKit2_SOURCES
 
     WebProcess/WebPage/atk/WebPageAccessibilityObjectAtk.cpp
 
+    WebProcess/WebPage/gstreamer/WebPageGStreamer.cpp
+
     WebProcess/WebPage/gtk/PrinterListGtk.cpp
     WebProcess/WebPage/gtk/WebInspectorUIGtk.cpp
     WebProcess/WebPage/gtk/WebPageGtk.cpp
     WebProcess/WebPage/gtk/WebPrintOperationGtk.cpp
 
+    WebProcess/gtk/SeccompFiltersWebProcessGtk.cpp
+    WebProcess/gtk/SeccompFiltersWebProcessGtk.h
     WebProcess/gtk/WebGtkExtensionManager.cpp
     WebProcess/gtk/WebGtkInjectedBundleMain.cpp
     WebProcess/gtk/WebProcessMainGtk.cpp
@@ -370,6 +386,7 @@ set(WebKit2GTK_INSTALLED_HEADERS
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitDefines.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitDownload.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitEditingCommands.h
+    ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitEditorState.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitError.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitFaviconDatabase.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitFileChooserRequest.h
@@ -378,6 +395,7 @@ set(WebKit2GTK_INSTALLED_HEADERS
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitForwardDeclarations.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitGeolocationPermissionRequest.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitHitTestResult.h
+    ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitInstallMissingMediaPluginsPermissionRequest.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitJavascriptResult.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitMimeInfo.h
     ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitNavigationAction.h
@@ -411,6 +429,7 @@ set(WebKit2GTK_INSTALLED_HEADERS
 set(WebKit2WebExtension_INSTALLED_HEADERS
     ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk/WebKitFrame.h
     ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk/WebKitScriptWorld.h
+    ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk/WebKitWebEditor.h
     ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk/WebKitWebExtension.h
     ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk/WebKitWebHitTestResult.h
     ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk/WebKitWebPage.h
@@ -470,7 +489,11 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/Shared/API/c/gtk"
     "${WEBKIT2_DIR}/Shared/Network/CustomProtocols/soup"
     "${WEBKIT2_DIR}/Shared/Downloads/soup"
+    "${WEBKIT2_DIR}/Shared/Plugins/unix"
+    "${WEBKIT2_DIR}/Shared/glib"
     "${WEBKIT2_DIR}/Shared/gtk"
+    "${WEBKIT2_DIR}/Shared/linux"
+    "${WEBKIT2_DIR}/Shared/linux/SeccompFilters"
     "${WEBKIT2_DIR}/Shared/soup"
     "${WEBKIT2_DIR}/Shared/unix"
     "${WEBKIT2_DIR}/UIProcess/API/C/cairo"
@@ -480,6 +503,7 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/UIProcess/API/gtk"
     "${WEBKIT2_DIR}/UIProcess/Network/CustomProtocols/soup"
     "${WEBKIT2_DIR}/UIProcess/Plugins/gtk"
+    "${WEBKIT2_DIR}/UIProcess/gstreamer"
     "${WEBKIT2_DIR}/UIProcess/gtk"
     "${WEBKIT2_DIR}/UIProcess/soup"
     "${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk"
@@ -499,6 +523,7 @@ list(APPEND WebKit2_SYSTEM_INCLUDE_DIRECTORIES
     ${CAIRO_INCLUDE_DIRS}
     ${ENCHANT_INCLUDE_DIRS}
     ${GEOCLUE_INCLUDE_DIRS}
+    ${GSTREAMER_INCLUDE_DIRS}
     ${HARFBUZZ_INCLUDE_DIRS}
     ${LIBSOUP_INCLUDE_DIRS}
 )
@@ -553,6 +578,21 @@ if (LIBNOTIFY_FOUND)
 list(APPEND WebKit2_LIBRARIES
     ${LIBNOTIFY_LIBRARIES}
 )
+endif ()
+
+if (ENABLE_SECCOMP_FILTERS)
+    list(APPEND WebKit2_LIBRARIES
+        ${LIBSECCOMP_LIBRARIES}
+    )
+    list(APPEND WebKit2_SYSTEM_INCLUDE_DIRECTORIES
+        ${LIBSECCOMP_INCLUDE_DIRS}
+    )
+
+    # If building with WebKit jhbuild (not GNOME jhbuild), add the root build
+    # directory to the filesystem access policy.
+    if (DEVELOPER_MODE AND IS_DIRECTORY ${CMAKE_SOURCE_DIR}/WebKitBuild/DependenciesGTK)
+        add_definitions(-DSOURCE_DIR=\"${CMAKE_SOURCE_DIR}\")
+    endif ()
 endif ()
 
 ADD_WHOLE_ARCHIVE_TO_LIBRARIES(WebKit2_LIBRARIES)

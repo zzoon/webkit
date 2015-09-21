@@ -26,7 +26,7 @@
 
 #include "RenderTheme.h"
 
-#if WIN32
+#ifdef WIN32
 typedef void* HANDLE;
 typedef struct HINSTANCE__* HINSTANCE;
 typedef HINSTANCE HMODULE;
@@ -87,7 +87,7 @@ public:
     virtual bool paintMenuList(const RenderObject&, const PaintInfo&, const FloatRect&) override;
     virtual void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
-    virtual bool paintMenuListButtonDecorations(const RenderObject&, const PaintInfo&, const FloatRect&) override;
+    virtual bool paintMenuListButtonDecorations(const RenderBox&, const PaintInfo&, const FloatRect&) override;
 
     virtual bool paintSliderTrack(const RenderObject&, const PaintInfo&, const IntRect&) override;
     virtual bool paintSliderThumb(const RenderObject&, const PaintInfo&, const IntRect&) override;
@@ -134,8 +134,6 @@ public:
     virtual bool paintMeter(const RenderObject&, const PaintInfo&, const IntRect&) override;
 #endif
 
-    virtual bool shouldShowPlaceholderWhenFocused() const override { return true; }
-
 private:
     enum ControlSubPart {
         None,
@@ -147,7 +145,7 @@ private:
     virtual ~RenderThemeWin();
 
     // System fonts.
-    virtual void updateCachedSystemFontDescription(CSSValueID, FontDescription&) const override;
+    virtual void updateCachedSystemFontDescription(CSSValueID, FontCascadeDescription&) const override;
 
     void addIntrinsicMargins(RenderStyle&) const;
     void close();

@@ -28,10 +28,8 @@
 
 #if PLATFORM(MAC)
 
-#import "AttributedString.h"
 #import "ColorSpaceData.h"
 #import "DataReference.h"
-#import "DictionaryPopupInfo.h"
 #import "DownloadProxy.h"
 #import "NativeWebKeyboardEvent.h"
 #import "NativeWebWheelEvent.h"
@@ -53,14 +51,15 @@
 #import <WebCore/AlternativeTextUIController.h>
 #import <WebCore/BitmapImage.h>
 #import <WebCore/Cursor.h>
+#import <WebCore/DictionaryLookup.h>
 #import <WebCore/FloatRect.h>
 #import <WebCore/GraphicsContext.h>
 #import <WebCore/Image.h>
 #import <WebCore/KeyboardEvent.h>
-#import <WebCore/LookupSPI.h>
 #import <WebCore/NotImplemented.h>
 #import <WebCore/SharedBuffer.h>
 #import <WebCore/TextIndicator.h>
+#import <WebCore/TextIndicatorWindow.h>
 #import <WebCore/TextUndoInsertionMarkupMac.h>
 #import <WebKitSystemInterface.h>
 #import <wtf/text/CString.h>
@@ -71,7 +70,7 @@
 #endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-#include <WebCore/WebMediaSessionManagerMac.h>
+#include <WebCore/WebMediaSessionManager.h>
 #endif
 
 @interface NSApplication (WebNSApplicationDetails)
@@ -83,8 +82,6 @@
 - (BOOL)_hostsLayersInWindowServer;
 @end
 #endif
-
-SOFT_LINK_CONSTANT_MAY_FAIL(Lookup, LUTermOptionDisableSearchTermIndicator, NSString *)
 
 using namespace WebCore;
 using namespace WebKit;
@@ -181,7 +178,7 @@ void PageClientImpl::scrollView(const IntRect& scrollRect, const IntSize& scroll
     ASSERT_NOT_REACHED();
 }
 
-void PageClientImpl::requestScroll(const FloatPoint& scrollPosition, bool isProgrammaticScroll)
+void PageClientImpl::requestScroll(const FloatPoint& scrollPosition, const IntPoint& scrollOrigin, bool isProgrammaticScroll)
 {
     ASSERT_NOT_REACHED();
 }
@@ -311,6 +308,7 @@ void PageClientImpl::toolTipChanged(const String& oldToolTip, const String& newT
 
 void PageClientImpl::didCommitLoadForMainFrame(const String& mimeType, bool useCustomContentProvider)
 {
+    [m_wkView _didCommitLoadForMainFrame];
 }
 
 void PageClientImpl::didFinishLoadingDataForCustomContentProvider(const String& suggestedFilename, const IPC::DataReference& dataReference)
@@ -487,29 +485,29 @@ void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent& event, bool 
     [m_wkView _doneWithKeyEvent:event.nativeEvent() eventWasHandled:eventWasHandled];
 }
 
-PassRefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy* page)
+RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy* page)
 {
     return WebPopupMenuProxyMac::create(m_wkView, page);
 }
 
-PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy* page)
+RefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy* page)
 {
     return WebContextMenuProxyMac::create(m_wkView, page);
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
-PassRefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy* page, const WebCore::Color& initialColor,  const WebCore::IntRect& rect)
+RefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy* page, const WebCore::Color& initialColor,  const WebCore::IntRect& rect)
 {
     return WebColorPickerMac::create(page, initialColor, rect, wkView());
 }
 #endif
 
-void PageClientImpl::setTextIndicator(Ref<TextIndicator> textIndicator, WebCore::TextIndicatorLifetime lifetime)
+void PageClientImpl::setTextIndicator(Ref<TextIndicator> textIndicator, WebCore::TextIndicatorWindowLifetime lifetime)
 {
     [m_wkView _setTextIndicator:textIndicator.get() withLifetime:lifetime];
 }
 
-void PageClientImpl::clearTextIndicator(WebCore::TextIndicatorDismissalAnimation dismissalAnimation)
+void PageClientImpl::clearTextIndicator(WebCore::TextIndicatorWindowDismissalAnimation dismissalAnimation)
 {
     [m_wkView _clearTextIndicatorWithAnimation:dismissalAnimation];
 }
@@ -583,25 +581,11 @@ void PageClientImpl::setPluginComplexTextInputState(uint64_t pluginComplexTextIn
 
 void PageClientImpl::didPerformDictionaryLookup(const DictionaryPopupInfo& dictionaryPopupInfo)
 {
-    if (!getLULookupDefinitionModuleClass())
-        return;
-
-    NSPoint textBaselineOrigin = dictionaryPopupInfo.origin;
-
-    // Convert to screen coordinates.
-    textBaselineOrigin = [m_wkView convertPoint:textBaselineOrigin toView:nil];
-    textBaselineOrigin = [m_wkView.window convertRectToScreen:NSMakeRect(textBaselineOrigin.x, textBaselineOrigin.y, 0, 0)].origin;
-
-    RetainPtr<NSMutableDictionary> mutableOptions = adoptNS([(NSDictionary *)dictionaryPopupInfo.options.get() mutableCopy]);
-
     [m_wkView _prepareForDictionaryLookup];
 
-    if (canLoadLUTermOptionDisableSearchTermIndicator() && dictionaryPopupInfo.textIndicator.contentImage) {
-        [m_wkView _setTextIndicator:TextIndicator::create(dictionaryPopupInfo.textIndicator) withLifetime:TextIndicatorLifetime::Permanent];
-        [mutableOptions setObject:@YES forKey:getLUTermOptionDisableSearchTermIndicator()];
-        [getLULookupDefinitionModuleClass() showDefinitionForTerm:dictionaryPopupInfo.attributedString.string.get() atLocation:textBaselineOrigin options:mutableOptions.get()];
-    } else
-        [getLULookupDefinitionModuleClass() showDefinitionForTerm:dictionaryPopupInfo.attributedString.string.get() atLocation:textBaselineOrigin options:mutableOptions.get()];
+    DictionaryLookup::showPopup(dictionaryPopupInfo, m_wkView, [this](TextIndicator& textIndicator) {
+        [m_wkView _setTextIndicator:textIndicator withLifetime:TextIndicatorWindowLifetime::Permanent];
+    });
 }
 
 void PageClientImpl::dismissContentRelativeChildWindows(bool withAnimation)
@@ -724,11 +708,13 @@ void PageClientImpl::exitFullScreen()
 void PageClientImpl::beganEnterFullScreen(const IntRect& initialFrame, const IntRect& finalFrame)
 {
     [m_wkView._fullScreenWindowController beganEnterFullScreenWithInitialFrame:initialFrame finalFrame:finalFrame];
+    [m_wkView _updateSupportsArbitraryLayoutModes];
 }
 
 void PageClientImpl::beganExitFullScreen(const IntRect& initialFrame, const IntRect& finalFrame)
 {
     [m_wkView._fullScreenWindowController beganExitFullScreenWithInitialFrame:initialFrame finalFrame:finalFrame];
+    [m_wkView _updateSupportsArbitraryLayoutModes];
 }
 
 #endif // ENABLE(FULLSCREEN_API)
@@ -776,6 +762,14 @@ void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem& item)
         NavigationState::fromWebPage(*m_webView->_page).willRecordNavigationSnapshot(item);
 #else
     UNUSED_PARAM(item);
+#endif
+}
+
+void PageClientImpl::didRemoveNavigationGestureSnapshot()
+{
+#if WK_API_ENABLED
+    if (m_webView)
+        NavigationState::fromWebPage(*m_webView->_page).navigationGestureSnapshotWasRemoved();
 #endif
 }
 
@@ -832,9 +826,19 @@ void PageClientImpl::showPlatformContextMenu(NSMenu *menu, IntPoint location)
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
 WebCore::WebMediaSessionManager& PageClientImpl::mediaSessionManager()
 {
-    return WebMediaSessionManagerMac::singleton();
+    return WebMediaSessionManager::shared();
 }
 #endif
+
+void PageClientImpl::refView()
+{
+    CFRetain(m_wkView);
+}
+
+void PageClientImpl::derefView()
+{
+    CFRelease(m_wkView);
+}
 
 } // namespace WebKit
 

@@ -60,7 +60,7 @@ RemoteLayerTreeDrawingArea::RemoteLayerTreeDrawingArea(WebPage& webPage, const W
     , m_rootLayer(GraphicsLayer::create(graphicsLayerFactory(), *this))
     , m_exposedRect(FloatRect::infiniteRect())
     , m_scrolledExposedRect(FloatRect::infiniteRect())
-    , m_layerFlushTimer(*this, &RemoteLayerTreeDrawingArea::layerFlushTimerFired)
+    , m_layerFlushTimer(*this, &RemoteLayerTreeDrawingArea::flushLayers)
     , m_isFlushingSuspended(false)
     , m_hasDeferredFlush(false)
     , m_isThrottlingLayerFlushes(false)
@@ -72,6 +72,7 @@ RemoteLayerTreeDrawingArea::RemoteLayerTreeDrawingArea(WebPage& webPage, const W
     , m_currentTransactionID(0)
     , m_contentLayer(nullptr)
     , m_viewOverlayRootLayer(nullptr)
+    , m_weakPtrFactory(this)
 {
     webPage.corePage()->settings().setForceCompositingMode(true);
 #if PLATFORM(IOS)
@@ -154,7 +155,7 @@ void RemoteLayerTreeDrawingArea::setRootCompositingLayer(GraphicsLayer* rootLaye
     scheduleCompositingLayerFlush();
 }
 
-void RemoteLayerTreeDrawingArea::updateGeometry(const IntSize& viewSize, const IntSize& layerPosition, bool flushSynchronously)
+void RemoteLayerTreeDrawingArea::updateGeometry(const IntSize& viewSize, const IntSize& layerPosition, bool flushSynchronously, const WebCore::MachSendRight&)
 {
     m_viewSize = viewSize;
     m_webPage.setSize(viewSize);
@@ -331,11 +332,6 @@ bool RemoteLayerTreeDrawingArea::adjustLayerFlushThrottling(WebCore::LayerFlushT
     return true;
 }
 
-void RemoteLayerTreeDrawingArea::layerFlushTimerFired()
-{
-    flushLayers();
-}
-
 void RemoteLayerTreeDrawingArea::flushLayers()
 {
     if (!m_rootLayer)
@@ -362,8 +358,12 @@ void RemoteLayerTreeDrawingArea::flushLayers()
     visibleRect.intersect(m_scrolledExposedRect);
 
 #if (TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
-    [CATransaction addCommitHandler:^{
-        m_webPage.corePage()->inspectorController().didComposite(m_webPage.mainFrameView()->frame());
+    RefPtr<WebPage> retainedPage = &m_webPage;
+    [CATransaction addCommitHandler:[retainedPage] {
+        if (Page* corePage = retainedPage->corePage()) {
+            if (Frame* coreFrame = retainedPage->mainFrame())
+                corePage->inspectorController().didComposite(*coreFrame);
+        }
     } forPhase:kCATransactionPhasePostCommit];
 #endif
 
@@ -466,9 +466,9 @@ bool RemoteLayerTreeDrawingArea::markLayersVolatileImmediatelyIfPossible()
     return m_remoteLayerTreeContext->backingStoreCollection().markAllBackingStoreVolatileImmediatelyIfPossible();
 }
 
-PassRefPtr<RemoteLayerTreeDrawingArea::BackingStoreFlusher> RemoteLayerTreeDrawingArea::BackingStoreFlusher::create(IPC::Connection* connection, std::unique_ptr<IPC::MessageEncoder> encoder, Vector<RetainPtr<CGContextRef>> contextsToFlush)
+Ref<RemoteLayerTreeDrawingArea::BackingStoreFlusher> RemoteLayerTreeDrawingArea::BackingStoreFlusher::create(IPC::Connection* connection, std::unique_ptr<IPC::MessageEncoder> encoder, Vector<RetainPtr<CGContextRef>> contextsToFlush)
 {
-    return adoptRef(new RemoteLayerTreeDrawingArea::BackingStoreFlusher(connection, WTF::move(encoder), WTF::move(contextsToFlush)));
+    return adoptRef(*new RemoteLayerTreeDrawingArea::BackingStoreFlusher(connection, WTF::move(encoder), WTF::move(contextsToFlush)));
 }
 
 RemoteLayerTreeDrawingArea::BackingStoreFlusher::BackingStoreFlusher(IPC::Connection* connection, std::unique_ptr<IPC::MessageEncoder> encoder, Vector<RetainPtr<CGContextRef>> contextsToFlush)

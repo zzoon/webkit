@@ -23,8 +23,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-function SymbolIterator()
+function symbolIterator()
 {
-    'use strict';
+    "use strict";
+
     return this;
 }

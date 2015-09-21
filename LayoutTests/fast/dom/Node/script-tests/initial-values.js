@@ -101,7 +101,7 @@ shouldBe("element.attributes.toString()", "'[object NamedNodeMap]'");
 
 debug("Prefixed element creation using createElementNS on an HTML doc:")
 element = document.createElementNS("http://www.w3.org/1999/xhtml", "html:pre");
-shouldBe("element.nodeName", "'html:pre'");
+shouldBe("element.nodeName", "'HTML:PRE'");
 shouldBe("element.localName", "'pre'");
 shouldBe("element.namespaceURI", "'http://www.w3.org/1999/xhtml'");
 shouldBe("element.prefix", "'html'");
@@ -168,8 +168,13 @@ shouldBe("entityReference.nodeValue", "null");
 
 // Not possible to create Notation nodes via the DOM, WebKit doesn't create them from parsing
 
-shouldThrow("document.createProcessingInstruction('xml-stylesheet', 'type=\"text/xsl\" href=\"missing.xsl\"')");
-var processingInstruction = xmlDoc.createProcessingInstruction('xml-stylesheet', 'type="text/xsl" href="missing.xsl"');
+var processingInstruction = document.createProcessingInstruction('xml-stylesheet', 'type=\"text/xsl\" href=\"missing.xsl\"');
+shouldBe("processingInstruction.nodeName", "'xml-stylesheet'");
+shouldBe("processingInstruction.localName", "null");
+shouldBe("processingInstruction.namespaceURI", "null");
+shouldBe("processingInstruction.prefix", "null");
+
+processingInstruction = xmlDoc.createProcessingInstruction('xml-stylesheet', 'type="text/xsl" href="missing.xsl"');
 shouldBe("processingInstruction.nodeName", "'xml-stylesheet'");
 shouldBe("processingInstruction.localName", "null");
 shouldBe("processingInstruction.namespaceURI", "null");

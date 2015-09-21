@@ -124,18 +124,20 @@ void MemoryPressureHandler::releaseCriticalMemory(Synchronous synchronous)
 
     {
         ReliefLogger log("Drain CSSValuePool");
-        cssValuePool().drain();
+        CSSValuePool::singleton().drain();
     }
 
     {
         ReliefLogger log("Discard StyleResolvers");
-        for (auto* document : Document::allDocuments())
+        Vector<RefPtr<Document>> documents;
+        copyToVector(Document::allDocuments(), documents);
+        for (auto& document : documents)
             document->clearStyleResolver();
     }
 
     {
         ReliefLogger log("Discard all JIT-compiled code");
-        GCController::singleton().discardAllCompiledCode();
+        GCController::singleton().deleteAllCode();
     }
 
     {
@@ -143,6 +145,7 @@ void MemoryPressureHandler::releaseCriticalMemory(Synchronous synchronous)
         FontCache::singleton().invalidate();
     }
 
+#if ENABLE(VIDEO)
     {
         ReliefLogger log("Dropping buffered data from paused media elements");
         for (auto* mediaElement: HTMLMediaElement::allMediaElements()) {
@@ -150,6 +153,7 @@ void MemoryPressureHandler::releaseCriticalMemory(Synchronous synchronous)
                 mediaElement->purgeBufferedDataIfPossible();
         }
     }
+#endif
 
     if (synchronous == Synchronous::Yes) {
         ReliefLogger log("Collecting JavaScript garbage");
@@ -178,7 +182,7 @@ void MemoryPressureHandler::releaseMemory(Critical critical, Synchronous synchro
     }
 }
 
-#if !PLATFORM(COCOA) && !OS(LINUX)
+#if !PLATFORM(COCOA) && !OS(LINUX) && !PLATFORM(WIN)
 void MemoryPressureHandler::install() { }
 void MemoryPressureHandler::uninstall() { }
 void MemoryPressureHandler::holdOff(unsigned) { }

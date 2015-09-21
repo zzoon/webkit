@@ -63,6 +63,9 @@ static void destroyInspectorWindow(Ecore_Evas* inspectorWindow)
     Evas_Object* inspectorView = evas_object_name_find(ecore_evas_get(inspectorWindow), "inspector");
     if (inspectorView)
         evas_object_smart_callback_call(inspectorView, "inspector,view,close", 0);
+
+    ecore_evas_free(inspectorWindow);
+    inspectorWindow = nullptr;
 }
 
 static void closeInspectorWindow(void* userData, Evas_Object*, void*)
@@ -132,13 +135,9 @@ void WebInspectorProxy::platformOpen()
 void WebInspectorProxy::platformDidClose()
 {
     if (m_inspectorView) {
+        evas_object_smart_callback_del(m_inspectorView, "inspector,view,close", closeInspectorWindow);
         evas_object_del(m_inspectorView);
-        m_inspectorView = 0;
-    }
-
-    if (m_inspectorWindow) {
-        ecore_evas_free(m_inspectorWindow);
-        m_inspectorWindow = 0;
+        m_inspectorView = nullptr;
     }
 }
 
@@ -171,27 +170,28 @@ void WebInspectorProxy::platformInspectedURLChanged(const String& url)
     ecore_evas_title_set(m_inspectorWindow, title.utf8().data());
 }
 
-String WebInspectorProxy::inspectorPageURL() const
+String WebInspectorProxy::inspectorPageURL()
 {
     StringBuilder builder;
-    builder.append(inspectorBaseURL());
+    builder.append(WebInspectorProxy::inspectorBaseURL());
     builder.appendLiteral("/Main.html");
-
     return builder.toString();
 }
 
-String WebInspectorProxy::inspectorTestPageURL() const
+String WebInspectorProxy::inspectorTestPageURL()
 {
     StringBuilder builder;
-    builder.append(inspectorBaseURL());
+    builder.append(WebInspectorProxy::inspectorBaseURL());
     builder.appendLiteral("/Test.html");
-
     return builder.toString();
 }
 
-String WebInspectorProxy::inspectorBaseURL() const
+String WebInspectorProxy::inspectorBaseURL()
 {
-    return "file://" + WebCore::inspectorResourcePath();
+    StringBuilder builder;
+    builder.appendLiteral("file://");
+    builder.append(WebCore::inspectorResourcePath());
+    return builder.toString();
 }
 
 unsigned WebInspectorProxy::platformInspectedWindowHeight()

@@ -42,7 +42,6 @@
 #include "ClipPathOperation.h"
 #include "FloatConversion.h"
 #include "IdentityTransformOperation.h"
-#include "MaskImageOperation.h"
 #include "Matrix3DTransformOperation.h"
 #include "MatrixTransformOperation.h"
 #include "RenderBox.h"
@@ -117,7 +116,7 @@ static inline std::unique_ptr<ShadowData> blendFunc(const AnimationBase* anim, c
 
 static inline TransformOperations blendFunc(const AnimationBase* animation, const TransformOperations& from, const TransformOperations& to, double progress)
 {
-    if (animation->isTransformFunctionListValid())
+    if (animation->transformFunctionListsMatch())
         return to.blendByMatchingOperations(from, progress);
     return to.blendByUsingMatrixInterpolation(from, progress, is<RenderBox>(*animation->renderer()) ? downcast<RenderBox>(*animation->renderer()).borderBoxRect().size() : LayoutSize());
 }
@@ -348,19 +347,6 @@ static inline PassRefPtr<StyleImage> blendFunc(const AnimationBase* anim, StyleI
     return to;
 }
 
-static inline PassRefPtr<MaskImageOperation> blendFunc(const AnimationBase* anim, const RefPtr<MaskImageOperation> from, const RefPtr<MaskImageOperation> to, double progress)
-{
-    if (!from.get() || !to.get())
-        return to;
-
-    // Only animates between masks using images (PNG, entire SVG, generated image).
-    // It does not animate between <mask> elements (file.svg#identifier).
-    if (from->image() && to->image())
-        return MaskImageOperation::create(blendFunc(anim, from->image(), to->image(), progress));
-
-    return to;
-}
-
 static inline NinePieceImage blendFunc(const AnimationBase* anim, const NinePieceImage& from, const NinePieceImage& to, double progress)
 {
     if (!from.hasImage() || !to.hasImage())
@@ -527,31 +513,6 @@ public:
     }
 };
 
-class MaskImagePropertyWrapper : public PropertyWrapper<const RefPtr<MaskImageOperation>> {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    MaskImagePropertyWrapper()
-        : PropertyWrapper<const RefPtr<MaskImageOperation>>(CSSPropertyWebkitMaskImage, &RenderStyle::maskImage, &RenderStyle::setMaskImage)
-    {
-    }
-    
-    virtual bool equals(const RenderStyle* a, const RenderStyle* b) const
-    {
-        // If the style pointers are the same, don't bother doing the test.
-        // If either is null, return false. If both are null, return true.
-        if (a == b)
-            return true;
-        if (!a || !b)
-            return false;
-        
-        const RefPtr<MaskImageOperation> maskImageA = (a->*m_getter)();
-        const RefPtr<MaskImageOperation> maskImageB = (b->*m_getter)();
-        StyleImage* styleImageA = (maskImageA ? maskImageA->image() : nullptr);
-        StyleImage* styleImageB = (maskImageB ? maskImageB->image() : nullptr);
-        return StyleImage::imagesEquivalent(styleImageA, styleImageB);
-    }
-};
-
 class PropertyWrapperColor : public PropertyWrapperGetter<Color> {
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -610,7 +571,7 @@ class PropertyWrapperAcceleratedFilter : public PropertyWrapper<const FilterOper
     WTF_MAKE_FAST_ALLOCATED;
 public:
     PropertyWrapperAcceleratedFilter()
-        : PropertyWrapper<const FilterOperations&>(CSSPropertyWebkitFilter, &RenderStyle::filter, &RenderStyle::setFilter)
+        : PropertyWrapper<const FilterOperations&>(CSSPropertyFilter, &RenderStyle::filter, &RenderStyle::setFilter)
     {
     }
 
@@ -1239,7 +1200,7 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
 
         new FillLayersPropertyWrapper(CSSPropertyBackgroundImage, &RenderStyle::backgroundLayers, &RenderStyle::ensureBackgroundLayers),
         new StyleImagePropertyWrapper(CSSPropertyListStyleImage, &RenderStyle::listStyleImage, &RenderStyle::setListStyleImage),
-        new MaskImagePropertyWrapper(),
+        new StyleImagePropertyWrapper(CSSPropertyWebkitMaskImage, &RenderStyle::maskImage, &RenderStyle::setMaskImage),
 
         new StyleImagePropertyWrapper(CSSPropertyBorderImageSource, &RenderStyle::borderImageSource, &RenderStyle::setBorderImageSource),
         new LengthPropertyWrapper<LengthBox>(CSSPropertyBorderImageSlice, &RenderStyle::borderImageSlices, &RenderStyle::setBorderImageSlices),

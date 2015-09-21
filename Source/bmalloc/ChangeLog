@@ -1,3 +1,93 @@
+2015-08-31  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        Implement bmalloc::isASanEnabled for generic Unix
+        https://bugs.webkit.org/show_bug.cgi?id=148623
+
+        Reviewed by Geoffrey Garen.
+
+        * bmalloc/BPlatform.h: Add BOS_UNIX to detect whether the OS is a Unix.
+        * bmalloc/Environment.cpp:
+        (bmalloc::isASanEnabled): Implement a runtime check that should work on any Unix.
+
+2015-08-19  Geoffrey Garen  <ggaren@apple.com>
+
+        Crash @ bmalloc::Environment::computeIsBmallocEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=148183
+
+        Reviewed by NOBODY Michael Saboff.
+
+        CrashTracer says we have some crashes beneath computeIsBmallocEnabled
+        dereferencing null in strstr. We null check getenv but not
+        _dyld_get_image_name, so deduction indicates that _dyld_get_image_name
+        must be returning null. _dyld_get_image_name isn't really documented,
+        so let's assume it can return null.
+
+        * bmalloc/Environment.cpp:
+        (bmalloc::isASanEnabled): Check _dyld_get_image_name's return value for
+        null because we can't prove it won't be null.
+
+2015-07-24  Geoffrey Garen  <ggaren@apple.com>
+
+        vmmap crash at JavaScriptCore: 0x31cd12f6 (the JavaScript malloc zone enumerator)
+        https://bugs.webkit.org/show_bug.cgi?id=147274
+
+        Reviewed by Anders Carlsson.
+
+        It's not really clear why vmmap sometimes fails to read the target
+        process, but we can avoid a crash when it does. This is useful because
+        you'll still get all the non-bmalloc data out of the target process,
+        and bmalloc might not even be relevant to your investigation.
+
+        * bmalloc/Zone.cpp:
+        (bmalloc::remoteRead): Check for failure.
+
+2015-07-24  Geoffrey Garen  <ggaren@apple.com>
+
+        JavaScriptCore bmalloc should not register its malloc zone more than once
+        https://bugs.webkit.org/show_bug.cgi?id=147273
+
+        Reviewed by Andreas Kling.
+
+        This was a goof: The Zone constructor, by virtue of running automatically,
+        was registering a Zone inside the analysis process.
+
+        * bmalloc/Zone.cpp:
+        (bmalloc::remoteRead): Clarify that the pointer is remote.
+
+        (bmalloc::enumerator):
+        (bmalloc::Zone::Zone):
+        * bmalloc/Zone.h: Separate the normal constructor and the remote constructor.
+        The remote constructor skips zone registration since its goal is not
+        to register a zone in the current process or do any allocation but rather
+        to mirror the bytes of the zone from the target process.
+
+2015-07-23  Geoffrey Garen  <ggaren@apple.com>
+
+        bmalloc: Shrink the super chunk size (again)
+        https://bugs.webkit.org/show_bug.cgi?id=147240
+
+        Reviewed by Andreas Kling.
+
+        Shrinking to 8MB reduced VM exhaustion crashes but did not eliminate them.
+        Let's try 4MB.
+
+        (My previous comment was that the maximum fast object was 2MB. But it
+        was 4MB! Now it's 2MB for realsies.)
+
+        * bmalloc/Sizes.h:
+
+2015-07-03  Dan Bernstein  <mitz@apple.com>
+
+        [Xcode] Update some build settings as recommended by Xcode 7
+        https://bugs.webkit.org/show_bug.cgi?id=146597
+
+        Reviewed by Sam Weinig.
+
+        * Configurations/Base.xcconfig: Enabled CLANG_WARN_UNREACHABLE_CODE, GCC_NO_COMMON_BLOCKS,
+        and ENABLE_STRICT_OBJC_MSGSEND. Removed GCC_MODEL_TUNING.
+
+        * bmalloc.xcodeproj/project.pbxproj: Updated LastUpgradeCheck.
+
 2015-07-02  Geoffrey Garen  <ggaren@apple.com>
 
         bmalloc: Shrink the super chunk size

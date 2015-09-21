@@ -39,13 +39,14 @@
 #include "MediaStreamTrackPrivate.h"
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
 class MediaStreamTrackPrivate;
 
-class MediaStreamPrivateClient {
+class MediaStreamPrivateClient : public RefCounted<MediaStreamPrivateClient> {
 public:
     virtual ~MediaStreamPrivateClient() { }
 
@@ -60,6 +61,7 @@ public:
     static RefPtr<MediaStreamPrivate> create(const Vector<RefPtr<MediaStreamTrackPrivate>>&);
     static RefPtr<MediaStreamPrivate> create();
 
+    MediaStreamPrivate() { }
     virtual ~MediaStreamPrivate() { }
 
     enum class NotifyClientOption { Notify, DontNotify };

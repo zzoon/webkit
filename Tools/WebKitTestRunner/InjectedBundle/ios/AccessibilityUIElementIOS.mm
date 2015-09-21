@@ -60,6 +60,7 @@ typedef void (*AXPostedNotificationCallback)(id element, NSString* notification,
 - (void)_accessibilitySetValue:(NSString *)value;
 - (void)_accessibilityActivate;
 - (UIAccessibilityTraits)_axSelectedTrait;
+- (NSString *)accessibilityARIACurrentStatus;
 @end
 
 @interface NSObject (WebAccessibilityObjectWrapperPrivate)
@@ -109,6 +110,7 @@ static JSStringRef concatenateAttributeAndValue(NSString* attribute, NSString* v
     
 AccessibilityUIElement::AccessibilityUIElement(PlatformUIElement element)
     : m_element(element)
+    , m_notificationHandler(0)
 {
     // FIXME: ap@webkit.org says ObjC objects need to be CFRetained/CFRelease to be GC-compliant on the mac.
     [m_element retain];
@@ -117,6 +119,7 @@ AccessibilityUIElement::AccessibilityUIElement(PlatformUIElement element)
 AccessibilityUIElement::AccessibilityUIElement(const AccessibilityUIElement& other)
     : JSWrappable()
     , m_element(other.m_element)
+    , m_notificationHandler(0)
 {
     [m_element retain];
 }
@@ -311,6 +314,9 @@ JSRetainPtr<JSStringRef> AccessibilityUIElement::stringAttributeValue(JSStringRe
 {
     if (JSStringIsEqualToUTF8CString(attribute, "AXPlaceholderValue"))
         return [[m_element accessibilityPlaceholderValue] createJSStringRef];
+    
+    if (JSStringIsEqualToUTF8CString(attribute, "AXARIACurrent"))
+        return [[m_element accessibilityARIACurrentStatus] createJSStringRef];
     
     return JSStringCreateWithCharacters(0, 0);
 }
@@ -697,6 +703,14 @@ PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::verticalScrollbar() c
 void AccessibilityUIElement::scrollToMakeVisible()
 {
 }
+    
+void AccessibilityUIElement::scrollToGlobalPoint(int x, int y)
+{
+}
+    
+void AccessibilityUIElement::scrollToMakeVisibleWithSubFocus(int x, int y, int width, int height)
+{
+}
 
 JSRetainPtr<JSStringRef> AccessibilityUIElement::selectedTextRange()
 {
@@ -735,6 +749,14 @@ void AccessibilityUIElement::setSelectedChild(AccessibilityUIElement* element) c
 {
 }
 
+void AccessibilityUIElement::setSelectedChildAtIndex(unsigned index) const
+{
+}
+
+void AccessibilityUIElement::removeSelectionAtIndex(unsigned index) const
+{
+}
+
 JSRetainPtr<JSStringRef> AccessibilityUIElement::accessibilityValue() const
 {
     // FIXME: implement
@@ -754,6 +776,25 @@ JSRetainPtr<JSStringRef> AccessibilityUIElement::documentURI()
 void AccessibilityUIElement::assistiveTechnologySimulatedFocus()
 {
     [m_element accessibilityElementDidBecomeFocused];
+}
+    
+bool AccessibilityUIElement::scrollPageUp()
+{
+    return [m_element accessibilityScroll:UIAccessibilityScrollDirectionUp];
+}
+
+bool AccessibilityUIElement::scrollPageDown()
+{
+    return [m_element accessibilityScroll:UIAccessibilityScrollDirectionDown];
+}
+bool AccessibilityUIElement::scrollPageLeft()
+{
+    return [m_element accessibilityScroll:UIAccessibilityScrollDirectionLeft];
+}
+
+bool AccessibilityUIElement::scrollPageRight()
+{
+    return [m_element accessibilityScroll:UIAccessibilityScrollDirectionRight];
 }
 
 void AccessibilityUIElement::increaseTextSelection()

@@ -78,12 +78,12 @@ bool HTMLTextFormControlElement::childShouldCreateRenderer(const Node& child) co
 
 Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(ContainerNode& insertionPoint)
 {
-    HTMLFormControlElementWithState::insertedInto(insertionPoint);
+    InsertionNotificationRequest insertionNotificationRequest = HTMLFormControlElementWithState::insertedInto(insertionPoint);
     if (!insertionPoint.inDocument())
-        return InsertionDone;
+        return insertionNotificationRequest;
     String initialValue = value();
     setTextAsOfLastFormControlChangeEvent(initialValue.isNull() ? emptyString() : initialValue);
-    return InsertionDone;
+    return insertionNotificationRequest;
 }
 
 void HTMLTextFormControlElement::dispatchFocusEvent(RefPtr<Element>&& oldFocusedElement, FocusDirection direction)
@@ -150,10 +150,7 @@ bool HTMLTextFormControlElement::placeholderShouldBeVisible() const
 {
     // This function is used by the style resolver to match the :placeholder-shown pseudo class.
     // Since it is used for styling, it must not use any value depending on the style.
-    return supportsPlaceholder()
-        && isEmptyValue()
-        && !isPlaceholderEmpty()
-        && (document().focusedElement() != this || (document().page()->theme().shouldShowPlaceholderWhenFocused()));
+    return supportsPlaceholder() && isEmptyValue() && !isPlaceholderEmpty();
 }
 
 void HTMLTextFormControlElement::updatePlaceholderVisibility()

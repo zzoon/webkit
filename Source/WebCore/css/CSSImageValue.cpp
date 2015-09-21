@@ -94,11 +94,6 @@ StyleCachedImage* CSSImageValue::cachedImage(CachedResourceLoader& loader, const
     return is<StyleCachedImage>(m_image.get()) ? downcast<StyleCachedImage>(m_image.get()) : nullptr;
 }
 
-StyleCachedImage* CSSImageValue::cachedImage(CachedResourceLoader& loader)
-{
-    return cachedImage(loader, CachedResourceLoader::defaultCachedResourceOptions());
-}
-
 bool CSSImageValue::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
     if (!is<StyleCachedImage>(m_image.get()))
@@ -118,12 +113,12 @@ String CSSImageValue::customCSSText() const
     return "url(" + quoteCSSURLIfNeeded(m_url) + ')';
 }
 
-PassRefPtr<CSSValue> CSSImageValue::cloneForCSSOM() const
+Ref<CSSValue> CSSImageValue::cloneForCSSOM() const
 {
     // NOTE: We expose CSSImageValues as URI primitive values in CSSOM to maintain old behavior.
-    RefPtr<CSSPrimitiveValue> uriValue = CSSPrimitiveValue::create(m_url, CSSPrimitiveValue::CSS_URI);
+    Ref<CSSPrimitiveValue> uriValue = CSSPrimitiveValue::create(m_url, CSSPrimitiveValue::CSS_URI);
     uriValue->setCSSOMSafe();
-    return uriValue.release();
+    return WTF::move(uriValue);
 }
 
 bool CSSImageValue::knownToBeOpaque(const RenderElement* renderer) const

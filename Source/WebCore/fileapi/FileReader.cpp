@@ -140,7 +140,7 @@ void FileReader::readInternal(Blob* blob, FileReaderLoader::ReadType type, Excep
     m_blob = blob;
     m_readType = type;
     m_state = LOADING;
-    m_error = 0;
+    m_error = nullptr;
 
     m_loader = std::make_unique<FileReaderLoader>(m_readType, this);
     m_loader->setEncoding(m_encoding);
@@ -241,10 +241,10 @@ void FileReader::fireEvent(const AtomicString& type)
     dispatchEvent(ProgressEvent::create(type, true, m_loader ? m_loader->bytesLoaded() : 0, m_loader ? m_loader->totalBytes() : 0));
 }
 
-PassRefPtr<ArrayBuffer> FileReader::arrayBufferResult() const
+RefPtr<ArrayBuffer> FileReader::arrayBufferResult() const
 {
     if (!m_loader || m_error)
-        return 0;
+        return nullptr;
     return m_loader->arrayBufferResult();
 }
 

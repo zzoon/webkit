@@ -397,9 +397,9 @@ String StyleProperties::getLayeredShorthandValue(const StylePropertyShorthand& s
                     // Color only belongs in the last layer.
                     if (shorthand.properties()[j] == CSSPropertyBackgroundColor) {
                         if (i != numLayers - 1)
-                            value = 0;
+                            value = nullptr;
                     } else if (i) // Other singletons only belong in the first layer.
-                        value = 0;
+                        value = nullptr;
                 }
             }
 
@@ -583,7 +583,7 @@ PassRefPtr<CSSValue> StyleProperties::getPropertyCSSValue(CSSPropertyID property
 {
     int foundPropertyIndex = findPropertyIndex(propertyID);
     if (foundPropertyIndex == -1)
-        return 0;
+        return nullptr;
     return propertyAt(foundPropertyIndex).value();
 }
 
@@ -746,12 +746,12 @@ void MutableStyleProperties::setPrefixingVariantProperty(const CSSProperty& prop
 
 bool MutableStyleProperties::setProperty(CSSPropertyID propertyID, CSSValueID identifier, bool important)
 {
-    return setProperty(CSSProperty(propertyID, cssValuePool().createIdentifierValue(identifier), important));
+    return setProperty(CSSProperty(propertyID, CSSValuePool::singleton().createIdentifierValue(identifier), important));
 }
 
 bool MutableStyleProperties::setProperty(CSSPropertyID propertyID, CSSPropertyID identifier, bool important)
 {
-    return setProperty(CSSProperty(propertyID, cssValuePool().createIdentifierValue(identifier), important));
+    return setProperty(CSSProperty(propertyID, CSSValuePool::singleton().createIdentifierValue(identifier), important));
 }
 
 void MutableStyleProperties::parseDeclaration(const String& styleDeclaration, StyleSheetContents* contextStyleSheet)

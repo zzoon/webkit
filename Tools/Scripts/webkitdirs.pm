@@ -80,6 +80,7 @@ BEGIN {
        &setupMacWebKitEnvironment
        &sharedCommandLineOptions
        &sharedCommandLineOptionsUsage
+       SIMULATOR_DEVICE_SUFFIX_FOR_WEBKIT_DEVELOPMENT
        USE_OPEN_COMMAND
    );
    %EXPORT_TAGS = ( );
@@ -90,6 +91,7 @@ use constant USE_OPEN_COMMAND => 1; # Used in runMacWebKitApp().
 use constant INCLUDE_OPTIONS_FOR_DEBUGGING => 1;
 use constant SIMULATOR_DEVICE_STATE_SHUTDOWN => "1";
 use constant SIMULATOR_DEVICE_STATE_BOOTED => "3";
+use constant SIMULATOR_DEVICE_SUFFIX_FOR_WEBKIT_DEVELOPMENT  => "For WebKit Development";
 
 our @EXPORT_OK;
 
@@ -291,12 +293,6 @@ sub determineConfiguration
         $configuration = "Debug" if $configuration eq "Development";
     } else {
         $configuration = "Release";
-    }
-
-    if ($configuration && isWinCairo()) {
-        unless ($configuration =~ /_WinCairo$/) {
-            $configuration .= "_WinCairo";
-        }
     }
 }
 
@@ -508,10 +504,11 @@ sub visualStudioInstallDir
         $vsInstallDir = $ENV{'VSINSTALLDIR'};
         $vsInstallDir =~ s|[\\/]$||;
     } else {
-        $vsInstallDir = File::Spec->catdir(programFilesPath(), "Microsoft Visual Studio 12.0");
+        $vsInstallDir = File::Spec->catdir(programFilesPath(), "Microsoft Visual Studio 14.0");
     }
     chomp($vsInstallDir = `cygpath "$vsInstallDir"`) if isCygwin();
 
+    print "Using Visual Studio: $vsInstallDir\n";
     return $vsInstallDir;
 }
 
@@ -519,9 +516,11 @@ sub msBuildInstallDir
 {
     return $msBuildInstallDir if defined $msBuildInstallDir;
 
-    $msBuildInstallDir = File::Spec->catdir(programFilesPath(), "MSBuild", "12.0", "Bin");
+    $msBuildInstallDir = File::Spec->catdir(programFilesPath(), "MSBuild", "14.0", "Bin");
+   
     chomp($msBuildInstallDir = `cygpath "$msBuildInstallDir"`) if isCygwin();
 
+    print "Using MSBuild: $msBuildInstallDir\n";
     return $msBuildInstallDir;
 }
 
@@ -531,8 +530,9 @@ sub visualStudioVersion
 
     my $installDir = visualStudioInstallDir();
 
-    $vsVersion = ($installDir =~ /Microsoft Visual Studio ([0-9]+\.[0-9]*)/) ? $1 : "12";
+    $vsVersion = ($installDir =~ /Microsoft Visual Studio ([0-9]+\.[0-9]*)/) ? $1 : "14";
 
+    print "Using Visual Studio $vsVersion\n";
     return $vsVersion;
 }
 
@@ -715,8 +715,6 @@ sub determinePassedConfiguration
     } elsif (checkForArgumentAndRemoveFromARGV("--profile") || checkForArgumentAndRemoveFromARGV("--profiling")) {
         $passedConfiguration = "Profiling";
     }
-
-    $passedConfiguration .= "_WinCairo" if (defined($passedConfiguration) && isWinCairo());
 }
 
 sub passedConfiguration
@@ -1402,7 +1400,7 @@ sub checkRequiredSystemConfig
             print "most likely fail. The latest Xcode is available from the App Store.\n";
             print "*************************************************************\n";
         }
-    } elsif (isGtk() or isEfl() or isWindows()) {
+    } elsif (isGtk() or isEfl() or isWindows() or isCygwin()) {
         my @cmds = qw(bison gperf flex);
         my @missing = ();
         my $oldPath = $ENV{PATH};
@@ -1572,7 +1570,7 @@ sub setupCygwinEnv()
             print "*************************************************************\n";
             print "Cannot find '$visualStudioPath'\n";
             print "Please execute the file 'vcvars32.bat' from\n";
-            print "'$programFilesPath\\Microsoft Visual Studio 12.0\\VC\\bin\\'\n";
+            print "'$programFilesPath\\Microsoft Visual Studio 14.0\\VC\\bin\\'\n";
             print "to setup the necessary environment variables.\n";
             print "*************************************************************\n";
             die;
@@ -1680,7 +1678,6 @@ sub buildVisualStudioProject
     my $warningLogging = "/flp1:LogFile=" . $warningLogFile . ";WarningsOnly";
 
     my @command = ($vcBuildPath, "/verbosity:minimal", $project, $action, $config, $platform, "/fl", $errorLogging, "/fl1", $warningLogging);
-
     print join(" ", @command), "\n";
     return system @command;
 }
@@ -1725,6 +1722,9 @@ sub isCachedArgumentfileOutOfDate($@)
 
 sub jhbuildWrapperPrefixIfNeeded()
 {
+    if (isWindows() || isCygwin()) {
+        return ();
+    }
     if (-e getJhbuildPath()) {
         my @prefix = (File::Spec->catfile(sourceDir(), "Tools", "jhbuild", "jhbuild-wrapper"));
         if (isEfl()) {
@@ -1811,6 +1811,8 @@ sub cmakeGeneratedBuildfile(@)
     my ($willUseNinja) = @_;
     if ($willUseNinja) {
         return File::Spec->catfile(baseProductDir(), configuration(), "build.ninja")
+    } elsif (isWindows() || isCygwin()) {
+        return File::Spec->catfile(baseProductDir(), configuration(), "WebKit.sln")
     } else {
         return File::Spec->catfile(baseProductDir(), configuration(), "Makefile")
     }
@@ -1858,12 +1860,13 @@ sub generateBuildSystemFromCMakeProject
     push @args, @cmakeArgs if @cmakeArgs;
     push @args, $additionalCMakeArgs if $additionalCMakeArgs;
 
-    push @args, '"' . sourceDir() . '"';
+    my $cmakeSourceDir = isCygwin() ? windowsSourceDir() : sourceDir();
+    push @args, '"' . $cmakeSourceDir . '"';
 
     # Compiler options to keep floating point values consistent
     # between 32-bit and 64-bit architectures.
     determineArchitecture();
-    if ($architecture ne "x86_64" && !isARM() && !isCrossCompilation()) {
+    if ($architecture ne "x86_64" && !isARM() && !isCrossCompilation() && !isWindows() && !isCygwin()) {
         $ENV{'CXXFLAGS'} = "-march=pentium4 -msse2 -mfpmath=sse " . ($ENV{'CXXFLAGS'} || "");
     }
 
@@ -2238,7 +2241,7 @@ sub runIOSWebKitAppInSimulator($;$)
     my $productDir = productDir();
     my $appDisplayName = appDisplayNameFromBundle($appBundle);
     my $appIdentifier = appIdentifierFromBundle($appBundle);
-    my $simulatedDevice = findOrCreateSimulatorForIOSDevice("For WebKit Development");
+    my $simulatedDevice = findOrCreateSimulatorForIOSDevice(SIMULATOR_DEVICE_SUFFIX_FOR_WEBKIT_DEVELOPMENT);
     my $simulatedDeviceUDID = $simulatedDevice->{UDID};
 
     my $willUseSystemInstalledApp = isIOSSimulatorSystemInstalledApp($appBundle);

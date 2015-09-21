@@ -169,7 +169,14 @@ interface AccessibilityUIElement {
     readonly attribute AccessibilityUIElement verticalScrollbar;
 
     void scrollToMakeVisible();
+    void scrollToGlobalPoint(int x, int y);
+    void scrollToMakeVisibleWithSubFocus(int x, int y, int width, int height);
+
     void takeFocus();
+    boolean scrollPageDown();
+    boolean scrollPageUp();
+    boolean scrollPageLeft();
+    boolean scrollPageRight();
 
     // Text markers.
     AccessibilityTextMarkerRange lineTextMarkerRangeForTextMarker(AccessibilityTextMarker textMarker);

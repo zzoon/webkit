@@ -21,6 +21,7 @@
 #include "TestController.h"
 
 #include "PlatformWebView.h"
+#include "TestInvocation.h"
 #include <Ecore.h>
 #include <Evas.h>
 #include <stdio.h>
@@ -59,11 +60,12 @@ void TestController::platformInitialize()
     }
 }
 
-void TestController::platformDestroy()
+WKPreferencesRef TestController::platformPreferences()
 {
+    return WKPageGroupGetPreferences(m_pageGroup.get());
 }
 
-void TestController::platformWillRunTest(const TestInvocation&)
+void TestController::platformDestroy()
 {
 }
 
@@ -130,6 +132,33 @@ void TestController::runModal(PlatformWebView*)
 const char* TestController::platformLibraryPathForTesting()
 {
     return 0;
+}
+
+static bool shouldUseFixedLayout(const TestInvocation& test)
+{
+#if ENABLE(CSS_DEVICE_ADAPTATION)
+    if (test.urlContains("device-adapt/") || test.urlContains("device-adapt\\"))
+        return true;
+#endif
+
+#if USE(COORDINATED_GRAPHICS)
+    if (test.urlContains("sticky/") || test.urlContains("sticky\\"))
+        return true;
+#endif
+    return false;
+}
+
+void TestController::updatePlatformSpecificTestOptionsForTest(TestOptions& testOptions, const TestInvocation& test) const
+{
+    testOptions.useFixedLayout = shouldUseFixedLayout(test);
+}
+
+void TestController::platformConfigureViewForTest(const TestInvocation&)
+{
+}
+
+void TestController::platformResetPreferencesToConsistentValues()
+{
 }
 
 } // namespace WTR

@@ -23,17 +23,19 @@ AtomicString
 CPPPureInterface
 CachedAttribute
 CallbackNeedsOperatorEqual
-CallWith=ScriptExecutionContext|ScriptState|ScriptArguments|CallStack
+Callback=FunctionOnly
+CallWith=ScriptExecutionContext|ScriptState|ScriptArguments|CallStack|ActiveWindow|FirstWindow
 CheckSecurity
 CheckSecurityForNode
 Clamp
 Conditional=*
 Constructor
-ConstructorCallWith=Document|ScriptExecutionContext
+ConstructorCallWith=Document|ScriptExecutionContext|ScriptState
 ConstructorConditional=*
 ConstructorRaisesException
 ConstructorTemplate=Event|TypedArray
 Custom
+CustomBinding
 CustomCall
 CustomConstructor
 CustomDeleteProperty
@@ -70,7 +72,7 @@ ImplementationNamespace=*
 ImplementedAs=*
 InitializedByEventConstructor
 InterfaceName=*
-IsIndex
+IsWeakCallback
 JSCustomDefineOwnProperty
 JSCustomDefineOwnPropertyOnPrototype
 JSCustomFinalize
@@ -86,6 +88,7 @@ JSLegacyParent=*
 MasqueradesAsUndefined
 NamedConstructor=*
 NewImpurePropertyFiresWatchpoints
+NewObject
 NoInterfaceObject
 Nondeterministic
 NotEnumerable
@@ -97,16 +100,17 @@ ObjCLegacyUnnamedParameters
 ObjCPolymorphic
 ObjCProtocol
 ObjCUseDefaultView
-OperationsNotDeletable
+OverrideBuiltins
 PassContext
+PutForwards=*
 RaisesException
 Reflect=*
 Replaceable
 ReplaceableConstructor
 ReportExtraMemoryCost
 RequiresExistingAtomicString
-ReturnNewObject
 SetterRaisesException
+SetterCallWith=ScriptExecutionContext|ScriptState|ScriptArguments|CallStack|ActiveWindow|FirstWindow
 SkipVTableValidation
 StrictTypeChecking
 SuppressToJSObject
@@ -116,6 +120,7 @@ TreatReturnedNullStringAs=Null|Undefined
 TreatUndefinedAs=NullString
 TypedArray=*
 URL
+Unforgeable
 WindowEventHandler
 
 # PLATFORM(IOS)

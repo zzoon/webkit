@@ -181,7 +181,7 @@ static wstring getLastErrorString(HRESULT hr)
 #if USE_CONSOLE_ENTRY_POINT
 int main(int argc, const char* argv[])
 #else
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpstrCmdLine, int nCmdShow)
+int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpstrCmdLine, _In_ int nCmdShow)
 #endif
 {
 #if defined(_M_X64) || defined(__x86_64__)
@@ -192,6 +192,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpstrCm
     // FIXME: http://webkit.org/b/141449: Remove this workaround when we switch to VS2015+.
     _set_FMA3_enable(0);
 #endif
+
+    BOOL didIt = SetProcessDPIAware();
+    _ASSERT(didIt);
 
 #ifdef _CRTDBG_MAP_ALLOC
     _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);

@@ -120,6 +120,7 @@ NON_SVG_BINDING_IDLS = \
 	$(WebCore)/Modules/mediastream/AllVideoCapabilities.idl \
 	$(WebCore)/Modules/mediastream/AllAudioCapabilities.idl \
     $(WebCore)/Modules/mediastream/CapabilityRange.idl \
+	$(WebCore)/Modules/mediastream/DOMURLMediaStream.idl \
     $(WebCore)/Modules/mediastream/HTMLMediaElementMediaStream.idl \
     $(WebCore)/Modules/mediastream/MediaSourceStates.idl \
     $(WebCore)/Modules/mediastream/MediaDeviceInfo.idl \
@@ -175,6 +176,7 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/Modules/speech/SpeechSynthesisEvent.idl \
     $(WebCore)/Modules/speech/SpeechSynthesisUtterance.idl \
     $(WebCore)/Modules/speech/SpeechSynthesisVoice.idl \
+    $(WebCore)/Modules/streams/CountQueuingStrategy.idl \
     $(WebCore)/Modules/streams/ReadableStream.idl \
     $(WebCore)/Modules/streams/ReadableStreamController.idl \
     $(WebCore)/Modules/streams/ReadableStreamReader.idl \
@@ -317,8 +319,9 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/dom/ProgressEvent.idl \
     $(WebCore)/dom/ProgressEvent.idl \
     $(WebCore)/dom/Range.idl \
-    $(WebCore)/dom/RangeException.idl \
     $(WebCore)/dom/RequestAnimationFrameCallback.idl \
+    $(WebCore)/dom/SecurityPolicyViolationEvent.idl \
+    $(WebCore)/dom/ShadowRoot.idl \
     $(WebCore)/dom/StringCallback.idl \
     $(WebCore)/dom/Text.idl \
     $(WebCore)/dom/TextEvent.idl \
@@ -399,6 +402,7 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/html/HTMLQuoteElement.idl \
     $(WebCore)/html/HTMLScriptElement.idl \
     $(WebCore)/html/HTMLSelectElement.idl \
+    $(WebCore)/html/HTMLSlotElement.idl \
     $(WebCore)/html/HTMLSourceElement.idl \
     $(WebCore)/html/HTMLSpanElement.idl \
     $(WebCore)/html/HTMLStyleElement.idl \
@@ -732,7 +736,7 @@ ifeq ($(shell $(CC) -std=gnu++11 -x c++ -E -P -dM $(SDK_FLAGS) $(FRAMEWORK_FLAGS
 endif
 
 ifeq ($(PLATFORM_FEATURE_DEFINES),)
-ifeq ($(OS), Windows*)
+ifeq ($(OS), Windows_NT)
 PLATFORM_FEATURE_DEFINES = $(WEBKIT_LIBRARIES)/tools/vsprops/FeatureDefines.props
 else
 PLATFORM_FEATURE_DEFINES = Configurations/FeatureDefines.xcconfig
@@ -954,7 +958,7 @@ XPathGrammar.cpp : xml/XPathGrammar.y $(PROJECT_FILE)
 
 # user agent style sheets
 
-USER_AGENT_STYLE_SHEETS = $(WebCore)/css/html.css $(WebCore)/css/quirks.css $(WebCore)/css/themeWin.css $(WebCore)/css/themeWinQuirks.css $(WebCore)/css/plugIns.css
+USER_AGENT_STYLE_SHEETS = $(WebCore)/css/html.css $(WebCore)/css/quirks.css $(WebCore)/css/plugIns.css
 USER_AGENT_STYLE_SHEETS := $(USER_AGENT_STYLE_SHEETS) $(WebCore)/css/svg.css
 
 ifeq ($(findstring ENABLE_MATHML,$(FEATURE_DEFINES)), ENABLE_MATHML)
@@ -975,6 +979,10 @@ endif
 
 ifeq ($(OS),MACOS)
 	USER_AGENT_STYLE_SHEETS := $(USER_AGENT_STYLE_SHEETS) $(WebCore)/Modules/plugins/QuickTimePluginReplacement.css
+endif
+
+ifeq ($(OS), Windows_NT)
+    USER_AGENT_STYLE_SHEETS := $(USER_AGENT_STYLE_SHEETS) $(WebCore)/css/themeWin.css $(WebCore)/css/themeWinQuirks.css
 endif
 
 UserAgentStyleSheets.h : css/make-css-file-arrays.pl bindings/scripts/preprocessor.pm $(USER_AGENT_STYLE_SHEETS) $(PLATFORM_FEATURE_DEFINES)
@@ -1049,6 +1057,10 @@ endif
 
 ifeq ($(findstring ENABLE_MEDIA_STREAM,$(FEATURE_DEFINES)), ENABLE_MEDIA_STREAM)
     HTML_FLAGS := $(HTML_FLAGS) ENABLE_MEDIA_STREAM=1
+endif
+
+ifeq ($(findstring ENABLE_SHADOW_DOM,$(FEATURE_DEFINES)), ENABLE_SHADOW_DOM)
+    HTML_FLAGS := $(HTML_FLAGS) ENABLE_SHADOW_DOM=1
 endif
 
 JSHTMLElementWrapperFactory.cpp JSHTMLElementWrapperFactory.h HTMLElementFactory.cpp HTMLElementFactory.h HTMLElementTypeHelpers.h HTMLNames.cpp HTMLNames.h : htmlMakeNames.intermediate

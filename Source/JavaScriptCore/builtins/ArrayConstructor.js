@@ -36,7 +36,8 @@ function of(/* items... */)
     return array;
 }
 
-function from(items /*, mapFn, thisArg */) {
+function from(items /*, mapFn, thisArg */)
+{
     "use strict";
 
     var thisObj = this;
@@ -89,7 +90,7 @@ function from(items /*, mapFn, thisArg */) {
     }
 
     var arrayLike = @Object(items);
-    var arrayLikeLength = @ToLength(arrayLike.length);
+    var arrayLikeLength = @toLength(arrayLike.length);
 
     // TODO: Need isConstructor(thisObj) instead of typeof "function" check.
     var result = (typeof thisObj === "function") ? @Object(new thisObj(arrayLikeLength)) : new @Array(arrayLikeLength);

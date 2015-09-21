@@ -44,7 +44,7 @@ class PluginProcessConnection;
         
 class PluginProcessConnectionManager : public IPC::Connection::WorkQueueMessageReceiver {
 public:
-    static PassRefPtr<PluginProcessConnectionManager> create();
+    static Ref<PluginProcessConnectionManager> create();
     ~PluginProcessConnectionManager();
 
     void initializeConnection(IPC::Connection*);
@@ -64,7 +64,7 @@ private:
 
     Vector<RefPtr<PluginProcessConnection>> m_pluginProcessConnections;
 
-    Mutex m_tokensAndConnectionsMutex;
+    Lock m_tokensAndConnectionsMutex;
     HashMap<uint64_t, RefPtr<IPC::Connection>> m_tokensAndConnections;
 };
 

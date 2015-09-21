@@ -45,6 +45,9 @@ class WebMediaSessionManager : public MediaPlaybackTargetPicker::Client {
     WTF_MAKE_NONCOPYABLE(WebMediaSessionManager);
 public:
 
+    WEBCORE_EXPORT static WebMediaSessionManager& shared();
+    WEBCORE_EXPORT static void setWebMediaSessionManagerOverride(WebMediaSessionManager*);
+
     WEBCORE_EXPORT uint64_t addPlaybackTargetPickerClient(WebMediaSessionManagerClient&, uint64_t);
     WEBCORE_EXPORT void removePlaybackTargetPickerClient(WebMediaSessionManagerClient&, uint64_t);
     WEBCORE_EXPORT void removeAllPlaybackTargetPickerClients(WebMediaSessionManagerClient&);
@@ -56,6 +59,7 @@ protected:
     virtual ~WebMediaSessionManager();
 
     virtual WebCore::MediaPlaybackTargetPicker& targetPicker() = 0;
+    static WebMediaSessionManager& platformManager();
 
 private:
 
@@ -64,27 +68,36 @@ private:
     virtual void externalOutputDeviceAvailableDidChange(bool) override;
 
     size_t find(WebMediaSessionManagerClient*, uint64_t);
+
     void configurePlaybackTargetClients();
     void configureNewClients();
     void configurePlaybackTargetMonitoring();
+    void configureWatchdogTimer();
 
     enum ConfigurationTaskFlags {
         NoTask = 0,
         InitialConfigurationTask = 1 << 0,
         TargetClientsConfigurationTask = 1 << 1,
         TargetMonitoringConfigurationTask = 1 << 2,
+        WatchdogTimerConfigurationTask = 1 << 3,
     };
     typedef unsigned ConfigurationTasks;
     String toString(ConfigurationTasks);
 
     void scheduleDelayedTask(ConfigurationTasks);
     void taskTimerFired();
+
+    void watchdogTimerFired();
+
     RunLoop::Timer<WebMediaSessionManager> m_taskTimer;
+    RunLoop::Timer<WebMediaSessionManager> m_watchdogTimer;
 
     Vector<std::unique_ptr<ClientState>> m_clientState;
     RefPtr<MediaPlaybackTarget> m_playbackTarget;
     ConfigurationTasks m_taskFlags { NoTask };
+    double m_currentWatchdogInterval { 0 };
     bool m_externalOutputDeviceAvailable { false };
+    bool m_targetChanged { false };
 };
 
 } // namespace WebCore

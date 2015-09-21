@@ -33,7 +33,9 @@
 #if ENABLE(STREAMS_API)
 
 #include "ActiveDOMObject.h"
+#include "DOMRequestState.h"
 #include "JSDOMPromise.h"
+#include "ScriptState.h"
 #include "ScriptWrappable.h"
 #include <functional>
 #include <wtf/Deque.h>
@@ -47,6 +49,7 @@ class JSValue;
 
 namespace WebCore {
 
+class Dictionary;
 class ReadableStreamReader;
 class ScriptExecutionContext;
 
@@ -64,6 +67,7 @@ public:
         Errored
     };
 
+    static RefPtr<ReadableStream> create(JSC::ExecState&, JSC::JSValue, const Dictionary&);
     virtual ~ReadableStream();
 
     ReadableStreamReader* getReader(ExceptionCode&);
@@ -87,8 +91,6 @@ public:
     void notifyCancelSucceeded();
     void notifyCancelFailed();
 
-    typedef std::function<void(JSC::JSValue)> FailureCallback;
-
     typedef DOMPromise<std::nullptr_t, JSC::JSValue> CancelPromise;
     void cancel(JSC::JSValue, CancelPromise&&, ExceptionCode&);
     void cancelNoCheck(JSC::JSValue, CancelPromise&&);
@@ -96,9 +98,8 @@ public:
     typedef DOMPromise<std::nullptr_t, JSC::JSValue> ClosedPromise;
     void closed(ClosedPromise&&);
 
-    typedef std::function<void(JSC::JSValue)> ReadSuccessCallback;
-    typedef std::function<void()> ReadEndCallback;
-    void read(ReadSuccessCallback&&, ReadEndCallback&&, FailureCallback&&);
+    typedef DOMPromiseIteratorWithCallback<JSC::JSValue, JSC::JSValue> ReadPromise;
+    void read(ReadPromise&&);
 
 protected:
     explicit ReadableStream(ScriptExecutionContext&);
@@ -114,6 +115,7 @@ private:
     void clearCallbacks();
     void close();
 
+    virtual void clearValues() = 0;
     virtual bool hasEnoughValues() const = 0;
     virtual bool hasValue() const = 0;
     virtual JSC::JSValue read() = 0;
@@ -126,12 +128,7 @@ private:
     Optional<CancelPromise> m_cancelPromise;
     Optional<ClosedPromise> m_closedPromise;
 
-    struct ReadCallbacks {
-        ReadSuccessCallback successCallback;
-        ReadEndCallback endCallback;
-        FailureCallback failureCallback;
-    };
-    Deque<ReadCallbacks> m_readRequests;
+    Deque<ReadPromise> m_readRequests;
 
     bool m_isStarted { false };
     bool m_isPulling { false };
@@ -139,6 +136,31 @@ private:
     bool m_closeRequested { false };
     State m_state { State::Readable };
 };
+
+// This class manages the queue and knows whether there is sufficient data in it.
+//   Subclasses should implement error storage, pulling and cancelling.
+template<typename ChunkType>
+class ReadableEnqueuingStream final : public ReadableStream {
+protected:
+    explicit ReadableEnqueuingStream(ScriptExecutionContext& context) : ReadableStream(context) { }
+
+    void enqueueChunk(ChunkType&& chunk) { m_queue.append(std::forward(chunk)); }
+
+private:
+    virtual void clearValues() override { m_queue.clear(); }
+    virtual bool hasEnoughValues() const override { return m_queue.size(); }
+    virtual bool hasValue() const override { return m_queue.size(); }
+    virtual JSC::JSValue read() override;
+
+    Deque<ChunkType> m_queue;
+};
+
+template<typename ChunkType>
+inline JSC::JSValue ReadableEnqueuingStream<ChunkType>::read()
+{
+    DOMRequestState state(scriptExecutionContext());
+    return toJS(state.exec(), toJSDOMGlobalObject(scriptExecutionContext(), state.exec()), m_queue.read());
+}
 
 }
 

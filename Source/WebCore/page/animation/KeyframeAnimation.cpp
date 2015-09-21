@@ -49,7 +49,7 @@ KeyframeAnimation::KeyframeAnimation(Animation& animation, RenderElement* render
 {
     // Get the keyframe RenderStyles
     if (m_object && m_object->element())
-        m_object->document().ensureStyleResolver().keyframeStylesForAnimation(m_object->element(), unanimatedStyle, m_keyframes);
+        m_object->element()->styleResolver().keyframeStylesForAnimation(m_object->element(), unanimatedStyle, m_keyframes);
 
     // Update the m_transformFunctionListValid flag based on whether the function lists in the keyframes match.
     validateTransformFunctionList();
@@ -106,8 +106,15 @@ void KeyframeAnimation::fetchIntervalEndpointsForProperty(CSSPropertyID property
     if (prevIndex == -1)
         prevIndex = 0;
 
-    if (nextIndex == -1)
-        nextIndex = m_keyframes.size() - 1;
+    if (nextIndex == -1) {
+        int lastIndex = m_keyframes.size() - 1;
+        if (prevIndex == lastIndex)
+            nextIndex = 0;
+        else
+            nextIndex = lastIndex;
+    }
+
+    ASSERT(prevIndex != nextIndex);
 
     const KeyframeValue& prevKeyframe = m_keyframes[prevIndex];
     const KeyframeValue& nextKeyframe = m_keyframes[nextIndex];
@@ -223,7 +230,7 @@ bool KeyframeAnimation::computeExtentOfTransformAnimation(LayoutRect& bounds) co
         LayoutRect keyframeBounds = bounds;
         
         bool canCompute;
-        if (isTransformFunctionListValid())
+        if (transformFunctionListsMatch())
             canCompute = computeTransformedExtentViaTransformList(rendererBox, *keyframe.style(), keyframeBounds);
         else
             canCompute = computeTransformedExtentViaMatrix(rendererBox, *keyframe.style(), keyframeBounds);
@@ -357,7 +364,7 @@ bool KeyframeAnimation::affectsProperty(CSSPropertyID property) const
 
 void KeyframeAnimation::validateTransformFunctionList()
 {
-    m_transformFunctionListValid = false;
+    m_transformFunctionListsMatch = false;
     
     if (m_keyframes.size() < 2 || !m_keyframes.containsProperty(CSSPropertyTransform))
         return;
@@ -392,15 +399,14 @@ void KeyframeAnimation::validateTransformFunctionList()
             return;
     }
 
-    // Keyframes are valid
-    m_transformFunctionListValid = true;
+    m_transformFunctionListsMatch = true;
 }
 
 void KeyframeAnimation::checkForMatchingFilterFunctionLists()
 {
     m_filterFunctionListsMatch = false;
 
-    if (m_keyframes.size() < 2 || !m_keyframes.containsProperty(CSSPropertyWebkitFilter))
+    if (m_keyframes.size() < 2 || !m_keyframes.containsProperty(CSSPropertyFilter))
         return;
 
     // Empty filters match anything, so find the first non-empty entry as the reference

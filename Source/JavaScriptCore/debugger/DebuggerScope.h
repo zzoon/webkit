@@ -89,9 +89,10 @@ public:
     bool isFunctionNameScope() const;
     bool isWithScope() const;
     bool isGlobalScope() const;
-    bool isFunctionOrEvalScope() const;
+    bool isClosureScope() const;
+    bool isGlobalLexicalEnvironment() const;
 
-    JSValue caughtValue() const;
+    JSValue caughtValue(ExecState*) const;
 
 private:
     JS_EXPORT_PRIVATE DebuggerScope(VM&, JSScope*);

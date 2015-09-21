@@ -26,27 +26,22 @@
 #include "config.h"
 #include "JSPromise.h"
 
-#if ENABLE(PROMISES)
-
 #include "Error.h"
 #include "JSCJSValueInlines.h"
 #include "JSCellInlines.h"
 #include "JSPromiseConstructor.h"
-#include "JSPromiseReaction.h"
 #include "Microtask.h"
 #include "SlotVisitorInlines.h"
 #include "StructureInlines.h"
 
 namespace JSC {
 
-static void triggerPromiseReactions(VM&, JSGlobalObject*, Vector<WriteBarrier<JSPromiseReaction>>&, JSValue);
-
 const ClassInfo JSPromise::s_info = { "Promise", &Base::s_info, 0, CREATE_METHOD_TABLE(JSPromise) };
 
-JSPromise* JSPromise::create(VM& vm, JSGlobalObject* globalObject, JSPromiseConstructor* constructor)
+JSPromise* JSPromise::create(VM& vm, Structure* structure)
 {
-    JSPromise* promise = new (NotNull, allocateCell<JSPromise>(vm.heap)) JSPromise(vm, globalObject->promiseStructure());
-    promise->finishCreation(vm, constructor);
+    JSPromise* promise = new (NotNull, allocateCell<JSPromise>(vm.heap)) JSPromise(vm, structure);
+    promise->finishCreation(vm);
     return promise;
 }
 
@@ -56,114 +51,41 @@ Structure* JSPromise::createStructure(VM& vm, JSGlobalObject* globalObject, JSVa
 }
 
 JSPromise::JSPromise(VM& vm, Structure* structure)
-    : JSDestructibleObject(vm, structure)
-    , m_status(Status::Unresolved)
+    : Base(vm, structure)
 {
 }
 
-void JSPromise::finishCreation(VM& vm, JSPromiseConstructor* constructor)
+void JSPromise::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(info()));
-    
-    m_constructor.set(vm, this, constructor);
+    putDirect(vm, vm.propertyNames->promiseStatePrivateName, jsNumber(static_cast<unsigned>(Status::Pending)));
+    putDirect(vm, vm.propertyNames->promiseFulfillReactionsPrivateName, jsUndefined());
+    putDirect(vm, vm.propertyNames->promiseRejectReactionsPrivateName, jsUndefined());
+    putDirect(vm, vm.propertyNames->promiseResultPrivateName, jsUndefined());
 }
 
-void JSPromise::destroy(JSCell* cell)
+void JSPromise::initialize(ExecState* exec, JSGlobalObject* globalObject, JSValue executor)
 {
-    static_cast<JSPromise*>(cell)->JSPromise::~JSPromise();
+    JSFunction* initializePromise = globalObject->initializePromiseFunction();
+    CallData callData;
+    CallType callType = JSC::getCallData(initializePromise, callData);
+    ASSERT(callType != CallTypeNone);
+
+    MarkedArgumentBuffer arguments;
+    arguments.append(executor);
+    call(exec, initializePromise, callType, callData, this, arguments);
 }
 
-void JSPromise::visitChildren(JSCell* cell, SlotVisitor& visitor)
+auto JSPromise::status(VM& vm) const -> Status
 {
-    JSPromise* thisObject = jsCast<JSPromise*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-
-    Base::visitChildren(thisObject, visitor);
-
-    visitor.append(&thisObject->m_result);
-    visitor.append(&thisObject->m_constructor);
-    visitor.append(thisObject->m_resolveReactions.begin(), thisObject->m_resolveReactions.end());
-    visitor.append(thisObject->m_rejectReactions.begin(), thisObject->m_rejectReactions.end());
+    JSValue value = getDirect(vm, vm.propertyNames->promiseStatePrivateName);
+    ASSERT(value.isUInt32());
+    return static_cast<Status>(value.asUInt32());
 }
 
-void JSPromise::reject(VM& vm, JSValue reason)
+JSValue JSPromise::result(VM& vm) const
 {
-    // 1. If the value of promise's internal slot [[PromiseStatus]] is not "unresolved", return.
-    if (m_status != Status::Unresolved)
-        return;
-
-    DeferGC deferGC(vm.heap);
-
-    // 2. Let 'reactions' be the value of promise's [[RejectReactions]] internal slot.
-    Vector<WriteBarrier<JSPromiseReaction>> reactions;
-    reactions.swap(m_rejectReactions);
-
-    // 3. Set the value of promise's [[Result]] internal slot to reason.
-    m_result.set(vm, this, reason);
-
-    // 4. Set the value of promise's [[ResolveReactions]] internal slot to undefined.
-    m_resolveReactions.clear();
-
-    // 5. Set the value of promise's [[RejectReactions]] internal slot to undefined.
-    // NOTE: Handled by the swap above.
-
-    // 6. Set the value of promise's [[PromiseStatus]] internal slot to "has-rejection".
-    m_status = Status::HasRejection;
-
-    // 7. Return the result of calling TriggerPromiseReactions(reactions, reason).
-    triggerPromiseReactions(vm, globalObject(), reactions, reason);
-}
-
-void JSPromise::resolve(VM& vm, JSValue resolution)
-{
-    // 1. If the value of promise's internal slot [[PromiseStatus]] is not "unresolved", return.
-    if (m_status != Status::Unresolved)
-        return;
-
-    DeferGC deferGC(vm.heap);
-
-    // 2. Let 'reactions' be the value of promise's [[ResolveReactions]] internal slot.
-    Vector<WriteBarrier<JSPromiseReaction>> reactions;
-    reactions.swap(m_resolveReactions);
-    
-    // 3. Set the value of promise's [[Result]] internal slot to resolution.
-    m_result.set(vm, this, resolution);
-
-    // 4. Set the value of promise's [[ResolveReactions]] internal slot to undefined.
-    // NOTE: Handled by the swap above.
-
-    // 5. Set the value of promise's [[RejectReactions]] internal slot to undefined.
-    m_rejectReactions.clear();
-
-    // 6. Set the value of promise's [[PromiseStatus]] internal slot to "has-resolution".
-    m_status = Status::HasResolution;
-
-    // 7. Return the result of calling TriggerPromiseReactions(reactions, resolution).
-    triggerPromiseReactions(vm, globalObject(), reactions, resolution);
-}
-
-void JSPromise::appendResolveReaction(VM& vm, JSPromiseReaction* reaction)
-{
-    m_resolveReactions.append(WriteBarrier<JSPromiseReaction>(vm, this, reaction));
-}
-
-void JSPromise::appendRejectReaction(VM& vm, JSPromiseReaction* reaction)
-{
-    m_rejectReactions.append(WriteBarrier<JSPromiseReaction>(vm, this, reaction));
-}
-
-void triggerPromiseReactions(VM& vm, JSGlobalObject* globalObject, Vector<WriteBarrier<JSPromiseReaction>>& reactions, JSValue argument)
-{
-    // 1. Repeat for each reaction in reactions, in original insertion order
-    for (auto& reaction : reactions) {
-        // i. Call QueueMicrotask(ExecutePromiseReaction, (reaction, argument)).
-        globalObject->queueMicrotask(createExecutePromiseReactionMicrotask(vm, reaction.get(), argument));
-    }
-    
-    // 2. Return.
+    return getDirect(vm, vm.propertyNames->promiseResultPrivateName);
 }
 
 } // namespace JSC
-
-#endif // ENABLE(PROMISES)

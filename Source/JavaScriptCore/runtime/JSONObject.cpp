@@ -108,8 +108,9 @@ private:
     friend class Holder;
 
     JSValue toJSON(JSValue, const PropertyNameForFunctionCall&);
+    JSValue toJSONImpl(JSValue, const PropertyNameForFunctionCall&);
 
-    enum StringifyResult { StringifyFailed, StringifySucceeded, StringifyFailedDueToUndefinedValue };
+    enum StringifyResult { StringifyFailed, StringifySucceeded, StringifyFailedDueToUndefinedOrSymbolValue };
     StringifyResult appendStringifiedValue(StringBuilder&, JSValue, JSObject* holder, const PropertyNameForFunctionCall&);
 
     bool willIndent() const;
@@ -143,6 +144,9 @@ static inline JSValue unwrapBoxedPrimitive(ExecState* exec, JSValue value)
         return object->toString(exec);
     if (object->inherits(BooleanObject::info()))
         return object->toPrimitive(exec);
+
+    // Do not unwrap SymbolObject to Symbol. It is not performed in the spec.
+    // http://www.ecma-international.org/ecma-262/6.0/#sec-serializejsonproperty
     return value;
 }
 
@@ -205,7 +209,7 @@ Stringifier::Stringifier(ExecState* exec, const Local<Unknown>& replacer, const 
     : m_exec(exec)
     , m_replacer(replacer)
     , m_usingArrayReplacer(false)
-    , m_arrayReplacerPropertyNames(exec)
+    , m_arrayReplacerPropertyNames(exec, PropertyNameMode::Strings)
     , m_replacerCallType(CallTypeNone)
     , m_gap(gap(exec, space.get()))
 {
@@ -253,12 +257,16 @@ Local<Unknown> Stringifier::stringify(Handle<Unknown> value)
     return Local<Unknown>(m_exec->vm(), jsString(m_exec, result.toString()));
 }
 
-inline JSValue Stringifier::toJSON(JSValue value, const PropertyNameForFunctionCall& propertyName)
+ALWAYS_INLINE JSValue Stringifier::toJSON(JSValue value, const PropertyNameForFunctionCall& propertyName)
 {
     ASSERT(!m_exec->hadException());
     if (!value.isObject() || !asObject(value)->hasProperty(m_exec, m_exec->vm().propertyNames->toJSON))
         return value;
+    return toJSONImpl(value, propertyName);
+}
 
+JSValue Stringifier::toJSONImpl(JSValue value, const PropertyNameForFunctionCall& propertyName)
+{
     JSValue toJSONFunction = asObject(value)->get(m_exec, m_exec->vm().propertyNames->toJSON);
     if (m_exec->hadException())
         return jsNull();
@@ -294,8 +302,8 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
             return StringifyFailed;
     }
 
-    if (value.isUndefined() && !holder->inherits(JSArray::info()))
-        return StringifyFailedDueToUndefinedValue;
+    if ((value.isUndefined() || value.isSymbol()) && !holder->inherits(JSArray::info()))
+        return StringifyFailedDueToUndefinedOrSymbolValue;
 
     if (value.isNull()) {
         builder.appendLiteral("null");
@@ -344,7 +352,7 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
             builder.appendLiteral("null");
             return StringifySucceeded;
         }
-        return StringifyFailedDueToUndefinedValue;
+        return StringifyFailedDueToUndefinedOrSymbolValue;
     }
 
     // Handle cycle detection, and put the holder on the stack.
@@ -427,7 +435,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
             if (stringifier.m_usingArrayReplacer)
                 m_propertyNames = stringifier.m_arrayReplacerPropertyNames.data();
             else {
-                PropertyNameArray objectPropertyNames(exec);
+                PropertyNameArray objectPropertyNames(exec, PropertyNameMode::Strings);
                 m_object->methodTable()->getOwnPropertyNames(m_object.get(), exec, objectPropertyNames, EnumerationMode());
                 m_propertyNames = objectPropertyNames.releaseData();
             }
@@ -509,10 +517,10 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
             break;
         case StringifySucceeded:
             break;
-        case StringifyFailedDueToUndefinedValue:
-            // This only occurs when get an undefined value for an object property.
-            // In this case we don't want the separator and property name that we
-            // already appended, so roll back.
+        case StringifyFailedDueToUndefinedOrSymbolValue:
+            // This only occurs when get an undefined value or a symbol value for
+            // an object property. In this case we don't want the separator and
+            // property name that we already appended, so roll back.
             builder.resize(rollBackPoint);
             break;
     }
@@ -644,7 +652,7 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
                 JSObject* object = asObject(inValue);
                 objectStack.push(object);
                 indexStack.append(0);
-                propertyStack.append(PropertyNameArray(m_exec));
+                propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                 object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), EnumerationMode());
             }
             objectStartVisitMember:

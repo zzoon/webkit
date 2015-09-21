@@ -44,12 +44,13 @@ class MediaConstraints;
 class MediaStreamCreationClient;
 class RealtimeMediaSourceStates;
 class MediaStreamTrackSourcesRequestClient;
+class TrackSourceInfo;
 
 class RealtimeMediaSourceCenter {
 public:
     virtual ~RealtimeMediaSourceCenter();
 
-    static RealtimeMediaSourceCenter& singleton();
+    WEBCORE_EXPORT static RealtimeMediaSourceCenter& singleton();
     static void setSharedStreamCenter(RealtimeMediaSourceCenter*);
 
     virtual void validateRequestConstraints(PassRefPtr<MediaStreamCreationClient>, PassRefPtr<MediaConstraints> audioConstraints, PassRefPtr<MediaConstraints> videoConstraints) = 0;
@@ -57,6 +58,8 @@ public:
     virtual void createMediaStream(PassRefPtr<MediaStreamCreationClient>, PassRefPtr<MediaConstraints> audioConstraints, PassRefPtr<MediaConstraints> videoConstraints) = 0;
 
     virtual bool getMediaStreamTrackSources(PassRefPtr<MediaStreamTrackSourcesRequestClient>) = 0;
+    
+    virtual RefPtr<TrackSourceInfo> sourceWithUID(const String&, RealtimeMediaSource::Type, MediaConstraints*) = 0;
 
 protected:
     RealtimeMediaSourceCenter();

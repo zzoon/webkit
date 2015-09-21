@@ -177,7 +177,7 @@ void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<Storage>& resu
 void JSDictionary::convertValue(ExecState* exec, JSValue value, MessagePortArray& result)
 {
     ArrayBufferArray arrayBuffers;
-    fillMessagePortArray(exec, value, result, arrayBuffers);
+    fillMessagePortArray(*exec, value, result, arrayBuffers);
 }
 
 #if ENABLE(VIDEO_TRACK)
@@ -270,6 +270,11 @@ void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Game
     result = JSGamepad::toWrapped(value);
 }
 #endif
+
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, JSC::JSFunction*& result)
+{
+    result = jsDynamicCast<JSC::JSFunction*>(value);
+}
 
 bool JSDictionary::getWithUndefinedOrNullCheck(const char* propertyName, String& result) const
 {

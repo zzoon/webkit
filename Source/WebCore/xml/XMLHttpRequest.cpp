@@ -120,9 +120,6 @@ XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext& context)
     : ActiveDOMObject(&context)
     , m_async(true)
     , m_includeCredentials(false)
-#if ENABLE(XHR_TIMEOUT)
-    , m_timeoutMilliseconds(0)
-#endif
     , m_state(UNSENT)
     , m_createdDocument(false)
     , m_error(false)
@@ -138,6 +135,7 @@ XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext& context)
     , m_responseCacheIsValid(false)
     , m_resumeTimer(*this, &XMLHttpRequest::resumeTimerFired)
     , m_dispatchErrorOnResuming(false)
+    , m_timeoutTimer(*this, &XMLHttpRequest::didReachTimeout)
 {
 #ifndef NDEBUG
     xmlHttpRequestCounter.increment();
@@ -245,7 +243,7 @@ Blob* XMLHttpRequest::responseBlob()
             data.append(m_binaryResponseBuilder->data(), m_binaryResponseBuilder->size());
             String normalizedContentType = Blob::normalizedContentType(responseMIMEType()); // responseMIMEType defaults to text/xml which may be incorrect.
             m_responseBlob = Blob::create(WTF::move(data), normalizedContentType);
-            m_binaryResponseBuilder.clear();
+            m_binaryResponseBuilder = nullptr;
         } else {
             // If we errored out or got no data, we still return a blob, just an empty one.
             m_responseBlob = Blob::create();
@@ -265,25 +263,29 @@ ArrayBuffer* XMLHttpRequest::responseArrayBuffer()
             m_responseArrayBuffer = m_binaryResponseBuilder->createArrayBuffer();
         else
             m_responseArrayBuffer = ArrayBuffer::create(nullptr, 0);
-        m_binaryResponseBuilder.clear();
+        m_binaryResponseBuilder = nullptr;
     }
 
     return m_responseArrayBuffer.get();
 }
 
-#if ENABLE(XHR_TIMEOUT)
-void XMLHttpRequest::setTimeout(unsigned long timeout, ExceptionCode& ec)
+void XMLHttpRequest::setTimeout(unsigned timeout, ExceptionCode& ec)
 {
-    // FIXME: Need to trigger or update the timeout Timer here, if needed. http://webkit.org/b/98156
-    // XHR2 spec, 4.7.3. "This implies that the timeout attribute can be set while fetching is in progress. If that occurs it will still be measured relative to the start of fetching."
     if (scriptExecutionContext()->isDocument() && !m_async) {
         logConsoleError(scriptExecutionContext(), "XMLHttpRequest.timeout cannot be set for synchronous HTTP(S) requests made from the window context.");
         ec = INVALID_ACCESS_ERR;
         return;
     }
     m_timeoutMilliseconds = timeout;
+    if (!m_timeoutTimer.isActive())
+        return;
+    if (!m_timeoutMilliseconds) {
+        m_timeoutTimer.stop();
+        return;
+    }
+    std::chrono::duration<double> interval = std::chrono::milliseconds { m_timeoutMilliseconds } - (std::chrono::steady_clock::now() - m_sendingTime);
+    m_timeoutTimer.startOneShot(std::max(0.0, interval.count()));
 }
-#endif
 
 void XMLHttpRequest::setResponseType(const String& responseType, ExceptionCode& ec)
 {
@@ -504,7 +506,7 @@ void XMLHttpRequest::open(const String& method, const URL& url, bool async, Exce
         if (document.frame())
             shouldBypassMainWorldContentSecurityPolicy = document.frame()->script().shouldBypassMainWorldContentSecurityPolicy();
     }
-    if (!shouldBypassMainWorldContentSecurityPolicy && !scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url)) {
+    if (!scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url, shouldBypassMainWorldContentSecurityPolicy)) {
         // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return;
@@ -527,14 +529,12 @@ void XMLHttpRequest::open(const String& method, const URL& url, bool async, Exce
             return;
         }
 
-#if ENABLE(XHR_TIMEOUT)
         // Similarly, timeouts are disabled for synchronous requests as well.
         if (m_timeoutMilliseconds > 0) {
             logConsoleError(scriptExecutionContext(), "Synchronous XMLHttpRequests must not have a timeout value set.");
             ec = INVALID_ACCESS_ERR;
             return;
         }
-#endif
     }
 
     m_method = uppercaseKnownHTTPMethod(method);
@@ -766,10 +766,14 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     options.securityOrigin = securityOrigin();
     options.initiator = cachedResourceRequestInitiators().xmlhttprequest;
 
-#if ENABLE(XHR_TIMEOUT)
-    if (m_timeoutMilliseconds)
-        request.setTimeoutInterval(m_timeoutMilliseconds / 1000.0);
-#endif
+    if (m_timeoutMilliseconds) {
+        if (!m_async)
+            request.setTimeoutInterval(m_timeoutMilliseconds / 1000.0);
+        else {
+            m_sendingTime = std::chrono::steady_clock::now();
+            m_timeoutTimer.startOneShot(std::chrono::milliseconds { m_timeoutMilliseconds });
+        }
+    }
 
     m_exceptionCode = 0;
     m_error = false;
@@ -835,6 +839,9 @@ bool XMLHttpRequest::internalAbort()
 
     m_decoder = nullptr;
 
+    if (m_timeoutTimer.isActive())
+        m_timeoutTimer.stop();
+
     if (!m_loader)
         return true;
 
@@ -868,8 +875,8 @@ void XMLHttpRequest::clearResponseBuffers()
     m_createdDocument = false;
     m_responseDocument = nullptr;
     m_responseBlob = nullptr;
-    m_binaryResponseBuilder.clear();
-    m_responseArrayBuffer.clear();
+    m_binaryResponseBuilder = nullptr;
+    m_responseArrayBuffer = nullptr;
     m_responseCacheIsValid = false;
 }
 
@@ -940,7 +947,8 @@ void XMLHttpRequest::setRequestHeader(const String& name, const String& value, E
         return;
     }
 
-    if (!isValidHTTPToken(name) || !isValidHTTPHeaderValue(value)) {
+    String normalizedValue = stripLeadingAndTrailingHTTPSpaces(value);
+    if (!isValidHTTPToken(name) || !isValidHTTPHeaderValue(normalizedValue)) {
         ec = SYNTAX_ERR;
         return;
     }
@@ -951,7 +959,7 @@ void XMLHttpRequest::setRequestHeader(const String& name, const String& value, E
         return;
     }
 
-    setRequestHeaderInternal(name, value);
+    setRequestHeaderInternal(name, normalizedValue);
 }
 
 void XMLHttpRequest::setRequestHeaderInternal(const String& name, const String& value)
@@ -1076,12 +1084,11 @@ void XMLHttpRequest::didFail(const ResourceError& error)
         return;
     }
 
-#if ENABLE(XHR_TIMEOUT)
+    // In case of worker sync timeouts.
     if (error.isTimeout()) {
-        didTimeout();
+        didReachTimeout();
         return;
     }
-#endif
 
     // Network failures are already reported to Web Inspector by ResourceLoader.
     if (error.domain() == errorDomainWebKitInternal)
@@ -1117,6 +1124,9 @@ void XMLHttpRequest::didFinishLoading(unsigned long identifier, double)
     changeState(DONE);
     m_responseEncoding = String();
     m_decoder = nullptr;
+
+    if (m_timeoutTimer.isActive())
+        m_timeoutTimer.stop();
 
     if (hadLoader)
         dropProtection();
@@ -1225,8 +1235,7 @@ void XMLHttpRequest::dispatchErrorEvents(const AtomicString& type)
     m_progressEventThrottle.dispatchProgressEvent(eventNames().loadendEvent);
 }
 
-#if ENABLE(XHR_TIMEOUT)
-void XMLHttpRequest::didTimeout()
+void XMLHttpRequest::didReachTimeout()
 {
     // internalAbort() calls dropProtection(), which may release the last reference.
     Ref<XMLHttpRequest> protect(*this);
@@ -1249,7 +1258,6 @@ void XMLHttpRequest::didTimeout()
 
     dispatchErrorEvents(eventNames().timeoutEvent);
 }
-#endif
 
 bool XMLHttpRequest::canSuspendForPageCache() const
 {

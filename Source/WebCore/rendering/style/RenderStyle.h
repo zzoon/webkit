@@ -107,7 +107,6 @@ class FilterOperations;
 class FontCascade;
 class FontMetrics;
 class IntRect;
-class MaskImageOperation;
 class Pair;
 class ShadowData;
 class StyleImage;
@@ -700,7 +699,7 @@ public:
 
     WEBCORE_EXPORT const FontCascade& fontCascade() const;
     WEBCORE_EXPORT const FontMetrics& fontMetrics() const;
-    WEBCORE_EXPORT const FontDescription& fontDescription() const;
+    WEBCORE_EXPORT const FontCascadeDescription& fontDescription() const;
     float specifiedFontSize() const;
     float computedFontSize() const;
     int fontSize() const;
@@ -732,6 +731,8 @@ public:
 
     float zoom() const { return visual->m_zoom; }
     float effectiveZoom() const { return rareInheritedData->m_effectiveZoom; }
+    
+    TextZoom textZoom() const { return static_cast<TextZoom>(rareInheritedData->m_textZoom); }
 
     TextDirection direction() const { return static_cast<TextDirection>(inherited_flags._direction); }
     bool isLeftToRightDirection() const { return direction() == LTR; }
@@ -809,6 +810,7 @@ public:
     FillLayer& ensureBackgroundLayers() { return m_background.access()->m_background; }
     const FillLayer* backgroundLayers() const { return &(m_background->background()); }
 
+    StyleImage* maskImage() const { return rareNonInheritedData->m_mask.image(); }
     EFillRepeat maskRepeatX() const { return static_cast<EFillRepeat>(rareNonInheritedData->m_mask.repeatX()); }
     EFillRepeat maskRepeatY() const { return static_cast<EFillRepeat>(rareNonInheritedData->m_mask.repeatY()); }
     CompositeOperator maskComposite() const { return static_cast<CompositeOperator>(rareNonInheritedData->m_mask.composite()); }
@@ -893,7 +895,7 @@ public:
     void getTextShadowBlockDirectionExtent(LayoutUnit& logicalTop, LayoutUnit& logicalBottom) const { getShadowBlockDirectionExtent(textShadow(), logicalTop, logicalBottom); }
 
     float textStrokeWidth() const { return rareInheritedData->textStrokeWidth; }
-    ColorSpace colorSpace() const { return static_cast<ColorSpace>(rareInheritedData->colorSpace); }
+    static ColorSpace colorSpace() { return ColorSpaceSRGB; } // FIXME: Remove after adding color space handling into the Color class.
     float opacity() const { return rareNonInheritedData->opacity; }
     ControlPart appearance() const { return static_cast<ControlPart>(rareNonInheritedData->m_appearance); }
     AspectRatioType aspectRatioType() const { return static_cast<AspectRatioType>(rareNonInheritedData->m_aspectRatioType); }
@@ -996,7 +998,7 @@ public:
     short hyphenationLimitAfter() const { return rareInheritedData->hyphenationLimitAfter; }
     short hyphenationLimitLines() const { return rareInheritedData->hyphenationLimitLines; }
     const AtomicString& hyphenationString() const { return rareInheritedData->hyphenationString; }
-    const AtomicString& locale() const { return rareInheritedData->locale; }
+    const AtomicString& locale() const { return fontDescription().locale(); }
     EBorderFit borderFit() const { return static_cast<EBorderFit>(rareNonInheritedData->m_borderFit); }
     EResize resize() const { return static_cast<EResize>(rareInheritedData->resize); }
     ColumnAxis columnAxis() const { return static_cast<ColumnAxis>(rareNonInheritedData->m_multiCol->m_axis); }
@@ -1049,7 +1051,7 @@ public:
     void applyTransform(TransformationMatrix&, const FloatRect& boundingBox, ApplyTransformOrigin = IncludeTransformOrigin) const;
     void setPageScaleTransform(float);
 
-    bool hasMask() const { return rareNonInheritedData->m_mask.hasNonEmptyMaskImage() || rareNonInheritedData->m_mask.hasImage() || rareNonInheritedData->m_maskBoxImage.hasImage(); }
+    bool hasMask() const { return rareNonInheritedData->m_mask.hasImage() || rareNonInheritedData->m_maskBoxImage.hasImage(); }
 
     TextCombine textCombine() const { return static_cast<TextCombine>(rareNonInheritedData->m_textCombine); }
     bool hasTextCombine() const { return textCombine() != TextCombineNone; }
@@ -1155,9 +1157,6 @@ public:
     FilterOperations& mutableFilter() { return rareNonInheritedData.access()->m_filter.access()->m_operations; }
     const FilterOperations& filter() const { return rareNonInheritedData->m_filter->m_operations; }
     bool hasFilter() const { return !rareNonInheritedData->m_filter->m_operations.operations().isEmpty(); }
-    
-    RefPtr<MaskImageOperation>& mutableMaskImage() { return rareNonInheritedData.access()->m_mask.m_maskImageOperation; }
-    const RefPtr<MaskImageOperation> maskImage() const { return rareNonInheritedData->m_mask.maskImage(); }
 
 #if ENABLE(FILTERS_LEVEL_2)
     FilterOperations& mutableBackdropFilter() { return rareNonInheritedData.access()->m_backdropFilter.access()->m_operations; }
@@ -1335,7 +1334,7 @@ public:
     void setClear(EClear v) { noninherited_flags.setClear(v); }
     void setTableLayout(ETableLayout v) { noninherited_flags.setTableLayout(v); }
 
-    bool setFontDescription(const FontDescription&);
+    bool setFontDescription(const FontCascadeDescription&);
     // Only used for blending font sizes when animating, for MathML anonymous blocks, and for text autosizing.
     void setFontSize(float);
 
@@ -1373,7 +1372,8 @@ public:
     bool setZoom(float);
     void setZoomWithoutReturnValue(float f) { setZoom(f); }
     bool setEffectiveZoom(float);
-
+    void setTextZoom(TextZoom v) { SET_VAR(rareInheritedData, m_textZoom, v); }
+    
 #if ENABLE(CSS_IMAGE_ORIENTATION)
     void setImageOrientation(ImageOrientationEnum v) { SET_VAR(rareInheritedData, m_imageOrientation, static_cast<int>(v)); }
 #endif
@@ -1412,6 +1412,8 @@ public:
             ensureMaskLayers().fillUnsetProperties();
         }
     }
+
+    void setMaskImage(PassRefPtr<StyleImage> v) { rareNonInheritedData.access()->m_mask.setImage(v); }
 
     void setMaskBoxImage(const NinePieceImage& b) { SET_VAR(rareNonInheritedData, m_maskBoxImage, b); }
     void setMaskBoxImageSource(PassRefPtr<StyleImage> v) { rareNonInheritedData.access()->m_maskBoxImage.setImage(v); }
@@ -1487,7 +1489,6 @@ public:
     void setTextStrokeColor(const Color& c) { SET_VAR(rareInheritedData, textStrokeColor, c); }
     void setTextStrokeWidth(float w) { SET_VAR(rareInheritedData, textStrokeWidth, w); }
     void setTextFillColor(const Color& c) { SET_VAR(rareInheritedData, textFillColor, c); }
-    void setColorSpace(ColorSpace space) { SET_VAR(rareInheritedData, colorSpace, space); }
     void setOpacity(float f) { float v = clampTo<float>(f, 0, 1); SET_VAR(rareNonInheritedData, opacity, v); }
     void setAppearance(ControlPart a) { SET_VAR(rareNonInheritedData, m_appearance, a); }
     // For valid values of box-align see http://www.w3.org/TR/2009/WD-css3-flexbox-20090723/#alignment
@@ -1570,7 +1571,6 @@ public:
     void setHyphenationLimitAfter(short limit) { SET_VAR(rareInheritedData, hyphenationLimitAfter, limit); }
     void setHyphenationLimitLines(short limit) { SET_VAR(rareInheritedData, hyphenationLimitLines, limit); }
     void setHyphenationString(const AtomicString& h) { SET_VAR(rareInheritedData, hyphenationString, h); }
-    void setLocale(const AtomicString& locale) { SET_VAR(rareInheritedData, locale, locale); }
     void setBorderFit(EBorderFit b) { SET_VAR(rareNonInheritedData, m_borderFit, b); }
     void setResize(EResize r) { SET_VAR(rareInheritedData, resize, r); }
     void setColumnAxis(ColumnAxis axis) { SET_VAR(rareNonInheritedData.access()->m_multiCol, m_axis, axis); }
@@ -1617,9 +1617,6 @@ public:
 #if ENABLE(FILTERS_LEVEL_2)
     void setBackdropFilter(const FilterOperations& ops) { SET_VAR(rareNonInheritedData.access()->m_backdropFilter, m_operations, ops); }
 #endif
-
-    void setMaskImage(const Vector<RefPtr<MaskImageOperation>>&);
-    void setMaskImage(const RefPtr<MaskImageOperation> maskImage) { Vector<RefPtr<MaskImageOperation>> vectMask; vectMask.append(maskImage); setMaskImage(vectMask); }
 
     void setTabSize(unsigned size) { SET_VAR(rareInheritedData, m_tabSize, size); }
 
@@ -1781,7 +1778,7 @@ public:
     }
     ClipPathOperation* clipPath() const { return rareNonInheritedData->m_clipPath.get(); }
 
-    static ClipPathOperation* initialClipPath() { return 0; }
+    static ClipPathOperation* initialClipPath() { return nullptr; }
 
     bool hasContent() const { return contentData(); }
     const ContentData* contentData() const { return rareNonInheritedData->m_content.get(); }
@@ -1800,6 +1797,17 @@ public:
 
     QuotesData* quotes() const { return rareInheritedData->quotes.get(); }
     void setQuotes(PassRefPtr<QuotesData>);
+
+    WillChangeData* willChange() const { return rareNonInheritedData->m_willChange.get(); }
+    void setWillChange(PassRefPtr<WillChangeData>);
+
+    bool willChangeCreatesStackingContext() const
+    {
+        if (!willChange())
+            return false;
+        
+        return willChange()->canCreateStackingContext();
+    }
 
     const AtomicString& hyphenString() const;
 
@@ -1868,7 +1876,6 @@ public:
     static NinePieceImage initialNinePieceImage() { return NinePieceImage(); }
     static LengthSize initialBorderRadius() { return LengthSize(Length(0, Fixed), Length(0, Fixed)); }
     static ECaptionSide initialCaptionSide() { return CAPTOP; }
-    static ColorSpace initialColorSpace() { return ColorSpaceDeviceRGB; }
     static ColumnAxis initialColumnAxis() { return AutoColumnAxis; }
     static ColumnProgression initialColumnProgression() { return NormalColumnProgression; }
     static TextDirection initialDirection() { return LTR; }
@@ -1896,7 +1903,7 @@ public:
     static float initialLetterSpacing() { return 0; }
     static Length initialWordSpacing() { return Length(Fixed); }
     static Length initialSize() { return Length(); }
-    static Length initialMinSize() { return Length(Fixed); }
+    static Length initialMinSize() { return Length(); }
     static Length initialMaxSize() { return Length(Undefined); }
     static Length initialOffset() { return Length(); }
     static Length initialMargin() { return Length(Fixed); }
@@ -1924,6 +1931,7 @@ public:
     static TextDecorationSkip initialTextDecorationSkip() { return TextDecorationSkipAuto; }
     static TextUnderlinePosition initialTextUnderlinePosition() { return TextUnderlinePositionAuto; }
     static float initialZoom() { return 1.0f; }
+    static TextZoom initialTextZoom() { return TextZoomNormal; }
     static int initialOutlineOffset() { return 0; }
     static float initialOpacity() { return 1.0f; }
     static EBoxAlignment initialBoxAlign() { return BSTRETCH; }
@@ -1966,7 +1974,6 @@ public:
     static short initialHyphenationLimitAfter() { return -1; }
     static short initialHyphenationLimitLines() { return -1; }
     static const AtomicString& initialHyphenationString() { return nullAtom; }
-    static const AtomicString& initialLocale() { return nullAtom; }
     static EBorderFit initialBorderFit() { return BorderFitBorder; }
     static EResize initialResize() { return RESIZE_NONE; }
     static ControlPart initialAppearance() { return NoControlPart; }
@@ -2006,6 +2013,8 @@ public:
     static PrintColorAdjust initialPrintColorAdjust() { return PrintColorAdjustEconomy; }
     static QuotesData* initialQuotes() { return nullptr; }
     static const AtomicString& initialContentAltText() { return emptyAtom; }
+
+    static WillChangeData* initialWillChange() { return nullptr; }
 
 #if ENABLE(CSS_SCROLL_SNAP)
     static ScrollSnapType initialScrollSnapType() { return ScrollSnapType::None; }
@@ -2216,6 +2225,15 @@ inline float adjustFloatForAbsoluteZoom(float value, const RenderStyle& style)
 inline LayoutUnit adjustLayoutUnitForAbsoluteZoom(LayoutUnit value, const RenderStyle& style)
 {
     return value / style.effectiveZoom();
+}
+
+inline EBorderStyle collapsedBorderStyle(EBorderStyle style)
+{
+    if (style == OUTSET)
+        return GROOVE;
+    if (style == INSET)
+        return RIDGE;
+    return style;
 }
 
 inline bool RenderStyle::setZoom(float f)

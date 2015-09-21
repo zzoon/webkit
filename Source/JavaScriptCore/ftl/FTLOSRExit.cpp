@@ -41,12 +41,12 @@ namespace JSC { namespace FTL {
 using namespace DFG;
 
 OSRExit::OSRExit(
-    ExitKind exitKind, ValueFormat profileValueFormat,
+    ExitKind exitKind, DataFormat profileDataFormat,
     MethodOfGettingAValueProfile valueProfile, CodeOrigin codeOrigin,
     CodeOrigin originForProfile, unsigned numberOfArguments,
     unsigned numberOfLocals)
     : OSRExitBase(exitKind, codeOrigin, originForProfile)
-    , m_profileValueFormat(profileValueFormat)
+    , m_profileDataFormat(profileDataFormat)
     , m_valueProfile(valueProfile)
     , m_patchableCodeOffset(0)
     , m_values(numberOfArguments, numberOfLocals)
@@ -59,6 +59,15 @@ CodeLocationJump OSRExit::codeLocationForRepatch(CodeBlock* ftlCodeBlock) const
         reinterpret_cast<char*>(
             ftlCodeBlock->jitCode()->ftl()->exitThunks().dataLocation()) +
         m_patchableCodeOffset);
+}
+
+void OSRExit::validateReferences(const TrackedReferences& trackedReferences)
+{
+    for (unsigned i = m_values.size(); i--;)
+        m_values[i].validateReferences(trackedReferences);
+    
+    for (ExitTimeObjectMaterialization* materialization : m_materializations)
+        materialization->validateReferences(trackedReferences);
 }
 
 } } // namespace JSC::FTL

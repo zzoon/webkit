@@ -1254,7 +1254,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                     indexStack.removeLast();
                     lengthStack.removeLast();
 
-                    propertyStack.append(PropertyNameArray(m_exec));
+                    propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                     array->methodTable()->getOwnNonIndexPropertyNames(array, m_exec, propertyStack.last(), EnumerationMode());
                     if (propertyStack.last().size()) {
                         write(NonIndexPropertiesTag);
@@ -1304,7 +1304,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                     return DataCloneError;
                 inputObjectStack.append(inObject);
                 indexStack.append(0);
-                propertyStack.append(PropertyNameArray(m_exec));
+                propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                 inObject->methodTable()->getOwnPropertyNames(inObject, m_exec, propertyStack.last(), EnumerationMode());
             }
             objectStartVisitMember:
@@ -1372,7 +1372,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                     mapIteratorStack.removeLast();
                     JSObject* object = inputObjectStack.last();
                     ASSERT(jsDynamicCast<JSMap*>(object));
-                    propertyStack.append(PropertyNameArray(m_exec));
+                    propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                     object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), EnumerationMode());
                     write(NonMapPropertiesTag);
                     indexStack.append(0);
@@ -1416,7 +1416,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                     setIteratorStack.removeLast();
                     JSObject* object = inputObjectStack.last();
                     ASSERT(jsDynamicCast<JSSet*>(object));
-                    propertyStack.append(PropertyNameArray(m_exec));
+                    propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
                     object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), EnumerationMode());
                     write(NonSetPropertiesTag);
                     indexStack.append(0);
@@ -2695,7 +2695,7 @@ Ref<SerializedScriptValue> SerializedScriptValue::undefinedValue()
 }
 #endif
 
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(JSContextRef originContext, JSValueRef apiValue, JSValueRef* exception)
+RefPtr<SerializedScriptValue> SerializedScriptValue::create(JSContextRef originContext, JSValueRef apiValue, JSValueRef* exception)
 {
     ExecState* exec = toJS(originContext);
     JSLockHolder locker(exec);
@@ -2705,10 +2705,10 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(JSContextRef ori
         if (exception)
             *exception = toRef(exec, exec->exception()->value());
         exec->clearException();
-        return 0;
+        return nullptr;
     }
     ASSERT(serializedValue);
-    return serializedValue.release();
+    return serializedValue;
 }
 
 String SerializedScriptValue::toString()

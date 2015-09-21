@@ -115,7 +115,6 @@ public:
     SessionID sessionID() const;
 
     void removeCachedResource(CachedResource&);
-    void addCachedResource(CachedResource&);
 
     void loadDone(CachedResource*, bool shouldPerformPostLoadActions = true);
 
@@ -154,7 +153,6 @@ private:
     bool shouldContinueAfterNotifyingLoadedFromMemoryCache(const CachedResourceRequest&, CachedResource*);
     bool checkInsecureContent(CachedResource::Type, const URL&) const;
 
-    void garbageCollectDocumentResourcesTimerFired();
     void performPostLoadActions();
 
     bool clientDefersImage(const URL&) const;

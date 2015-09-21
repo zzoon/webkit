@@ -73,7 +73,7 @@ namespace DFG {
 class Worklist;
 }
 
-static void* const zombifiedBits = reinterpret_cast<void*>(0xdeadbeef);
+static void* const zombifiedBits = reinterpret_cast<void*>(static_cast<uintptr_t>(0xdeadbeef));
 
 typedef HashCountedSet<JSCell*> ProtectCountSet;
 typedef HashCountedSet<const char*> TypeCountSet;
@@ -149,7 +149,7 @@ public:
 
     typedef void (*Finalizer)(JSCell*);
     JS_EXPORT_PRIVATE void addFinalizer(JSCell*, Finalizer);
-    void addCompiledCode(ExecutableBase*);
+    void addExecutable(ExecutableBase*);
 
     void notifyIsSafeToCollect() { m_isSafeToCollect = true; }
     bool isSafeToCollect() const { return m_isSafeToCollect; }
@@ -197,7 +197,6 @@ public:
 
     void willStartIterating();
     void didFinishIterating();
-    void getConservativeRegisterRoots(HashSet<JSCell*>& roots);
 
     double lastFullGCLength() const { return m_lastFullGCLength; }
     double lastEdenGCLength() const { return m_lastEdenGCLength; }
@@ -208,8 +207,8 @@ public:
     size_t sizeBeforeLastFullCollection() const { return m_sizeBeforeLastFullCollect; }
     size_t sizeAfterLastFullCollection() const { return m_sizeAfterLastFullCollect; }
 
-    JS_EXPORT_PRIVATE void deleteAllCompiledCode();
-    void deleteAllUnlinkedFunctionCode();
+    JS_EXPORT_PRIVATE void deleteAllCodeBlocks();
+    void deleteAllUnlinkedCodeBlocks();
 
     void didAllocate(size_t);
     void didAbandon(size_t);
@@ -269,8 +268,8 @@ private:
 
     static const size_t minExtraMemory = 256;
     
-    class FinalizerOwner : public WeakHandleOwner {
-        virtual void finalize(Handle<Unknown>, void* context) override;
+    class FinalizerOwner final : public WeakHandleOwner {
+        void finalize(JSCell*&, void* context) override;
     };
 
     JS_EXPORT_PRIVATE bool isValidAllocation(size_t);
@@ -281,7 +280,6 @@ private:
 
     void suspendCompilerThreads();
     void willStartCollection(HeapOperation collectionType);
-    void deleteOldCode(double gcStartTime);
     void flushOldStructureIDTables();
     void flushWriteBarrierBuffer();
     void stopAllocation();
@@ -388,9 +386,8 @@ private:
     VM* m_vm;
     double m_lastFullGCLength;
     double m_lastEdenGCLength;
-    double m_lastCodeDiscardTime;
 
-    Vector<ExecutableBase*> m_compiledCode;
+    Vector<ExecutableBase*> m_executables;
 
     Vector<WeakBlock*> m_logicallyEmptyWeakBlocks;
     size_t m_indexOfNextLogicallyEmptyWeakBlockToSweep { WTF::notFound };

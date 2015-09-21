@@ -70,8 +70,8 @@ protected:
 
 class JSTestNamedConstructorOwner : public JSC::WeakHandleOwner {
 public:
-    virtual bool isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown>, void* context, JSC::SlotVisitor&);
-    virtual void finalize(JSC::Handle<JSC::Unknown>, void* context);
+    bool isReachableFromOpaqueRoots(JSC::JSCell&, void* context, JSC::SlotVisitor&) override;
+    void finalize(JSC::JSCell*&, void* context) override;
 };
 
 inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestNamedConstructor*)
@@ -81,7 +81,8 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestNamedConstructor
 }
 
 JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestNamedConstructor*);
-inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, TestNamedConstructor& impl) { return toJS(exec, globalObject, &impl); }
+inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestNamedConstructor& impl) { return toJS(state, globalObject, &impl); }
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject*, TestNamedConstructor*);
 
 
 } // namespace WebCore

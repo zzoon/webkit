@@ -37,13 +37,8 @@
 #include <wtf/HashSet.h>
 
 #if PLATFORM(IOS)
-#ifdef __OBJC__
-@class WAKScrollView;
-@class WAKView;
-#else
-class WAKScrollView;
-class WAKView;
-#endif
+OBJC_CLASS WAKScrollView;
+OBJC_CLASS WAKView;
 
 #ifndef NSScrollView
 #define NSScrollView WAKScrollView
@@ -55,6 +50,7 @@ class WAKView;
 #endif // PLATFORM(IOS)
 
 #if PLATFORM(COCOA) && defined __OBJC__
+@class NSScrollView;
 @protocol WebCoreFrameScrollView;
 #endif
 
@@ -347,8 +343,8 @@ public:
     }
 
     // Widget override. Handles painting of the contents of the view as well as the scrollbars.
-    WEBCORE_EXPORT virtual void paint(GraphicsContext*, const IntRect&) override;
-    void paintScrollbars(GraphicsContext*, const IntRect&);
+    WEBCORE_EXPORT virtual void paint(GraphicsContext&, const IntRect&) override;
+    void paintScrollbars(GraphicsContext&, const IntRect&);
 
     // Widget overrides to ensure that our children's visibility status is kept up to date when we get shown and hidden.
     WEBCORE_EXPORT virtual void show() override;
@@ -359,20 +355,20 @@ public:
     static const int noPanScrollRadius = 15;
     void addPanScrollIcon(const IntPoint&);
     void removePanScrollIcon();
-    void paintPanScrollIcon(GraphicsContext*);
+    void paintPanScrollIcon(GraphicsContext&);
 
     virtual bool isPointInScrollbarCorner(const IntPoint&);
     virtual bool scrollbarCornerPresent() const;
     virtual IntRect scrollCornerRect() const override;
-    virtual void paintScrollCorner(GraphicsContext*, const IntRect& cornerRect);
-    virtual void paintScrollbar(GraphicsContext*, Scrollbar*, const IntRect&);
+    virtual void paintScrollCorner(GraphicsContext&, const IntRect& cornerRect);
+    virtual void paintScrollbar(GraphicsContext&, Scrollbar&, const IntRect&);
 
     virtual IntRect convertFromScrollbarToContainingView(const Scrollbar*, const IntRect&) const override;
     virtual IntRect convertFromContainingViewToScrollbar(const Scrollbar*, const IntRect&) const override;
     virtual IntPoint convertFromScrollbarToContainingView(const Scrollbar*, const IntPoint&) const override;
     virtual IntPoint convertFromContainingViewToScrollbar(const Scrollbar*, const IntPoint&) const override;
 
-    void calculateAndPaintOverhangAreas(GraphicsContext*, const IntRect& dirtyRect);
+    void calculateAndPaintOverhangAreas(GraphicsContext&, const IntRect& dirtyRect);
 
     virtual bool isScrollView() const override { return true; }
 
@@ -382,9 +378,9 @@ protected:
     ScrollView();
 
     virtual void repaintContentRectangle(const IntRect&);
-    virtual void paintContents(GraphicsContext*, const IntRect& damageRect) = 0;
+    virtual void paintContents(GraphicsContext&, const IntRect& damageRect) = 0;
 
-    virtual void paintOverhangAreas(GraphicsContext*, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect);
+    virtual void paintOverhangAreas(GraphicsContext&, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect);
 
     virtual void availableContentSizeChanged(AvailableSizeChangeReason) override;
     virtual void addedOrRemovedScrollbar() = 0;

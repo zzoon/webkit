@@ -68,6 +68,7 @@
 #if USE(CF)
 #include <wtf/RetainPtr.h>
 #endif
+#include <wtf/Lock.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
 #include <wtf/text/CString.h>
@@ -133,10 +134,11 @@ static char* cookieJarPath()
 #endif
 }
 
-static Mutex* sharedResourceMutex(curl_lock_data data) {
-    DEPRECATED_DEFINE_STATIC_LOCAL(Mutex, cookieMutex, ());
-    DEPRECATED_DEFINE_STATIC_LOCAL(Mutex, dnsMutex, ());
-    DEPRECATED_DEFINE_STATIC_LOCAL(Mutex, shareMutex, ());
+static Lock* sharedResourceMutex(curl_lock_data data)
+{
+    DEPRECATED_DEFINE_STATIC_LOCAL(Lock, cookieMutex, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(Lock, dnsMutex, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(Lock, shareMutex, ());
 
     switch (data) {
         case CURL_LOCK_DATA_COOKIE:
@@ -190,13 +192,13 @@ static void calculateWebTimingInformations(ResourceHandleInternal* d)
 // cache.
 static void curl_lock_callback(CURL* /* handle */, curl_lock_data data, curl_lock_access /* access */, void* /* userPtr */)
 {
-    if (Mutex* mutex = sharedResourceMutex(data))
+    if (Lock* mutex = sharedResourceMutex(data))
         mutex->lock();
 }
 
 static void curl_unlock_callback(CURL* /* handle */, curl_lock_data data, void* /* userPtr */)
 {
-    if (Mutex* mutex = sharedResourceMutex(data))
+    if (Lock* mutex = sharedResourceMutex(data))
         mutex->unlock();
 }
 
@@ -967,13 +969,13 @@ void ResourceHandleManager::applyAuthenticationToRequest(ResourceHandle* handle,
         if (d->m_user.isEmpty() && d->m_pass.isEmpty()) {
             // <rdar://problem/7174050> - For URLs that match the paths of those previously challenged for HTTP Basic authentication, 
             // try and reuse the credential preemptively, as allowed by RFC 2617.
-            d->m_initialCredential = CredentialStorage::get(request.url());
+            d->m_initialCredential = CredentialStorage::defaultCredentialStorage().get(request.url());
         } else {
             // If there is already a protection space known for the URL, update stored credentials
             // before sending a request. This makes it possible to implement logout by sending an
             // XMLHttpRequest with known incorrect credentials, and aborting it immediately (so that
             // an authentication dialog doesn't pop up).
-            CredentialStorage::set(Credential(d->m_user, d->m_pass, CredentialPersistenceNone), request.url());
+            CredentialStorage::defaultCredentialStorage().set(Credential(d->m_user, d->m_pass, CredentialPersistenceNone), request.url());
         }
     }
 

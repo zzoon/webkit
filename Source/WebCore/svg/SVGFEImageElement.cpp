@@ -77,7 +77,10 @@ void SVGFEImageElement::clearResourceReferences()
 
 void SVGFEImageElement::requestImageResource()
 {
-    CachedResourceRequest request(ResourceRequest(document().completeURL(href())));
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+    options.setContentSecurityPolicyImposition(isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+
+    CachedResourceRequest request(ResourceRequest(document().completeURL(href())), options);
     request.setInitiator(this);
     m_cachedImage = document().cachedResourceLoader().requestImage(request);
 
@@ -164,9 +167,8 @@ void SVGFEImageElement::notifyFinished(CachedResource*)
         return;
 
     Element* parent = parentElement();
-    ASSERT(parent);
 
-    if (!parent->hasTagName(SVGNames::filterTag))
+    if (!parent || !parent->hasTagName(SVGNames::filterTag))
         return;
 
     RenderElement* parentRenderer = parent->renderer();

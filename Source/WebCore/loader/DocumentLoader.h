@@ -70,6 +70,7 @@ namespace WebCore {
     class Page;
     class ResourceLoader;
     class SharedBuffer;
+    class SubresourceLoader;
     class SubstituteResource;
 
 #if ENABLE(CONTENT_FILTERING)
@@ -88,14 +89,13 @@ namespace WebCore {
         }
         WEBCORE_EXPORT virtual ~DocumentLoader();
 
-        WEBCORE_EXPORT void setFrame(Frame*);
+        void attachToFrame(Frame&);
         Frame* frame() const { return m_frame; }
 
-        WEBCORE_EXPORT virtual void attachToFrame();
         WEBCORE_EXPORT virtual void detachFromFrame();
 
         WEBCORE_EXPORT FrameLoader* frameLoader() const;
-        WEBCORE_EXPORT ResourceLoader* mainResourceLoader() const;
+        WEBCORE_EXPORT SubresourceLoader* mainResourceLoader() const;
         WEBCORE_EXPORT PassRefPtr<SharedBuffer> mainResourceData() const;
         
         DocumentWriter& writer() const { return m_writer; }
@@ -229,8 +229,8 @@ namespace WebCore {
 
         void addSubresourceLoader(ResourceLoader*);
         void removeSubresourceLoader(ResourceLoader*);
-        WEBCORE_EXPORT void addPlugInStreamLoader(ResourceLoader*);
-        WEBCORE_EXPORT void removePlugInStreamLoader(ResourceLoader*);
+        void addPlugInStreamLoader(ResourceLoader&);
+        void removePlugInStreamLoader(ResourceLoader&);
 
         void subresourceLoaderFinishedLoadingOnePart(ResourceLoader*);
 
@@ -280,6 +280,8 @@ namespace WebCore {
 
     protected:
         WEBCORE_EXPORT DocumentLoader(const ResourceRequest&, const SubstituteData&);
+
+        WEBCORE_EXPORT virtual void attachToFrame();
 
         bool m_deferMainResourceDataLoad;
 
@@ -335,8 +337,11 @@ namespace WebCore {
 
         void clearMainResource();
 
+        void cancelPolicyCheckIfNeeded();
+        void becomeMainResourceClient();
+
 #if ENABLE(CONTENT_FILTERING)
-        void becomeMainResourceClientIfFilterAllows();
+        friend class ContentFilter;
         void installContentFilterUnblockHandler(ContentFilter&);
         void contentFilterDidDecide();
 #endif
@@ -444,9 +449,12 @@ namespace WebCore {
 
 #if ENABLE(CONTENT_EXTENSIONS)
         HashMap<String, RefPtr<StyleSheetContents>> m_pendingNamedContentExtensionStyleSheets;
-        HashMap<String, std::pair<String, uint32_t>> m_pendingContentExtensionDisplayNoneSelectors;
+        HashMap<String, Vector<std::pair<String, uint32_t>>> m_pendingContentExtensionDisplayNoneSelectors;
 #endif
 
+#ifndef NDEBUG
+        bool m_hasEverBeenAttached { false };
+#endif
     };
 
     inline void DocumentLoader::recordMemoryCacheLoadForFutureClientNotification(const ResourceRequest& request)

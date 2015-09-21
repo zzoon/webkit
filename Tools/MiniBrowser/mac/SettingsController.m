@@ -36,6 +36,7 @@ static NSString * const LayerBordersVisiblePreferenceKey = @"LayerBordersVisible
 static NSString * const SimpleLineLayoutDebugBordersEnabledPreferenceKey = @"SimpleLineLayoutDebugBordersEnabled";
 static NSString * const TiledScrollingIndicatorVisiblePreferenceKey = @"TiledScrollingIndicatorVisible";
 static NSString * const IncrementalRenderingSuppressedPreferenceKey = @"IncrementalRenderingSuppressed";
+static NSString * const AcceleratedDrawingEnabledPreferenceKey = @"AcceleratedDrawingEnabled";
 
 static NSString * const NonFastScrollableRegionOverlayVisiblePreferenceKey = @"NonFastScrollableRegionOverlayVisible";
 static NSString * const WheelEventHandlerRegionOverlayVisiblePreferenceKey = @"WheelEventHandlerRegionOverlayVisible";
@@ -98,6 +99,7 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     _menu = [[NSMenu alloc] initWithTitle:@"Settings"];
 
     [self _addItemWithTitle:@"Use WebKit2 By Default" action:@selector(toggleUseWebKit2ByDefault:) indented:NO];
+    [self _addItemWithTitle:@"Set Default URL to Current URL" action:@selector(setDefaultURLToCurrentURL:) indented:NO];
 
     [_menu addItem:[NSMenuItem separatorItem]];
 
@@ -106,6 +108,7 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     [self _addItemWithTitle:@"Show Layer Borders" action:@selector(toggleShowLayerBorders:) indented:NO];
     [self _addItemWithTitle:@"Show Simple Line Layout Borders" action:@selector(toggleSimpleLineLayoutDebugBordersEnabled:) indented:NO];
     [self _addItemWithTitle:@"Suppress Incremental Rendering in New Windows" action:@selector(toggleIncrementalRenderingSuppressed:) indented:NO];
+    [self _addItemWithTitle:@"Enable Accelerated Drawing" action:@selector(toggleAcceleratedDrawingEnabled:) indented:NO];
 
     [self _addHeaderWithTitle:@"WebKit2-only Settings"];
 
@@ -151,6 +154,8 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
         [menuItem setState:[self simpleLineLayoutDebugBordersEnabled] ? NSOnState : NSOffState];
     else if (action == @selector(toggleIncrementalRenderingSuppressed:))
         [menuItem setState:[self incrementalRenderingSuppressed] ? NSOnState : NSOffState];
+    else if (action == @selector(toggleAcceleratedDrawingEnabled:))
+        [menuItem setState:[self acceleratedDrawingEnabled] ? NSOnState : NSOffState];
     else if (action == @selector(toggleShowTiledScrollingIndicator:))
         [menuItem setState:[self tiledScrollingIndicatorVisible] ? NSOnState : NSOffState];
     else if (action == @selector(toggleUseUISideCompositing:))
@@ -263,6 +268,16 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     return [[NSUserDefaults standardUserDefaults] boolForKey:SimpleLineLayoutDebugBordersEnabledPreferenceKey];
 }
 
+- (void)toggleAcceleratedDrawingEnabled:(id)sender
+{
+    [self _toggleBooleanDefault:AcceleratedDrawingEnabledPreferenceKey];
+}
+
+- (BOOL)acceleratedDrawingEnabled
+{
+    return [[NSUserDefaults standardUserDefaults] boolForKey:AcceleratedDrawingEnabledPreferenceKey];
+}
+
 - (void)toggleShowTiledScrollingIndicator:(id)sender
 {
     [self _toggleBooleanDefault:TiledScrollingIndicatorVisiblePreferenceKey];
@@ -327,6 +342,18 @@ typedef NS_ENUM(NSInteger, DebugOverylayMenuItemTag) {
     if (customDefaultURL)
         return customDefaultURL;
     return defaultURL;
+}
+
+- (void)setDefaultURLToCurrentURL:(id)sender
+{
+    NSWindowController *windowController = [[NSApp keyWindow] windowController];
+    NSString *customDefaultURL = nil;
+
+    if ([windowController isKindOfClass:[BrowserWindowController class]])
+        customDefaultURL = [[(BrowserWindowController *)windowController currentURL] absoluteString];
+
+    if (customDefaultURL)
+        [[NSUserDefaults standardUserDefaults] setObject:customDefaultURL forKey:DefaultURLPreferenceKey];
 }
 
 @end

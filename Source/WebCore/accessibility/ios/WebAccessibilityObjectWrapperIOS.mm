@@ -362,8 +362,10 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
     if (![self _prepareAccessibilityCall])
         return 0;
 
-    if ([self isAttachment] && [self attachmentView])
-        return [[self attachmentView] accessibilityElementCount];
+    if ([self isAttachment]) {
+        if (id attachmentView = [self attachmentView])
+            return [attachmentView accessibilityElementCount];
+    }
     
     return m_object->children().size();
 }
@@ -373,8 +375,10 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
     if (![self _prepareAccessibilityCall])
         return nil;
 
-    if ([self isAttachment] && [self attachmentView])
-        return [[self attachmentView] accessibilityElementAtIndex:index];
+    if ([self isAttachment]) {
+        if (id attachmentView = [self attachmentView])
+            return [attachmentView accessibilityElementAtIndex:index];
+    }
     
     const auto& children = m_object->children();
     size_t elementIndex = static_cast<size_t>(index);
@@ -382,8 +386,10 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
         return nil;
     
     AccessibilityObjectWrapper* wrapper = children[elementIndex]->wrapper();
-    if (children[elementIndex]->isAttachment())
-        return [wrapper attachmentView];
+    if (children[elementIndex]->isAttachment()) {
+        if (id attachmentView = [wrapper attachmentView])
+            return attachmentView;
+    }
 
     return wrapper;
 }
@@ -393,8 +399,10 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
     if (![self _prepareAccessibilityCall])
         return NSNotFound;
     
-    if ([self isAttachment] && [self attachmentView])
-        return [[self attachmentView] indexOfAccessibilityElement:element];
+    if ([self isAttachment]) {
+        if (id attachmentView = [self attachmentView])
+            return [attachmentView indexOfAccessibilityElement:element];
+    }
     
     const auto& children = m_object->children();
     unsigned count = children.size();
@@ -479,7 +487,7 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
 - (AccessibilityObjectWrapper*)_accessibilityTableAncestor
 {
     for (AccessibilityObject* parent = m_object->parentObject(); parent != nil; parent = parent->parentObject()) {
-        if (parent->roleValue() == TableRole)
+        if (parent->roleValue() == TableRole || parent->roleValue() == GridRole)
             return parent->wrapper();   
     }
     
@@ -521,6 +529,7 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
             case ListRole:
                 traits |= [self _axContainedByListTrait];
                 break;
+            case GridRole:
             case TableRole:
                 traits |= [self _axContainedByTableTrait];
                 break;
@@ -731,6 +740,7 @@ static AccessibilityObjectWrapper* AccessibilityUnignoredAncestor(AccessibilityO
         case FooterRole:
         case FormRole:
         case GridRole:
+        case GridCellRole:
         case GrowAreaRole:
         case HelpTagRole:
         case IgnoredRole:
@@ -1139,54 +1149,36 @@ static void appendStringToResult(NSMutableString *result, NSString *string)
     if (![self _prepareAccessibilityCall])
         return NO;
     
-    ScrollView* scrollView = m_object->scrollViewAncestor();
-    if (!scrollView)
-        return NO;
-    
-    IntPoint scrollPosition = scrollView->scrollPosition();
-    IntPoint newScrollPosition = scrollPosition;
-    IntSize scrollSize = scrollView->contentsSize();
-    IntRect scrollVisibleRect = scrollView->visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
+    AccessibilityObject::ScrollByPageDirection scrollDirection;
     switch (direction) {
-    case UIAccessibilityScrollDirectionRight: {
-        int scrollAmount = scrollVisibleRect.size().width();
-        int newX = scrollPosition.x() - scrollAmount;
-        newScrollPosition.setX(std::max(newX, 0));
+    case UIAccessibilityScrollDirectionRight:
+        scrollDirection = AccessibilityObject::ScrollByPageDirection::Right;
         break;
-    }
-    case UIAccessibilityScrollDirectionLeft: {
-        int scrollAmount = scrollVisibleRect.size().width();
-        int newX = scrollAmount + scrollPosition.x();
-        int maxX = scrollSize.width() - scrollAmount;
-        newScrollPosition.setX(std::min(newX, maxX));
+    case UIAccessibilityScrollDirectionLeft:
+        scrollDirection = AccessibilityObject::ScrollByPageDirection::Left;
         break;
-    }
-    case UIAccessibilityScrollDirectionUp: {
-        int scrollAmount = scrollVisibleRect.size().height();
-        int newY = scrollPosition.y() - scrollAmount;
-        newScrollPosition.setY(std::max(newY, 0));
+    case UIAccessibilityScrollDirectionUp:
+        scrollDirection = AccessibilityObject::ScrollByPageDirection::Up;
         break;
-    }
-    case UIAccessibilityScrollDirectionDown: {
-        int scrollAmount = scrollVisibleRect.size().height();
-        int newY = scrollAmount + scrollPosition.y();
-        int maxY = scrollSize.height() - scrollAmount;
-        newScrollPosition.setY(std::min(newY, maxY));
+    case UIAccessibilityScrollDirectionDown:
+        scrollDirection = AccessibilityObject::ScrollByPageDirection::Down;
         break;
-    }
     default:
-        break;
+        return NO;
     }
+
+    BOOL result = m_object->scrollByPage(scrollDirection);
     
-    if (newScrollPosition != scrollPosition) {
-        scrollView->setScrollPosition(newScrollPosition);
-        m_object->document()->updateLayoutIgnorePendingStylesheets();
+    if (result) {
+        [self postScrollStatusChangeNotification];
+
+        CGPoint scrollPos = [self _accessibilityScrollPosition];
+        NSString *testString = [NSString stringWithFormat:@"AXScroll [position: %.2f %.2f]", scrollPos.x, scrollPos.y];
+        [self accessibilityPostedNotification:@"AXScrollByPage" userInfo:@{ @"status" : testString }];
     }
-    
-    [self postScrollStatusChangeNotification];
     
     // This means that this object handled the scroll and no other ancestor should attempt scrolling.
-    return YES;
+    return result;
 }
 
 - (CGPoint)convertPointToScreenSpace:(FloatPoint &)point
@@ -1615,10 +1607,7 @@ static RenderObject* rendererForView(WAKView* view)
     if (![self _prepareAccessibilityCall])
         return CGPointZero;
     
-    ScrollView* scrollView = m_object->scrollViewAncestor();
-    if (!scrollView)
-        return CGPointZero;
-    return scrollView->scrollPosition();
+    return m_object->scrollPosition();
 }
 
 - (CGSize)_accessibilityScrollSize
@@ -1626,10 +1615,7 @@ static RenderObject* rendererForView(WAKView* view)
     if (![self _prepareAccessibilityCall])
         return CGSizeZero;
     
-    ScrollView* scrollView = m_object->scrollViewAncestor();
-    if (!scrollView)
-        return CGSizeZero;
-    return scrollView->contentsSize();
+    return m_object->scrollContentsSize();
 }
 
 - (CGRect)_accessibilityScrollVisibleRect
@@ -1637,10 +1623,7 @@ static RenderObject* rendererForView(WAKView* view)
     if (![self _prepareAccessibilityCall])
         return CGRectZero;
     
-    ScrollView* scrollView = m_object->scrollViewAncestor();
-    if (!scrollView)
-        return CGRectZero;
-    return scrollView->visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
+    return m_object->scrollVisibleContentRect();
 }
 
 - (void)accessibilityElementDidBecomeFocused
@@ -1924,25 +1907,24 @@ static void AXAttributedStringAppendText(NSMutableAttributedString* attrString, 
     TextIterator it(makeRange(startVisiblePosition, endVisiblePosition).get());
     for (; !it.atEnd(); it.advance()) {
         // locate the node and starting offset for this range
-        int exception = 0;
-        Node* node = it.range()->startContainer(exception);
-        ASSERT(node == it.range()->endContainer(exception));
-        int offset = it.range()->startOffset(exception);
+        Node& node = it.range()->startContainer();
+        ASSERT(&node == &it.range()->endContainer());
+        int offset = it.range()->startOffset();
         
         // non-zero length means textual node, zero length means replaced node (AKA "attachments" in AX)
         if (it.text().length() != 0) {
             if (!attributed) {
                 // First check if this is represented by a link.
-                AccessibilityObject* linkObject = AccessibilityObject::anchorElementForNode(node);
+                AccessibilityObject* linkObject = AccessibilityObject::anchorElementForNode(&node);
                 if ([self _addAccessibilityObject:linkObject toTextMarkerArray:array])
                     continue;
                 
                 // Next check if this region is represented by a heading.
-                AccessibilityObject* headingObject = AccessibilityObject::headingElementForNode(node);
+                AccessibilityObject* headingObject = AccessibilityObject::headingElementForNode(&node);
                 if ([self _addAccessibilityObject:headingObject toTextMarkerArray:array])
                     continue;
                 
-                String listMarkerText = m_object->listMarkerTextForNodeAndPosition(node, VisiblePosition(it.range()->startPosition())); 
+                String listMarkerText = m_object->listMarkerTextForNodeAndPosition(&node, VisiblePosition(it.range()->startPosition()));
                 
                 if (!listMarkerText.isEmpty()) 
                     [array addObject:listMarkerText];
@@ -1951,22 +1933,22 @@ static void AXAttributedStringAppendText(NSMutableAttributedString* attrString, 
             }
             else
             {
-                String listMarkerText = m_object->listMarkerTextForNodeAndPosition(node, VisiblePosition(it.range()->startPosition())); 
+                String listMarkerText = m_object->listMarkerTextForNodeAndPosition(&node, VisiblePosition(it.range()->startPosition()));
 
                 if (!listMarkerText.isEmpty()) {
                     NSMutableAttributedString* attrString = [[NSMutableAttributedString alloc] init];
-                    AXAttributedStringAppendText(attrString, node, listMarkerText);
+                    AXAttributedStringAppendText(attrString, &node, listMarkerText);
                     [array addObject:attrString];
                     [attrString release];
                 }
                 
                 NSMutableAttributedString *attrString = [[NSMutableAttributedString alloc] init];
-                AXAttributedStringAppendText(attrString, node, it.text().createNSStringWithoutCopying().get());
+                AXAttributedStringAppendText(attrString, &node, it.text().createNSStringWithoutCopying().get());
                 [array addObject:attrString];
                 [attrString release];
             }
         } else {
-            Node* replacedNode = node->traverseToChildAt(offset);
+            Node* replacedNode = node.traverseToChildAt(offset);
             if (replacedNode) {
                 AccessibilityObject* obj = m_object->axObjectCache()->getOrCreate(replacedNode->renderer());
                 if (obj && !obj->accessibilityIsIgnored())
@@ -1980,7 +1962,7 @@ static void AXAttributedStringAppendText(NSMutableAttributedString* attrString, 
 
 - (NSRange)_convertToNSRange:(Range *)range
 {
-    if (!range || !range->startContainer())
+    if (!range)
         return NSMakeRange(NSNotFound, 0);
     
     Document* document = m_object->document();
@@ -1990,23 +1972,23 @@ static void AXAttributedStringAppendText(NSMutableAttributedString* attrString, 
     // Mouse events may cause TSM to attempt to create an NSRange for a portion of the view
     // that is not inside the current editable region.  These checks ensure we don't produce
     // potentially invalid data when responding to such requests.
-    if (range->startContainer() != scope && !range->startContainer()->isDescendantOf(scope))
+    if (&range->startContainer() != scope && !range->startContainer().isDescendantOf(scope))
         return NSMakeRange(NSNotFound, 0);
-    if (range->endContainer() != scope && !range->endContainer()->isDescendantOf(scope))
+    if (&range->endContainer() != scope && !range->endContainer().isDescendantOf(scope))
         return NSMakeRange(NSNotFound, 0);
     
-    RefPtr<Range> testRange = Range::create(scope->document(), scope, 0, range->startContainer(), range->startOffset());
-    ASSERT(testRange->startContainer() == scope);
+    RefPtr<Range> testRange = Range::create(scope->document(), scope, 0, &range->startContainer(), range->startOffset());
+    ASSERT(&testRange->startContainer() == scope);
     int startPosition = TextIterator::rangeLength(testRange.get());
     
     ExceptionCode ec;
-    testRange->setEnd(range->endContainer(), range->endOffset(), ec);
-    ASSERT(testRange->startContainer() == scope);
+    testRange->setEnd(&range->endContainer(), range->endOffset(), ec);
+    ASSERT(&testRange->startContainer() == scope);
     int endPosition = TextIterator::rangeLength(testRange.get());
     return NSMakeRange(startPosition, endPosition - startPosition);
 }
 
-- (PassRefPtr<Range>)_convertToDOMRange:(NSRange)nsrange
+- (RefPtr<Range>)_convertToDOMRange:(NSRange)nsrange
 {
     if (nsrange.location > INT_MAX)
         return nullptr;
@@ -2114,7 +2096,7 @@ static void AXAttributedStringAppendText(NSMutableAttributedString* attrString, 
     if (![self _prepareAccessibilityCall])
         return nil;
 
-    PassRefPtr<Range> range = [self _convertToDOMRange:NSMakeRange(position, 0)];
+    RefPtr<Range> range = [self _convertToDOMRange:NSMakeRange(position, 0)];
     if (!range)
         return nil;
     
@@ -2427,6 +2409,30 @@ static void AXAttributedStringAppendText(NSMutableAttributedString* attrString, 
         return nil;
     
     return m_object->invalidStatus();
+}
+
+- (NSString *)accessibilityARIACurrentStatus
+{
+    if (![self _prepareAccessibilityCall])
+        return nil;
+    
+    switch (m_object->ariaCurrentState()) {
+    case ARIACurrentFalse:
+        return @"false";
+    case ARIACurrentPage:
+        return @"page";
+    case ARIACurrentStep:
+        return @"step";
+    case ARIACurrentLocation:
+        return @"location";
+    case ARIACurrentTime:
+        return @"time";
+    case ARIACurrentDate:
+        return @"date";
+    default:
+    case ARIACurrentTrue:
+        return @"true";
+    }
 }
 
 - (WebAccessibilityObjectWrapper *)accessibilityMathRootIndexObject

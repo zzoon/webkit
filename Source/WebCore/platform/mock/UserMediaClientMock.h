@@ -45,7 +45,7 @@ public:
     void fire() override
     {
         if (m_requestSuccess)
-            m_request->userMediaAccessGranted();
+            m_request->userMediaAccessGranted(m_request->videoDeviceUIDs().at(0), m_request->audioDeviceUIDs().at(0));
         else
             m_request->userMediaAccessDenied();
     }
@@ -58,7 +58,10 @@ private:
 class UserMediaClientMock final : public UserMediaClient, public TimerEventBasedMock {
 public:
     public:
-    virtual void pageDestroyed() override { }
+    virtual void pageDestroyed() override
+    {
+        delete this;
+    }
 
     virtual void requestPermission(Ref<UserMediaRequest>&& request) override
     {

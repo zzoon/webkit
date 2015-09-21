@@ -49,6 +49,8 @@ namespace WebCore {
 class Cursor;
 class TextIndicator;
 class WebMediaSessionManager;
+enum class TextIndicatorWindowLifetime : uint8_t;
+enum class TextIndicatorWindowDismissalAnimation : uint8_t;
 struct Highlight;
 struct ViewportAttributes;
 }
@@ -75,6 +77,10 @@ class WebColorPicker;
 class WebFullScreenManagerProxyClient;
 #endif
 
+#if USE(GSTREAMER)
+class InstallMissingMediaPluginsPermissionRequest;
+#endif
+
 #if PLATFORM(COCOA)
 struct ColorSpaceData;
 #endif
@@ -97,7 +103,7 @@ public:
     // Tell the view to scroll scrollRect by scrollOffset.
     virtual void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset) = 0;
     // Tell the view to scroll to the given position, and whether this was a programmatic scroll.
-    virtual void requestScroll(const WebCore::FloatPoint& scrollPosition, bool isProgrammaticScroll) = 0;
+    virtual void requestScroll(const WebCore::FloatPoint& scrollPosition, const WebCore::IntPoint& scrollOrigin, bool isProgrammaticScroll) = 0;
 
     // Return the size of the view the page is associated with.
     virtual WebCore::IntSize viewSize() = 0;
@@ -145,9 +151,9 @@ public:
     virtual void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&) = 0;
 #endif
 
-#if PLATFORM(EFL) || PLATFORM(GTK)
+#if PLATFORM(EFL)
     virtual void updateTextInputState() = 0;
-#endif // PLATFORM(EFL) || PLATOFRM(GTK)
+#endif // PLATFORM(EFL)
 
     virtual void handleDownloadRequest(DownloadProxy*) = 0;
 
@@ -179,6 +185,9 @@ public:
     virtual LayerOrView *acceleratedCompositingRootLayer() const = 0;
     virtual PassRefPtr<ViewSnapshot> takeViewSnapshot() = 0;
     virtual void wheelEventWasNotHandledByWebCore(const NativeWebWheelEvent&) = 0;
+#endif
+
+#if PLATFORM(COCOA) || PLATFORM(GTK)
     virtual void selectionDidChange() = 0;
 #endif
 
@@ -210,16 +219,18 @@ public:
     virtual void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled) = 0;
 #endif
 
-    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) = 0;
-    virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) = 0;
+    virtual RefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) = 0;
+    virtual RefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) = 0;
 
 #if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassRefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) = 0;
+    virtual RefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) = 0;
 #endif
 
-    virtual void setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorLifetime = WebCore::TextIndicatorLifetime::Permanent) = 0;
-    virtual void clearTextIndicator(WebCore::TextIndicatorDismissalAnimation = WebCore::TextIndicatorDismissalAnimation::FadeOut) = 0;
+#if PLATFORM(COCOA)
+    virtual void setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorWindowLifetime) = 0;
+    virtual void clearTextIndicator(WebCore::TextIndicatorWindowDismissalAnimation) = 0;
     virtual void setTextIndicatorAnimationProgress(float) = 0;
+#endif
 
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&) = 0;
     virtual void exitAcceleratedCompositingMode() = 0;
@@ -228,7 +239,7 @@ public:
 #if PLATFORM(MAC)
     virtual void pluginFocusOrWindowFocusChanged(uint64_t pluginComplexTextInputIdentifier, bool pluginHasFocusAndWindowHasFocus) = 0;
     virtual void setPluginComplexTextInputState(uint64_t pluginComplexTextInputIdentifier, PluginComplexTextInputState) = 0;
-    virtual void didPerformDictionaryLookup(const DictionaryPopupInfo&) = 0;
+    virtual void didPerformDictionaryLookup(const WebCore::DictionaryPopupInfo&) = 0;
     virtual void dismissContentRelativeChildWindows(bool withAnimation = true) = 0;
     virtual void showCorrectionPanel(WebCore::AlternativeTextType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings) = 0;
     virtual void dismissCorrectionPanel(WebCore::ReasonForDismissingAlternativeText) = 0;
@@ -279,7 +290,7 @@ public:
     virtual void zoomToRect(WebCore::FloatRect, double minimumScale, double maximumScale) = 0;
     virtual void didChangeViewportMetaTagWidth(float) = 0;
     virtual double minimumZoomScale() const = 0;
-    virtual WebCore::FloatSize contentsSize() const = 0;
+    virtual WebCore::FloatRect documentRect() const = 0;
     virtual void overflowScrollViewWillStartPanGesture() = 0;
     virtual void overflowScrollViewDidScroll() = 0;
     virtual void overflowScrollWillStartScroll() = 0;
@@ -310,6 +321,7 @@ public:
     virtual void navigationGestureDidEnd(bool willNavigate, WebBackForwardListItem&) = 0;
     virtual void navigationGestureDidEnd() = 0;
     virtual void willRecordNavigationSnapshot(WebBackForwardListItem&) = 0;
+    virtual void didRemoveNavigationGestureSnapshot() = 0;
 
     virtual void didFirstVisuallyNonEmptyLayoutForMainFrame() = 0;
     virtual void didFinishLoadForMainFrame() = 0;
@@ -326,6 +338,12 @@ public:
     virtual WebCore::WebMediaSessionManager& mediaSessionManager() = 0;
 #endif
 
+    virtual void refView() = 0;
+    virtual void derefView() = 0;
+
+#if USE(GSTREAMER)
+    virtual bool decicePolicyForInstallMissingMediaPluginsPermissionRequest(InstallMissingMediaPluginsPermissionRequest&) = 0;
+#endif
 };
 
 } // namespace WebKit

@@ -23,7 +23,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-function raw(template) {
+function raw(template)
+{
     "use strict";
 
     if (template === null || template === undefined)
@@ -37,7 +38,7 @@ function raw(template) {
 
     var numberOfSubstitutions = arguments.length - 1;
 
-    var segmentCount = @ToLength(rawSegments.length);
+    var segmentCount = @toLength(rawSegments.length);
 
     if (segmentCount <= 0)
         return '';

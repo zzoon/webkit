@@ -43,7 +43,10 @@
 #include <WebCore/PageOverlayController.h>
 #include <WebCore/PlatformMouseEvent.h>
 #include <WebCore/PluginDocument.h>
-#include <WebCore/TextIndicator.h>
+
+#if PLATFORM(COCOA)
+#include <WebCore/TextIndicatorWindow.h>
+#endif
 
 using namespace WebCore;
 
@@ -231,11 +234,15 @@ void FindController::findString(const String& string, FindOptions options, unsig
     else
         found = m_webPage->corePage()->findString(string, coreOptions);
 
-    if (found && !foundStringStartsAfterSelection) {
-        if (options & FindOptionsBackwards)
-            m_foundStringMatchIndex--;
-        else
-            m_foundStringMatchIndex++;
+    if (found) {
+        didFindString();
+
+        if (!foundStringStartsAfterSelection) {
+            if (options & FindOptionsBackwards)
+                m_foundStringMatchIndex--;
+            else
+                m_foundStringMatchIndex++;
+        }
     }
 
     RefPtr<WebPage> protectedWebPage = m_webPage;
@@ -254,7 +261,7 @@ void FindController::findStringMatches(const String& string, FindOptions options
     Vector<Vector<IntRect>> matchRects;
     for (size_t i = 0; i < m_findMatches.size(); ++i) {
         Vector<IntRect> rects;
-        m_findMatches[i]->textRects(rects);
+        m_findMatches[i]->absoluteTextRects(rects);
         matchRects.append(WTF::move(rects));
     }
 
@@ -265,7 +272,7 @@ void FindController::getImageForFindMatch(uint32_t matchIndex)
 {
     if (matchIndex >= m_findMatches.size())
         return;
-    Frame* frame = m_findMatches[matchIndex]->startContainer()->document().frame();
+    Frame* frame = m_findMatches[matchIndex]->startContainer().document().frame();
     if (!frame)
         return;
 
@@ -292,7 +299,7 @@ void FindController::selectFindMatch(uint32_t matchIndex)
 {
     if (matchIndex >= m_findMatches.size())
         return;
-    Frame* frame = m_findMatches[matchIndex]->startContainer()->document().frame();
+    Frame* frame = m_findMatches[matchIndex]->startContainer().document().frame();
     if (!frame)
         return;
     frame->selection().setSelection(VisibleSelection(*m_findMatches[matchIndex]));
@@ -317,12 +324,14 @@ void FindController::hideFindUI()
 #if !PLATFORM(IOS)
 bool FindController::updateFindIndicator(Frame& selectedFrame, bool isShowingOverlay, bool shouldAnimate)
 {
-    RefPtr<TextIndicator> indicator = TextIndicator::createWithSelectionInFrame(selectedFrame, shouldAnimate ? TextIndicatorPresentationTransition::Bounce : TextIndicatorPresentationTransition::None);
+    RefPtr<TextIndicator> indicator = TextIndicator::createWithSelectionInFrame(selectedFrame, TextIndicatorOptionIncludeMarginIfRangeMatchesSelection, shouldAnimate ? TextIndicatorPresentationTransition::Bounce : TextIndicatorPresentationTransition::None);
     if (!indicator)
         return false;
 
     m_findIndicatorRect = enclosingIntRect(indicator->selectionRectInRootViewCoordinates());
-    m_webPage->send(Messages::WebPageProxy::SetTextIndicator(indicator->data(), static_cast<uint64_t>(isShowingOverlay ? TextIndicatorLifetime::Permanent : TextIndicatorLifetime::Temporary)));
+#if PLATFORM(COCOA)
+    m_webPage->send(Messages::WebPageProxy::SetTextIndicator(indicator->data(), static_cast<uint64_t>(isShowingOverlay ? TextIndicatorWindowLifetime::Permanent : TextIndicatorWindowLifetime::Temporary)));
+#endif
     m_isShowingFindIndicator = true;
 
     return true;
@@ -340,6 +349,10 @@ void FindController::hideFindIndicator()
 }
 
 void FindController::willFindString()
+{
+}
+
+void FindController::didFindString()
 {
 }
 

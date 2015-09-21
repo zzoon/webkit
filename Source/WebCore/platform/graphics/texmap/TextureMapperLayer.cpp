@@ -408,7 +408,7 @@ void TextureMapperLayer::paintWithIntermediateSurface(const TextureMapperPaintOp
 
     if (replicaSurface && options.opacity == 1) {
         commitSurface(options, replicaSurface, rect, 1);
-        replicaSurface.clear();
+        replicaSurface = nullptr;
     }
 
     mainSurface = paintIntoSurface(paintOptions, rect.size());
@@ -661,7 +661,7 @@ void TextureMapperLayer::syncAnimations()
     if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyOpacity))
         m_currentOpacity = m_state.opacity;
 
-    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyWebkitFilter))
+    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyFilter))
         m_currentFilters = m_state.filters;
 }
 

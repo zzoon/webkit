@@ -139,8 +139,9 @@ void SVGUseElement::transferSizeAttributesToTargetClone(SVGElement& shadowElemen
     } else if (is<SVGSVGElement>(shadowElement)) {
         // Spec (<use> on <svg>): If attributes width and/or height are provided on the 'use' element, then these
         // values will override the corresponding attributes on the 'svg' in the generated tree.
-        shadowElement.setAttribute(SVGNames::widthAttr, (widthIsValid() && width().valueInSpecifiedUnits()) ? AtomicString(width().valueAsString()) : shadowElement.correspondingElement()->getAttribute(SVGNames::widthAttr));
-        shadowElement.setAttribute(SVGNames::heightAttr, (heightIsValid() && height().valueInSpecifiedUnits()) ? AtomicString(height().valueAsString()) : shadowElement.correspondingElement()->getAttribute(SVGNames::heightAttr));
+        SVGElement* correspondingElement = shadowElement.correspondingElement();
+        shadowElement.setAttribute(SVGNames::widthAttr, (widthIsValid() && width().valueInSpecifiedUnits()) ? AtomicString(width().valueAsString()) : (correspondingElement ? correspondingElement->getAttribute(SVGNames::widthAttr) : nullAtom));
+        shadowElement.setAttribute(SVGNames::heightAttr, (heightIsValid() && height().valueInSpecifiedUnits()) ? AtomicString(height().valueAsString()) : (correspondingElement ? correspondingElement->getAttribute(SVGNames::heightAttr) : nullAtom));
     }
 }
 
@@ -329,8 +330,11 @@ static void removeDisallowedElementsFromSubtree(SVGElement& subtree)
         }
         ++it;
     }
-    for (auto* element : disallowedElements)
-        element->parentNode()->removeChild(element);
+    for (auto* element : disallowedElements) {
+        for (auto& descendant : descendantsOfType<SVGElement>(*element))
+            descendant.setCorrespondingElement(nullptr);
+        element->parentNode()->removeChild(*element);
+    }
 }
 
 static void associateClonesWithOriginals(SVGElement& clone, SVGElement& original)
@@ -402,7 +406,7 @@ SVGElement* SVGUseElement::findTarget(String* targetID) const
 
 void SVGUseElement::cloneTarget(ContainerNode& container, SVGElement& target) const
 {
-    Ref<SVGElement> targetClone = static_pointer_cast<SVGElement>(target.cloneElementWithChildren(document())).releaseNonNull();
+    Ref<SVGElement> targetClone = static_cast<SVGElement&>(target.cloneElementWithChildren(document()).get());
     associateClonesWithOriginals(targetClone.get(), target);
     removeDisallowedElementsFromSubtree(targetClone.get());
     transferSizeAttributesToTargetClone(targetClone.get());
@@ -416,7 +420,7 @@ static void cloneDataAndChildren(SVGElement& replacementClone, SVGElement& origi
     ASSERT(!replacementClone.parentNode());
 
     replacementClone.cloneDataFromElement(originalClone);
-    originalClone.cloneChildNodes(&replacementClone);
+    originalClone.cloneChildNodes(replacementClone);
     associateReplacementClonesWithOriginals(replacementClone, originalClone);
     removeDisallowedElementsFromSubtree(replacementClone);
 }
@@ -445,7 +449,7 @@ void SVGUseElement::expandUseElementsInShadowTree() const
         if (target)
             originalClone.cloneTarget(replacementClone.get(), *target);
 
-        originalClone.parentNode()->replaceChild(replacementClone.ptr(), &originalClone);
+        originalClone.parentNode()->replaceChild(replacementClone.copyRef(), originalClone);
 
         // Resume iterating, starting just inside the replacement clone.
         it = descendants.from(replacementClone.get());
@@ -469,7 +473,7 @@ void SVGUseElement::expandSymbolElementsInShadowTree() const
         auto replacementClone = SVGSVGElement::create(document());
         cloneDataAndChildren(replacementClone.get(), originalClone);
 
-        originalClone.parentNode()->replaceChild(replacementClone.ptr(), &originalClone);
+        originalClone.parentNode()->replaceChild(replacementClone.copyRef(), originalClone);
 
         // Resume iterating, starting just inside the replacement clone.
         it = descendants.from(replacementClone.get());
@@ -543,14 +547,14 @@ void SVGUseElement::updateExternalDocument()
     if (externalDocumentURL.isNull())
         m_externalDocument = nullptr;
     else {
-        CachedResourceRequest request { ResourceRequest { externalDocumentURL } };
+        ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+        options.setContentSecurityPolicyImposition(isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+
+        CachedResourceRequest request { ResourceRequest { externalDocumentURL }, options };
         request.setInitiator(this);
         m_externalDocument = document().cachedResourceLoader().requestSVGDocument(request);
-        if (m_externalDocument) {
-            // FIXME: Is it really OK for us to set this to false for a document that might be shared by another client?
-            m_externalDocument->setShouldCreateFrameForDocument(false); // No frame needed, we just want the elements.
+        if (m_externalDocument)
             m_externalDocument->addClient(this);
-        }
     }
 
     invalidateShadowTree();

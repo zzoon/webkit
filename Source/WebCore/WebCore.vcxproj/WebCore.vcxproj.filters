@@ -483,12 +483,6 @@
     <ClCompile Include="..\Modules\webdatabase\DatabaseAuthorizer.cpp">
       <Filter>Modules\webdatabase</Filter>
     </ClCompile>
-    <ClCompile Include="..\Modules\webdatabase\DatabaseBackend.cpp">
-      <Filter>Modules\webdatabase</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Modules\webdatabase\DatabaseBackendBase.cpp">
-      <Filter>Modules\webdatabase</Filter>
-    </ClCompile>
     <ClCompile Include="..\Modules\webdatabase\DatabaseContext.cpp">
       <Filter>Modules\webdatabase</Filter>
     </ClCompile>
@@ -523,9 +517,6 @@
       <Filter>Modules\webdatabase</Filter>
     </ClCompile>
     <ClCompile Include="..\Modules\webdatabase\SQLStatement.cpp">
-      <Filter>Modules\webdatabase</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Modules\webdatabase\SQLStatementBackend.cpp">
       <Filter>Modules\webdatabase</Filter>
     </ClCompile>
     <ClCompile Include="..\Modules\webdatabase\SQLTransaction.cpp">
@@ -667,6 +658,12 @@
       <Filter>accessibility</Filter>
     </ClCompile>
     <ClCompile Include="..\accessibility\AccessibilityTableRow.cpp">
+      <Filter>accessibility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\accessibility\AccessibilityTree.cpp">
+      <Filter>accessibility</Filter>
+    </ClCompile>
+    <ClCompile Include="..\accessibility\AccessibilityTreeItem.cpp">
       <Filter>accessibility</Filter>
     </ClCompile>
     <ClCompile Include="..\accessibility\AXObjectCache.cpp">
@@ -816,7 +813,7 @@
     <ClCompile Include="..\fileapi\WebKitBlobBuilder.cpp">
       <Filter>page</Filter>
     </ClCompile>
-    <ClCompile Include="..\page\WheelEventDeltaTracker.cpp">
+    <ClCompile Include="..\page\WheelEventDeltaFilter.cpp">
       <Filter>page</Filter>
     </ClCompile>
     <ClCompile Include="..\page\WheelEventTestTrigger.cpp">
@@ -1725,9 +1722,6 @@
     <ClCompile Include="..\platform\graphics\ca\win\LayerChangesFlusher.cpp">
       <Filter>platform\graphics\ca\win</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\graphics\ca\win\LegacyCACFLayerTreeHost.cpp">
-      <Filter>platform\graphics\ca\win</Filter>
-    </ClCompile>
     <ClCompile Include="..\platform\graphics\ca\win\PlatformCAAnimationWin.cpp">
       <Filter>platform\graphics\ca\win</Filter>
     </ClCompile>
@@ -2227,9 +2221,6 @@
       <Filter>css</Filter>
     </ClCompile>
     <ClCompile Include="..\css\LengthFunctions.cpp">
-      <Filter>css</Filter>
-    </ClCompile>
-    <ClCompile Include="..\css\MediaAllInOne.cpp">
       <Filter>css</Filter>
     </ClCompile>
     <ClCompile Include="..\css\MediaFeatureNames.cpp">
@@ -2832,6 +2823,9 @@
     <ClCompile Include="..\rendering\style\StyleVisualData.cpp">
       <Filter>rendering\style</Filter>
     </ClCompile>
+    <ClCompile Include="..\rendering\style\WillChangeData.cpp">
+      <Filter>rendering\style</Filter>
+    </ClCompile>
     <ClCompile Include="..\rendering\style\SVGRenderStyle.cpp">
       <Filter>rendering\style</Filter>
     </ClCompile>
@@ -3039,9 +3033,6 @@
     <ClCompile Include="..\dom\ChildNodeList.cpp">
       <Filter>dom</Filter>
     </ClCompile>
-    <ClCompile Include="..\dom\ClassNodeList.cpp">
-      <Filter>dom</Filter>
-    </ClCompile>
     <ClCompile Include="..\dom\ClientRect.cpp">
       <Filter>dom</Filter>
     </ClCompile>
@@ -3240,9 +3231,6 @@
     <ClCompile Include="..\dom\Node.cpp">
       <Filter>dom</Filter>
     </ClCompile>
-    <ClCompile Include="..\dom\NodeFilter.cpp">
-      <Filter>dom</Filter>
-    </ClCompile>
     <ClCompile Include="..\dom\NodeFilterCondition.cpp">
       <Filter>dom</Filter>
     </ClCompile>
@@ -3291,9 +3279,6 @@
     <ClCompile Include="..\dom\Range.cpp">
       <Filter>dom</Filter>
     </ClCompile>
-    <ClCompile Include="..\dom\RangeException.cpp">
-      <Filter>dom</Filter>
-    </ClCompile>
     <ClCompile Include="..\dom\RegisteredEventListener.cpp">
       <Filter>dom</Filter>
     </ClCompile>
@@ -3339,7 +3324,7 @@
     <ClCompile Include="..\dom\StyledElement.cpp">
       <Filter>dom</Filter>
     </ClCompile>
-    <ClCompile Include="..\dom\TagNodeList.cpp">
+    <ClCompile Include="..\dom\TagCollection.cpp">
       <Filter>dom</Filter>
     </ClCompile>
     <ClCompile Include="..\dom\Text.cpp">
@@ -3600,6 +3585,9 @@
     <ClCompile Include="..\fileapi\AsyncFileStream.cpp">
       <Filter>html</Filter>
     </ClCompile>
+    <ClCompile Include="..\html\AttributeDOMTokenList.cpp">
+      <Filter>html</Filter>
+    </ClCompile>
     <ClCompile Include="..\html\BaseButtonInputType.cpp">
       <Filter>html</Filter>
     </ClCompile>
@@ -3625,9 +3613,6 @@
       <Filter>html</Filter>
     </ClCompile>
     <ClCompile Include="..\html\CheckboxInputType.cpp">
-      <Filter>html</Filter>
-    </ClCompile>
-    <ClCompile Include="..\html\ClassList.cpp">
       <Filter>html</Filter>
     </ClCompile>
     <ClCompile Include="..\html\ColorInputType.cpp">
@@ -3897,6 +3882,9 @@
     <ClCompile Include="..\html\HTMLSelectElementWin.cpp">
       <Filter>html</Filter>
     </ClCompile>
+    <ClCompile Include="..\html\HTMLSlotElementWin.cpp">
+      <Filter>html</Filter>
+    </ClCompile>
     <ClCompile Include="..\html\HTMLSourceElement.cpp">
       <Filter>html</Filter>
     </ClCompile>
@@ -4006,9 +3994,6 @@
       <Filter>html</Filter>
     </ClCompile>
     <ClCompile Include="..\html\RangeInputType.cpp">
-      <Filter>html</Filter>
-    </ClCompile>
-    <ClCompile Include="..\html\RelList.cpp">
       <Filter>html</Filter>
     </ClCompile>
     <ClCompile Include="..\html\ResetInputType.cpp">
@@ -4254,10 +4239,10 @@
     <ClCompile Include="..\bindings\js\JSCanvasRenderingContextCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
-    <ClCompile Include="..\bindings\js\JSCDATASectionCustom.cpp">
+    <ClCompile Include="..\bindings\js\JSCommandLineAPIHostCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
-    <ClCompile Include="..\bindings\js\JSCommandLineAPIHostCustom.cpp">
+    <ClCompile Include="..\bindings\js\JSCountQueuingStrategyCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\JSCSSRuleCustom.cpp">
@@ -4311,6 +4296,9 @@
     <ClCompile Include="..\bindings\js\JSDOMMimeTypeArrayCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
+    <ClCompile Include="..\bindings\js\JSDOMNamedFlowCollectionCustom.cpp">
+      <Filter>bindings\js</Filter>
+    </ClCompile>
     <ClCompile Include="..\bindings\js\JSDOMPluginArrayCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
@@ -4324,6 +4312,9 @@
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\JSDOMStringMapCustom.cpp">
+      <Filter>bindings\js</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bindings\js\JSDOMTokenListCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\JSErrorHandler.cpp">
@@ -4351,9 +4342,6 @@
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\JSHTMLInputElementCustom.cpp">
-      <Filter>bindings\js</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bindings\js\JSHTMLLinkElementCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\JSHTMLObjectElementCustom.cpp">
@@ -4404,9 +4392,6 @@
     <ClCompile Include="..\bindings\js\JSNodeCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
-    <ClCompile Include="..\bindings\js\JSNodeFilterCondition.cpp">
-      <Filter>bindings\js</Filter>
-    </ClCompile>
     <ClCompile Include="..\bindings\js\JSNodeFilterCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
@@ -4429,9 +4414,6 @@
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\ReadableJSStream.cpp">
-      <Filter>bindings\js</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bindings\js\JSRequestAnimationFrameCallbackCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\JSSQLResultSetRowListCustom.cpp">
@@ -4465,9 +4447,6 @@
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\JSSVGPathSegCustom.cpp">
-      <Filter>bindings\js</Filter>
-    </ClCompile>
-    <ClCompile Include="..\bindings\js\JSTextCustom.cpp">
       <Filter>bindings\js</Filter>
     </ClCompile>
     <ClCompile Include="..\bindings\js\JSTreeWalkerCustom.cpp">
@@ -5134,6 +5113,9 @@
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSCounter.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
+    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSCountQueuingStrategy.cpp">
+      <Filter>DerivedSources</Filter>
+    </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSCrypto.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
@@ -5270,9 +5252,6 @@
       <Filter>DerivedSources</Filter>
     </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSElement.cpp">
-      <Filter>DerivedSources</Filter>
-    </ClCompile>
-    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSEntity.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSEntityReference.cpp">
@@ -5503,6 +5482,9 @@
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSHTMLSelectElement.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
+    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSHTMLSlotElement.cpp">
+      <Filter>DerivedSources</Filter>
+    </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSHTMLSourceElement.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
@@ -5698,9 +5680,6 @@
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSRange.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
-    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSRangeException.cpp">
-      <Filter>DerivedSources</Filter>
-    </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSReadableStream.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
@@ -5720,6 +5699,12 @@
       <Filter>DerivedSources</Filter>
     </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSScreen.cpp">
+      <Filter>DerivedSources</Filter>
+    </ClCompile>
+    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSSecurityPolicyViolationEvent.cpp">
+      <Filter>DerivedSources</Filter>
+    </ClCompile>
+    <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSShadowRoot.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSSQLError.cpp">
@@ -6748,9 +6733,6 @@
     <ClCompile Include="..\page\scrolling\coordinatedgraphics\ScrollingStateNodeCoordinatedGraphics.cpp">
       <Filter>page\scrolling\coordinatedgraphics</Filter>
     </ClCompile>
-    <ClCompile Include="..\page\scrolling\coordinatedgraphics\ScrollingStateScrollingNodeCoordinatedGraphics.cpp">
-      <Filter>page\scrolling\coordinatedgraphics</Filter>
-    </ClCompile>
     <ClCompile Include="..\platform\graphics\GraphicsLayerTransform.cpp">
       <Filter>platform\graphics</Filter>
     </ClCompile>
@@ -7105,15 +7087,6 @@
     <ClCompile Include="..\editing\win\EditorWin.cpp">
       <Filter>editing</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\graphics\MaskImageOperation.cpp">
-      <Filter>platform\graphics</Filter>
-    </ClCompile>
-    <ClCompile Include="..\rendering\RenderLayerMaskImageInfo.cpp">
-      <Filter>rendering</Filter>
-    </ClCompile>
-    <ClCompile Include="..\css\WebKitCSSResourceValue.cpp">
-      <Filter>css</Filter>
-    </ClCompile>
     <ClCompile Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\WebCore\DerivedSources\JSEXTsRGB.cpp">
       <Filter>DerivedSources</Filter>
     </ClCompile>
@@ -7263,6 +7236,32 @@
     </ClCompile>
     <ClCompile Include="..\platform\graphics\PlatformDisplay.cpp">
       <Filter>platform\graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\win\MemoryPressureHandlerWin.cpp">
+      <Filter>platform\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dom\NodeOrString.cpp" />
+    <ClCompile Include="..\bindings\js\JSCharacterDataCustom.cpp" />
+    <ClCompile Include="..\bindings\js\JSDocumentFragmentCustom.cpp" />
+    <ClCompile Include="..\bindings\js\JSDocumentTypeCustom.cpp" />
+    <ClCompile Include="..\bindings\js\JSNodeOrString.cpp" />
+    <ClCompile Include="..\html\canvas\DOMPath.cpp">
+      <Filter>html\canvas</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\graphics\PathUtilities.cpp">
+      <Filter>platform\graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\win\GDIUtilities.cpp">
+      <Filter>platform\graphics\win</Filter>
+    </ClCompile>
+    <ClCompile Include="..\page\DOMSecurityPolicy.cpp">
+      <Filter>page</Filter>
+    </ClCompile>
+    <ClCompile Include="..\platform\network\DataURLDecoder.cpp" />
+    <ClCompile Include="..\dom\ClassCollection.cpp" />
+    <ClCompile Include="..\html\GenericCachedHTMLCollection.cpp" />
+    <ClCompile Include="..\platform\graphics\ca\win\WebTiledBackingLayerWin.cpp">
+      <Filter>platform\graphics\ca\win</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -7434,12 +7433,6 @@
     <ClInclude Include="..\Modules\webdatabase\DatabaseAuthorizer.h">
       <Filter>Modules\webdatabase</Filter>
     </ClInclude>
-    <ClInclude Include="..\Modules\webdatabase\DatabaseBackend.h">
-      <Filter>Modules\webdatabase</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Modules\webdatabase\DatabaseBackendBase.h">
-      <Filter>Modules\webdatabase</Filter>
-    </ClInclude>
     <ClInclude Include="..\Modules\webdatabase\DatabaseBasicTypes.h">
       <Filter>Modules\webdatabase</Filter>
     </ClInclude>
@@ -7489,9 +7482,6 @@
       <Filter>Modules\webdatabase</Filter>
     </ClInclude>
     <ClInclude Include="..\Modules\webdatabase\SQLStatement.h">
-      <Filter>Modules\webdatabase</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Modules\webdatabase\SQLStatementBackend.h">
       <Filter>Modules\webdatabase</Filter>
     </ClInclude>
     <ClInclude Include="..\Modules\webdatabase\SQLStatementCallback.h">
@@ -7654,6 +7644,12 @@
       <Filter>accessibility</Filter>
     </ClInclude>
     <ClInclude Include="..\accessibility\AccessibilityTableRow.h">
+      <Filter>accessibility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\accessibility\AccessibilityTree.h">
+      <Filter>accessibility</Filter>
+    </ClInclude>
+    <ClInclude Include="..\accessibility\AccessibilityTreeItem.h">
       <Filter>accessibility</Filter>
     </ClInclude>
     <ClInclude Include="..\accessibility\AXObjectCache.h">
@@ -7830,7 +7826,7 @@
     <ClInclude Include="..\page\WebKitPoint.h">
       <Filter>page</Filter>
     </ClInclude>
-    <ClInclude Include="..\page\WheelEventDeltaTracker.h">
+    <ClInclude Include="..\page\WheelEventDeltaFilter.h">
       <Filter>page</Filter>
     </ClInclude>
     <ClInclude Include="..\page\WheelEventTestTrigger.h">
@@ -8713,9 +8709,6 @@
       <Filter>platform\graphics\ca\win</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\graphics\ca\win\CACFLayerTreeHostClient.h">
-      <Filter>platform\graphics\ca\win</Filter>
-    </ClInclude>
-    <ClInclude Include="..\platform\graphics\ca\win\LegacyCACFLayerTreeHost.h">
       <Filter>platform\graphics\ca\win</Filter>
     </ClInclude>
     <ClInclude Include="..\platform\graphics\ca\win\PlatformCALayerWinInternal.h">
@@ -9885,6 +9878,9 @@
     <ClInclude Include="..\rendering\style\StyleVisualData.h">
       <Filter>rendering\style</Filter>
     </ClInclude>
+    <ClInclude Include="..\rendering\style\WillChangeData.h">
+      <Filter>rendering\style</Filter>
+    </ClInclude>
     <ClInclude Include="..\rendering\style\SVGRenderStyle.h">
       <Filter>rendering\style</Filter>
     </ClInclude>
@@ -10099,9 +10095,6 @@
       <Filter>dom</Filter>
     </ClInclude>
     <ClInclude Include="..\dom\ChildNodeList.h">
-      <Filter>dom</Filter>
-    </ClInclude>
-    <ClInclude Include="..\dom\ClassNodeList.h">
       <Filter>dom</Filter>
     </ClInclude>
     <ClInclude Include="..\dom\ClientRect.h">
@@ -10392,9 +10385,6 @@
     <ClInclude Include="..\dom\RangeBoundaryPoint.h">
       <Filter>dom</Filter>
     </ClInclude>
-    <ClInclude Include="..\dom\RangeException.h">
-      <Filter>dom</Filter>
-    </ClInclude>
     <ClInclude Include="..\dom\RegisteredEventListener.h">
       <Filter>dom</Filter>
     </ClInclude>
@@ -10446,7 +10436,7 @@
     <ClInclude Include="..\dom\StyledElement.h">
       <Filter>dom</Filter>
     </ClInclude>
-    <ClInclude Include="..\dom\TagNodeList.h">
+    <ClInclude Include="..\dom\TagCollection.h">
       <Filter>dom</Filter>
     </ClInclude>
     <ClInclude Include="..\dom\TemplateContentDocumentFragment.h">
@@ -10752,6 +10742,9 @@
     <ClInclude Include="..\fileapi\AsyncFileStream.h">
       <Filter>html</Filter>
     </ClInclude>
+    <ClInclude Include="..\html\AttributeDOMTokenList.h">
+      <Filter>html</Filter>
+    </ClInclude>
     <ClInclude Include="..\html\BaseButtonInputType.h">
       <Filter>html</Filter>
     </ClInclude>
@@ -10777,9 +10770,6 @@
       <Filter>html</Filter>
     </ClInclude>
     <ClInclude Include="..\html\CheckboxInputType.h">
-      <Filter>html</Filter>
-    </ClInclude>
-    <ClInclude Include="..\html\ClassList.h">
       <Filter>html</Filter>
     </ClInclude>
     <ClInclude Include="..\html\CollectionType.h">
@@ -11055,6 +11045,9 @@
     <ClInclude Include="..\html\HTMLSelectElement.h">
       <Filter>html</Filter>
     </ClInclude>
+    <ClInclude Include="..\html\HTMLSlotElement.h">
+      <Filter>html</Filter>
+    </ClInclude>
     <ClInclude Include="..\html\HTMLSourceElement.h">
       <Filter>html</Filter>
     </ClInclude>
@@ -11170,9 +11163,6 @@
       <Filter>html</Filter>
     </ClInclude>
     <ClInclude Include="..\html\RangeInputType.h">
-      <Filter>html</Filter>
-    </ClInclude>
-    <ClInclude Include="..\html\RelList.h">
       <Filter>html</Filter>
     </ClInclude>
     <ClInclude Include="..\html\ResetInputType.h">
@@ -11485,9 +11475,6 @@
       <Filter>bindings\js</Filter>
     </ClInclude>
     <ClInclude Include="..\bindings\js\JSNodeCustom.h">
-      <Filter>bindings\js</Filter>
-    </ClInclude>
-    <ClInclude Include="..\bindings\js\JSNodeFilterCondition.h">
       <Filter>bindings\js</Filter>
     </ClInclude>
     <ClInclude Include="..\bindings\js\JSPluginElementFunctions.h">
@@ -11922,9 +11909,6 @@
     <ClInclude Include="..\inspector\InspectorDOMStorageAgent.h">
       <Filter>inspector</Filter>
     </ClInclude>
-    <ClInclude Include="..\inspector\InspectorForwarding.h">
-      <Filter>inspector</Filter>
-    </ClInclude>
     <ClInclude Include="..\inspector\InspectorFrontendClient.h">
       <Filter>inspector</Filter>
     </ClInclude>
@@ -12191,6 +12175,9 @@
       <Filter>ForwardingHeaders\runtime</Filter>
     </ClInclude>
     <ClInclude Include="..\ForwardingHeaders\runtime\SymbolTable.h">
+      <Filter>ForwardingHeaders\runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ForwardingHeaders\runtime\Watchdog.h">
       <Filter>ForwardingHeaders\runtime</Filter>
     </ClInclude>
     <ClInclude Include="..\ForwardingHeaders\runtime\WeakGCMap.h">
@@ -12515,6 +12502,9 @@
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSCounter.h">
       <Filter>DerivedSources</Filter>
     </ClInclude>
+    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSCountQueuingStrategy.h">
+      <Filter>DerivedSources</Filter>
+    </ClInclude>
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSCrypto.h">
       <Filter>DerivedSources</Filter>
     </ClInclude>
@@ -12651,9 +12641,6 @@
       <Filter>DerivedSources</Filter>
     </ClInclude>
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSElement.h">
-      <Filter>DerivedSources</Filter>
-    </ClInclude>
-    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSEntity.h">
       <Filter>DerivedSources</Filter>
     </ClInclude>
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSEntityReference.h">
@@ -12884,6 +12871,9 @@
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSHTMLSelectElement.h">
       <Filter>DerivedSources</Filter>
     </ClInclude>
+    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSHTMLSlotElement.h">
+      <Filter>DerivedSources</Filter>
+    </ClInclude>
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSHTMLSourceElement.h">
       <Filter>DerivedSources</Filter>
     </ClInclude>
@@ -13073,9 +13063,6 @@
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSRange.h">
       <Filter>DerivedSources</Filter>
     </ClInclude>
-    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSRangeException.h">
-      <Filter>DerivedSources</Filter>
-    </ClInclude>
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSRect.h">
       <Filter>DerivedSources</Filter>
     </ClInclude>
@@ -13086,6 +13073,9 @@
       <Filter>DerivedSources</Filter>
     </ClInclude>
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSScreen.h">
+      <Filter>DerivedSources</Filter>
+    </ClInclude>
+    <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSShadowRoot.h">
       <Filter>DerivedSources</Filter>
     </ClInclude>
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSSQLError.h">
@@ -14543,15 +14533,6 @@
     <ClInclude Include="..\platform\graphics\avfoundation\MediaTimeAVFoundation.h">
       <Filter>platform\graphics\avfoundation</Filter>
     </ClInclude>
-    <ClInclude Include="..\platform\graphics\MaskImageOperation.h">
-      <Filter>platform\graphics</Filter>
-    </ClInclude>
-    <ClInclude Include="..\rendering\RenderLayerMaskImageInfo.h">
-      <Filter>rendering</Filter>
-    </ClInclude>
-    <ClInclude Include="..\css\WebKitCSSResourceValue.h">
-      <Filter>css</Filter>
-    </ClInclude>
     <ClInclude Include="$(ConfigurationBuildDir)\obj$(PlatformArchitecture)\$(ProjectName)\DerivedSources\JSEXTsRGB.h">
       <Filter>DerivedSources</Filter>
     </ClInclude>
@@ -14593,9 +14574,6 @@
     </ClInclude>
     <ClInclude Include="..\platform\graphics\opentype\OpenTypeVerticalData.h">
       <Filter>platform\graphics\opentype</Filter>
-    </ClInclude>
-    <ClInclude Include="..\svg\ColorDistance.h">
-      <Filter>svg</Filter>
     </ClInclude>
     <ClInclude Include="..\svg\SVGAElement.h">
       <Filter>svg</Filter>
@@ -15215,6 +15193,9 @@
     <ClInclude Include="..\platform\graphics\FontCascadeFonts.h">
       <Filter>platform\graphics</Filter>
     </ClInclude>
+    <ClInclude Include="..\Modules\streams\CountQueuingStrategy.h">
+      <Filter>Modules\streams</Filter>
+    </ClInclude>
     <ClInclude Include="..\Modules\streams\ReadableStream.h">
       <Filter>Modules\streams</Filter>
     </ClInclude>
@@ -15251,7 +15232,29 @@
     <ClInclude Include="..\platform\graphics\win\PlatformDisplayWin.h">
       <Filter>platform\graphics\win</Filter>
     </ClInclude>
-    <ClInclude Include="..\platform\VNodeTracker.h" />
+    <ClInclude Include="..\platform\VNodeTracker.h">
+      <Filter>platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\dom\NodeOrString.h" />
+    <ClInclude Include="..\bindings\js\JSNodeOrString.h" />
+    <ClInclude Include="..\html\canvas\DOMPath.h">
+      <Filter>html\canvas</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\graphics\PathUtilities.h">
+      <Filter>platform\graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="..\platform\win\GDIUtilities.h">
+      <Filter>platform\graphics\win</Filter>
+    </ClInclude>
+    <ClInclude Include="..\page\DOMSecurityPolicy.h">
+      <Filter>page</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ForwardingHeaders\inspector\InspectorFrontendRouter.h" />
+    <ClInclude Include="..\platform\network\DataURLDecoder.h" />
+    <ClInclude Include="..\dom\ClassCollection.h" />
+    <ClInclude Include="..\platform\graphics\ca\win\WebTiledBackingLayerWin.h">
+      <Filter>platform\graphics\ca\win</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\css\CSSGrammar.y.in">

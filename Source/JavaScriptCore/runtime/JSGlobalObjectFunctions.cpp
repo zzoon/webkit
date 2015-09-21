@@ -580,11 +580,12 @@ EncodedJSValue JSC_HOST_CALL globalFuncEval(ExecState* exec)
     }
 
     JSGlobalObject* calleeGlobalObject = exec->callee()->globalObject();
-    EvalExecutable* eval = EvalExecutable::create(exec, makeSource(s), false, ThisTDZMode::CheckIfNeeded);
+    VariableEnvironment emptyTDZVariables; // Indirect eval does not have access to the lexical scope.
+    EvalExecutable* eval = EvalExecutable::create(exec, makeSource(s), false, ThisTDZMode::CheckIfNeeded, &emptyTDZVariables);
     if (!eval)
         return JSValue::encode(jsUndefined());
 
-    return JSValue::encode(exec->interpreter()->execute(eval, exec, calleeGlobalObject->globalThis(), calleeGlobalObject));
+    return JSValue::encode(exec->interpreter()->execute(eval, exec, calleeGlobalObject->globalThis(), calleeGlobalObject->globalScope()));
 }
 
 EncodedJSValue JSC_HOST_CALL globalFuncParseInt(ExecState* exec)
@@ -871,6 +872,9 @@ EncodedJSValue JSC_HOST_CALL globalFuncProtoSetter(ExecState* exec)
 
     // Setting __proto__ to a non-object, non-null value is silently ignored to match Mozilla.
     if (!value.isObject() && !value.isNull())
+        return JSValue::encode(jsUndefined());
+
+    if (thisObject->prototype() == value)
         return JSValue::encode(jsUndefined());
 
     if (!thisObject->isExtensible())

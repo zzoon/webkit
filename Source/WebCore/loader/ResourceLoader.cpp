@@ -32,6 +32,7 @@
 
 #include "ApplicationCacheHost.h"
 #include "AuthenticationChallenge.h"
+#include "DataURLDecoder.h"
 #include "DiagnosticLoggingClient.h"
 #include "DiagnosticLoggingKeys.h"
 #include "DocumentLoader.h"
@@ -66,7 +67,7 @@ ResourceLoader::ResourceLoader(Frame* frame, ResourceLoaderOptions options)
     , m_reachedTerminalState(false)
     , m_notifiedLoadComplete(false)
     , m_cancellationStatus(NotCancelled)
-    , m_defersLoading(frame->page()->defersLoading())
+    , m_defersLoading(options.defersLoadingPolicy() == DefersLoadingPolicy::AllowDefersLoading && frame->page()->defersLoading())
     , m_options(options)
     , m_isQuickLookResource(false)
 #if ENABLE(CONTENT_EXTENSIONS)
@@ -80,6 +81,17 @@ ResourceLoader::~ResourceLoader()
     ASSERT(m_reachedTerminalState);
 }
 
+void ResourceLoader::finishNetworkLoad()
+{
+    platformStrategies()->loaderStrategy()->resourceLoadScheduler()->remove(this);
+
+    if (m_handle) {
+        ASSERT(m_handle->client() == this);
+        m_handle->clearClient();
+        m_handle = nullptr;
+    }
+}
+
 void ResourceLoader::releaseResources()
 {
     ASSERT(!m_reachedTerminalState);
@@ -90,25 +102,18 @@ void ResourceLoader::releaseResources()
     // has been deallocated and also to avoid reentering this method.
     Ref<ResourceLoader> protect(*this);
 
-    m_frame = 0;
-    m_documentLoader = 0;
+    m_frame = nullptr;
+    m_documentLoader = nullptr;
     
     // We need to set reachedTerminalState to true before we release
     // the resources to prevent a double dealloc of WebView <rdar://problem/4372628>
     m_reachedTerminalState = true;
 
-    platformStrategies()->loaderStrategy()->resourceLoadScheduler()->remove(this);
+    finishNetworkLoad();
+
     m_identifier = 0;
 
-    if (m_handle) {
-        // Clear out the ResourceHandle's client so that it doesn't try to call
-        // us back after we release it, unless it has been replaced by someone else.
-        if (m_handle->client() == this)
-            m_handle->setClient(0);
-        m_handle = 0;
-    }
-
-    m_resourceData = 0;
+    m_resourceData = nullptr;
     m_deferredRequest = ResourceRequest();
 }
 
@@ -130,7 +135,8 @@ bool ResourceLoader::init(const ResourceRequest& r)
     }
 #endif
     
-    m_defersLoading = m_frame->page()->defersLoading();
+    m_defersLoading = m_options.defersLoadingPolicy() == DefersLoadingPolicy::AllowDefersLoading && m_frame->page()->defersLoading();
+
     if (m_options.securityCheck() == DoSecurityCheck && !m_frame->document()->securityOrigin()->canDisplay(clientRequest.url())) {
         FrameLoader::reportLocalLoadFailed(m_frame.get(), clientRequest.url().string());
         releaseResources();
@@ -147,7 +153,7 @@ bool ResourceLoader::init(const ResourceRequest& r)
             clientRequest.setFirstPartyForCookies(document->firstPartyForCookies());
     }
 
-    willSendRequest(clientRequest, ResourceResponse());
+    willSendRequestInternal(clientRequest, ResourceResponse());
 
 #if PLATFORM(IOS)
     // If this ResourceLoader was stopped as a result of willSendRequest, bail out.
@@ -202,14 +208,22 @@ void ResourceLoader::start()
         return;
     }
 
-    if (!m_reachedTerminalState) {
-        FrameLoader& loader = m_request.url().protocolIsData() ? dataProtocolFrameLoader() : *frameLoader();
-        m_handle = ResourceHandle::create(loader.networkingContext(), m_request, this, m_defersLoading, m_options.sniffContent() == SniffContent);
+    if (m_reachedTerminalState)
+        return;
+
+    if (m_request.url().protocolIsData()) {
+        loadDataURL();
+        return;
     }
+
+    m_handle = ResourceHandle::create(frameLoader()->networkingContext(), m_request, this, m_defersLoading, m_options.sniffContent() == SniffContent);
 }
 
 void ResourceLoader::setDefersLoading(bool defers)
 {
+    if (m_options.defersLoadingPolicy() == DefersLoadingPolicy::DisallowDefersLoading)
+        return;
+
     m_defersLoading = defers;
     if (m_handle)
         m_handle->setDefersLoading(defers);
@@ -225,17 +239,35 @@ void ResourceLoader::setDefersLoading(bool defers)
 FrameLoader* ResourceLoader::frameLoader() const
 {
     if (!m_frame)
-        return 0;
+        return nullptr;
     return &m_frame->loader();
 }
 
-// This function should only be called when frameLoader() is non-null.
-FrameLoader& ResourceLoader::dataProtocolFrameLoader() const
+void ResourceLoader::loadDataURL()
 {
-    FrameLoader* loader = frameLoader();
-    ASSERT(loader);
-    FrameLoader* dataProtocolLoader = loader->client().dataProtocolLoader();
-    return *(dataProtocolLoader ? dataProtocolLoader : loader);
+    auto url = m_request.url();
+    ASSERT(url.protocolIsData());
+
+    RefPtr<ResourceLoader> loader(this);
+    DataURLDecoder::decode(url, [loader, url] (Optional<DataURLDecoder::Result> decodeResult) {
+        if (loader->reachedTerminalState())
+            return;
+        if (!decodeResult) {
+            loader->didFail(ResourceError(errorDomainWebKitInternal, 0, url.string(), "Data URL decoding failed"));
+            return;
+        }
+        auto& result = decodeResult.value();
+        auto dataSize = result.data->size();
+
+        ResourceResponse dataResponse { url, result.mimeType, dataSize, result.charset };
+        loader->didReceiveResponse(dataResponse);
+
+        if (!loader->reachedTerminalState() && dataSize)
+            loader->didReceiveBuffer(result.data.get(), dataSize, DataPayloadWholeResource);
+
+        if (!loader->reachedTerminalState())
+            loader->didFinishLoading(currentTime());
+    });
 }
 
 void ResourceLoader::setDataBufferingPolicy(DataBufferingPolicy dataBufferingPolicy)
@@ -244,7 +276,7 @@ void ResourceLoader::setDataBufferingPolicy(DataBufferingPolicy dataBufferingPol
 
     // Reset any already buffered data
     if (dataBufferingPolicy == DoNotBufferData)
-        m_resourceData = 0;
+        m_resourceData = nullptr;
 }
     
 void ResourceLoader::willSwitchToSubstituteResource()
@@ -286,7 +318,7 @@ bool ResourceLoader::isSubresourceLoader()
     return false;
 }
 
-void ResourceLoader::willSendRequest(ResourceRequest& request, const ResourceResponse& redirectResponse)
+void ResourceLoader::willSendRequestInternal(ResourceRequest& request, const ResourceResponse& redirectResponse)
 {
     // Protect this in this delegate method since the additional processing can do
     // anything including possibly derefing this; one example of this is Radar 3266216.
@@ -297,38 +329,27 @@ void ResourceLoader::willSendRequest(ResourceRequest& request, const ResourceRes
     ASSERT(m_resourceType != ResourceType::Invalid);
 #endif
 
-    if (!frameLoader()) {
-        didFail(cannotShowURLError());
-        return;
-    }
-
-    Page* page = frameLoader()->frame().page();
-    if (!page) {
-        didFail(cannotShowURLError());
-        return;
-    }
-
-    if (!m_documentLoader) {
-        didFail(cannotShowURLError());
-        return;
-    }
-
-#if ENABLE(CONTENT_EXTENSIONS)
-    auto* userContentController = page->userContentController();
-    if (userContentController)
-        userContentController->processContentExtensionRulesForLoad(*page, request, m_resourceType, *m_documentLoader);
-
-    if (request.isNull()) {
-        didFail(cannotShowURLError());
-        return;
-    }
-#endif
-
     // We need a resource identifier for all requests, even if FrameLoader is never going to see it (such as with CORS preflight requests).
     bool createdResourceIdentifier = false;
     if (!m_identifier) {
         m_identifier = m_frame->page()->progress().createUniqueIdentifier();
         createdResourceIdentifier = true;
+    }
+
+#if ENABLE(CONTENT_EXTENSIONS)
+    if (frameLoader()) {
+        Page* page = frameLoader()->frame().page();
+        if (page && m_documentLoader) {
+            auto* userContentController = page->userContentController();
+            if (userContentController)
+                userContentController->processContentExtensionRulesForLoad(*page, request, m_resourceType, *m_documentLoader);
+        }
+    }
+#endif
+
+    if (request.isNull()) {
+        didFail(cannotShowURLError());
+        return;
     }
 
     if (m_options.sendLoadCallbacks() == SendCallbacks) {
@@ -346,19 +367,29 @@ void ResourceLoader::willSendRequest(ResourceRequest& request, const ResourceRes
     else
         InspectorInstrumentation::willSendRequest(m_frame.get(), m_identifier, m_frame->loader().documentLoader(), request, redirectResponse);
 
-    if (!redirectResponse.isNull())
+    bool isRedirect = !redirectResponse.isNull();
+    if (isRedirect)
         platformStrategies()->loaderStrategy()->resourceLoadScheduler()->crossOriginRedirectReceived(this, request.url());
 
     m_request = request;
 
-    if (!redirectResponse.isNull() && !m_documentLoader->isCommitted())
-        frameLoader()->client().dispatchDidReceiveServerRedirectForProvisionalLoad();
+    if (isRedirect) {
+        auto& redirectURL = request.url();
+        if (!m_documentLoader->isCommitted())
+            frameLoader()->client().dispatchDidReceiveServerRedirectForProvisionalLoad();
+
+        if (redirectURL.protocolIsData()) {
+            // Handle data URL decoding locally.
+            finishNetworkLoad();
+            loadDataURL();
+        }
+    }
 }
 
-void ResourceLoader::willSendRequest(ResourceRequest&& request, const ResourceResponse& redirectResponse, std::function<void(ResourceRequest&)> callback)
+void ResourceLoader::willSendRequest(ResourceRequest&& request, const ResourceResponse& redirectResponse, std::function<void(ResourceRequest&&)>&& callback)
 {
-    willSendRequest(request, redirectResponse);
-    callback(request);
+    willSendRequestInternal(request, redirectResponse);
+    callback(WTF::move(request));
 }
 
 void ResourceLoader::didSendData(unsigned long long, unsigned long long)
@@ -381,6 +412,8 @@ static void logResourceResponseSource(Frame* frame, ResourceResponse::Source sou
     case ResourceResponse::Source::DiskCacheAfterValidation:
         sourceKey = DiagnosticLoggingKeys::diskCacheAfterValidationKey();
         break;
+    case ResourceResponse::Source::MemoryCache:
+    case ResourceResponse::Source::MemoryCacheAfterValidation:
     case ResourceResponse::Source::Unknown:
         return;
     }
@@ -530,7 +563,7 @@ void ResourceLoader::cancel(const ResourceError& error)
         m_documentLoader->cancelPendingSubstituteLoad(this);
         if (m_handle) {
             m_handle->cancel();
-            m_handle = 0;
+            m_handle = nullptr;
         }
         cleanupForError(nonNullError);
     }
@@ -568,7 +601,7 @@ void ResourceLoader::willSendRequest(ResourceHandle*, ResourceRequest& request, 
 {
     if (documentLoader()->applicationCacheHost()->maybeLoadFallbackForRedirect(this, request, redirectResponse))
         return;
-    willSendRequest(request, redirectResponse);
+    willSendRequestInternal(request, redirectResponse);
 }
 
 void ResourceLoader::didSendData(ResourceHandle*, unsigned long long bytesSent, unsigned long long totalBytesToBeSent)

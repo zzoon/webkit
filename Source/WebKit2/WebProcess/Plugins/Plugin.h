@@ -126,16 +126,16 @@ public:
 
     // Tells the plug-in to paint itself into the given graphics context. The passed-in context and
     // dirty rect are in window coordinates. The context is saved/restored by the caller.
-    virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRect) = 0;
+    virtual void paint(WebCore::GraphicsContext&, const WebCore::IntRect& dirtyRect) = 0;
 
     // Invalidate native tintable controls. The passed-in context is in window coordinates.
-    virtual void updateControlTints(WebCore::GraphicsContext*);
+    virtual void updateControlTints(WebCore::GraphicsContext&);
 
     // Returns whether the plug-in supports snapshotting or not.
     virtual bool supportsSnapshotting() const = 0;
 
     // Tells the plug-in to draw itself into a bitmap, and return that.
-    virtual PassRefPtr<ShareableBitmap> snapshot() = 0;
+    virtual RefPtr<ShareableBitmap> snapshot() = 0;
 
 #if PLATFORM(COCOA)
     // If a plug-in is using the Core Animation drawing model, this returns its plug-in layer.
@@ -164,6 +164,9 @@ public:
     // Tells the plug-in that a request to evaluate JavaScript (using PluginController::loadURL) has been fulfilled and passes
     // back the result. If evaluating the script failed, result will be null.
     virtual void didEvaluateJavaScript(uint64_t requestID, const String& result) = 0;
+
+    // Tells the plug-in that a stream may send an HTTP request.
+    virtual void streamWillSendRequest(uint64_t streamID, const WebCore::URL& requestURL, const WebCore::URL& responseURL, int responseStatusCode) = 0;
 
     // Tells the plug-in that a stream has received its HTTP response.
     virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::URL& responseURL, uint32_t streamLength, 
@@ -283,7 +286,7 @@ public:
 
     virtual bool shouldAlwaysAutoStart() const { return false; }
 
-    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const = 0;
+    virtual RefPtr<WebCore::SharedBuffer> liveResourceData() const = 0;
 
     virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) = 0;
 

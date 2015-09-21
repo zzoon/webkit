@@ -47,43 +47,16 @@ using namespace JSC;
 
 namespace WebCore {
 
-JSValue JSReadableStream::cancel(ExecState* exec)
+JSValue JSReadableStream::pipeTo(ExecState& state)
 {
-    // FIXME: We should be able to remove this custom binding, once we can pass a JSValue or a ScriptValue.
-    ExceptionCode ec = 0;
-    JSPromiseDeferred& promiseDeferred = *JSPromiseDeferred::create(exec, globalObject());
-    impl().cancel(exec->argument(0), DeferredWrapper(exec, globalObject(), &promiseDeferred), ec);
-
-    if (ec)
-        DeferredWrapper(exec, globalObject(), &promiseDeferred).reject(ec);
-
-    return promiseDeferred.promise();
+    JSValue error = createError(&state, ASCIILiteral("pipeTo is not implemented"));
+    return state.vm().throwException(&state, error);
 }
 
-JSValue JSReadableStream::pipeTo(ExecState* exec)
+JSValue JSReadableStream::pipeThrough(ExecState& state)
 {
-    JSValue error = createError(exec, ASCIILiteral("pipeTo is not implemented"));
-    return exec->vm().throwException(exec, error);
-}
-
-JSValue JSReadableStream::pipeThrough(ExecState* exec)
-{
-    JSValue error = createError(exec, ASCIILiteral("pipeThrough is not implemented"));
-    return exec->vm().throwException(exec, error);
-}
-
-EncodedJSValue JSC_HOST_CALL constructJSReadableStream(ExecState* exec)
-{
-    DOMConstructorObject* jsConstructor = jsCast<DOMConstructorObject*>(exec->callee());
-    ASSERT(jsConstructor);
-
-    RefPtr<ReadableJSStream> readableStream = ReadableJSStream::create(*exec, *jsConstructor->scriptExecutionContext());
-
-    if (!readableStream) {
-        ASSERT(exec->hadException());
-        return JSValue::encode(jsUndefined());
-    }
-    return JSValue::encode(toJS(exec, jsCast<JSDOMGlobalObject*>(exec->callee()->globalObject()), WTF::move(readableStream)));
+    JSValue error = createError(&state, ASCIILiteral("pipeThrough is not implemented"));
+    return state.vm().throwException(&state, error);
 }
 
 } // namespace WebCore

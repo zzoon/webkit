@@ -40,14 +40,14 @@ void buildGetByIDProtoList(ExecState*, JSValue, const Identifier&, const Propert
 void repatchPutByID(ExecState*, JSValue, Structure*, const Identifier&, const PutPropertySlot&, StructureStubInfo&, PutKind);
 void buildPutByIdList(ExecState*, JSValue, Structure*, const Identifier&, const PutPropertySlot&, StructureStubInfo&, PutKind);
 void repatchIn(ExecState*, JSCell*, const Identifier&, bool wasFound, const PropertySlot&, StructureStubInfo&);
-void linkFor(ExecState*, CallLinkInfo&, CodeBlock*, JSFunction* callee, MacroAssemblerCodePtr, CodeSpecializationKind, RegisterPreservationMode);
-void linkSlowFor(ExecState*, CallLinkInfo&, CodeSpecializationKind, RegisterPreservationMode);
-void unlinkFor(RepatchBuffer&, CallLinkInfo&, CodeSpecializationKind, RegisterPreservationMode);
-void linkVirtualFor(ExecState*, CallLinkInfo&, CodeSpecializationKind, RegisterPreservationMode);
-void linkPolymorphicCall(ExecState*, CallLinkInfo&, CallVariant, RegisterPreservationMode);
-void resetGetByID(RepatchBuffer&, StructureStubInfo&);
-void resetPutByID(RepatchBuffer&, StructureStubInfo&);
-void resetIn(RepatchBuffer&, StructureStubInfo&);
+void linkFor(ExecState*, CallLinkInfo&, CodeBlock*, JSFunction* callee, MacroAssemblerCodePtr);
+void linkSlowFor(ExecState*, CallLinkInfo&);
+void unlinkFor(VM&, CallLinkInfo&);
+void linkVirtualFor(ExecState*, CallLinkInfo&);
+void linkPolymorphicCall(ExecState*, CallLinkInfo&, CallVariant);
+void resetGetByID(CodeBlock*, StructureStubInfo&);
+void resetPutByID(CodeBlock*, StructureStubInfo&);
+void resetIn(CodeBlock*, StructureStubInfo&);
 
 } // namespace JSC
 

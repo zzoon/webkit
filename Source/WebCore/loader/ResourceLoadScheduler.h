@@ -51,8 +51,8 @@ class ResourceLoadScheduler {
 public:
     WEBCORE_EXPORT friend ResourceLoadScheduler* resourceLoadScheduler();
 
-    WEBCORE_EXPORT virtual PassRefPtr<SubresourceLoader> scheduleSubresourceLoad(Frame*, CachedResource*, const ResourceRequest&, const ResourceLoaderOptions&);
-    WEBCORE_EXPORT virtual PassRefPtr<NetscapePlugInStreamLoader> schedulePluginStreamLoad(Frame*, NetscapePlugInStreamLoaderClient*, const ResourceRequest&);
+    WEBCORE_EXPORT virtual RefPtr<SubresourceLoader> scheduleSubresourceLoad(Frame*, CachedResource*, const ResourceRequest&, const ResourceLoaderOptions&);
+    WEBCORE_EXPORT virtual RefPtr<NetscapePlugInStreamLoader> schedulePluginStreamLoad(Frame*, NetscapePlugInStreamLoaderClient*, const ResourceRequest&);
     WEBCORE_EXPORT virtual void remove(ResourceLoader*);
     virtual void setDefersLoading(ResourceLoader*, bool);
     virtual void crossOriginRedirectReceived(ResourceLoader*, const URL& redirectURL);
@@ -75,10 +75,6 @@ public:
 protected:
     WEBCORE_EXPORT ResourceLoadScheduler();
     WEBCORE_EXPORT virtual ~ResourceLoadScheduler();
-
-#if USE(QUICK_LOOK)
-    WEBCORE_EXPORT bool maybeLoadQuickLookResource(ResourceLoader&);
-#endif
 
 private:
     void scheduleLoad(ResourceLoader*);

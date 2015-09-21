@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -66,7 +66,7 @@ MacroAssemblerCodePtr JITThunks::ctiNativeTailCall(VM* vm)
 
 MacroAssemblerCodeRef JITThunks::ctiStub(VM* vm, ThunkGenerator generator)
 {
-    Locker locker(m_lock);
+    LockHolder locker(m_lock);
     CTIStubMap::AddResult entry = m_ctiStubMap.add(generator, MacroAssemblerCodeRef());
     if (entry.isNewEntry) {
         // Compilation thread can only retrieve existing entries.
@@ -76,9 +76,9 @@ MacroAssemblerCodeRef JITThunks::ctiStub(VM* vm, ThunkGenerator generator)
     return entry.iterator->value;
 }
 
-void JITThunks::finalize(Handle<Unknown> handle, void*)
+void JITThunks::finalize(JSCell*& cell, void*)
 {
-    auto* nativeExecutable = jsCast<NativeExecutable*>(handle.get().asCell());
+    auto* nativeExecutable = jsCast<NativeExecutable*>(cell);
     weakRemove(*m_hostFunctionStubMap, std::make_pair(nativeExecutable->function(), nativeExecutable->constructor()), nativeExecutable);
 }
 

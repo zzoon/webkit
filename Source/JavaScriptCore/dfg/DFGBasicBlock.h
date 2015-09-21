@@ -141,10 +141,7 @@ struct BasicBlock : RefCounted<BasicBlock> {
     
     BlockNodeList::iterator begin() { return m_nodes.begin(); }
     BlockNodeList::iterator end() { return m_nodes.end(); }
-    
-    Node* firstOriginNode();
-    NodeOrigin firstOrigin();
-    
+
     unsigned numSuccessors() { return terminal()->numSuccessors(); }
     
     BasicBlock*& successor(unsigned index)
@@ -204,8 +201,8 @@ struct BasicBlock : RefCounted<BasicBlock> {
     Vector<Node*> phis;
     PredecessorList predecessors;
     
-    Operands<Node*, NodePointerTraits> variablesAtHead;
-    Operands<Node*, NodePointerTraits> variablesAtTail;
+    Operands<Node*> variablesAtHead;
+    Operands<Node*> variablesAtTail;
     
     Operands<AbstractValue> valuesAtHead;
     Operands<AbstractValue> valuesAtTail;
@@ -237,11 +234,14 @@ struct BasicBlock : RefCounted<BasicBlock> {
     unsigned innerMostLoopIndices[numberOfInnerMostLoopIndices];
 
     struct SSAData {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
         AvailabilityMap availabilityAtHead;
         AvailabilityMap availabilityAtTail;
         
-        HashSet<Node*> liveAtHead;
+        bool liveAtTailIsDirty { false };
         HashSet<Node*> liveAtTail;
+        HashSet<Node*> liveAtHead;
         HashMap<Node*, AbstractValue> valuesAtHead;
         HashMap<Node*, AbstractValue> valuesAtTail;
         

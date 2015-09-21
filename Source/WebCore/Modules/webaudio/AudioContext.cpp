@@ -231,7 +231,7 @@ void AudioContext::clear()
 {
     // We have to release our reference to the destination node before the context will ever be deleted since the destination node holds a reference to the context.
     if (m_destinationNode)
-        m_destinationNode.clear();
+        m_destinationNode = nullptr;
 
     // Audio thread is dead. Nobody will schedule node deletion action. Let's do it ourselves.
     do {
@@ -367,6 +367,11 @@ const char* AudioContext::activeDOMObjectName() const
 Document* AudioContext::document() const
 {
     ASSERT(m_scriptExecutionContext);
+    return downcast<Document>(m_scriptExecutionContext);
+}
+
+const Document* AudioContext::hostingDocument() const
+{
     return downcast<Document>(m_scriptExecutionContext);
 }
 
@@ -1064,7 +1069,13 @@ void AudioContext::pageMutedStateDidChange()
 
 void AudioContext::isPlayingAudioDidChange()
 {
-    document()->updateIsPlayingMedia();
+    // Make sure to call Document::updateIsPlayingMedia() on the main thread, since
+    // we could be on the audio I/O thread here and the call into WebCore could block.
+    RefPtr<AudioContext> strongThis(this);
+    callOnMainThread([strongThis] {
+        if (strongThis->document())
+            strongThis->document()->updateIsPlayingMedia();
+    });
 }
 
 void AudioContext::fireCompletionEvent()

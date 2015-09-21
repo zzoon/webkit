@@ -72,6 +72,7 @@
 #import <wtf/CurrentTime.h>
 #import <wtf/ListHashSet.h>
 #import <wtf/NeverDestroyed.h>
+#import <wtf/OSObjectPtr.h>
 #import <wtf/text/CString.h>
 #import <wtf/text/StringBuilder.h>
 
@@ -676,7 +677,7 @@ void MediaPlayerPrivateAVFoundationObjC::createAVPlayerLayer()
     [m_videoLayer addObserver:m_objcObserver.get() forKeyPath:@"readyForDisplay" options:NSKeyValueObservingOptionNew context:(void *)MediaPlayerAVFoundationObservationContextAVPlayerLayer];
     updateVideoLayerGravity();
     [m_videoLayer setContentsScale:player()->client().mediaPlayerContentsScale()];
-    IntSize defaultSize = player()->client().mediaPlayerContentBoxRect().pixelSnappedSize();
+    IntSize defaultSize = snappedIntRect(player()->client().mediaPlayerContentBoxRect()).size();
     LOG(Media, "MediaPlayerPrivateAVFoundationObjC::createVideoLayer(%p) - returning %p", this, m_videoLayer.get());
 
 #if PLATFORM(IOS)
@@ -1044,31 +1045,29 @@ void MediaPlayerPrivateAVFoundationObjC::beginLoadingMetadata()
 {
     LOG(Media, "MediaPlayerPrivateAVFoundationObjC::beginLoadingMetadata(%p) - requesting metadata loading", this);
 
-    dispatch_group_t metadataLoadingGroup = dispatch_group_create();
-    dispatch_group_enter(metadataLoadingGroup);
+    OSObjectPtr<dispatch_group_t> metadataLoadingGroup = adoptOSObject(dispatch_group_create());
+    dispatch_group_enter(metadataLoadingGroup.get());
     auto weakThis = createWeakPtr();
     [m_avAsset.get() loadValuesAsynchronouslyForKeys:assetMetadataKeyNames() completionHandler:^{
 
         callOnMainThread([weakThis, metadataLoadingGroup] {
             if (weakThis && [weakThis->m_avAsset.get() statusOfValueForKey:@"tracks" error:nil] == AVKeyValueStatusLoaded) {
                 for (AVAssetTrack *track in [weakThis->m_avAsset.get() tracks]) {
-                    dispatch_group_enter(metadataLoadingGroup);
+                    dispatch_group_enter(metadataLoadingGroup.get());
                     [track loadValuesAsynchronouslyForKeys:assetTrackMetadataKeyNames() completionHandler:^{
-                        dispatch_group_leave(metadataLoadingGroup);
+                        dispatch_group_leave(metadataLoadingGroup.get());
                     }];
                 }
             }
-            dispatch_group_leave(metadataLoadingGroup);
+            dispatch_group_leave(metadataLoadingGroup.get());
         });
     }];
 
-    dispatch_group_notify(metadataLoadingGroup, dispatch_get_main_queue(), ^{
+    dispatch_group_notify(metadataLoadingGroup.get(), dispatch_get_main_queue(), ^{
         callOnMainThread([weakThis] {
             if (weakThis)
                 [weakThis->m_objcObserver.get() metadataLoaded];
         });
-
-        dispatch_release(metadataLoadingGroup);
     });
 }
 
@@ -1124,9 +1123,8 @@ void MediaPlayerPrivateAVFoundationObjC::setVideoFullscreenLayer(PlatformLayer* 
     CAContext *newContext = nil;
     
     if (m_videoFullscreenLayer && m_videoLayer) {
-        [m_videoLayer setFrame:CGRectMake(0, 0, m_videoFullscreenFrame.width(), m_videoFullscreenFrame.height())];
-        [m_videoLayer removeFromSuperlayer];
         [m_videoFullscreenLayer insertSublayer:m_videoLayer.get() atIndex:0];
+        [m_videoLayer setFrame:CGRectMake(0, 0, m_videoFullscreenFrame.width(), m_videoFullscreenFrame.height())];
         newContext = [m_videoFullscreenLayer context];
     } else if (m_videoInlineLayer && m_videoLayer) {
         [m_videoLayer setFrame:[m_videoInlineLayer bounds]];
@@ -1158,11 +1156,7 @@ void MediaPlayerPrivateAVFoundationObjC::setVideoFullscreenFrame(FloatRect frame
         return;
 
     if (m_videoLayer) {
-        [m_videoLayer setStyle:nil]; // This enables actions, i.e. implicit animations.
-        [CATransaction begin];
         [m_videoLayer setFrame:CGRectMake(0, 0, frame.width(), frame.height())];
-        [CATransaction commit];
-        [m_videoLayer web_disableAllActions];
     }
     syncTextTrackBounds();
 }
@@ -1182,8 +1176,12 @@ void MediaPlayerPrivateAVFoundationObjC::setVideoFullscreenGravity(MediaPlayer::
         videoGravity = AVLayerVideoGravityResizeAspectFill;
     else
         ASSERT_NOT_REACHED();
+    
+    if ([m_videoLayer videoGravity] == videoGravity)
+        return;
 
     [m_videoLayer setVideoGravity:videoGravity];
+    syncTextTrackBounds();
 }
 
 void MediaPlayerPrivateAVFoundationObjC::setVideoFullscreenMode(MediaPlayer::VideoFullscreenMode mode)
@@ -1305,6 +1303,8 @@ void MediaPlayerPrivateAVFoundationObjC::seekToTime(const MediaTime& time, const
     CMTime cmAfter = toCMTime(positiveTolerance);
 
     auto weakThis = createWeakPtr();
+
+    LOG(Media, "MediaPlayerPrivateAVFoundationObjC::seekToTime(%p) - calling seekToTime", this);
 
     [m_avPlayerItem.get() seekToTime:cmTime toleranceBefore:cmBefore toleranceAfter:cmAfter completionHandler:^(BOOL finished) {
         callOnMainThread([weakThis, finished] {
@@ -1494,9 +1494,9 @@ long MediaPlayerPrivateAVFoundationObjC::assetErrorCode() const
     return [error code];
 }
 
-void MediaPlayerPrivateAVFoundationObjC::paintCurrentFrameInContext(GraphicsContext* context, const FloatRect& rect)
+void MediaPlayerPrivateAVFoundationObjC::paintCurrentFrameInContext(GraphicsContext& context, const FloatRect& rect)
 {
-    if (!metaDataAvailable() || context->paintingDisabled())
+    if (!metaDataAvailable() || context.paintingDisabled())
         return;
 
     setDelayCallbacks(true);
@@ -1515,9 +1515,9 @@ void MediaPlayerPrivateAVFoundationObjC::paintCurrentFrameInContext(GraphicsCont
     m_videoFrameHasDrawn = true;
 }
 
-void MediaPlayerPrivateAVFoundationObjC::paint(GraphicsContext* context, const FloatRect& rect)
+void MediaPlayerPrivateAVFoundationObjC::paint(GraphicsContext& context, const FloatRect& rect)
 {
-    if (!metaDataAvailable() || context->paintingDisabled())
+    if (!metaDataAvailable() || context.paintingDisabled())
         return;
 
     // We can ignore the request if we are already rendering to a layer.
@@ -1531,18 +1531,18 @@ void MediaPlayerPrivateAVFoundationObjC::paint(GraphicsContext* context, const F
     paintCurrentFrameInContext(context, rect);
 }
 
-void MediaPlayerPrivateAVFoundationObjC::paintWithImageGenerator(GraphicsContext* context, const FloatRect& rect)
+void MediaPlayerPrivateAVFoundationObjC::paintWithImageGenerator(GraphicsContext& context, const FloatRect& rect)
 {
     LOG(Media, "MediaPlayerPrivateAVFoundationObjC::paintWithImageGenerator(%p)", this);
 
     RetainPtr<CGImageRef> image = createImageForTimeInRect(currentTime(), rect);
     if (image) {
-        GraphicsContextStateSaver stateSaver(*context);
-        context->translate(rect.x(), rect.y() + rect.height());
-        context->scale(FloatSize(1.0f, -1.0f));
-        context->setImageInterpolationQuality(InterpolationLow);
+        GraphicsContextStateSaver stateSaver(context);
+        context.translate(rect.x(), rect.y() + rect.height());
+        context.scale(FloatSize(1.0f, -1.0f));
+        context.setImageInterpolationQuality(InterpolationLow);
         IntRect paintRect(IntPoint(0, 0), IntSize(rect.width(), rect.height()));
-        CGContextDrawImage(context->platformContext(), CGRectMake(0, 0, paintRect.width(), paintRect.height()), image.get());
+        CGContextDrawImage(context.platformContext(), CGRectMake(0, 0, paintRect.width(), paintRect.height()), image.get());
         image = 0;
     }
 }
@@ -1627,7 +1627,10 @@ MediaPlayer::SupportsType MediaPlayerPrivateAVFoundationObjC::supportsType(const
     if (parameters.isMediaSource)
         return MediaPlayer::IsNotSupported;
 #endif
-
+#if ENABLE(MEDIA_STREAM)
+    if (parameters.isMediaStream)
+        return MediaPlayer::IsNotSupported;
+#endif
     if (isUnsupportedMIMEType(parameters.type))
         return MediaPlayer::IsNotSupported;
 
@@ -2320,7 +2323,7 @@ void MediaPlayerPrivateAVFoundationObjC::updateLastImage()
         m_lastImage = createImageFromPixelBuffer(pixelBuffer.get());
 }
 
-void MediaPlayerPrivateAVFoundationObjC::paintWithVideoOutput(GraphicsContext* context, const FloatRect& outputRect)
+void MediaPlayerPrivateAVFoundationObjC::paintWithVideoOutput(GraphicsContext& context, const FloatRect& outputRect)
 {
 #if (!defined(__MAC_OS_X_VERSION_MIN_REQUIRED) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000)
     if (m_videoOutput && !m_lastImage && !videoOutputHasAvailableFrame())
@@ -2338,13 +2341,13 @@ void MediaPlayerPrivateAVFoundationObjC::paintWithVideoOutput(GraphicsContext* c
 
     LOG(Media, "MediaPlayerPrivateAVFoundationObjC::paintWithVideoOutput(%p)", this);
 
-    GraphicsContextStateSaver stateSaver(*context);
+    GraphicsContextStateSaver stateSaver(context);
     FloatRect imageRect(0, 0, CGImageGetWidth(m_lastImage.get()), CGImageGetHeight(m_lastImage.get()));
     AffineTransform videoTransform = [firstEnabledVideoTrack preferredTransform];
     FloatRect transformedOutputRect = videoTransform.inverse().mapRect(outputRect);
 
-    context->concatCTM(videoTransform);
-    context->drawNativeImage(m_lastImage.get(), imageRect.size(), ColorSpaceDeviceRGB, transformedOutputRect, imageRect);
+    context.concatCTM(videoTransform);
+    context.drawNativeImage(m_lastImage.get(), imageRect.size(), ColorSpaceDeviceRGB, transformedOutputRect, imageRect);
 
     // If we have created an AVAssetImageGenerator in the past due to m_videoOutput not having an available
     // video frame, destroy it now that it is no longer needed.
@@ -2822,14 +2825,13 @@ void MediaPlayerPrivateAVFoundationObjC::setShouldPlayToPlaybackTarget(bool shou
 {
     m_shouldPlayToPlaybackTarget = shouldPlay;
 
+    AVOutputContext *newContext = shouldPlay ? m_outputContext.get() : nil;
+    LOG(Media, "MediaPlayerPrivateAVFoundationObjC::setShouldPlayToPlaybackTarget(%p) - target = %p, shouldPlay = %s", this, newContext, boolString(shouldPlay));
+
     if (!m_avPlayer)
         return;
 
-    AVOutputContext *newContext = shouldPlay ? m_outputContext.get() : nil;
     RetainPtr<AVOutputContext> currentContext = m_avPlayer.get().outputContext;
-
-    LOG(Media, "MediaPlayerPrivateAVFoundationObjC::setShouldPlayToPlaybackTarget(%p) - target = %p, shouldPlay = %s", this, newContext, boolString(shouldPlay));
-
     if ((!newContext && !currentContext.get()) || [currentContext.get() isEqual:newContext])
         return;
 

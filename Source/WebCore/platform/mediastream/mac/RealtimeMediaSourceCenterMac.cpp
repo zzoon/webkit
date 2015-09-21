@@ -64,7 +64,7 @@ void RealtimeMediaSourceCenterMac::validateRequestConstraints(PassRefPtr<MediaSt
 
     if (audioConstraints) {
         String invalidConstraint;
-        AVCaptureDeviceManager::singleton().verifyConstraintsForMediaType(RealtimeMediaSource::Audio, audioConstraints.get(), invalidConstraint);
+        AVCaptureDeviceManager::singleton().verifyConstraintsForMediaType(nil, RealtimeMediaSource::Audio, audioConstraints.get(), invalidConstraint);
         if (!invalidConstraint.isEmpty()) {
             client->constraintsInvalid(invalidConstraint);
             return;
@@ -73,16 +73,17 @@ void RealtimeMediaSourceCenterMac::validateRequestConstraints(PassRefPtr<MediaSt
 
     if (videoConstraints) {
         String invalidConstraint;
-        AVCaptureDeviceManager::singleton().verifyConstraintsForMediaType(RealtimeMediaSource::Video, videoConstraints.get(), invalidConstraint);
+        AVCaptureDeviceManager::singleton().verifyConstraintsForMediaType(nil, RealtimeMediaSource::Video, videoConstraints.get(), invalidConstraint);
         if (!invalidConstraint.isEmpty()) {
             client->constraintsInvalid(invalidConstraint);
             return;
         }
     }
-
-    client->constraintsValidated();
+    Vector<RefPtr<RealtimeMediaSource>> bestVideoSources = AVCaptureDeviceManager::singleton().bestSourcesForTypeAndConstraints(RealtimeMediaSource::Type::Video, videoConstraints);
+    Vector<RefPtr<RealtimeMediaSource>> bestAudioSources = AVCaptureDeviceManager::singleton().bestSourcesForTypeAndConstraints(RealtimeMediaSource::Type::Audio, audioConstraints);
+    client->constraintsValidated(bestVideoSources, bestAudioSources);
 }
-    
+
 void RealtimeMediaSourceCenterMac::createMediaStream(PassRefPtr<MediaStreamCreationClient> prpQueryClient, PassRefPtr<MediaConstraints> audioConstraints, PassRefPtr<MediaConstraints> videoConstraints)
 {
     RefPtr<MediaStreamCreationClient> client = prpQueryClient;
@@ -94,13 +95,14 @@ void RealtimeMediaSourceCenterMac::createMediaStream(PassRefPtr<MediaStreamCreat
     
     if (audioConstraints) {
         String invalidConstraint;
-        AVCaptureDeviceManager::singleton().verifyConstraintsForMediaType(RealtimeMediaSource::Audio, audioConstraints.get(), invalidConstraint);
+        AVCaptureDeviceManager::singleton().verifyConstraintsForMediaType(nil, RealtimeMediaSource::Audio, audioConstraints.get(), invalidConstraint);
         if (!invalidConstraint.isEmpty()) {
             client->failedToCreateStreamWithConstraintsError(invalidConstraint);
             return;
         }
-        
-        RefPtr<RealtimeMediaSource> audioSource = AVCaptureDeviceManager::singleton().bestSourceForTypeAndConstraints(RealtimeMediaSource::Audio, audioConstraints.get());
+        // FIXME: Consider the constraints when choosing among multiple devices. For now just select the first available
+        // device of the appropriate type.
+        RefPtr<RealtimeMediaSource> audioSource = AVCaptureDeviceManager::singleton().bestSourcesForTypeAndConstraints(RealtimeMediaSource::Audio, audioConstraints.get()).at(0);
         ASSERT(audioSource);
         
         audioSources.append(audioSource.release());
@@ -108,13 +110,14 @@ void RealtimeMediaSourceCenterMac::createMediaStream(PassRefPtr<MediaStreamCreat
     
     if (videoConstraints) {
         String invalidConstraint;
-        AVCaptureDeviceManager::singleton().verifyConstraintsForMediaType(RealtimeMediaSource::Video, videoConstraints.get(), invalidConstraint);
+        AVCaptureDeviceManager::singleton().verifyConstraintsForMediaType(nil, RealtimeMediaSource::Video, videoConstraints.get(), invalidConstraint);
         if (!invalidConstraint.isEmpty()) {
             client->failedToCreateStreamWithConstraintsError(invalidConstraint);
             return;
         }
-        
-        RefPtr<RealtimeMediaSource> videoSource = AVCaptureDeviceManager::singleton().bestSourceForTypeAndConstraints(RealtimeMediaSource::Video, videoConstraints.get());
+        // FIXME: Consider the constraints when choosing among multiple devices. For now just select the first available
+        // device of the appropriate type.
+        RefPtr<RealtimeMediaSource> videoSource = AVCaptureDeviceManager::singleton().bestSourcesForTypeAndConstraints(RealtimeMediaSource::Video, videoConstraints.get()).at(0);
         ASSERT(videoSource);
         
         videoSources.append(videoSource.release());
@@ -127,10 +130,21 @@ bool RealtimeMediaSourceCenterMac::getMediaStreamTrackSources(PassRefPtr<MediaSt
 {
     RefPtr<MediaStreamTrackSourcesRequestClient> requestClient = prpClient;
 
-    Vector<RefPtr<TrackSourceInfo>> sources = AVCaptureDeviceManager::singleton().getSourcesInfo(requestClient->requestOrigin());
+    TrackSourceInfoVector sources = AVCaptureDeviceManager::singleton().getSourcesInfo(requestClient->requestOrigin());
 
-    requestClient->didCompleteRequest(sources);
+    callOnMainThread([this, requestClient, sources] {
+        requestClient->didCompleteRequest(sources);
+    });
+
     return true;
+}
+
+RefPtr<TrackSourceInfo> RealtimeMediaSourceCenterMac::sourceWithUID(const String& UID, RealtimeMediaSource::Type type, MediaConstraints* constraints)
+{
+    RefPtr<RealtimeMediaSource> mediaSource = AVCaptureDeviceManager::singleton().sourceWithUID(UID, type, constraints);
+    if (!mediaSource)
+        return nullptr;
+    return TrackSourceInfo::create(mediaSource->id(), mediaSource->type() == RealtimeMediaSource::Type::Video ? TrackSourceInfo::SourceKind::Video : TrackSourceInfo::SourceKind::Audio, mediaSource->name());
 }
 
 } // namespace WebCore

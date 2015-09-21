@@ -427,6 +427,9 @@ void InjectedBundlePage::resetAfterTest()
     JSGlobalContextRef context = WKBundleFrameGetJavaScriptContext(frame);
     WebCoreTestSupport::resetInternalsObject(context);
     assignedUrlsCache.clear();
+
+    // User scripts need to be removed after the test and before loading about:blank, as otherwise they would run in about:blank, and potentially leak results into a subsequest test.
+    WKBundlePageRemoveAllUserContent(m_page);
 }
 
 // Loader Client Callbacks
@@ -1286,6 +1289,9 @@ WKBundlePagePolicyAction InjectedBundlePage::decidePolicyForNavigationAction(WKB
         injectedBundle.outputText(stringBuilder.toString());
     }
 
+    if (injectedBundle.testRunner()->shouldDecideNavigationPolicyAfterDelay())
+        return WKBundlePagePolicyActionPassThrough;
+
     if (!injectedBundle.testRunner()->isPolicyDelegateEnabled())
         return WKBundlePagePolicyActionUse;
 
@@ -1326,7 +1332,7 @@ WKBundlePagePolicyAction InjectedBundlePage::decidePolicyForNewWindowAction(WKBu
 
 WKBundlePagePolicyAction InjectedBundlePage::decidePolicyForResponse(WKBundlePageRef page, WKBundleFrameRef, WKURLResponseRef response, WKURLRequestRef, WKTypeRef*)
 {
-    if (WKURLResponseIsAttachment(response)) {
+    if (InjectedBundle::singleton().testRunner()->isPolicyDelegateEnabled() && WKURLResponseIsAttachment(response)) {
         StringBuilder stringBuilder;
         WKRetainPtr<WKStringRef> filename = adoptWK(WKURLResponseCopySuggestedFilename(response));
         stringBuilder.appendLiteral("Policy delegate: resource is an attachment, suggested file name \'");

@@ -52,20 +52,20 @@ public:
 
     String customCSSText() const;
 
-    PassRefPtr<Image> image(RenderElement*, const FloatSize&);
+    RefPtr<Image> image(RenderElement*, const FloatSize&);
     bool isFixedSize() const { return true; }
     FloatSize fixedSize(const RenderElement*);
 
     bool isPending() const;
     bool knownToBeOpaque(const RenderElement*) const;
 
-    void loadSubimages(CachedResourceLoader&);
+    void loadSubimages(CachedResourceLoader&, const ResourceLoaderOptions&);
 
     void setPercentage(PassRefPtr<CSSPrimitiveValue> percentageValue) { m_percentageValue = percentageValue; }
 
     bool traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const;
 
-    PassRefPtr<CSSCrossfadeValue> blend(const CSSCrossfadeValue&, double) const;
+    RefPtr<CSSCrossfadeValue> blend(const CSSCrossfadeValue&, double) const;
 
     bool equals(const CSSCrossfadeValue&) const;
 

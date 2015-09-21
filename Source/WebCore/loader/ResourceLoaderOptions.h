@@ -66,6 +66,16 @@ enum CertificateInfoPolicy {
     DoNotIncludeCertificateInfo
 };
 
+enum class ContentSecurityPolicyImposition : uint8_t {
+    SkipPolicyCheck,
+    DoPolicyCheck
+};
+
+enum class DefersLoadingPolicy : uint8_t {
+    AllowDefersLoading,
+    DisallowDefersLoading
+};
+
 struct ResourceLoaderOptions {
     ResourceLoaderOptions()
         : m_sendLoadCallbacks(DoNotSendCallbacks)
@@ -79,7 +89,7 @@ struct ResourceLoaderOptions {
     {
     }
 
-    ResourceLoaderOptions(SendCallbackPolicy sendLoadCallbacks, ContentSniffingPolicy sniffContent, DataBufferingPolicy dataBufferingPolicy, StoredCredentials allowCredentials, ClientCredentialPolicy credentialPolicy, SecurityCheckPolicy securityCheck, RequestOriginPolicy requestOriginPolicy, CertificateInfoPolicy certificateInfoPolicy)
+    ResourceLoaderOptions(SendCallbackPolicy sendLoadCallbacks, ContentSniffingPolicy sniffContent, DataBufferingPolicy dataBufferingPolicy, StoredCredentials allowCredentials, ClientCredentialPolicy credentialPolicy, SecurityCheckPolicy securityCheck, RequestOriginPolicy requestOriginPolicy, CertificateInfoPolicy certificateInfoPolicy, ContentSecurityPolicyImposition contentSecurityPolicyImposition, DefersLoadingPolicy defersLoadingPolicy)
         : m_sendLoadCallbacks(sendLoadCallbacks)
         , m_sniffContent(sniffContent)
         , m_dataBufferingPolicy(dataBufferingPolicy)
@@ -88,6 +98,8 @@ struct ResourceLoaderOptions {
         , m_securityCheck(securityCheck)
         , m_requestOriginPolicy(requestOriginPolicy)
         , m_certificateInfoPolicy(certificateInfoPolicy)
+        , m_contentSecurityPolicyImposition(contentSecurityPolicyImposition)
+        , m_defersLoadingPolicy(defersLoadingPolicy)
     {
     }
 
@@ -107,6 +119,10 @@ struct ResourceLoaderOptions {
     void setRequestOriginPolicy(RequestOriginPolicy policy) { m_requestOriginPolicy = policy; }
     CertificateInfoPolicy certificateInfoPolicy() const { return static_cast<CertificateInfoPolicy>(m_certificateInfoPolicy); }
     void setCertificateInfoPolicy(CertificateInfoPolicy policy) { m_certificateInfoPolicy = policy; }
+    ContentSecurityPolicyImposition contentSecurityPolicyImposition() const { return m_contentSecurityPolicyImposition; }
+    void setContentSecurityPolicyImposition(ContentSecurityPolicyImposition imposition) { m_contentSecurityPolicyImposition = imposition; }
+    DefersLoadingPolicy defersLoadingPolicy() const { return m_defersLoadingPolicy; }
+    void setDefersLoadingPolicy(DefersLoadingPolicy defersLoadingPolicy) { m_defersLoadingPolicy = defersLoadingPolicy; }
 
     unsigned m_sendLoadCallbacks : 1;
     unsigned m_sniffContent : 1;
@@ -116,6 +132,8 @@ struct ResourceLoaderOptions {
     unsigned m_securityCheck : 1;
     unsigned m_requestOriginPolicy : 2;
     unsigned m_certificateInfoPolicy : 1; // Whether the response should include certificate info.
+    ContentSecurityPolicyImposition m_contentSecurityPolicyImposition { ContentSecurityPolicyImposition::DoPolicyCheck };
+    DefersLoadingPolicy m_defersLoadingPolicy { DefersLoadingPolicy::AllowDefersLoading };
 };
 
 } // namespace WebCore    

@@ -111,10 +111,10 @@
 #import <WebCore/ProtectionSpace.h>
 #import <WebCore/ResourceError.h>
 #import <WebCore/ResourceHandle.h>
-#import <WebCore/ResourceLoader.h>
 #import <WebCore/ResourceRequest.h>
 #import <WebCore/ScriptController.h>
 #import <WebCore/SharedBuffer.h>
+#import <WebCore/SubresourceLoader.h>
 #import <WebCore/WebCoreObjCExtras.h>
 #import <WebCore/WebScriptObjectPrivate.h>
 #import <WebCore/Widget.h>
@@ -286,9 +286,10 @@ void WebFrameLoaderClient::detachedFromParent3()
 void WebFrameLoaderClient::convertMainResourceLoadToDownload(DocumentLoader* documentLoader, const ResourceRequest& request, const ResourceResponse& response)
 {
     WebView *webView = getWebView(m_webFrame.get());
+    SubresourceLoader* mainResourceLoader = documentLoader->mainResourceLoader();
 
-    if (!documentLoader->mainResourceLoader()) {
-        // The resource has already been cached, start a new download.
+    if (!mainResourceLoader) {
+        // The resource has already been cached, or the conversion is being attmpted when not calling SubresourceLoader::didReceiveResponse().
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
         WebDownload *webDownload = [[WebDownload alloc] initWithRequest:request.nsURLRequest(UpdateHTTPBody) delegate:[webView downloadDelegate]];
@@ -297,7 +298,7 @@ void WebFrameLoaderClient::convertMainResourceLoadToDownload(DocumentLoader* doc
         return;
     }
 
-    ResourceHandle* handle = documentLoader->mainResourceLoader()->handle();
+    ResourceHandle* handle = mainResourceLoader->handle();
 
 #if USE(CFNETWORK)
     ASSERT([WebDownload respondsToSelector:@selector(_downloadWithLoadingCFURLConnection:request:response:delegate:proxy:)]);
@@ -1322,15 +1323,15 @@ void WebFrameLoaderClient::prepareForDataSourceReplacement()
 #endif
 }
 
-PassRefPtr<DocumentLoader> WebFrameLoaderClient::createDocumentLoader(const ResourceRequest& request, const SubstituteData& substituteData)
+Ref<DocumentLoader> WebFrameLoaderClient::createDocumentLoader(const ResourceRequest& request, const SubstituteData& substituteData)
 {
-    RefPtr<WebDocumentLoaderMac> loader = WebDocumentLoaderMac::create(request, substituteData);
+    Ref<WebDocumentLoaderMac> loader = WebDocumentLoaderMac::create(request, substituteData);
 
-    WebDataSource *dataSource = [[WebDataSource alloc] _initWithDocumentLoader:loader.get()];
+    WebDataSource *dataSource = [[WebDataSource alloc] _initWithDocumentLoader:loader.ptr()];
     loader->setDataSource(dataSource, getWebView(m_webFrame.get()));
     [dataSource release];
 
-    return loader.release();
+    return WTF::move(loader);
 }
 
 void WebFrameLoaderClient::setTitle(const StringWithDirection& title, const URL& url)
@@ -1608,7 +1609,7 @@ bool WebFrameLoaderClient::canCachePage() const
     return true;
 }
 
-PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const URL& url, const String& name, HTMLFrameOwnerElement* ownerElement,
+RefPtr<Frame> WebFrameLoaderClient::createFrame(const URL& url, const String& name, HTMLFrameOwnerElement* ownerElement,
     const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
@@ -1627,19 +1628,19 @@ PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const URL& url, const String
 
     // The creation of the frame may have run arbitrary JavaScript that removed it from the page already.
     if (!result->page())
-        return 0;
+        return nullptr;
  
     core(m_webFrame.get())->loader().loadURLIntoChildFrame(url, referrer, result.get());
 
     // The frame's onload handler may have removed it from the document.
     if (!result->tree().parent())
-        return 0;
+        return nullptr;
 
-    return result.release();
+    return result;
 
     END_BLOCK_OBJC_EXCEPTIONS;
 
-    return 0;
+    return nullptr;
 }
 
 ObjectContentType WebFrameLoaderClient::objectContentType(const URL& url, const String& mimeType, bool shouldPreferPlugInsForImages)
@@ -1907,7 +1908,7 @@ private:
 
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 
-PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize& size, HTMLPlugInElement* element, const URL& url,
+RefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize& size, HTMLPlugInElement* element, const URL& url,
     const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
 {
     BEGIN_BLOCK_OBJC_EXCEPTIONS;
@@ -2047,7 +2048,7 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize& size, HTMLP
 
     END_BLOCK_OBJC_EXCEPTIONS;
 
-    return 0;
+    return nullptr;
 }
 
 void WebFrameLoaderClient::recreatePlugin(Widget*)

@@ -29,7 +29,8 @@ endif ()
 
 if (WIN32)
     add_subdirectory(DumpRenderTree)
-    add_subdirectory(WinLauncher)
+    add_subdirectory(TestWebKitAPI)
+    add_subdirectory(MiniBrowser/win)
 endif ()
 
 if (ENABLE_WEBKIT2 AND ENABLE_API_TESTS)

@@ -29,6 +29,7 @@
 #include "CallFrameInlines.h"
 #include "ClonedArguments.h"
 #include "Executable.h"
+#include "InlineCallFrame.h"
 #include "Interpreter.h"
 #include "JSCInlines.h"
 #include <wtf/DataLog.h>
@@ -68,6 +69,14 @@ void StackVisitor::gotoNextFrame()
     readFrame(m_frame.callerFrame());
 }
 
+void StackVisitor::unwindToMachineCodeBlockFrame()
+{
+#if ENABLE(DFG_JIT)
+    while (m_frame.isInlinedFrame())
+        gotoNextFrame();
+#endif
+}
+
 void StackVisitor::readFrame(CallFrame* callFrame)
 {
     if (!callFrame) {
@@ -94,7 +103,7 @@ void StackVisitor::readFrame(CallFrame* callFrame)
         return;
     }
 
-    unsigned index = callFrame->locationAsCodeOriginIndex();
+    CallSiteIndex index = callFrame->callSiteIndex();
     ASSERT(codeBlock->canGetCodeOrigin(index));
     if (!codeBlock->canGetCodeOrigin(index)) {
         // See assertion above. In release builds, we try to protect ourselves
@@ -124,7 +133,7 @@ void StackVisitor::readNonInlinedFrame(CallFrame* callFrame, CodeOrigin* codeOri
     m_frame.m_codeBlock = callFrame->codeBlock();
     m_frame.m_bytecodeOffset = !m_frame.codeBlock() ? 0
         : codeOrigin ? codeOrigin->bytecodeIndex
-        : callFrame->locationAsBytecodeOffset();
+        : callFrame->bytecodeOffset();
 #if ENABLE(DFG_JIT)
     m_frame.m_inlineCallFrame = 0;
 #endif
@@ -180,6 +189,8 @@ StackVisitor::Frame::CodeType StackVisitor::Frame::codeType() const
     switch (codeBlock()->codeType()) {
     case EvalCode:
         return CodeType::Eval;
+    case ModuleCode:
+        return CodeType::Module;
     case FunctionCode:
         return CodeType::Function;
     case GlobalCode:
@@ -197,6 +208,9 @@ String StackVisitor::Frame::functionName()
     switch (codeType()) {
     case CodeType::Eval:
         traceLine = ASCIILiteral("eval code");
+        break;
+    case CodeType::Module:
+        traceLine = ASCIILiteral("module code");
         break;
     case CodeType::Native:
         if (callee)
@@ -218,9 +232,10 @@ String StackVisitor::Frame::sourceURL()
 
     switch (codeType()) {
     case CodeType::Eval:
+    case CodeType::Module:
     case CodeType::Function:
     case CodeType::Global: {
-        String sourceURL = codeBlock()->ownerExecutable()->sourceURL();
+        String sourceURL = codeBlock()->ownerScriptExecutable()->sourceURL();
         if (!sourceURL.isEmpty())
             traceLine = sourceURL.impl();
         break;
@@ -291,11 +306,11 @@ void StackVisitor::Frame::computeLineAndColumn(unsigned& line, unsigned& column)
     unsigned divotColumn = 0;
     retrieveExpressionInfo(divot, unusedStartOffset, unusedEndOffset, divotLine, divotColumn);
 
-    line = divotLine + codeBlock->ownerExecutable()->firstLine();
+    line = divotLine + codeBlock->ownerScriptExecutable()->firstLine();
     column = divotColumn + (divotLine ? 1 : codeBlock->firstLineColumnOffset());
 
-    if (codeBlock->ownerExecutable()->hasOverrideLineNumber())
-        line = codeBlock->ownerExecutable()->overrideLineNumber();
+    if (codeBlock->ownerScriptExecutable()->hasOverrideLineNumber())
+        line = codeBlock->ownerScriptExecutable()->overrideLineNumber();
 }
 
 void StackVisitor::Frame::retrieveExpressionInfo(int& divot, int& startOffset, int& endOffset, unsigned& line, unsigned& column)
@@ -331,7 +346,7 @@ void logF(unsigned indent, const char* format, const Types&... values)
 {
     printIndents(indent);
 
-#if COMPILER(CLANG) || COMPILER(GCC)
+#if COMPILER(GCC_OR_CLANG)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #pragma GCC diagnostic ignored "-Wmissing-format-attribute"
@@ -339,7 +354,7 @@ void logF(unsigned indent, const char* format, const Types&... values)
 
     dataLogF(format, values...);
 
-#if COMPILER(CLANG) || COMPILER(GCC)
+#if COMPILER(GCC_OR_CLANG)
 #pragma GCC diagnostic pop
 #endif
 }
@@ -375,7 +390,7 @@ void StackVisitor::Frame::print(int indent)
         logF(indent, "callee: %p\n", callee());
         logF(indent, "returnPC: %p\n", returnPC);
         logF(indent, "callerFrame: %p\n", callerFrame);
-        unsigned locationRawBits = callFrame->locationAsRawBits();
+        unsigned locationRawBits = callFrame->callSiteAsRawBits();
         logF(indent, "rawLocationBits: %u 0x%x\n", locationRawBits, locationRawBits);
         logF(indent, "codeBlock: %p ", codeBlock);
         if (codeBlock)
@@ -384,15 +399,15 @@ void StackVisitor::Frame::print(int indent)
         if (codeBlock && !isInlined) {
             indent++;
 
-            if (callFrame->hasLocationAsBytecodeOffset()) {
-                unsigned bytecodeOffset = callFrame->locationAsBytecodeOffset();
+            if (callFrame->callSiteBitsAreBytecodeOffset()) {
+                unsigned bytecodeOffset = callFrame->bytecodeOffset();
                 log(indent, "bytecodeOffset: ", bytecodeOffset, " of ", codeBlock->instructions().size(), "\n");
 #if ENABLE(DFG_JIT)
             } else {
                 log(indent, "hasCodeOrigins: ", codeBlock->hasCodeOrigins(), "\n");
                 if (codeBlock->hasCodeOrigins()) {
-                    unsigned codeOriginIndex = callFrame->locationAsCodeOriginIndex();
-                    log(indent, "codeOriginIndex: ", codeOriginIndex, " of ", codeBlock->codeOrigins().size(), "\n");
+                    CallSiteIndex callSiteIndex = callFrame->callSiteIndex();
+                    log(indent, "callSiteIndex: ", callSiteIndex.bits(), " of ", codeBlock->codeOrigins().size(), "\n");
 
                     JITCode::JITType jitType = codeBlock->jitType();
                     if (jitType != JITCode::FTLJIT) {

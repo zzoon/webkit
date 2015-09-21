@@ -38,7 +38,7 @@ bool buildPathFromByteStream(SVGPathByteStream*, Path&);
 
 // SVGPathSegList/String -> SVGPathByteStream
 bool buildSVGPathByteStreamFromSVGPathSegList(const SVGPathSegList&, SVGPathByteStream*, PathParsingMode);
-bool appendSVGPathByteStreamFromSVGPathSeg(PassRefPtr<SVGPathSeg>, SVGPathByteStream*, PathParsingMode);
+bool appendSVGPathByteStreamFromSVGPathSeg(RefPtr<SVGPathSeg>&&, SVGPathByteStream*, PathParsingMode);
 bool buildSVGPathByteStreamFromString(const String&, SVGPathByteStream*, PathParsingMode);
 
 // SVGPathByteStream/SVGPathSegList -> String
@@ -54,6 +54,9 @@ bool addToSVGPathByteStream(SVGPathByteStream*, SVGPathByteStream*, unsigned rep
 bool getSVGPathSegAtLengthFromSVGPathByteStream(SVGPathByteStream*, float length, unsigned& pathSeg);
 bool getTotalLengthOfSVGPathByteStream(SVGPathByteStream*, float& totalLength);
 bool getPointAtLengthOfSVGPathByteStream(SVGPathByteStream*, float length, SVGPoint&);
+
+// Path -> String
+WEBCORE_EXPORT bool buildStringFromPath(const Path&, String&);
 
 } // namespace WebCore
 

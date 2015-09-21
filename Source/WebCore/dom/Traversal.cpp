@@ -30,15 +30,15 @@
 
 namespace WebCore {
 
-NodeIteratorBase::NodeIteratorBase(PassRefPtr<Node> rootNode, unsigned whatToShow, PassRefPtr<NodeFilter> nodeFilter, bool expandEntityReferences)
+NodeIteratorBase::NodeIteratorBase(PassRefPtr<Node> rootNode, unsigned long whatToShow, RefPtr<NodeFilter>&& nodeFilter, bool expandEntityReferences)
     : m_root(rootNode)
     , m_whatToShow(whatToShow)
-    , m_filter(nodeFilter)
+    , m_filter(WTF::move(nodeFilter))
     , m_expandEntityReferences(expandEntityReferences)
 {
 }
 
-short NodeIteratorBase::acceptNode(JSC::ExecState* state, Node* node) const
+short NodeIteratorBase::acceptNode(Node* node) const
 {
     // FIXME: To handle XML properly we would have to check m_expandEntityReferences.
 
@@ -48,7 +48,7 @@ short NodeIteratorBase::acceptNode(JSC::ExecState* state, Node* node) const
         return NodeFilter::FILTER_SKIP;
     if (!m_filter)
         return NodeFilter::FILTER_ACCEPT;
-    return m_filter->acceptNode(state, node);
+    return m_filter->acceptNode(node);
 }
 
 } // namespace WebCore

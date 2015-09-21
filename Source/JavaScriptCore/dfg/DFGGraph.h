@@ -95,9 +95,10 @@ namespace DFG {
             (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion); \
     } while (false)
 
-#define DFG_CRASH(graph, node, reason)                                  \
-    (graph).handleAssertionFailure(                                     \
-        (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, (reason));
+#define DFG_CRASH(graph, node, reason) do {                             \
+        (graph).handleAssertionFailure(                                 \
+            (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, (reason)); \
+    } while (false)
 
 struct InlineVariableData {
     InlineCallFrame* inlineCallFrame;
@@ -185,9 +186,8 @@ public:
 
     void dethread();
     
-    FrozenValue* freezeFragile(JSValue value);
-    FrozenValue* freeze(JSValue value); // We use weak freezing by default. Shorthand for freezeFragile(value)->strengthenTo(WeakValue);
-    FrozenValue* freezeStrong(JSValue value); // Shorthand for freezeFragile(value)->strengthenTo(StrongValue).
+    FrozenValue* freeze(JSValue); // We use weak freezing by default.
+    FrozenValue* freezeStrong(JSValue); // Shorthand for freeze(value)->strengthenTo(StrongValue).
     
     void convertToConstant(Node* node, FrozenValue* value);
     void convertToConstant(Node* node, JSValue value);
@@ -210,7 +210,7 @@ public:
 
     // Dump the code origin of the given node as a diff from the code origin of the
     // preceding node. Returns true if anything was printed.
-    bool dumpCodeOrigin(PrintStream&, const char* prefix, Node* previousNode, Node* currentNode, DumpContext*);
+    bool dumpCodeOrigin(PrintStream&, const char* prefix, Node*& previousNode, Node* currentNode, DumpContext*);
 
     AddSpeculationMode addSpeculationMode(Node* add, bool leftShouldSpeculateInt32, bool rightShouldSpeculateInt32, PredictionPass pass)
     {
@@ -325,7 +325,8 @@ public:
     
     StructureSet* addStructureSet(const StructureSet& structureSet)
     {
-        ASSERT(structureSet.size());
+        for (Structure* structure : structureSet)
+            registerStructure(structure);
         m_structureSet.append(structureSet);
         return &m_structureSet.last();
     }
@@ -344,7 +345,7 @@ public:
     ScriptExecutable* executableFor(InlineCallFrame* inlineCallFrame)
     {
         if (!inlineCallFrame)
-            return m_codeBlock->ownerExecutable();
+            return m_codeBlock->ownerScriptExecutable();
         
         return inlineCallFrame->executable.get();
     }
@@ -364,16 +365,6 @@ public:
     CodeBlock* baselineCodeBlockFor(const CodeOrigin& codeOrigin)
     {
         return baselineCodeBlockForOriginAndBaselineCodeBlock(codeOrigin, m_profiledBlock);
-    }
-    
-    SymbolTable* symbolTableFor(InlineCallFrame* inlineCallFrame)
-    {
-        return baselineCodeBlockFor(inlineCallFrame)->symbolTable();
-    }
-    
-    SymbolTable* symbolTableFor(const CodeOrigin& codeOrigin)
-    {
-        return symbolTableFor(codeOrigin.inlineCallFrame);
     }
     
     bool isStrictModeFor(CodeOrigin codeOrigin)
@@ -443,7 +434,7 @@ public:
     
     void killBlock(BlockIndex blockIndex)
     {
-        m_blocks[blockIndex].clear();
+        m_blocks[blockIndex] = nullptr;
     }
     
     void killBlock(BasicBlock* basicBlock)
@@ -676,6 +667,15 @@ public:
     DesiredIdentifiers& identifiers() { return m_plan.identifiers; }
     DesiredWatchpoints& watchpoints() { return m_plan.watchpoints; }
     
+    // Returns false if the key is already invalid or unwatchable. If this is a Presence condition,
+    // this also makes it cheap to query if the condition holds. Also makes sure that the GC knows
+    // what's going on.
+    bool watchCondition(const ObjectPropertyCondition&);
+
+    // Checks if it's known that loading from the given object at the given offset is fine. This is
+    // computed by tracking which conditions we track with watchCondition().
+    bool isSafeToLoad(JSObject* base, PropertyOffset);
+    
     FullBytecodeLiveness& livenessFor(CodeBlock*);
     FullBytecodeLiveness& livenessFor(InlineCallFrame*);
     
@@ -799,8 +799,6 @@ public:
     
     NodeAllocator& m_allocator;
 
-    Operands<FrozenValue*> m_mustHandleValues;
-    
     Vector< RefPtr<BasicBlock> , 8> m_blocks;
     Vector<Edge, 16> m_varArgChildren;
 
@@ -857,6 +855,7 @@ public:
     Vector<InlineVariableData, 4> m_inlineVariableData;
     HashMap<CodeBlock*, std::unique_ptr<FullBytecodeLiveness>> m_bytecodeLiveness;
     HashMap<CodeBlock*, std::unique_ptr<BytecodeKills>> m_bytecodeKills;
+    HashSet<std::pair<JSObject*, PropertyOffset>> m_safeToLoad;
     Dominators m_dominators;
     PrePostNumbering m_prePostNumbering;
     NaturalLoops m_naturalLoops;
@@ -876,6 +875,7 @@ public:
     PlanStage m_planStage { PlanStage::Initial };
     RefCountState m_refCountState;
     bool m_hasDebuggerEnabled;
+    bool m_hasExceptionHandlers { false };
 private:
     
     void handleSuccessor(Vector<BasicBlock*, 16>& worklist, BasicBlock*, BasicBlock* successor);

@@ -1,3 +1,124 @@
+2015-09-18  Alex Christensen  <achristensen@webkit.org>
+
+        Remove last required use of WEBKIT_LIBRARIES environment variable on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=149355
+
+        Reviewed by Brent Fulgham.
+
+        * win/tools/scripts/auto-version.pl:
+        Use the directory of $0 (the currently executed perl script) to find the perl script instead of an environment variable.
+        This makes it possible to build WebKit on Windows without environment variables.
+
+2015-09-14  Chris Dumez  <cdumez@apple.com>
+
+        Disable PICTURE_SIZES on AppleWin
+        https://bugs.webkit.org/show_bug.cgi?id=149125
+
+        Reviewed by Alexey Proskuryakov.
+
+        * win/tools/vsprops/FeatureDefines.props:
+
+2015-08-31  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix.
+
+        * win/lib32/WebKitSystemInterface.lib: Update with VS2015 build of this
+        library to avoid linker errors on build bots.
+
+2015-08-21  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix.
+
+        * win/tools/vsprops/common.props: Ignore a warning that is filling the
+        build logs with useless cruft.
+
+2015-08-20  Lucas Forschler  <lforschler@apple.com>
+
+        Check in LLVM 3.6.2 binary drops for OS X Mavericks.
+        Check in drops built from the LLVM 3.6.2 open source release. 
+
+        * LLVMIncludesMavericks.tar.bz2:
+        * LLVMLibrariesMavericks.tar.bz2:
+
+2015-08-12  Lucas Forschler  <lforschler@apple.com>
+
+        Check in LLVM 3.6.2 binary drops for OS X Yosemite
+        Check in drops built from the LLVM 3.6.2 open source release.
+
+2015-08-11  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix for VS2015 targets.
+
+        * win/lib32/WebKitSystemInterface.lib: Update with VS2015 version of library.
+
+2015-08-04  Alex Christensen  <achristensen@webkit.org>
+
+        Fix quirks with CMake and VS2015
+        https://bugs.webkit.org/show_bug.cgi?id=147663
+
+        Reviewed by Brent Fulgham.
+
+        * win/tools/vsprops/common.props:
+        Hide some warnings.  Using the same variable names in nested scopes is ok for now.
+
+2015-08-04  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Update Apple Windows build for VS2015
+        https://bugs.webkit.org/show_bug.cgi?id=147653
+
+        Reviewed by Dean Jackson.
+
+        * win/tools/vsprops/common.props: Fix build flags to use Windows 7
+        (WINVER=0x601) as minimum build target for 64-bit builds.
+
+2015-08-03  Filip Pizlo  <fpizlo@apple.com>
+
+        Check in LLVM 3.6.2 binary drops for El Capitan
+        https://bugs.webkit.org/show_bug.cgi?id=147582
+
+        Reviewed by Alexey Proskuryakov.
+        
+        Check in drops built from the LLVM 3.6.2 open source release.
+        
+        These drops were built by doing:
+        
+        1) Check out WebKit to a directory like /some/path/OpenSource.
+
+        2) Unpack LLVM 3.6.2 into /some/path/OpenSource/llvm. I got LLVM 3.6.2 from:
+        
+        http://llvm.org/releases/3.6.2/llvm-3.6.2.src.tar.xz
+
+        3) While in /some/path/OpenSource, run Tools/Scripts/build-jsc --release. Make sure it's a
+        totally clean build (i.e. delete WebKitBuild before starting).
+
+        4) Run the following to create binary drops:
+
+        Tools/Scripts/export-llvm-build -i WebKitLibraries/LLVMIncludesElCapitan.tar.bz2 -l WebKitLibraries/LLVMLibrariesElCapitan.tar.bz2 -b llvm/wkLLVMBuild -B llvm/wkLLVMBuild/Release+Asserts -s llvm
+
+        * LLVMIncludesElCapitan.tar.bz2: Added.
+        * LLVMLibrariesElCapitan.tar.bz2: Added.
+
+2015-07-28  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [ES6] Add ENABLE_ES6_MODULES compile time flag with the default value "false"
+        https://bugs.webkit.org/show_bug.cgi?id=147350
+
+        Reviewed by Sam Weinig.
+
+        * win/tools/vsprops/FeatureDefines.props:
+        * win/tools/vsprops/FeatureDefinesCairo.props:
+
+2015-07-20  Gordon Sheridan  <gordon_sheridan@apple.com>
+
+        WKSI support for blocking a plug-in for non-security reasons.
+        https://bugs.webkit.org/show_bug.cgi?id=145009
+
+        Reviewed by Anders Carlsson.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceMavericks.a:
+        * libWebKitSystemInterfaceYosemite.a:
+
 2015-07-02  Daniel Bates  <dabates@apple.com>
 
         [iOS] Add WebKitSystemInterface for iOS 8.4

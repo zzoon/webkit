@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,6 @@
 #include "CACFLayerTreeHostClient.h"
 #include "DefWndProcWindowClass.h"
 #include "LayerChangesFlusher.h"
-#include "LegacyCACFLayerTreeHost.h"
 #include "PlatformCALayerWin.h"
 #include "WKCACFViewLayerTreeHost.h"
 #include "WebCoreInstanceHandle.h"
@@ -113,8 +112,6 @@ PassRefPtr<CACFLayerTreeHost> CACFLayerTreeHost::create()
     if (!acceleratedCompositingAvailable())
         return 0;
     RefPtr<CACFLayerTreeHost> host = WKCACFViewLayerTreeHost::create();
-    if (!host)
-        host = LegacyCACFLayerTreeHost::create();
     host->initialize();
     return host.release();
 }
@@ -225,8 +222,8 @@ void CACFLayerTreeHost::layerTreeDidChange()
 
 void CACFLayerTreeHost::destroyRenderer()
 {
-    m_rootLayer = 0;
-    m_rootChildLayer = 0;
+    m_rootLayer = nullptr;
+    m_rootChildLayer = nullptr;
     LayerChangesFlusher::singleton().cancelPendingFlush(this);
 }
 
@@ -323,6 +320,14 @@ CGRect CACFLayerTreeHost::bounds() const
     GetClientRect(m_window, &clientRect);
 
     return winRectToCGRect(clientRect);
+}
+
+String CACFLayerTreeHost::layerTreeAsString() const
+{
+    if (!m_rootLayer)
+        return emptyString();
+
+    return m_rootLayer->layerTreeAsString();
 }
 
 }

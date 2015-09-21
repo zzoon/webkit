@@ -332,6 +332,26 @@ static JSValueRef increaseTextSelectionCallback(JSContextRef context, JSObjectRe
     return JSValueMakeUndefined(context);
 }
 
+static JSValueRef scrollPageUpCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    return JSValueMakeBoolean(context, toAXElement(thisObject)->scrollPageUp());
+}
+
+static JSValueRef scrollPageDownCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    return JSValueMakeBoolean(context, toAXElement(thisObject)->scrollPageDown());
+}
+
+static JSValueRef scrollPageLeftCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    return JSValueMakeBoolean(context, toAXElement(thisObject)->scrollPageLeft());
+}
+
+static JSValueRef scrollPageRightCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    return JSValueMakeBoolean(context, toAXElement(thisObject)->scrollPageRight());
+}
+
 static JSValueRef decreaseTextSelectionCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     toAXElement(thisObject)->decreaseTextSelection();
@@ -459,6 +479,24 @@ static JSValueRef setSelectedChildCallback(JSContextRef context, JSObjectRef fun
 
     toAXElement(thisObject)->setSelectedChild(toAXElement(element));
 
+    return JSValueMakeUndefined(context);
+}
+
+static JSValueRef setSelectedChildAtIndexCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    if (argumentCount == 1) {
+        unsigned indexNumber = JSValueToNumber(context, arguments[0], exception);
+        toAXElement(thisObject)->setSelectedChildAtIndex(indexNumber);
+    }
+    return JSValueMakeUndefined(context);
+}
+
+static JSValueRef removeSelectionAtIndexCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    if (argumentCount == 1) {
+        unsigned indexNumber = JSValueToNumber(context, arguments[0], exception);
+        toAXElement(thisObject)->removeSelectionAtIndex(indexNumber);
+    }
     return JSValueMakeUndefined(context);
 }
 
@@ -667,6 +705,36 @@ static JSValueRef showMenuCallback(JSContextRef context, JSObjectRef function, J
 static JSValueRef pressCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     toAXElement(thisObject)->press();
+    return JSValueMakeUndefined(context);
+}
+
+static JSValueRef scrollToMakeVisibleWithSubFocusCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    unsigned x = 0;
+    unsigned y = 0;
+    unsigned width = 0;
+    unsigned height = 0;
+    if (argumentCount == 4) {
+        x = JSValueToNumber(context, arguments[0], exception);
+        y = JSValueToNumber(context, arguments[1], exception);
+        width = JSValueToNumber(context, arguments[2], exception);
+        height = JSValueToNumber(context, arguments[3], exception);
+    }
+
+    toAXElement(thisObject)->scrollToMakeVisibleWithSubFocus(x, y, width, height);
+    return JSValueMakeUndefined(context);
+}
+
+static JSValueRef scrollToGlobalPointCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    unsigned x = 0;
+    unsigned y = 0;
+    if (argumentCount == 2) {
+        x = JSValueToNumber(context, arguments[0], exception);
+        y = JSValueToNumber(context, arguments[1], exception);
+    }
+
+    toAXElement(thisObject)->scrollToGlobalPoint(x, y);
     return JSValueMakeUndefined(context);
 }
 
@@ -1274,28 +1342,6 @@ static JSValueRef sentenceAtOffsetCallback(JSContextRef context, JSObjectRef fun
     return JSValueMakeString(context, sentenceAtOffset.get());
 }
 
-static JSValueRef setSelectedChildAtIndexCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    int indexNumber = -1;
-    if (argumentCount == 1);
-        indexNumber = JSValueToNumber(context, arguments[0], exception);
-
-    if (indexNumber >= 0)
-        toAXElement(thisObject)->setSelectedChildAtIndex(indexNumber);
-    return JSValueMakeUndefined(context);
-}
-
-static JSValueRef removeSelectionAtIndexCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    int indexNumber = -1;
-    if (argumentCount == 1)
-        indexNumber = JSValueToNumber(context, arguments[0], exception);
-
-    if (indexNumber >= 0)
-        toAXElement(thisObject)->removeSelectionAtIndex(indexNumber);
-    return JSValueMakeUndefined(context);
-}
-
 #elif PLATFORM(IOS)
 
 static JSValueRef stringForSelectionCallback(JSContextRef context, JSObjectRef thisObject, JSStringRef propertyName, JSValueRef* exception)
@@ -1326,6 +1372,8 @@ static JSValueRef getElementTextLengthCallback(JSContextRef context, JSObjectRef
 {
     return JSValueMakeNumber(context, toAXElement(thisObject)->elementTextLength());
 }
+
+
 
 #endif // PLATFORM(IOS)
 
@@ -1358,6 +1406,8 @@ JSStringRef AccessibilityUIElement::speak() { return 0; }
 JSStringRef AccessibilityUIElement::rangeForLine(int line) { return 0; }
 JSStringRef AccessibilityUIElement::rangeForPosition(int, int) { return 0; }
 void AccessibilityUIElement::setSelectedChild(AccessibilityUIElement*) const { }
+void AccessibilityUIElement::setSelectedChildAtIndex(unsigned) const { }
+void AccessibilityUIElement::removeSelectionAtIndex(unsigned) const { }
 AccessibilityUIElement AccessibilityUIElement::horizontalScrollbar() const { return 0; }
 AccessibilityUIElement AccessibilityUIElement::verticalScrollbar() const { return 0; }
 AccessibilityUIElement AccessibilityUIElement::uiElementAttributeValue(JSStringRef) const { return 0; }
@@ -1674,23 +1724,29 @@ JSClassRef AccessibilityUIElement::getJSClass()
         { "previousTextMarker", previousTextMarkerCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "stringForTextMarkerRange", stringForTextMarkerRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setSelectedChild", setSelectedChildCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "setSelectedChildAtIndex", setSelectedChildAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "removeSelectionAtIndex", removeSelectionAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setValue", setValueCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setSelectedVisibleTextRange", setSelectedVisibleTextRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "selectedChildAtIndex", selectedChildAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "scrollToMakeVisible", scrollToMakeVisibleCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "scrollToGlobalPoint", scrollToGlobalPointCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "scrollToMakeVisibleWithSubFocus", scrollToMakeVisibleWithSubFocusCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
 #if PLATFORM(GTK) || PLATFORM(EFL)
         { "characterAtOffset", characterAtOffsetCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "wordAtOffset", wordAtOffsetCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "lineAtOffset", lineAtOffsetCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "sentenceAtOffset", sentenceAtOffsetCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "setSelectedChildAtIndex", setSelectedChildAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "removeSelectionAtIndex", removeSelectionAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
 #elif PLATFORM(IOS)
         { "linkedElement", linkedElementCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "headerElementAtIndex", headerElementAtIndexCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "elementsForRange", elementsForRangeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "increaseTextSelection", increaseTextSelectionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "decreaseTextSelection", decreaseTextSelectionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "scrollPageUp", scrollPageUpCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "scrollPageDown", scrollPageDownCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "scrollPageLeft", scrollPageLeftCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "scrollPageRight", scrollPageRightCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "assistiveTechnologySimulatedFocus", assistiveTechnologySimulatedFocusCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
 #endif
         { 0, 0, 0 }

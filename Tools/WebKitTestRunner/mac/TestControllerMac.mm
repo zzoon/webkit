@@ -26,20 +26,24 @@
 #import "config.h"
 #import "TestController.h"
 
-#import "CrashReporterInfo.h"
 #import "PlatformWebView.h"
 #import "PoseAsClass.h"
 #import "TestInvocation.h"
 #import "WebKitTestRunnerPasteboard.h"
 #import <WebKit/WKContextPrivate.h>
 #import <WebKit/WKPageGroup.h>
+#import <WebKit/WKProcessPoolPrivate.h>
 #import <WebKit/WKStringCF.h>
 #import <WebKit/WKURLCF.h>
+#import <WebKit/WKUserContentControllerPrivate.h>
+#import <WebKit/WKWebView.h>
+#import <WebKit/WKWebViewConfiguration.h>
+#import <WebKit/WKWebViewConfigurationPrivate.h>
 #import <WebKit/_WKUserContentExtensionStore.h>
 #import <WebKit/_WKUserContentExtensionStorePrivate.h>
 #import <mach-o/dyld.h>
 
-@interface NSSound (Details)
+@interface NSSound ()
 + (void)_setAlertType:(NSUInteger)alertType;
 @end
 
@@ -73,11 +77,6 @@ void TestController::initializeTestPluginDirectory()
     m_testPluginDirectory.adopt(WKStringCreateWithCFString((CFStringRef)[[NSBundle mainBundle] bundlePath]));
 }
 
-void TestController::platformWillRunTest(const TestInvocation& testInvocation)
-{
-    setCrashReportApplicationSpecificInformationToURL(testInvocation.url());
-}
-
 static bool shouldUseThreadedScrolling(const TestInvocation& test)
 {
     return test.urlContains("tiled-drawing/");
@@ -85,34 +84,26 @@ static bool shouldUseThreadedScrolling(const TestInvocation& test)
 
 void TestController::platformResetPreferencesToConsistentValues()
 {
-#if WK_API_ENABLED
-    __block bool doneRemoving = false;
-    [[_WKUserContentExtensionStore defaultStore] removeContentExtensionForIdentifier:@"TestContentExtensions" completionHandler:^(NSError *error)
-    {
-        doneRemoving = true;
-    }];
-    platformRunUntil(doneRemoving, 0);
-    [[_WKUserContentExtensionStore defaultStore] _removeAllContentExtensions];
-#endif
+}
+
+void TestController::platformResetStateToConsistentValues()
+{
+    cocoaResetStateToConsistentValues();
+
+    while ([NSApp nextEventMatchingMask:NSEventMaskGesture | NSScrollWheelMask untilDate:nil inMode:NSDefaultRunLoopMode dequeue:YES]) {
+        // Clear out (and ignore) any pending gesture and scroll wheel events.
+    }
+}
+
+void TestController::updatePlatformSpecificTestOptionsForTest(TestOptions& options, const TestInvocation& test) const
+{
+    options.useThreadedScrolling = shouldUseThreadedScrolling(test);
+    options.useRemoteLayerTree = shouldUseRemoteLayerTree();
+    options.shouldShowWebView = shouldShowWebView();
 }
 
 void TestController::platformConfigureViewForTest(const TestInvocation& test)
 {
-    auto viewOptions = adoptWK(WKMutableDictionaryCreate());
-    auto useThreadedScrollingKey = adoptWK(WKStringCreateWithUTF8CString("ThreadedScrolling"));
-    auto useThreadedScrollingValue = adoptWK(WKBooleanCreate(shouldUseThreadedScrolling(test)));
-    WKDictionarySetItem(viewOptions.get(), useThreadedScrollingKey.get(), useThreadedScrollingValue.get());
-
-    auto useRemoteLayerTreeKey = adoptWK(WKStringCreateWithUTF8CString("RemoteLayerTree"));
-    auto useRemoteLayerTreeValue = adoptWK(WKBooleanCreate(shouldUseRemoteLayerTree()));
-    WKDictionarySetItem(viewOptions.get(), useRemoteLayerTreeKey.get(), useRemoteLayerTreeValue.get());
-
-    auto shouldShowWebViewKey = adoptWK(WKStringCreateWithUTF8CString("ShouldShowWebView"));
-    auto shouldShowWebViewValue = adoptWK(WKBooleanCreate(shouldShowWebView()));
-    WKDictionarySetItem(viewOptions.get(), shouldShowWebViewKey.get(), shouldShowWebViewValue.get());
-
-    ensureViewSupportsOptions(viewOptions.get());
-
 #if WK_API_ENABLED
     if (!test.urlContains("contentextensions/"))
         return;
@@ -129,21 +120,13 @@ void TestController::platformConfigureViewForTest(const TestInvocation& test)
     [[_WKUserContentExtensionStore defaultStore] compileContentExtensionForIdentifier:@"TestContentExtensions" encodedContentExtension:contentExtensionString completionHandler:^(_WKUserContentFilter *filter, NSError *error)
     {
         if (!error)
-            WKPageGroupAddUserContentFilter(WKPageGetPageGroup(TestController::singleton().mainWebView()->page()), (__bridge WKUserContentFilterRef)filter);
+            [mainWebView()->platformView().configuration.userContentController _addUserContentFilter:filter];
         else
             NSLog(@"%@", [error helpAnchor]);
         doneCompiling = true;
     }];
     platformRunUntil(doneCompiling, 0);
 #endif
-}
-
-void TestController::platformRunUntil(bool& done, double timeout)
-{
-    NSDate *endDate = (timeout > 0) ? [NSDate dateWithTimeIntervalSinceNow:timeout] : [NSDate distantFuture];
-
-    while (!done && [endDate compare:[NSDate date]] == NSOrderedDescending)
-        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:endDate];
 }
 
 #if ENABLE(PLATFORM_FONT_LOOKUP)
@@ -210,7 +193,6 @@ static NSSet *allowedFontFamilySet()
         @"Hiragino Kaku Gothic ProN",
         @"Hiragino Kaku Gothic Std",
         @"Hiragino Kaku Gothic StdN",
-        @"Hiragino Maru Gothic Monospaced",
         @"Hiragino Maru Gothic Pro",
         @"Hiragino Maru Gothic ProN",
         @"Hiragino Mincho Pro",

@@ -127,7 +127,9 @@ IntRect PluginView::windowClipRect() const
     
     // Take our element and get the clip rect from the enclosing layer and frame view.
     FrameView* parentView = m_element->document().view();
-    clipRect.intersect(parentView->windowClipRectForFrameOwner(m_element, true));
+    IntRect windowClipRect = parentView->windowClipRectForFrameOwner(m_element, true);
+    windowClipRect.scale(deviceScaleFactor());
+    clipRect.intersect(windowClipRect);
 
     return clipRect;
 }
@@ -187,7 +189,7 @@ void PluginView::init()
     LOG(Plugins, "PluginView::init(): Initializing plug-in '%s'", m_plugin->name().utf8().data());
 
     if (!m_plugin->load()) {
-        m_plugin = 0;
+        m_plugin = nullptr;
         m_status = PluginStatusCanNotLoadPlugin;
         return;
     }
@@ -670,18 +672,18 @@ NPObject* PluginView::npObject()
 }
 #endif
 
-PassRefPtr<JSC::Bindings::Instance> PluginView::bindingInstance()
+RefPtr<JSC::Bindings::Instance> PluginView::bindingInstance()
 {
 #if ENABLE(NETSCAPE_PLUGIN_API)
     NPObject* object = npObject();
     if (!object)
-        return 0;
+        return nullptr;
 
     if (hasOneRef()) {
         // The renderer for the PluginView was destroyed during the above call, and
         // the PluginView will be destroyed when this function returns, so we
         // return null.
-        return 0;
+        return nullptr;
     }
 
     RefPtr<JSC::Bindings::RootObject> root = m_parentFrame->script().createRootObject(this);
@@ -689,9 +691,9 @@ PassRefPtr<JSC::Bindings::Instance> PluginView::bindingInstance()
 
     _NPN_ReleaseObject(object);
 
-    return instance.release();
+    return instance;
 #else
-    return 0;
+    return nullptr;
 #endif
 }
 
@@ -851,7 +853,7 @@ bool PluginView::isCallingPlugin()
     return s_callingPlugin > 0;
 }
 
-PassRefPtr<PluginView> PluginView::create(Frame* parentFrame, const IntSize& size, HTMLPlugInElement* element, const URL& url, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
+Ref<PluginView> PluginView::create(Frame* parentFrame, const IntSize& size, HTMLPlugInElement* element, const URL& url, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
 {
     // if we fail to find a plugin for this MIME type, findPlugin will search for
     // a plugin by the file extension and update the MIME type, so pass a mutable String
@@ -864,7 +866,7 @@ PassRefPtr<PluginView> PluginView::create(Frame* parentFrame, const IntSize& siz
         plugin = PluginDatabase::installedPlugins()->findPlugin(url, mimeTypeCopy);
     }
 
-    return adoptRef(new PluginView(parentFrame, size, plugin, element, url, paramNames, paramValues, mimeTypeCopy, loadManually));
+    return adoptRef(*new PluginView(parentFrame, size, plugin, element, url, paramNames, paramValues, mimeTypeCopy, loadManually));
 }
 
 void PluginView::freeStringArray(char** stringArray, int length)
@@ -1102,7 +1104,7 @@ void PluginView::invalidateWindowlessPluginRect(const IntRect& rect)
     renderer.repaintRectangle(dirtyRect);
 }
 
-void PluginView::paintMissingPluginIcon(GraphicsContext* context, const IntRect& rect)
+void PluginView::paintMissingPluginIcon(GraphicsContext& context, const IntRect& rect)
 {
     static RefPtr<Image> nullPluginImage;
     if (!nullPluginImage)
@@ -1118,10 +1120,10 @@ void PluginView::paintMissingPluginIcon(GraphicsContext* context, const IntRect&
     if (!rect.intersects(imageRect))
         return;
 
-    context->save();
-    context->clip(windowClipRect());
-    context->drawImage(nullPluginImage.get(), ColorSpaceDeviceRGB, imageRect.location());
-    context->restore();
+    context.save();
+    context.clip(windowClipRect());
+    context.drawImage(nullPluginImage.get(), ColorSpaceDeviceRGB, imageRect.location());
+    context.restore();
 }
 
 static const char* MozillaUserAgent = "Mozilla/5.0 ("

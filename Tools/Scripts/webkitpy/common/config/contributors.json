@@ -350,7 +350,7 @@
       },
       "Basile Clement" : {
         "emails" : [
-            "basile_clement@apple.com"
+            "cbasile06+webkit@gmail.com"
         ],
         "nicks" : [
             "elarnon"
@@ -716,6 +716,23 @@
          "expertise" : "The WebKitGTK+ Port",
          "nicks" : [
             "dnomi"
+         ]
+      },
+      "Devin Rousso" : {
+         "emails" : [
+            "dcrousso+webkit@gmail.com"
+         ],
+         "nicks" : [
+            "drousso"
+         ]
+      },
+      "Dewei Zhu" : {
+         "emails" : [
+            "dewei_zhu@apple.com"
+         ],
+         "expertise" : "Performance, Tools",
+         "nicks" : [
+            "Dewei"
          ]
       },
       "Dhi Aurrahman" : {
@@ -1113,6 +1130,15 @@
             "hyowon"
          ]
       },
+      "Hyungwook Lee" : {
+         "emails" : [
+            "hyungwook.lee@navercorp.com"
+         ],
+         "expertise" : "Loader, Graphics, The EFLWebKit port, WebKit on Windows",
+         "nicks" : [
+            "hwlee"
+         ]
+      },
       "Ian Vollick" : {
          "emails" : [
             "vollick@chromium.org"
@@ -1274,6 +1300,14 @@
          ],
          "nicks" : [
             "jasonliu"
+         ]
+      },
+      "Jason Marcell" : {
+         "emails" : [
+            "jmarcell@apple.com"
+         ],
+         "nicks" : [
+            "jmarcell"
          ]
       },
       "Javier Fernandez" : {
@@ -1557,6 +1591,15 @@
          ],
          "nicks" : [
             "silverroots"
+         ]
+      },
+      "Keith Miller" : {
+         "emails" : [
+            "keith_miller@apple.com"
+         ],
+         "nicks" : [
+            "keith_miller",
+            "keith_miller_"
          ]
       },
       "Keishi Hattori" : {
@@ -1866,6 +1909,14 @@
       "Matt Baker" : {
          "emails" : [
             "mattbaker@apple.com"
+         ]
+      },
+      "Matt Daiter" : {
+         "emails" : [
+            "mdaiter@apple.com"
+         ],
+         "nicks" : [
+            "mdaiter"
          ]
       },
       "Matt Delaney" : {
@@ -2433,14 +2484,6 @@
             "ryuan"
          ]
       },
-      "Saam Barati" : {
-         "emails" : [
-            "saambarati1@gmail.com"
-         ],
-         "nicks" : [
-            "saamyjoon"
-         ]
-      },
       "Sadrul Habib Chowdhury" : {
          "emails" : [
             "sadrul@chromium.org"
@@ -2587,6 +2630,15 @@
          "expertise" : "The EFLWebKit port, Memory Leaks",
          "nicks" : [
             "babu"
+         ]
+      },
+      "Sukolsak Sakshuwong": {
+         "emails" : [
+            "sukolsak@gmail.com"
+         ],
+         "expertise" : "JavaScript/ECMAScript, WebAssembly",
+         "nicks" : [
+            "sukol"
          ]
       },
       "Szilard Ledan-Muntean" : {
@@ -2818,6 +2870,15 @@
             "seumas"
          ]
       },
+      "Wenson Hsieh" : {
+         "emails" : [
+            "wenson_hsieh@apple.com",
+            "whsieh@berkeley.edu"
+         ],
+         "nicks" : [
+            "whsieh"
+         ]
+      },
       "William Siegrist" : {
          "emails" : [
             "wsiegrist@apple.com"
@@ -3012,6 +3073,14 @@
       "Alejandro Pineiro" : {
          "emails" : [
             "apinheiro@igalia.com"
+         ]
+      },
+      "Aleksandr Skachkov" : {
+         "emails" : [
+            "gskachkov@gmail.com"
+         ],
+         "nicks" : [
+            "gskachkov"
          ]
       },
       "Alexey Marinichev" : {
@@ -3332,14 +3401,6 @@
          ],
          "nicks" : [
             "hmartin"
-         ]
-      },
-      "Matt Daiter" : {
-         "emails" : [
-            "mdaiter@apple.com"
-         ],
-         "nicks" : [
-            "mdaiter"
          ]
       },
       "Mihai Balan" : {
@@ -3779,7 +3840,6 @@
       },
       "Brian Burg" : {
          "emails" : [
-            "burg@cs.washington.edu",
             "bburg@apple.com"
          ],
          "expertise" : "Developer Tools, Web Inspector",
@@ -4139,8 +4199,7 @@
       "Gyuyoung Kim" : {
          "emails" : [
             "gyuyoung.kim@webkit.org",
-            "gyuyoung.kim@navercorp.com",
-            "gyuyoung.kim@samsung.com"
+            "gyuyoung.kim@navercorp.com"
          ],
          "expertise" : "The EFLWebKit Port, Navigator Content Utils, CMake build system",
          "nicks" : [
@@ -4636,6 +4695,14 @@
          "expertise" : "HTML DOM, Core DOM, DOM Bindings (JavaScript, Objective-C and COM), Security, DumpRenderTree",
          "nicks" : [
             "weinig"
+         ]
+      },
+      "Saam Barati" : {
+         "emails" : [
+            "sbarati@apple.com"
+         ],
+         "nicks" : [
+            "saamyjoon"
          ]
       },
       "Sergio Villar Senin" : {

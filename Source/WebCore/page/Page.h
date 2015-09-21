@@ -55,7 +55,7 @@
 #endif
 
 #if ENABLE(MEDIA_SESSION)
-#include "MediaEventTypes.h"
+#include "MediaSessionEvents.h"
 #endif
 
 namespace JSC {
@@ -117,7 +117,6 @@ class ViewStateChangeObserver;
 class VisitedLinkStore;
 
 typedef uint64_t LinkHash;
-class SharedBuffer;
 
 enum FindDirection { FindDirectionForward, FindDirectionBackward };
 
@@ -135,8 +134,6 @@ public:
     WEBCORE_EXPORT ~Page();
 
     WEBCORE_EXPORT uint64_t renderTreeSize() const;
-    
-    static std::unique_ptr<Page> createPageFromBuffer(PageConfiguration&, const SharedBuffer*, const String& mimeType, bool canHaveScrollbars, bool transparent);
 
     void setNeedsRecalcStyleInAllFrames();
 
@@ -439,12 +436,13 @@ public:
     bool usesEphemeralSession() const { return m_sessionID.isEphemeral(); }
 
     MediaProducer::MediaStateFlags mediaState() const { return m_mediaState; }
-    void updateIsPlayingMedia();
+    void updateIsPlayingMedia(uint64_t);
     bool isMuted() const { return m_muted; }
     WEBCORE_EXPORT void setMuted(bool);
 
 #if ENABLE(MEDIA_SESSION)
     WEBCORE_EXPORT void handleMediaEvent(MediaEventType);
+    WEBCORE_EXPORT void setVolumeOfMediaElement(double, uint64_t);
 #endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
@@ -462,6 +460,11 @@ public:
     WEBCORE_EXPORT WheelEventTestTrigger& ensureTestTrigger();
     void clearTrigger() { m_testTrigger = nullptr; }
     bool expectsWheelEventTriggers() const { return !!m_testTrigger; }
+
+#if ENABLE(VIDEO)
+    bool allowsMediaDocumentInlinePlayback() const { return m_allowsMediaDocumentInlinePlayback; }
+    WEBCORE_EXPORT void setAllowsMediaDocumentInlinePlayback(bool);
+#endif
 
 private:
     WEBCORE_EXPORT void initGroup();
@@ -622,6 +625,7 @@ private:
     MediaProducer::MediaStateFlags m_mediaState { MediaProducer::IsNotPlaying };
     
     bool m_userContentExtensionsEnabled { true };
+    bool m_allowsMediaDocumentInlinePlayback { false };
 };
 
 inline PageGroup& Page::group()

@@ -2204,6 +2204,13 @@ public:
         return Call(m_assembler.label(), Call::LinkableNear);
     }
 
+    ALWAYS_INLINE Call nearTailCall()
+    {
+        AssemblerLabel label = m_assembler.label();
+        m_assembler.b();
+        return Call(label, Call::LinkableNearTail);
+    }
+
     ALWAYS_INLINE void ret()
     {
         m_assembler.ret();
@@ -2341,10 +2348,10 @@ public:
         return branch32(cond, left, dataTempRegister);
     }
 
-    PatchableJump patchableBranchPtr(RelationalCondition cond, Address left, TrustedImmPtr right = TrustedImmPtr(0))
+    PatchableJump patchableBranchPtr(RelationalCondition cond, Address left, TrustedImmPtr right)
     {
         m_makeJumpPatchable = true;
-        Jump result = branch32(cond, left, TrustedImm32(right));
+        Jump result = branch64(cond, left, TrustedImm64(right));
         m_makeJumpPatchable = false;
         return PatchableJump(result);
     }
@@ -2361,6 +2368,22 @@ public:
     {
         m_makeJumpPatchable = true;
         Jump result = branch32(cond, reg, imm);
+        m_makeJumpPatchable = false;
+        return PatchableJump(result);
+    }
+
+    PatchableJump patchableBranch64(RelationalCondition cond, RegisterID reg, TrustedImm64 imm)
+    {
+        m_makeJumpPatchable = true;
+        Jump result = branch64(cond, reg, imm);
+        m_makeJumpPatchable = false;
+        return PatchableJump(result);
+    }
+
+    PatchableJump patchableBranch64(RelationalCondition cond, RegisterID left, RegisterID right)
+    {
+        m_makeJumpPatchable = true;
+        Jump result = branch64(cond, left, right);
         m_makeJumpPatchable = false;
         return PatchableJump(result);
     }
@@ -2488,6 +2511,16 @@ public:
     static void revertJumpReplacementToPatchableBranch32WithPatch(CodeLocationLabel, Address, int32_t)
     {
         UNREACHABLE_FOR_PLATFORM();
+    }
+
+    static void repatchCall(CodeLocationCall call, CodeLocationLabel destination)
+    {
+        ARM64Assembler::repatchPointer(call.dataLabelPtrAtOffset(REPATCH_OFFSET_CALL_TO_POINTER).dataLocation(), destination.executableAddress());
+    }
+
+    static void repatchCall(CodeLocationCall call, FunctionPtr destination)
+    {
+        ARM64Assembler::repatchPointer(call.dataLabelPtrAtOffset(REPATCH_OFFSET_CALL_TO_POINTER).dataLocation(), destination.executableAddress());
     }
 
 protected:
@@ -2856,20 +2889,12 @@ private:
 
     static void linkCall(void* code, Call call, FunctionPtr function)
     {
-        if (call.isFlagSet(Call::Near))
-            ARM64Assembler::linkCall(code, call.m_label, function.value());
-        else
+        if (!call.isFlagSet(Call::Near))
             ARM64Assembler::linkPointer(code, call.m_label.labelAtOffset(REPATCH_OFFSET_CALL_TO_POINTER), function.value());
-    }
-
-    static void repatchCall(CodeLocationCall call, CodeLocationLabel destination)
-    {
-        ARM64Assembler::repatchPointer(call.dataLabelPtrAtOffset(REPATCH_OFFSET_CALL_TO_POINTER).dataLocation(), destination.executableAddress());
-    }
-
-    static void repatchCall(CodeLocationCall call, FunctionPtr destination)
-    {
-        ARM64Assembler::repatchPointer(call.dataLabelPtrAtOffset(REPATCH_OFFSET_CALL_TO_POINTER).dataLocation(), destination.executableAddress());
+        else if (call.isFlagSet(Call::Tail))
+            ARM64Assembler::linkJump(code, call.m_label, function.value());
+        else
+            ARM64Assembler::linkCall(code, call.m_label, function.value());
     }
 
     CachedTempRegister m_dataMemoryTempRegister;

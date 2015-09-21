@@ -40,7 +40,6 @@
 #import "WKContentViewInteraction.h"
 #import "WKGeolocationProviderIOS.h"
 #import "WKProcessPoolInternal.h"
-#import "WKViewPrivate.h"
 #import "WKWebViewConfigurationInternal.h"
 #import "WKWebViewContentProviderRegistry.h"
 #import "WKWebViewInternal.h"
@@ -111,15 +110,6 @@ namespace WebKit {
 PageClientImpl::PageClientImpl(WKContentView *contentView, WKWebView *webView)
     : m_contentView(contentView)
     , m_webView(webView)
-    , m_wkView(nil)
-    , m_undoTarget(adoptNS([[WKEditorUndoTargetObjC alloc] init]))
-{
-}
-
-PageClientImpl::PageClientImpl(WKContentView *contentView, WKView *wkView)
-    : m_contentView(contentView)
-    , m_webView(nil)
-    , m_wkView(wkView)
     , m_undoTarget(adoptNS([[WKEditorUndoTargetObjC alloc] init]))
 {
 }
@@ -154,10 +144,10 @@ void PageClientImpl::scrollView(const IntRect&, const IntSize&)
     ASSERT_NOT_REACHED();
 }
 
-void PageClientImpl::requestScroll(const FloatPoint& scrollPosition, bool isProgrammaticScroll)
+void PageClientImpl::requestScroll(const FloatPoint& scrollPosition, const IntPoint& scrollOrigin, bool isProgrammaticScroll)
 {
     UNUSED_PARAM(isProgrammaticScroll);
-    [m_webView _scrollToContentOffset:scrollPosition];
+    [m_webView _scrollToContentOffset:scrollPosition scrollOrigin:scrollOrigin];
 }
 
 IntSize PageClientImpl::viewSize()
@@ -223,7 +213,6 @@ void PageClientImpl::didRelaunchProcess()
 {
     [m_contentView _didRelaunchProcess];
     [m_webView _didRelaunchProcess];
-    [m_wkView _didRelaunchProcess];
 }
 
 void PageClientImpl::pageClosed()
@@ -278,9 +267,9 @@ double PageClientImpl::minimumZoomScale() const
     return 1;
 }
 
-WebCore::FloatSize PageClientImpl::contentsSize() const
+WebCore::FloatRect PageClientImpl::documentRect() const
 {
-    return FloatSize([m_contentView bounds].size);
+    return [m_contentView bounds];
 }
 
 void PageClientImpl::setCursor(const Cursor&)
@@ -441,23 +430,23 @@ void PageClientImpl::doneWithTouchEvent(const NativeWebTouchEvent& nativeWebtouc
 }
 #endif
 
-PassRefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy*)
+RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy*)
 {
     notImplemented();
-    return 0;
+    return nullptr;
 }
 
-PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy*)
+RefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy*)
 {
     notImplemented();
-    return 0;
+    return nullptr;
 }
 
-void PageClientImpl::setTextIndicator(Ref<TextIndicator> textIndicator, TextIndicatorLifetime)
+void PageClientImpl::setTextIndicator(Ref<TextIndicator> textIndicator, TextIndicatorWindowLifetime)
 {
 }
 
-void PageClientImpl::clearTextIndicator(TextIndicatorDismissalAnimation)
+void PageClientImpl::clearTextIndicator(TextIndicatorWindowDismissalAnimation)
 {
 }
 
@@ -715,6 +704,11 @@ void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem& item)
     NavigationState::fromWebPage(*m_webView->_page).willRecordNavigationSnapshot(item);
 }
 
+void PageClientImpl::didRemoveNavigationGestureSnapshot()
+{
+    NavigationState::fromWebPage(*m_webView->_page).navigationGestureSnapshotWasRemoved();
+}
+
 void PageClientImpl::didFirstVisuallyNonEmptyLayoutForMainFrame()
 {
 }
@@ -737,6 +731,18 @@ void PageClientImpl::didSameDocumentNavigationForMainFrame(SameDocumentNavigatio
 void PageClientImpl::didChangeBackgroundColor()
 {
     [m_webView _updateScrollViewBackground];
+}
+
+void PageClientImpl::refView()
+{
+    [m_contentView retain];
+    [m_webView retain];
+}
+
+void PageClientImpl::derefView()
+{
+    [m_contentView release];
+    [m_webView release];
 }
 
 } // namespace WebKit

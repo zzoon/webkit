@@ -38,10 +38,7 @@ messages -> WebPage LegacyReceiver {
     ViewWillEndLiveResize()
 
     KeyEvent(WebKit::WebKeyboardEvent event)
-    KeyEventSyncForTesting(WebKit::WebKeyboardEvent event) -> (bool handled)
     MouseEvent(WebKit::WebMouseEvent event)
-    MouseEventSyncForTesting(WebKit::WebMouseEvent event) -> (bool handled)
-    WheelEventSyncForTesting(WebKit::WebWheelEvent event) -> (bool handled)
 #if PLATFORM(IOS)
     SetViewportConfigurationMinimumLayoutSize(WebCore::FloatSize size)
     SetMaximumUnobscuredSize(WebCore::FloatSize size)
@@ -70,6 +67,7 @@ messages -> WebPage LegacyReceiver {
     SelectPositionAtPoint(WebCore::IntPoint point, uint64_t callbackID)
     BeginSelectionInDirection(uint32_t direction, uint64_t callbackID)
     UpdateSelectionWithExtentPoint(WebCore::IntPoint point, uint64_t callbackID)
+    UpdateSelectionWithExtentPointAndBoundary(WebCore::IntPoint point, uint32_t granularity, uint64_t callbackID)
     RequestDictationContext(uint64_t callbackID)
     ReplaceDictatedText(String oldText, String newText)
     ReplaceSelectedText(String oldText, String newText)
@@ -88,12 +86,13 @@ messages -> WebPage LegacyReceiver {
     SetAssistedNodeValueAsNumber(double value)
     SetAssistedNodeSelectedIndex(uint32_t index, bool allowMultipleSelection)
     ApplicationWillResignActive()
-    ApplicationDidEnterBackground()
+    ApplicationDidEnterBackground(bool isSuspendedUnderLock)
     ApplicationWillEnterForeground()
     ApplicationDidBecomeActive()
     ContentSizeCategoryDidChange(String contentSizeCategory)
     ExecuteEditCommandWithCallback(String name, uint64_t callbackID)
     GetLookupContextAtPoint(WebCore::IntPoint point, uint64_t callbackID)
+    SetAllowsMediaDocumentInlinePlayback(bool allows)
 #endif
 
 #if ENABLE(REMOTE_INSPECTOR)
@@ -105,7 +104,6 @@ messages -> WebPage LegacyReceiver {
 #endif
 #if !ENABLE(IOS_TOUCH_EVENTS) && ENABLE(TOUCH_EVENTS)
     TouchEvent(WebKit::WebTouchEvent event)
-    TouchEventSyncForTesting(WebKit::WebTouchEvent event) -> (bool handled)
 #endif
 
 #if ENABLE(INPUT_TYPE_COLOR)
@@ -186,7 +184,7 @@ messages -> WebPage LegacyReceiver {
 
     SetEditable(bool editable)
     ValidateCommand(String name, uint64_t callbackID)
-    ExecuteEditCommand(String name)
+    ExecuteEditCommand(String name, String argument)
 
     DidRemoveEditCommand(uint64_t commandID)
     ReapplyEditCommand(uint64_t commandID)
@@ -200,9 +198,6 @@ messages -> WebPage LegacyReceiver {
     ScalePage(double scale, WebCore::IntPoint origin)
     ScalePageInViewCoordinates(double scale, WebCore::IntPoint centerInViewCoordinates)
     ScaleView(double scale)
-#if PLATFORM(COCOA)
-    ScaleViewAndUpdateGeometryFenced(double scale, WebCore::IntSize viewSize, uint64_t callbackID)
-#endif
 
     SetUseFixedLayout(bool fixed)
     SetFixedLayoutSize(WebCore::IntSize size)
@@ -286,7 +281,7 @@ messages -> WebPage LegacyReceiver {
 
 #if ENABLE(MEDIA_STREAM)
     # MediaSteam
-    DidReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed)
+    DidReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed, String deviceUIDVideo, String deviceUIDAudio)
 #endif
 
     # Notification
@@ -314,6 +309,7 @@ messages -> WebPage LegacyReceiver {
 
 #if ENABLE(MEDIA_SESSION)
     HandleMediaEvent(uint32_t eventType)
+    SetVolumeOfMediaElement(double volume, uint64_t elementID)
 #endif
 
     // FIXME: This a dummy message, to avoid breaking the build for platforms that don't require
@@ -433,4 +429,8 @@ messages -> WebPage LegacyReceiver {
     ClearWheelEventTestTrigger()
     SetShouldScaleViewToFitDocument(bool shouldScaleViewToFitDocument)
     SetUserContentExtensionsEnabled(bool userContentExtensionsEnabled)
+
+#if ENABLE(VIDEO) && USE(GSTREAMER)
+    DidEndRequestInstallMissingMediaPlugins(uint32_t result)
+#endif
 }

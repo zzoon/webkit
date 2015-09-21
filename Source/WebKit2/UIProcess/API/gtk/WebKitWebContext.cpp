@@ -21,6 +21,7 @@
 #include "WebKitWebContext.h"
 
 #include "APIDownloadClient.h"
+#include "APIPageConfiguration.h"
 #include "APIProcessPoolConfiguration.h"
 #include "APIString.h"
 #include "TextChecker.h"
@@ -339,7 +340,7 @@ static void webkit_web_context_class_init(WebKitWebContextClass* webContextClass
 {
     GObjectClass* gObjectClass = G_OBJECT_CLASS(webContextClass);
 
-    bindtextdomain(GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR);
+    bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR);
     bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
 
     gObjectClass->get_property = webkitWebContextGetProperty;
@@ -1158,7 +1159,7 @@ void webkit_web_context_allow_tls_certificate_for_host(WebKitWebContext* context
  * the rest of the WebViews in the application will still function
  * normally.
  *
- * This method **must be called before any other functions**,
+ * This method **must be called before any web process has been created**,
  * as early as possible in your application. Calling it later will make
  * your application crash.
  *
@@ -1193,6 +1194,47 @@ WebKitProcessModel webkit_web_context_get_process_model(WebKitWebContext* contex
     g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS);
 
     return toWebKitProcessModel(context->priv->context->processModel());
+}
+
+/**
+ * webkit_web_context_set_web_process_count_limit:
+ * @context: the #WebKitWebContext
+ * @limit: the maximum number of web processes
+ *
+ * Sets the maximum number of web processes that can be created at the same time for the @context.
+ * The default value is 0 and means no limit.
+ *
+ * This method **must be called before any web process has been created**,
+ * as early as possible in your application. Calling it later will make
+ * your application crash.
+ *
+ * Since: 2.10
+ */
+void webkit_web_context_set_web_process_count_limit(WebKitWebContext* context, guint limit)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
+
+    if (limit == context->priv->context->configuration().maximumProcessCount())
+        return;
+
+    context->priv->context->setMaximumNumberOfProcesses(limit);
+}
+
+/**
+ * webkit_web_context_get_web_process_count_limit:
+ * @context: the #WebKitWebContext
+ *
+ * Gets the maximum number of web processes that can be created at the same time for the @context.
+ *
+ * Returns: the maximum limit of web processes, or 0 if there isn't a limit.
+ *
+ * Since: 2.10
+ */
+guint webkit_web_context_get_web_process_count_limit(WebKitWebContext* context)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), 0);
+
+    return context->priv->context->configuration().maximumProcessCount();
 }
 
 WebKitDownload* webkitWebContextGetOrCreateDownload(DownloadProxy* downloadProxy)
@@ -1274,13 +1316,15 @@ void webkitWebContextDidFinishLoadingCustomProtocol(WebKitWebContext* context, u
 void webkitWebContextCreatePageForWebView(WebKitWebContext* context, WebKitWebView* webView, WebKitUserContentManager* userContentManager, WebKitWebView* relatedView)
 {
     WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(webView);
-    WebPageConfiguration webPageConfiguration;
-    webPageConfiguration.preferences = webkitSettingsGetPreferences(webkit_web_view_get_settings(webView));
-    webPageConfiguration.relatedPage = relatedView ? webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(relatedView)) : nullptr;
-    webPageConfiguration.userContentController = userContentManager ? webkitUserContentManagerGetUserContentControllerProxy(userContentManager) : nullptr;
-    webPageConfiguration.websiteDataStore = &webkitWebsiteDataManagerGetDataStore(context->priv->websiteDataManager.get());
-    webPageConfiguration.sessionID = webPageConfiguration.websiteDataStore->sessionID();
-    webkitWebViewBaseCreateWebPage(webViewBase, context->priv->context.get(), WTF::move(webPageConfiguration));
+
+    auto pageConfiguration = API::PageConfiguration::create();
+    pageConfiguration->setProcessPool(context->priv->context.get());
+    pageConfiguration->setPreferences(webkitSettingsGetPreferences(webkit_web_view_get_settings(webView)));
+    pageConfiguration->setRelatedPage(relatedView ? webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(relatedView)) : nullptr);
+    pageConfiguration->setUserContentController(userContentManager ? webkitUserContentManagerGetUserContentControllerProxy(userContentManager) : nullptr);
+    pageConfiguration->setWebsiteDataStore(&webkitWebsiteDataManagerGetDataStore(context->priv->websiteDataManager.get()));
+    pageConfiguration->setSessionID(pageConfiguration->websiteDataStore()->websiteDataStore().sessionID());
+    webkitWebViewBaseCreateWebPage(webViewBase, WTF::move(pageConfiguration));
 
     WebPageProxy* page = webkitWebViewBaseGetPage(webViewBase);
     context->priv->webViews.set(page->pageID(), webView);

@@ -130,11 +130,6 @@ StyleCachedImageSet* CSSImageSetValue::cachedImageSet(CachedResourceLoader& load
     return is<StyleCachedImageSet>(m_imageSet.get()) ? downcast<StyleCachedImageSet>(m_imageSet.get()) : nullptr;
 }
 
-StyleCachedImageSet* CSSImageSetValue::cachedImageSet(CachedResourceLoader& loader)
-{
-    return cachedImageSet(loader, CachedResourceLoader::defaultCachedResourceOptions());
-}
-
 StyleImage* CSSImageSetValue::cachedOrPendingImageSet(Document& document)
 {
     if (!m_imageSet)
@@ -201,9 +196,9 @@ CSSImageSetValue::CSSImageSetValue(const CSSImageSetValue& cloneFrom)
     // Non-CSSValueList data is not accessible through CSS OM, no need to clone.
 }
 
-PassRefPtr<CSSImageSetValue> CSSImageSetValue::cloneForCSSOM() const
+Ref<CSSImageSetValue> CSSImageSetValue::cloneForCSSOM() const
 {
-    return adoptRef(new CSSImageSetValue(*this));
+    return adoptRef(*new CSSImageSetValue(*this));
 }
 
 } // namespace WebCore

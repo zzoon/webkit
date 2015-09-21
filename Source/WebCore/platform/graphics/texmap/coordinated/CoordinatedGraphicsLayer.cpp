@@ -460,19 +460,12 @@ void CoordinatedGraphicsLayer::setShowRepaintCounter(bool show)
 
 void CoordinatedGraphicsLayer::setContentsToImage(Image* image)
 {
-    NativeImagePtr newNativeImagePtr = image ? image->nativeImageForCurrentFrame() : 0;
-    if (newNativeImagePtr) {
-        // This code makes the assumption that pointer equality on a NativeImagePtr is a valid way to tell if the image is changed.
-        // This assumption is true in Qt, GTK and EFL.
-        if (newNativeImagePtr == m_compositedNativeImagePtr)
-            return;
+    NativeImagePtr nativeImagePtr = image ? image->nativeImageForCurrentFrame() : nullptr;
+    if (m_compositedImage == image && m_compositedNativeImagePtr == nativeImagePtr)
+        return;
 
-        m_compositedImage = image;
-        m_compositedNativeImagePtr = newNativeImagePtr;
-    } else {
-        m_compositedImage = 0;
-        m_compositedNativeImagePtr = 0;
-    }
+    m_compositedImage = image;
+    m_compositedNativeImagePtr = nativeImagePtr;
 
     GraphicsLayer::setContentsToImage(image);
     didChangeImageBacking();
@@ -535,11 +528,6 @@ void CoordinatedGraphicsLayer::setNeedsDisplayInRect(const FloatRect& rect, Shou
     didChangeLayerState();
 
     addRepaintRect(rect);
-}
-
-CoordinatedLayerID CoordinatedGraphicsLayer::id() const
-{
-    return m_id;
 }
 
 void CoordinatedGraphicsLayer::setScrollableArea(ScrollableArea* scrollableArea)
@@ -810,7 +798,7 @@ void CoordinatedGraphicsLayer::resetLayerState()
 bool CoordinatedGraphicsLayer::imageBackingVisible()
 {
     ASSERT(m_coordinatedImageBacking);
-    return tiledBackingStoreVisibleRect().intersects(IntRect(contentsRect()));
+    return transformedVisibleRect().intersects(IntRect(contentsRect()));
 }
 
 void CoordinatedGraphicsLayer::releaseImageBackingIfNeeded()
@@ -820,7 +808,7 @@ void CoordinatedGraphicsLayer::releaseImageBackingIfNeeded()
 
     ASSERT(m_coordinator);
     m_coordinatedImageBacking->removeHost(this);
-    m_coordinatedImageBacking.clear();
+    m_coordinatedImageBacking = nullptr;
     m_layerState.imageID = InvalidCoordinatedImageBackingID;
     m_layerState.imageChanged = true;
 }
@@ -872,14 +860,13 @@ void CoordinatedGraphicsLayer::adjustContentsScale()
     m_previousBackingStore = WTF::move(m_mainBackingStore);
 
     // No reason to save the previous backing store for non-visible areas.
-    m_previousBackingStore->removeAllNonVisibleTiles();
+    m_previousBackingStore->removeAllNonVisibleTiles(transformedVisibleRect(), IntRect(0, 0, size().width(), size().height()));
 }
 
 void CoordinatedGraphicsLayer::createBackingStore()
 {
-    m_mainBackingStore = std::make_unique<TiledBackingStore>(this);
+    m_mainBackingStore = std::make_unique<TiledBackingStore>(this, effectiveContentsScale());
     m_mainBackingStore->setSupportsAlpha(!contentsOpaque());
-    m_mainBackingStore->setContentsScale(effectiveContentsScale());
 }
 
 void CoordinatedGraphicsLayer::tiledBackingStorePaint(GraphicsContext* context, const IntRect& rect)
@@ -904,25 +891,20 @@ void CoordinatedGraphicsLayer::tiledBackingStoreHasPendingTileCreation()
     notifyFlushRequired();
 }
 
-IntRect CoordinatedGraphicsLayer::tiledBackingStoreContentsRect()
-{
-    return IntRect(0, 0, size().width(), size().height());
-}
-
-static void clampToContentsRectIfRectIsInfinite(FloatRect& rect, const IntRect& contentsRect)
+static void clampToContentsRectIfRectIsInfinite(FloatRect& rect, const FloatSize& contentsSize)
 {
     if (rect.width() >= LayoutUnit::nearlyMax() || rect.width() <= LayoutUnit::nearlyMin()) {
-        rect.setX(contentsRect.x());
-        rect.setWidth(contentsRect.width());
+        rect.setX(0);
+        rect.setWidth(contentsSize.width());
     }
 
     if (rect.height() >= LayoutUnit::nearlyMax() || rect.height() <= LayoutUnit::nearlyMin()) {
-        rect.setY(contentsRect.y());
-        rect.setHeight(contentsRect.height());
+        rect.setY(0);
+        rect.setHeight(contentsSize.height());
     }
 }
 
-IntRect CoordinatedGraphicsLayer::tiledBackingStoreVisibleRect()
+IntRect CoordinatedGraphicsLayer::transformedVisibleRect()
 {
     // Non-invertible layers are not visible.
     if (!m_layerTransform.combined().isInvertible())
@@ -933,7 +915,7 @@ IntRect CoordinatedGraphicsLayer::tiledBackingStoreVisibleRect()
     // so it might spread further than the real visible area (and then even more amplified by the cover rect multiplier).
     ASSERT(m_cachedInverseTransform == m_layerTransform.combined().inverse());
     FloatRect rect = m_cachedInverseTransform.clampedBoundsOfProjectedQuad(FloatQuad(m_coordinator->visibleContentsRect()));
-    clampToContentsRectIfRectIsInfinite(rect, tiledBackingStoreContentsRect());
+    clampToContentsRectIfRectIsInfinite(rect, size());
     return enclosingIntRect(rect);
 }
 
@@ -1003,12 +985,14 @@ void CoordinatedGraphicsLayer::updateContentBuffers()
 
     // This is the only place we (re)create the main tiled backing store, once we
     // have a remote client and we are ready to send our data to the UI process.
-    if (!m_mainBackingStore)
+    if (!m_mainBackingStore) {
         createBackingStore();
+        m_pendingVisibleRectAdjustment = true;
+    }
 
     if (m_pendingVisibleRectAdjustment) {
         m_pendingVisibleRectAdjustment = false;
-        m_mainBackingStore->coverWithTilesIfNeeded();
+        m_mainBackingStore->createTilesIfNeeded(transformedVisibleRect(), IntRect(0, 0, size().width(), size().height()));
     }
 
     m_mainBackingStore->updateTileBuffers();
@@ -1161,7 +1145,7 @@ bool CoordinatedGraphicsLayer::addAnimation(const KeyframeValueList& valueList, 
 {
     ASSERT(!keyframesName.isEmpty());
 
-    if (!anim || anim->isEmptyOrZeroDuration() || valueList.size() < 2 || (valueList.property() != AnimatedPropertyTransform && valueList.property() != AnimatedPropertyOpacity && valueList.property() != AnimatedPropertyWebkitFilter))
+    if (!anim || anim->isEmptyOrZeroDuration() || valueList.size() < 2 || (valueList.property() != AnimatedPropertyTransform && valueList.property() != AnimatedPropertyOpacity && valueList.property() != AnimatedPropertyFilter))
         return false;
 
     bool listsMatch = false;

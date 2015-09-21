@@ -154,11 +154,13 @@ using namespace WebCore;
 -(void)repaint;
 -(void)setDelayCallbacks:(BOOL)shouldDelay;
 -(void)loadStateChanged:(NSNotification *)notification;
+- (void)loadedRangesChanged:(NSNotification *)notification;
 -(void)rateChanged:(NSNotification *)notification;
 -(void)sizeChanged:(NSNotification *)notification;
 -(void)timeChanged:(NSNotification *)notification;
 -(void)didEnd:(NSNotification *)notification;
 -(void)layerHostChanged:(NSNotification *)notification;
+- (void)newImageAvailable:(NSNotification *)notification;
 @end
 
 @protocol WebKitVideoRenderingDetails
@@ -1182,7 +1184,7 @@ void MediaPlayerPrivateQTKit::repaint()
     m_player->repaint();
 }
 
-void MediaPlayerPrivateQTKit::paintCurrentFrameInContext(GraphicsContext* context, const FloatRect& r)
+void MediaPlayerPrivateQTKit::paintCurrentFrameInContext(GraphicsContext& context, const FloatRect& r)
 {
     id qtVideoRenderer = m_qtVideoRenderer.get();
     if (!qtVideoRenderer && currentRenderingMode() == MediaRenderingMovieLayer) {
@@ -1195,9 +1197,9 @@ void MediaPlayerPrivateQTKit::paintCurrentFrameInContext(GraphicsContext* contex
     paint(context, r);
 }
 
-void MediaPlayerPrivateQTKit::paint(GraphicsContext* context, const FloatRect& r)
+void MediaPlayerPrivateQTKit::paint(GraphicsContext& context, const FloatRect& r)
 {
-    if (context->paintingDisabled() || m_hasUnsupportedTracks)
+    if (context.paintingDisabled() || m_hasUnsupportedTracks)
         return;
     id qtVideoRenderer = m_qtVideoRenderer.get();
     if (!qtVideoRenderer)
@@ -1209,12 +1211,12 @@ void MediaPlayerPrivateQTKit::paint(GraphicsContext* context, const FloatRect& r
     FloatSize scaleFactor(1.0f, -1.0f);
     FloatRect paintRect(FloatPoint(), r.size());
 
-    GraphicsContextStateSaver stateSaver(*context);
-    context->translate(r.x(), r.y() + r.height());
-    context->scale(scaleFactor);
-    context->setImageInterpolationQuality(InterpolationLow);
+    GraphicsContextStateSaver stateSaver(context);
+    context.translate(r.x(), r.y() + r.height());
+    context.scale(scaleFactor);
+    context.setImageInterpolationQuality(InterpolationLow);
 
-    newContext = [NSGraphicsContext graphicsContextWithGraphicsPort:context->platformContext() flipped:NO];
+    newContext = [NSGraphicsContext graphicsContextWithGraphicsPort:context.platformContext() flipped:NO];
 
     [NSGraphicsContext saveGraphicsState];
     [NSGraphicsContext setCurrentContext:newContext];
@@ -1426,7 +1428,10 @@ void MediaPlayerPrivateQTKit::disableUnsupportedTracks()
         // Disable chapter tracks. These are most likely to lead to trouble, as
         // they will be composited under the video tracks, forcing QT to do extra
         // work.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundeclared-selector"
         QTTrack *chapterTrack = [track performSelector:@selector(chapterlist)];
+#pragma clang diagnostic pop
         if (!chapterTrack)
             continue;
         

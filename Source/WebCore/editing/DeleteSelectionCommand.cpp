@@ -302,7 +302,7 @@ void DeleteSelectionCommand::saveTypingStyleState()
     if (enclosingNodeOfType(m_selectionToDelete.start(), isMailBlockquote))
         m_deleteIntoBlockquoteStyle = EditingStyle::create(m_selectionToDelete.end());
     else
-        m_deleteIntoBlockquoteStyle = 0;
+        m_deleteIntoBlockquoteStyle = nullptr;
 }
 
 bool DeleteSelectionCommand::handleSpecialCaseBRDelete()
@@ -632,7 +632,7 @@ void DeleteSelectionCommand::mergeParagraphs()
     
     // We need to merge into m_upstreamStart's block, but it's been emptied out and collapsed by deletion.
     if (!mergeDestination.deepEquivalent().deprecatedNode() || !mergeDestination.deepEquivalent().deprecatedNode()->isDescendantOf(enclosingBlock(m_upstreamStart.containerNode())) || m_startsAtEmptyLine) {
-        insertNodeAt(createBreakElement(document()).get(), m_upstreamStart);
+        insertNodeAt(createBreakElement(document()).ptr(), m_upstreamStart);
         mergeDestination = VisiblePosition(m_upstreamStart);
     }
     
@@ -728,11 +728,11 @@ void DeleteSelectionCommand::calculateTypingStyleAfterDelete()
     // If we deleted into a blockquote, but are now no longer in a blockquote, use the alternate typing style
     if (m_deleteIntoBlockquoteStyle && !enclosingNodeOfType(m_endingPosition, isMailBlockquote, CanCrossEditingBoundary))
         m_typingStyle = m_deleteIntoBlockquoteStyle;
-    m_deleteIntoBlockquoteStyle = 0;
+    m_deleteIntoBlockquoteStyle = nullptr;
 
     m_typingStyle->prepareToApplyAt(m_endingPosition);
     if (m_typingStyle->isEmpty())
-        m_typingStyle = 0;
+        m_typingStyle = nullptr;
     // This is where we've deleted all traces of a style but not a whole paragraph (that's handled above).
     // In this case if we start typing, the new characters should have the same style as the just deleted ones,
     // but, if we change the selection, come back and start typing that style should be lost.  Also see 
@@ -855,7 +855,7 @@ void DeleteSelectionCommand::doApply()
     
     removePreviouslySelectedEmptyTableRows();
     
-    RefPtr<Node> placeholder = m_needPlaceholder ? createBreakElement(document()).get() : 0;
+    RefPtr<Node> placeholder = m_needPlaceholder ? createBreakElement(document()).ptr() : nullptr;
     
     if (placeholder) {
         if (m_sanitizeMarkup)

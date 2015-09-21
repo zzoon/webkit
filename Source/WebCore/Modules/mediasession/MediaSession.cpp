@@ -46,21 +46,19 @@ static const char* contentKind = "content";
 MediaSession::Kind MediaSession::parseKind(const String& kind)
 {
     // 4. Media Session
-    // 2. If no corresponding media session type can be found for the provided media session category or media session
-    //    category is empty, then set media session's current media session type to "content".
+    // 2. Set media session's current media session type to the corresponding media session type of media session category.
+
+    if (kind.isNull() || kind == contentKind)
+        return MediaSession::Kind::Content;
     if (kind == ambientKind)
         return MediaSession::Kind::Ambient;
     if (kind == transientKind)
         return MediaSession::Kind::Transient;
     if (kind == transientSoloKind)
         return MediaSession::Kind::TransientSolo;
-    return MediaSession::Kind::Content;
-}
 
-MediaSession::MediaSession(Document& document)
-    : m_document(document)
-{
-    MediaSessionManager::singleton().addMediaSession(*this);
+    ASSERT_NOT_REACHED();
+    return MediaSession::Kind::Content;
 }
 
 MediaSession::MediaSession(ScriptExecutionContext& context, const String& kind)
@@ -71,7 +69,7 @@ MediaSession::MediaSession(ScriptExecutionContext& context, const String& kind)
     // 3. If media session's current media session type is "content", then create a new media remote controller for media
     //    session. (Otherwise media session has no media remote controller.)
     if (m_kind == Kind::Content)
-        m_controls = adoptRef(*new MediaRemoteControls(context));
+        m_controls = MediaRemoteControls::create(context, this);
 
     MediaSessionManager::singleton().addMediaSession(*this);
 }
@@ -79,6 +77,9 @@ MediaSession::MediaSession(ScriptExecutionContext& context, const String& kind)
 MediaSession::~MediaSession()
 {
     MediaSessionManager::singleton().removeMediaSession(*this);
+
+    if (m_controls)
+        m_controls->clearSession();
 }
 
 String MediaSession::kind() const
@@ -115,14 +116,33 @@ void MediaSession::removeMediaElement(HTMLMediaElement& element)
     ASSERT(m_participatingElements.contains(&element));
     m_participatingElements.remove(&element);
 
-    m_activeParticipatingElements.remove(&element);
+    changeActiveMediaElements([&]() {
+        m_activeParticipatingElements.remove(&element);
+    });
+
     if (m_iteratedActiveParticipatingElements)
         m_iteratedActiveParticipatingElements->remove(&element);
 }
 
+void MediaSession::changeActiveMediaElements(std::function<void(void)> worker)
+{
+    if (Page *page = m_document.page()) {
+        bool hadActiveMediaElements = MediaSessionManager::singleton().hasActiveMediaElements();
+
+        worker();
+
+        bool hasActiveMediaElements = MediaSessionManager::singleton().hasActiveMediaElements();
+        if (hadActiveMediaElements != hasActiveMediaElements)
+            page->chrome().client().hasMediaSessionWithActiveMediaElementsDidChange(hasActiveMediaElements);
+    } else
+        worker();
+}
+
 void MediaSession::addActiveMediaElement(HTMLMediaElement& element)
 {
-    m_activeParticipatingElements.add(&element);
+    changeActiveMediaElements([&]() {
+        m_activeParticipatingElements.add(&element);
+    });
 }
 
 bool MediaSession::isMediaElementActive(HTMLMediaElement& element)
@@ -130,7 +150,7 @@ bool MediaSession::isMediaElementActive(HTMLMediaElement& element)
     return m_activeParticipatingElements.contains(&element);
 }
 
-bool MediaSession::hasActiveMediaElements()
+bool MediaSession::hasActiveMediaElements() const
 {
     return !m_activeParticipatingElements.isEmpty();
 }
@@ -165,16 +185,20 @@ void MediaSession::setMetadata(const Dictionary& metadata)
         page->chrome().client().mediaSessionMetadataDidChange(m_metadata);
 }
 
-void MediaSession::releaseSession()
+void MediaSession::deactivate()
 {
-    // 5.1.3
+    // 5.1.2. Object members
+    // When the deactivate() method is invoked, the user agent must run the following steps:
     // 1. Let media session be the current media session.
-    // 2. Indefinitely pause all of media session's active participating media elements.
-    // 3. Reset media session's active participating media elements to an empty list.
-    while (!m_activeParticipatingElements.isEmpty())
-        m_activeParticipatingElements.takeAny()->pause();
+    // 2. Indefinitely pause all of media session’s audio-producing participants.
+    // 3. Set media session's resume list to an empty list.
+    // 4. Set media session's audio-producing participants to an empty list.
+    changeActiveMediaElements([&]() {
+        while (!m_activeParticipatingElements.isEmpty())
+            m_activeParticipatingElements.takeAny()->pause();
+    });
 
-    // 4. Run the media session release algorithm for media session.
+    // 5. Run the media session deactivation algorithm for media session.
     releaseInternal();
 }
 
@@ -217,21 +241,69 @@ bool MediaSession::invoke()
     return true;
 }
 
+void MediaSession::handleDuckInterruption()
+{
+    for (auto* element : m_activeParticipatingElements)
+        element->setShouldDuck(true);
+
+    m_currentState = State::Interrupted;
+}
+
+void MediaSession::handleUnduckInterruption()
+{
+    for (auto* element : m_activeParticipatingElements)
+        element->setShouldDuck(false);
+
+    m_currentState = State::Active;
+}
+
+void MediaSession::handleIndefinitePauseInterruption()
+{
+    safelyIterateActiveMediaElements([](HTMLMediaElement* element) {
+        element->pause();
+    });
+
+    m_activeParticipatingElements.clear();
+    m_currentState = State::Idle;
+}
+
+void MediaSession::handlePauseInterruption()
+{
+    m_currentState = State::Interrupted;
+
+    safelyIterateActiveMediaElements([](HTMLMediaElement* element) {
+        element->pause();
+    });
+}
+
+void MediaSession::handleUnpauseInterruption()
+{
+    m_currentState = State::Active;
+
+    safelyIterateActiveMediaElements([](HTMLMediaElement* element) {
+        element->play();
+    });
+}
+
 void MediaSession::togglePlayback()
+{
+    safelyIterateActiveMediaElements([](HTMLMediaElement* element) {
+        if (element->paused())
+            element->play();
+        else
+            element->pause();
+    });
+}
+
+void MediaSession::safelyIterateActiveMediaElements(std::function<void(HTMLMediaElement*)> handler)
 {
     ASSERT(!m_iteratedActiveParticipatingElements);
 
     HashSet<HTMLMediaElement*> activeParticipatingElementsCopy = m_activeParticipatingElements;
     m_iteratedActiveParticipatingElements = &activeParticipatingElementsCopy;
 
-    while (!activeParticipatingElementsCopy.isEmpty()) {
-        HTMLMediaElement* element = activeParticipatingElementsCopy.takeAny();
-
-        if (element->paused())
-            element->play();
-        else
-            element->pause();
-    }
+    while (!activeParticipatingElementsCopy.isEmpty())
+        handler(activeParticipatingElementsCopy.takeAny());
 
     m_iteratedActiveParticipatingElements = nullptr;
 }
@@ -246,6 +318,21 @@ void MediaSession::skipToPreviousTrack()
 {
     if (m_controls && m_controls->previousTrackEnabled())
         m_controls->dispatchEvent(Event::create(eventNames().previoustrackEvent, false, false));
+}
+
+void MediaSession::controlIsEnabledDidChange()
+{
+    // Media remote controls are only allowed on Content media sessions.
+    ASSERT(m_kind == Kind::Content);
+
+    // Media elements belonging to Content media sessions have mutually-exclusive playback.
+    ASSERT(m_activeParticipatingElements.size() <= 1);
+
+    if (m_activeParticipatingElements.isEmpty())
+        return;
+
+    HTMLMediaElement* element = *m_activeParticipatingElements.begin();
+    m_document.updateIsPlayingMedia(element->elementID());
 }
 
 }

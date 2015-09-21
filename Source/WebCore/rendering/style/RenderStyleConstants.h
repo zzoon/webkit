@@ -69,7 +69,8 @@ enum StyleDifferenceContextSensitiveProperty {
     ContextSensitivePropertyOpacity     = 1 << 1,
     ContextSensitivePropertyFilter      = 1 << 2,
     ContextSensitivePropertyClipRect    = 1 << 3,
-    ContextSensitivePropertyClipPath    = 1 << 4
+    ContextSensitivePropertyClipPath    = 1 << 4,
+    ContextSensitivePropertyWillChange  = 1 << 5,
 };
 
 // Static pseudo styles. Dynamic ones are produced on the fly.
@@ -463,6 +464,10 @@ typedef unsigned TextDecorationSkip;
 enum TextUnderlinePosition {
     // FIXME: Implement support for 'under left' and 'under right' values.
     TextUnderlinePositionAuto = 0x1, TextUnderlinePositionAlphabetic = 0x2, TextUnderlinePositionUnder = 0x4
+};
+
+enum TextZoom {
+    TextZoomNormal, TextZoomReset
 };
 
 enum EPageBreak {

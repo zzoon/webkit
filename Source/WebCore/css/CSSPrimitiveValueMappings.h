@@ -3438,18 +3438,18 @@ template<> inline CSSPrimitiveValue::operator EPointerEvents() const
     return PE_ALL;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontDescription::Kerning kerning)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontCascadeDescription::Kerning kerning)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (kerning) {
-    case FontDescription::AutoKerning:
+    case FontCascadeDescription::AutoKerning:
         m_value.valueID = CSSValueAuto;
         return;
-    case FontDescription::NormalKerning:
+    case FontCascadeDescription::NormalKerning:
         m_value.valueID = CSSValueNormal;
         return;
-    case FontDescription::NoneKerning:
+    case FontCascadeDescription::NoneKerning:
         m_value.valueID = CSSValueNone;
         return;
     }
@@ -3458,23 +3458,23 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontDescription::Kerning 
     m_value.valueID = CSSValueAuto;
 }
 
-template<> inline CSSPrimitiveValue::operator FontDescription::Kerning() const
+template<> inline CSSPrimitiveValue::operator FontCascadeDescription::Kerning() const
 {
     ASSERT(isValueID());
 
     switch (m_value.valueID) {
     case CSSValueAuto:
-        return FontDescription::AutoKerning;
+        return FontCascadeDescription::AutoKerning;
     case CSSValueNormal:
-        return FontDescription::NormalKerning;
+        return FontCascadeDescription::NormalKerning;
     case CSSValueNone:
-        return FontDescription::NoneKerning;
+        return FontCascadeDescription::NoneKerning;
     default:
         break;
     }
 
     ASSERT_NOT_REACHED();
-    return FontDescription::AutoKerning;
+    return FontCascadeDescription::AutoKerning;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ObjectFit fit)
@@ -3745,42 +3745,6 @@ template<> inline CSSPrimitiveValue::operator TextRenderingMode() const
 
     ASSERT_NOT_REACHED();
     return AutoTextRendering;
-}
-
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ColorSpace space)
-    : CSSValue(PrimitiveClass)
-{
-    m_primitiveUnitType = CSS_VALUE_ID;
-    switch (space) {
-    case ColorSpaceDeviceRGB:
-        m_value.valueID = CSSValueDefault;
-        break;
-    case ColorSpaceSRGB:
-        m_value.valueID = CSSValueSrgb;
-        break;
-    case ColorSpaceLinearRGB:
-        // CSS color correction does not support linearRGB yet.
-        ASSERT_NOT_REACHED();
-        m_value.valueID = CSSValueDefault;
-        break;
-    }
-}
-
-template<> inline CSSPrimitiveValue::operator ColorSpace() const
-{
-    ASSERT(isValueID());
-
-    switch (m_value.valueID) {
-    case CSSValueDefault:
-        return ColorSpaceDeviceRGB;
-    case CSSValueSrgb:
-        return ColorSpaceSRGB;
-    default:
-        break;
-    }
-
-    ASSERT_NOT_REACHED();
-    return ColorSpaceDeviceRGB;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(Hyphens hyphens)
@@ -5252,6 +5216,40 @@ template<> inline CSSPrimitiveValue::operator ContentDistributionType() const
     }
     ASSERT_NOT_REACHED();
     return ContentDistributionStretch;
+}
+
+template<> inline CSSPrimitiveValue::operator TextZoom() const
+{
+    ASSERT(isValueID());
+
+    switch (m_value.valueID) {
+    case CSSValueNormal:
+        return TextZoomNormal;
+    case CSSValueReset:
+        return TextZoomReset;
+    default:
+        break;
+    }
+
+    ASSERT_NOT_REACHED();
+    return TextZoomNormal;
+}
+
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextZoom textZoom)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (textZoom) {
+    case TextZoomNormal:
+        m_value.valueID = CSSValueNormal;
+        return;
+    case TextZoomReset:
+        m_value.valueID = CSSValueReset;
+        return;
+    }
+
+    ASSERT_NOT_REACHED();
+    m_value.valueID = CSSValueNormal;
 }
 
 #if ENABLE(CSS_SCROLL_SNAP)

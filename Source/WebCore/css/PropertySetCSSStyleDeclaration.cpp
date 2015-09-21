@@ -160,11 +160,11 @@ void PropertySetCSSStyleDeclaration::setCssText(const String& text, ExceptionCod
     mutationScope.enqueueMutationRecord();    
 }
 
-PassRefPtr<CSSValue> PropertySetCSSStyleDeclaration::getPropertyCSSValue(const String& propertyName)
+RefPtr<CSSValue> PropertySetCSSStyleDeclaration::getPropertyCSSValue(const String& propertyName)
 {
     CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
-        return 0;
+        return nullptr;
     return cloneAndCacheForCSSOM(m_propertySet->getPropertyCSSValue(propertyID).get());
 }
 
@@ -245,7 +245,7 @@ String PropertySetCSSStyleDeclaration::removeProperty(const String& propertyName
     return result;
 }
 
-PassRefPtr<CSSValue> PropertySetCSSStyleDeclaration::getPropertyCSSValueInternal(CSSPropertyID propertyID)
+RefPtr<CSSValue> PropertySetCSSStyleDeclaration::getPropertyCSSValueInternal(CSSPropertyID propertyID)
 {
     return m_propertySet->getPropertyCSSValue(propertyID);
 }
@@ -365,7 +365,6 @@ void InlineCSSStyleDeclaration::didMutate(MutationType type)
     if (!m_parentElement)
         return;
 
-    m_parentElement->setNeedsStyleRecalc(InlineStyleChange);
     m_parentElement->invalidateStyleAttribute();
     StyleAttributeMutationScope(this).didInvalidateStyleAttr();
 }

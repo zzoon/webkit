@@ -174,7 +174,7 @@ void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicStr
     } else {
         if (name == nameAttr) {
             bool willHaveName = !value.isNull();
-            if (hasName() != willHaveName && inDocument() && is<HTMLDocument>(document())) {
+            if (m_hadNameBeforeAttributeChanged != willHaveName && inDocument() && is<HTMLDocument>(document())) {
                 HTMLDocument& document = downcast<HTMLDocument>(this->document());
                 const AtomicString& id = getIdAttribute();
                 if (!id.isEmpty() && id != getNameAttribute()) {
@@ -184,6 +184,7 @@ void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicStr
                         document.removeDocumentNamedItem(*id.impl(), *this);
                 }
             }
+            m_hadNameBeforeAttributeChanged = willHaveName;
         }
         HTMLElement::parseAttribute(name, value);
     }
@@ -295,7 +296,10 @@ int HTMLImageElement::width(bool ignorePendingStylesheets)
         document().updateLayout();
 
     RenderBox* box = renderBox();
-    return box ? adjustForAbsoluteZoom(box->contentBoxRect().pixelSnappedSize().width(), *box) : 0;
+    if (!box)
+        return 0;
+    LayoutRect contentRect = box->contentBoxRect();
+    return adjustForAbsoluteZoom(snappedIntRect(contentRect).width(), *box);
 }
 
 int HTMLImageElement::height(bool ignorePendingStylesheets)
@@ -318,7 +322,10 @@ int HTMLImageElement::height(bool ignorePendingStylesheets)
         document().updateLayout();
 
     RenderBox* box = renderBox();
-    return box ? adjustForAbsoluteZoom(box->contentBoxRect().pixelSnappedSize().height(), *box) : 0;
+    if (!box)
+        return 0;
+    LayoutRect contentRect = box->contentBoxRect();
+    return adjustForAbsoluteZoom(snappedIntRect(contentRect).height(), *box);
 }
 
 int HTMLImageElement::naturalWidth() const
@@ -497,7 +504,7 @@ void HTMLImageElement::createImageControls()
     if (!imageControls)
         return;
 
-    ensureUserAgentShadowRoot().appendChild(imageControls);
+    ensureUserAgentShadowRoot().appendChild(imageControls.releaseNonNull());
 
     auto* renderObject = renderer();
     if (!renderObject)
@@ -514,7 +521,7 @@ void HTMLImageElement::destroyImageControls()
 
     if (Node* node = shadowRoot->firstChild()) {
         ASSERT_WITH_SECURITY_IMPLICATION(node->isImageControlsRootElement());
-        shadowRoot->removeChild(node);
+        shadowRoot->removeChild(*node);
     }
 
     auto* renderObject = renderer();

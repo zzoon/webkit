@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@
 #include "WebKit.h"
 #include <WebCore/SecurityOrigin.h>
 
-class DECLSPEC_UUID("6EB8D98F-2723-4472-88D3-5936F9D6E631") WebSecurityOrigin : public IWebSecurityOrigin {
+class DECLSPEC_UUID("6EB8D98F-2723-4472-88D3-5936F9D6E631") WebSecurityOrigin : public IWebSecurityOrigin2 {
 public:
     // WebSecurityOrigin
     static WebSecurityOrigin* createInstance(WebCore::SecurityOrigin* origin);
@@ -40,40 +40,26 @@ public:
     WebCore::SecurityOrigin* securityOrigin() const { return m_securityOrigin.get(); }
 
     // IUnknown
-    virtual HRESULT STDMETHODCALLTYPE QueryInterface( 
-        /* [in] */ REFIID riid,
-        /* [iid_is][out] */ void** ppvObject);
-
+    virtual HRESULT STDMETHODCALLTYPE QueryInterface(_In_ REFIID riid, _COM_Outptr_ void** ppvObject);
     virtual ULONG STDMETHODCALLTYPE AddRef();
-
     virtual ULONG STDMETHODCALLTYPE Release();
 
     // IWebSecurityOrigin
-    virtual HRESULT STDMETHODCALLTYPE protocol( 
-        /* [retval][out] */ BSTR* result);
-        
-    virtual HRESULT STDMETHODCALLTYPE host( 
-        /* [retval][out] */ BSTR* result);
-        
-    virtual HRESULT STDMETHODCALLTYPE port( 
-        /* [retval][out] */ unsigned short* result);
+    virtual HRESULT STDMETHODCALLTYPE protocol(__deref_opt_out BSTR*);
+    virtual HRESULT STDMETHODCALLTYPE host(__deref_opt_out BSTR*);
+    virtual HRESULT STDMETHODCALLTYPE port(_Out_ unsigned short*);
+    virtual HRESULT STDMETHODCALLTYPE usage(_Out_ unsigned long long*);
+    virtual HRESULT STDMETHODCALLTYPE quota(_Out_ unsigned long long*);
+    virtual HRESULT STDMETHODCALLTYPE setQuota(unsigned long long);
 
-    virtual HRESULT STDMETHODCALLTYPE usage( 
-        /* [retval][out] */ unsigned long long* result);
-        
-    virtual HRESULT STDMETHODCALLTYPE quota( 
-        /* [retval][out] */ unsigned long long* result);
-        
-    virtual HRESULT STDMETHODCALLTYPE setQuota( 
-        /* [in] */ unsigned long long quota);
-
-    virtual HRESULT STDMETHODCALLTYPE initWithURL(/*[in]*/ BSTR);
+    // IWebSecurityOrigin2
+    virtual HRESULT STDMETHODCALLTYPE initWithURL(_In_ BSTR);
 
 private:
     WebSecurityOrigin(WebCore::SecurityOrigin*);
     ~WebSecurityOrigin();
 
-    ULONG m_refCount;
+    ULONG m_refCount { 0 };
     RefPtr<WebCore::SecurityOrigin> m_securityOrigin;
 };
 

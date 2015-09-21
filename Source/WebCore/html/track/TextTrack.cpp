@@ -116,9 +116,7 @@ TextTrack* TextTrack::captionMenuAutomaticItem()
 TextTrack::TextTrack(ScriptExecutionContext* context, TextTrackClient* client, const AtomicString& kind, const AtomicString& id, const AtomicString& label, const AtomicString& language, TextTrackType type)
     : TrackBase(TrackBase::TextTrack, id, label, language)
     , m_cues(0)
-#if ENABLE(WEBVTT_REGIONS)
     , m_regions(0)
-#endif
     , m_scriptExecutionContext(context)
     , m_mode(disabledKeyword().string())
     , m_client(client)
@@ -139,12 +137,10 @@ TextTrack::~TextTrack()
 
         for (size_t i = 0; i < m_cues->length(); ++i)
             m_cues->item(i)->setTrack(0);
-#if ENABLE(WEBVTT_REGIONS)
         if (m_regions) {
             for (size_t i = 0; i < m_regions->length(); ++i)
                 m_regions->item(i)->setTrack(0);
         }
-#endif
     }
     clearClient();
 }
@@ -245,7 +241,7 @@ TextTrackCueList* TextTrack::cues()
     // http://www.whatwg.org/specs/web-apps/current-work/#dom-texttrack-cues
     if (m_mode != disabledKeyword())
         return ensureTextTrackCueList();
-    return 0;
+    return nullptr;
 }
 
 void TextTrack::removeAllCues()
@@ -257,9 +253,9 @@ void TextTrack::removeAllCues()
         m_client->textTrackRemoveCues(this, m_cues.get());
     
     for (size_t i = 0; i < m_cues->length(); ++i)
-        m_cues->item(i)->setTrack(0);
+        m_cues->item(i)->setTrack(nullptr);
     
-    m_cues = 0;
+    m_cues = nullptr;
 }
 
 TextTrackCueList* TextTrack::activeCues() const
@@ -272,7 +268,7 @@ TextTrackCueList* TextTrack::activeCues() const
     // http://www.whatwg.org/specs/web-apps/current-work/#dom-texttrack-activecues
     if (m_cues && m_mode != disabledKeyword())
         return m_cues->activeCues();
-    return 0;
+    return nullptr;
 }
 
 void TextTrack::addCue(PassRefPtr<TextTrackCue> prpCue, ExceptionCode& ec)
@@ -342,7 +338,6 @@ void TextTrack::removeCue(TextTrackCue* cue, ExceptionCode& ec)
         m_client->textTrackRemoveCue(this, cue);
 }
 
-#if ENABLE(VIDEO_TRACK) && ENABLE(WEBVTT_REGIONS)
 VTTRegionList* TextTrack::ensureVTTRegionList()
 {
     if (!m_regions)
@@ -414,7 +409,6 @@ void TextTrack::removeRegion(VTTRegion* region, ExceptionCode &ec)
 
     region->setTrack(0);
 }
-#endif
 
 void TextTrack::cueWillChange(TextTrackCue* cue)
 {
@@ -541,48 +535,6 @@ bool TextTrack::hasCue(TextTrackCue* cue, TextTrackCue::CueMatchRules match)
     ASSERT_NOT_REACHED();
     return false;
 }
-
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-PassRefPtr<PlatformTextTrack> TextTrack::platformTextTrack()
-{
-    if (m_platformTextTrack)
-        return m_platformTextTrack;
-
-    PlatformTextTrack::TrackKind platformKind = PlatformTextTrack::Caption;
-    if (kind() == subtitlesKeyword())
-        platformKind = PlatformTextTrack::Subtitle;
-    else if (kind() == captionsKeyword())
-        platformKind = PlatformTextTrack::Caption;
-    else if (kind() == descriptionsKeyword())
-        platformKind = PlatformTextTrack::Description;
-    else if (kind() == chaptersKeyword())
-        platformKind = PlatformTextTrack::Chapter;
-    else if (kind() == metadataKeyword())
-        platformKind = PlatformTextTrack::MetaData;
-    else if (kind() == forcedKeyword())
-        platformKind = PlatformTextTrack::Forced;
-
-    PlatformTextTrack::TrackType type = PlatformTextTrack::OutOfBand;
-    if (m_trackType == TrackElement)
-        type = PlatformTextTrack::OutOfBand;
-    else if (m_trackType == AddTrack)
-        type = PlatformTextTrack::Script;
-    else if (m_trackType == InBand)
-        type = PlatformTextTrack::InBand;
-
-    PlatformTextTrack::TrackMode platformMode = PlatformTextTrack::Disabled;
-    if (TextTrack::hiddenKeyword() == mode())
-        platformMode = PlatformTextTrack::Hidden;
-    else if (TextTrack::disabledKeyword() == mode())
-        platformMode = PlatformTextTrack::Disabled;
-    else if (TextTrack::showingKeyword() == mode())
-        platformMode = PlatformTextTrack::Showing;
-
-    m_platformTextTrack = PlatformTextTrack::create(this, label(), language(), platformMode, platformKind, type, uniqueId());
-
-    return m_platformTextTrack;
-}
-#endif
 
 bool TextTrack::isMainProgramContent() const
 {

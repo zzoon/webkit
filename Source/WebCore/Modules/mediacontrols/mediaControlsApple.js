@@ -132,10 +132,21 @@ Controller.prototype = {
 
     extend: function(child)
     {
+        // This function doesn't actually do what we want it to. In particular it
+        // is not copying the getters and setters to the child class, since they are
+        // not enumerable. What we should do is use ES6 classes, or assign the __proto__
+        // directly.
+        // FIXME: Use ES6 classes.
+
         for (var property in this) {
             if (!child.hasOwnProperty(property))
                 child[property] = this[property];
         }
+    },
+
+    get idiom()
+    {
+        return "apple";
     },
 
     UIString: function(developmentString, replaceString, replacementString)
@@ -330,10 +341,10 @@ Controller.prototype = {
         this.listenFor(panel, 'click', this.handlePanelClick);
         this.listenFor(panel, 'dblclick', this.handlePanelClick);
         this.listenFor(panel, 'dragstart', this.handlePanelDragStart);
-        
+
         var panelBackgroundContainer = this.controls.panelBackgroundContainer = document.createElement('div');
         panelBackgroundContainer.setAttribute('pseudo', '-webkit-media-controls-panel-background-container');
-        
+
         var panelTint = this.controls.panelTint = document.createElement('div');
         panelTint.setAttribute('pseudo', '-webkit-media-controls-panel-tint');
         this.listenFor(panelTint, 'mousedown', this.handlePanelMouseDown);
@@ -395,7 +406,7 @@ Controller.prototype = {
 
         this.timelineContextName = "_webkit-media-controls-timeline-" + this.host.generateUUID();
         timeline.style.backgroundImage = '-webkit-canvas(' + this.timelineContextName + ')';
-        
+
         var thumbnailTrack = this.controls.thumbnailTrack = document.createElement('div');
         thumbnailTrack.classList.add(this.ClassNames.thumbnailTrack);
 
@@ -432,10 +443,10 @@ Controller.prototype = {
         var volumeBox = this.controls.volumeBox = document.createElement('div');
         volumeBox.setAttribute('pseudo', '-webkit-media-controls-volume-slider-container');
         volumeBox.classList.add(this.ClassNames.volumeBox);
-        
+
         var volumeBoxBackground = this.controls.volumeBoxBackground = document.createElement('div');
         volumeBoxBackground.setAttribute('pseudo', '-webkit-media-controls-volume-slider-container-background');
-        
+
         var volumeBoxTint = this.controls.volumeBoxTint = document.createElement('div');
         volumeBoxTint.setAttribute('pseudo', '-webkit-media-controls-volume-slider-container-tint');
 
@@ -452,7 +463,7 @@ Controller.prototype = {
 
         this.volumeContextName = "_webkit-media-controls-volume-" + this.host.generateUUID();
         volume.style.backgroundImage = '-webkit-canvas(' + this.volumeContextName + ')';
-        
+
         var captionButton = this.controls.captionButton = document.createElement('button');
         captionButton.setAttribute('pseudo', '-webkit-media-controls-toggle-closed-captions-button');
         captionButton.setAttribute('aria-label', this.UIString('Captions'));
@@ -477,10 +488,10 @@ Controller.prototype = {
 
         var inlinePlaybackPlaceholderText = this.controls.inlinePlaybackPlaceholderText = document.createElement('div');
         inlinePlaybackPlaceholderText.setAttribute('pseudo', '-webkit-media-controls-wireless-playback-text');
-        
+
         var inlinePlaybackPlaceholderTextTop = this.controls.inlinePlaybackPlaceholderTextTop = document.createElement('p');
         inlinePlaybackPlaceholderTextTop.setAttribute('pseudo', '-webkit-media-controls-wireless-playback-text-top');
-        
+
         var inlinePlaybackPlaceholderTextBottom = this.controls.inlinePlaybackPlaceholderTextBottom = document.createElement('p');
         inlinePlaybackPlaceholderTextBottom.setAttribute('pseudo', '-webkit-media-controls-wireless-playback-text-bottom');
 
@@ -488,6 +499,14 @@ Controller.prototype = {
         wirelessTargetPicker.setAttribute('pseudo', '-webkit-media-controls-wireless-playback-picker-button');
         wirelessTargetPicker.setAttribute('aria-label', this.UIString('Choose Wireless Display'));
         this.listenFor(wirelessTargetPicker, 'click', this.handleWirelessPickerButtonClicked);
+
+        // Show controls button is an accessibility workaround since the controls are now removed from the DOM. http://webkit.org/b/145684
+        var showControlsButton = this.showControlsButton = document.createElement('button');
+        showControlsButton.setAttribute('pseudo', '-webkit-media-show-controls');
+        showControlsButton.hidden = true;
+        showControlsButton.setAttribute('aria-label', this.UIString('Show Controls'));
+        this.listenFor(showControlsButton, 'click', this.handleShowControlsClick);
+        this.base.appendChild(showControlsButton);
 
         if (!Controller.gSimulateWirelessPlaybackTarget)
             wirelessTargetPicker.classList.add(this.ClassNames.hidden);
@@ -635,7 +654,7 @@ Controller.prototype = {
             this.controls.statusDisplay.innerText = this.UIString('Error');
         else if (this.isLive && this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA)
             this.controls.statusDisplay.innerText = this.UIString('Live Broadcast');
-        else if (this.video.networkState === HTMLMediaElement.NETWORK_LOADING)
+        else if (!this.isPlayable() && this.video.networkState === HTMLMediaElement.NETWORK_LOADING)
             this.controls.statusDisplay.innerText = this.UIString('Loading');
         else
             this.controls.statusDisplay.innerText = '';
@@ -682,6 +701,7 @@ Controller.prototype = {
         this.updateCaptionButton();
         this.updateCaptionContainer();
         this.updateFullscreenButtons();
+        this.updateWirelessTargetAvailable();
         this.updateWirelessTargetPickerButton();
         this.updateProgress();
         this.updateControls();
@@ -787,6 +807,15 @@ Controller.prototype = {
         }
     },
 
+    handleShowControlsClick: function(event)
+    {
+        if (!this.video.controls && !this.isFullScreen())
+            return;
+
+        if (this.controlsAreHidden())
+            this.showControls(true);
+    },
+
     handleWrapperMouseMove: function(event)
     {
         if (!this.video.controls && !this.isFullScreen())
@@ -836,7 +865,7 @@ Controller.prototype = {
     handlePanelTransitionEnd: function(event)
     {
         var opacity = window.getComputedStyle(this.controls.panel).opacity;
-        if (!parseInt(opacity) && !this.controlsAlwaysVisible() && this.video.controls) {
+        if (!parseInt(opacity) && !this.controlsAlwaysVisible() && (this.video.controls || this.isFullScreen())) {
             this.base.removeChild(this.controls.inlinePlaybackPlaceholder);
             this.base.removeChild(this.controls.panel);
         }
@@ -1183,7 +1212,7 @@ Controller.prototype = {
         var dpr = window.devicePixelRatio;
         var width = this.timelineWidth * dpr;
         var height = this.timelineHeight * dpr;
-        
+
         if (!width || !height)
             return;
 
@@ -1191,31 +1220,34 @@ Controller.prototype = {
         var buffered = 0;
         for (var i = 0, end = this.video.buffered.length; i < end; ++i)
             buffered = Math.max(this.video.buffered.end(i), buffered);
-        
+
         buffered /= this.video.duration;
-        
+
         var ctx = document.getCSSCanvasContext('2d', this.timelineContextName, width, height);
-        
+
         width /= dpr;
         height /= dpr;
-        
+
         ctx.save();
         ctx.scale(dpr, dpr);
         ctx.clearRect(0, 0, width, height);
-        
+
         var timelineHeight = 3;
         var trackHeight = 1;
         var scrubberWidth = 3;
         var scrubberHeight = 15;
         var borderSize = 2;
         var scrubberPosition = Math.max(0, Math.min(width - scrubberWidth, Math.round(width * played)));
-        
+
         // Draw buffered section.
         ctx.save();
-        ctx.fillStyle = "rgb(30, 30, 30)";
+        if (this.isAudio())
+            ctx.fillStyle = "rgb(71, 71, 71)";
+        else
+            ctx.fillStyle = "rgb(30, 30, 30)";
         ctx.fillRect(1, 8, Math.round(width * buffered) - borderSize, trackHeight);
         ctx.restore();
-        
+
         // Draw timeline border.
         ctx.save();
         ctx.beginPath();
@@ -1223,20 +1255,26 @@ Controller.prototype = {
         this.addRoundedRect(ctx, scrubberPosition + 1, 8, width - scrubberPosition - borderSize , trackHeight, trackHeight / 2.0);
         ctx.closePath();
         ctx.clip("evenodd");
-        ctx.fillStyle = "rgb(30, 30, 30)";
+        if (this.isAudio())
+            ctx.fillStyle = "rgb(71, 71, 71)";
+        else
+            ctx.fillStyle = "rgb(30, 30, 30)";
         ctx.fillRect(0, 0, width, height);
         ctx.restore();
-        
+
         // Draw played section.
-        ctx.save(); 
+        ctx.save();
         ctx.beginPath();
         this.addRoundedRect(ctx, 0, 7, width, timelineHeight, timelineHeight / 2.0);
         ctx.closePath();
         ctx.clip();
-        ctx.fillStyle = "rgb(75, 75, 75)";
+        if (this.isAudio())
+            ctx.fillStyle = "rgb(116, 116, 116)";
+        else
+            ctx.fillStyle = "rgb(75, 75, 75)";
         ctx.fillRect(0, 0, width * played, height);
         ctx.restore();
-        
+
         // Draw the scrubber.
         ctx.save();
         ctx.clearRect(scrubberPosition - 1, 0, scrubberWidth + borderSize, height, 0);
@@ -1244,10 +1282,13 @@ Controller.prototype = {
         this.addRoundedRect(ctx, scrubberPosition, 1, scrubberWidth, scrubberHeight, 1);
         ctx.closePath();
         ctx.clip();
-        ctx.fillStyle = "rgb(140, 140, 140)";
+        if (this.isAudio())
+            ctx.fillStyle = "rgb(181, 181, 181)";
+        else
+            ctx.fillStyle = "rgb(140, 140, 140)";
         ctx.fillRect(0, 0, width, height);
         ctx.restore();
-        
+
         ctx.restore();
     },
 
@@ -1258,25 +1299,25 @@ Controller.prototype = {
 
         if (!width || !height)
             return;
-            
+
         var ctx = document.getCSSCanvasContext('2d', this.volumeContextName, width, height);
-        
+
         width /= dpr;
         height /= dpr;
-        
+
         ctx.save();
         ctx.scale(dpr, dpr);
         ctx.clearRect(0, 0, width, height);
-        
+
         var seekerPosition = this.controls.volume.value;
         var trackHeight = 1;
         var timelineHeight = 3;
         var scrubberRadius = 3.5;
         var scrubberDiameter = 2 * scrubberRadius;
         var borderSize = 2;
-        
+
         var scrubberPosition = Math.round(seekerPosition * (width - scrubberDiameter - borderSize));
-        
+
 
         // Draw portion of volume under slider thumb.
         ctx.save();
@@ -1287,7 +1328,7 @@ Controller.prototype = {
         ctx.fillStyle = "rgb(75, 75, 75)";
         ctx.fillRect(0, 0, width, height);
         ctx.restore();
-        
+
         // Draw portion of volume above slider thumb.
         ctx.save();
         ctx.beginPath();
@@ -1297,7 +1338,7 @@ Controller.prototype = {
         ctx.fillStyle = "rgb(30, 30, 30)";
         ctx.fillRect(0, 0, width, height);
         ctx.restore();
-        
+
         // Clear a hole in the slider for the scrubber.
         ctx.save();
         ctx.beginPath();
@@ -1306,7 +1347,7 @@ Controller.prototype = {
         ctx.clip();
         ctx.clearRect(0, 0, width, height);
         ctx.restore();
-        
+
         // Draw scrubber.
         ctx.save();
         ctx.beginPath();
@@ -1319,10 +1360,10 @@ Controller.prototype = {
             ctx.fillStyle = "rgb(140, 140, 140)";
         ctx.fillRect(0, 0, width, height);
         ctx.restore();
-        
+
         ctx.restore();
     },
-    
+
     formatTime: function(time)
     {
         if (isNaN(time))
@@ -1346,7 +1387,7 @@ Controller.prototype = {
 
     setPlaying: function(isPlaying)
     {
-        if (!this.video.controls)
+        if (!this.video.controls && !this.isFullScreen())
             return;
 
         if (this.isPlaying === isPlaying)
@@ -1386,17 +1427,20 @@ Controller.prototype = {
         }
     },
 
-    showControls: function()
+    showControls: function(focusControls)
     {
         this.updateShouldListenForPlaybackTargetAvailabilityEvent();
-        if (!this.video.controls)
+        if (!this.video.controls && !this.isFullScreen())
             return;
 
         this.updateForShowingControls();
         if (this.shouldHaveControls() && !this.controls.panel.parentElement) {
             this.base.appendChild(this.controls.inlinePlaybackPlaceholder);
             this.base.appendChild(this.controls.panel);
+            if (focusControls)
+                this.controls.playButton.focus();
         }
+        this.showControlsButton.hidden = true;
     },
 
     hideControls: function()
@@ -1409,6 +1453,7 @@ Controller.prototype = {
         this.controls.panel.classList.remove(this.ClassNames.show);
         if (this.controls.panelBackground)
             this.controls.panelBackground.classList.remove(this.ClassNames.show);
+        this.showControlsButton.hidden = false;
     },
 
     setNeedsUpdateForDisplayedWidth: function()
@@ -1435,7 +1480,10 @@ Controller.prototype = {
         if (!this.controls || !this.controls.panel)
             return;
 
-        var visibleWidth = this.controls.panel.getBoundingClientRect().width * this._pageScaleFactor;
+        var visibleWidth = this.controls.panel.getBoundingClientRect().width;
+        if (this._pageScaleFactor > 1)
+            visibleWidth *= this._pageScaleFactor;
+
         if (visibleWidth <= 0 || visibleWidth == this.currentDisplayWidth)
             return;
 
@@ -1452,6 +1500,7 @@ Controller.prototype = {
 
         // Check if there is enough room for the scrubber.
         var shouldDropTimeline = (visibleWidth - visibleButtonWidth) < this.MinimumTimelineWidth;
+        this.controls.timeline.classList.toggle(this.ClassNames.dropped, shouldDropTimeline);
         this.controls.currentTime.classList.toggle(this.ClassNames.dropped, shouldDropTimeline);
         this.controls.thumbnailTrack.classList.toggle(this.ClassNames.dropped, shouldDropTimeline);
         this.controls.remainingTime.classList.toggle(this.ClassNames.dropped, shouldDropTimeline);
@@ -1848,9 +1897,6 @@ Controller.prototype = {
             this.controls.panel.classList.remove(this.ClassNames.noVideo);
         else
             this.controls.panel.classList.add(this.ClassNames.noVideo);
-
-        // The wireless target picker is only visible for files with video, force an update.
-        this.updateWirelessTargetAvailable();
     },
 
     updateVolume: function()
@@ -1964,7 +2010,7 @@ Controller.prototype = {
         if (this.wirelessPlaybackDisabled)
             wirelessPlaybackTargetsAvailable = false;
 
-        if (wirelessPlaybackTargetsAvailable && this.isPlayable() && this.hasVideo())
+        if (wirelessPlaybackTargetsAvailable && this.isPlayable())
             this.controls.wirelessTargetPicker.classList.remove(this.ClassNames.hidden);
         else
             this.controls.wirelessTargetPicker.classList.add(this.ClassNames.hidden);
@@ -2046,6 +2092,83 @@ Controller.prototype = {
         this.setNeedsTimelineMetricsUpdate();
         this.updateTimelineMetricsIfNeeded();
         this.drawTimelineBackground();
+    },
+
+    getCurrentControlsStatus: function ()
+    {
+        var result = {
+            idiom: this.idiom,
+            status: "ok"
+        };
+
+        var elements = [
+            {
+                name: "Show Controls",
+                object: this.showControlsButton,
+                extraProperties: ["hidden"]
+            },
+            {
+                name: "Status Display",
+                object: this.controls.statusDisplay,
+                styleValues: ["display"],
+                extraProperties: ["textContent"]
+            },
+            {
+                name: "Play Button",
+                object: this.controls.playButton
+            },
+            {
+                name: "Rewind Button",
+                object: this.controls.rewindButton
+            },
+            {
+                name: "Timeline Box",
+                object: this.controls.timelineBox
+            },
+            {
+                name: "Mute Box",
+                object: this.controls.muteBox
+            },
+            {
+                name: "Fullscreen Button",
+                object: this.controls.fullscreenButton
+            },
+            {
+                name: "AppleTV Device Picker",
+                object: this.controls.wirelessTargetPicker,
+                styleValues: ["display"],
+                extraProperties: ["hidden"],
+            },
+        ];
+
+        elements.forEach(function (element) {
+            var obj = element.object;
+            delete element.object;
+
+            element.computedStyle = {};
+            if (element.styleValues) {
+                var computedStyle = window.getComputedStyle(obj);
+                element.styleValues.forEach(function (propertyName) {
+                    element.computedStyle[propertyName] = computedStyle[propertyName];
+                });
+                delete element.styleValues;
+            }
+
+            element.bounds = obj.getBoundingClientRect();
+            element.className = obj.className;
+            element.ariaLabel = obj.getAttribute('aria-label');
+
+            if (element.extraProperties) {
+                element.extraProperties.forEach(function (property) {
+                    element[property] = obj[property];
+                });
+                delete element.extraProperties;
+            }
+        });
+
+        result.elements = elements;
+
+        return JSON.stringify(result);
     }
 
 };

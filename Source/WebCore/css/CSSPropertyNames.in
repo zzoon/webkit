@@ -109,7 +109,7 @@ text-rendering [Inherited, FontProperty, NameForMethods=TextRenderingMode]
 -webkit-font-kerning [Inherited, FontProperty, NameForMethods=Kerning]
 -webkit-font-smoothing [Inherited, FontProperty]
 -webkit-font-variant-ligatures [Inherited, Custom=All]
--webkit-locale [Inherited, Custom=Value]
+-webkit-locale [Inherited, FontProperty, Custom=Value]
 -webkit-text-orientation [Inherited, Custom=Value]
 -epub-text-orientation = -webkit-text-orientation
 #if defined(ENABLE_IOS_TEXT_AUTOSIZING) && ENABLE_IOS_TEXT_AUTOSIZING
@@ -117,6 +117,7 @@ text-rendering [Inherited, FontProperty, NameForMethods=TextRenderingMode]
 #endif
 -webkit-writing-mode [Inherited, Custom=Value]
 -epub-writing-mode = -webkit-writing-mode
+-webkit-text-zoom [Inherited, Custom=Value]
 zoom [Custom=All]
 font-synthesis [Inherited, FontProperty, Converter=FontSynthesis]
 
@@ -218,7 +219,6 @@ enable-background [SkipBuilder]
 fill [Inherited, SVG, Custom=All]
 fill-opacity [Inherited, SVG, Converter=Opacity]
 fill-rule [Inherited, SVG]
-filter [SVG, Converter=SVGURIReference, NameForMethods=FilterResource]
 float [NameForMethods=Floating]
 flood-color [SVG, Converter=SVGColor]
 flood-opacity [SVG, Converter=Opacity]
@@ -349,6 +349,7 @@ visibility [Inherited]
 white-space [Inherited]
 widows [Inherited, AutoFunctions]
 width [Initial=initialSize, Converter=LengthSizing]
+will-change [Custom=Value]
 word-break [Inherited]
 -epub-word-break = word-break
 word-spacing [Inherited, ConditionalConverter=WordSpacing]
@@ -418,7 +419,6 @@ alt [NameForMethods=ContentAltText, Custom=Value]
 // Let -webkit-box-shadow blur radius be w_r and box-shadow blur radius be b_r. For
 // w_r > 8px, b_r = 8 + 4 * sqrt((w_r - 8) / 2).
 -webkit-box-shadow [Custom=All]
--webkit-color-correction [Inherited, NameForMethods=ColorSpace]
 -webkit-column-axis
 -webkit-column-break-after [Initial=initialPageBreak]
 -webkit-column-break-before [Initial=initialPageBreak]
@@ -452,7 +452,8 @@ columns [Longhands=column-width|column-count]
 mix-blend-mode [NameForMethods=BlendMode]
 isolation
 #endif
--webkit-filter [ConditionalConverter=FilterOperations]
+filter [ConditionalConverter=FilterOperations]
+-webkit-filter = filter
 align-content [Initial=initialContentAlignment, Converter=ContentAlignmentData]
 -webkit-align-content = align-content
 align-items [Initial=initialSelfAlignment, Converter=SelfOrDefaultAlignmentData]
@@ -538,7 +539,7 @@ justify-items [Initial=initialSelfAlignment, Converter=SelfOrDefaultAlignmentDat
 -webkit-mask-box-image-width [Custom=All]
 -webkit-mask-clip [FillLayerProperty, NameForMethods=Clip]
 -webkit-mask-composite [FillLayerProperty, NameForMethods=Composite]
--webkit-mask-image [Custom=Initial|Inherit, Converter=MaskImageOperations]
+-webkit-mask-image [FillLayerProperty, NameForMethods=Image]
 -webkit-mask-origin [FillLayerProperty, NameForMethods=Origin]
 -webkit-mask-position [Longhands=-webkit-mask-position-x|-webkit-mask-position-y]
 -webkit-mask-position-x [FillLayerProperty, NameForMethods=XPosition]

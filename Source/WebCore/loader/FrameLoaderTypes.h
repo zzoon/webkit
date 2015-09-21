@@ -73,6 +73,7 @@ enum class NavigationType {
 
 enum class ShouldOpenExternalURLsPolicy {
     ShouldNotAllow,
+    ShouldAllowExternalSchemes,
     ShouldAllow,
 };
 
@@ -109,11 +110,6 @@ enum class ShouldOpenExternalURLsPolicy {
         DoNotReplaceDocumentIfJavaScriptURL
     };
 
-    enum ReasonForCallingAllowPlugins {
-        AboutToInstantiatePlugin,
-        NotAboutToInstantiatePlugin
-    };
-    
     enum WebGLLoadPolicy {
         WebGLBlockCreation,
         WebGLAllowCreation,

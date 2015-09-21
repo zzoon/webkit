@@ -55,6 +55,7 @@
 #include <WebCore/PageGroup.h>
 #include <WebCore/PlatformCookieJar.h>
 #include <WebCore/PlatformPasteboard.h>
+#include <WebCore/ProgressTracker.h>
 #include <WebCore/ResourceError.h>
 #include <WebCore/SessionID.h>
 #include <WebCore/StorageNamespace.h>
@@ -248,6 +249,33 @@ void WebPlatformStrategies::loadResourceSynchronously(NetworkingContext* context
     }
 }
 
+void WebPlatformStrategies::createPingHandle(NetworkingContext* networkingContext, ResourceRequest& request, bool shouldUseCredentialStorage)
+{
+    // It's possible that call to createPingHandle might be made during initial empty Document creation before a NetworkingContext exists.
+    // It is not clear that we should send ping loads during that process anyways.
+    if (!networkingContext)
+        return;
+
+    auto& webProcess = WebProcess::singleton();
+    if (!webProcess.usesNetworkProcess()) {
+        LoaderStrategy::createPingHandle(networkingContext, request, shouldUseCredentialStorage);
+        return;
+    }
+
+    WebFrameNetworkingContext* webContext = static_cast<WebFrameNetworkingContext*>(networkingContext);
+    WebFrameLoaderClient* webFrameLoaderClient = webContext->webFrameLoaderClient();
+    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : nullptr;
+    WebPage* webPage = webFrame ? webFrame->page() : nullptr;
+    
+    NetworkResourceLoadParameters loadParameters;
+    loadParameters.request = request;
+    loadParameters.sessionID = webPage ? webPage->sessionID() : SessionID::defaultSessionID();
+    loadParameters.allowStoredCredentials = shouldUseCredentialStorage ? AllowStoredCredentials : DoNotAllowStoredCredentials;
+    loadParameters.shouldClearReferrerOnHTTPSToHTTPRedirect = networkingContext->shouldClearReferrerOnHTTPSToHTTPRedirect();
+
+    webProcess.networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::LoadPing(loadParameters), 0);
+}
+
 BlobRegistry* WebPlatformStrategies::createBlobRegistry()
 {
     if (!WebProcess::singleton().usesNetworkProcess())
@@ -273,7 +301,7 @@ void WebPlatformStrategies::getPluginInfo(const WebCore::Page* page, Vector<WebC
     ASSERT_ARG(page, page);
     populatePluginCache(*page);
 
-    if (page->mainFrame().loader().subframeLoader().allowPlugins(NotAboutToInstantiatePlugin)) {
+    if (page->mainFrame().loader().subframeLoader().allowPlugins()) {
         plugins = m_cachedPlugins;
         return;
     }

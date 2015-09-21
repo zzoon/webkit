@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,8 +45,7 @@ WebSecurityOrigin* WebSecurityOrigin::createInstance(SecurityOrigin* securityOri
 }
 
 WebSecurityOrigin::WebSecurityOrigin(SecurityOrigin* securityOrigin)
-    : m_refCount(0)
-    , m_securityOrigin(securityOrigin)
+    : m_securityOrigin(securityOrigin)
 {
     gClassCount++;
     gClassNameCount().add("WebSecurityOrigin");
@@ -59,13 +58,17 @@ WebSecurityOrigin::~WebSecurityOrigin()
 }
 
 // IUnknown ------------------------------------------------------------------------
-HRESULT WebSecurityOrigin::QueryInterface(REFIID riid, void** ppvObject)
+HRESULT WebSecurityOrigin::QueryInterface(_In_ REFIID riid, _COM_Outptr_ void** ppvObject)
 {
-    *ppvObject = 0;
+    if (!ppvObject)
+        return E_POINTER;
+    *ppvObject = nullptr;
     if (IsEqualGUID(riid, IID_IUnknown))
-        *ppvObject = static_cast<IWebSecurityOrigin*>(this);
+        *ppvObject = static_cast<IWebSecurityOrigin2*>(this);
     else if (IsEqualGUID(riid, IID_IWebSecurityOrigin))
         *ppvObject = static_cast<IWebSecurityOrigin*>(this);
+    else if (IsEqualGUID(riid, IID_IWebSecurityOrigin2))
+        *ppvObject = static_cast<IWebSecurityOrigin2*>(this);
     else if (IsEqualGUID(riid, __uuidof(this)))
         *ppvObject = this;
     else
@@ -91,7 +94,7 @@ ULONG WebSecurityOrigin::Release()
 
 // IWebSecurityOrigin --------------------------------------------------------------
 
-HRESULT WebSecurityOrigin::protocol(/* [retval][out] */ BSTR* result)
+HRESULT WebSecurityOrigin::protocol(__deref_opt_out BSTR* result)
 {
     if (!result)
         return E_POINTER;
@@ -101,7 +104,7 @@ HRESULT WebSecurityOrigin::protocol(/* [retval][out] */ BSTR* result)
     return S_OK;
 }
         
-HRESULT WebSecurityOrigin::host(/* [retval][out] */ BSTR* result)
+HRESULT WebSecurityOrigin::host(__deref_opt_out BSTR* result)
 {
     if (!result)
         return E_POINTER;
@@ -111,7 +114,7 @@ HRESULT WebSecurityOrigin::host(/* [retval][out] */ BSTR* result)
     return S_OK;
 }
       
-HRESULT WebSecurityOrigin::port(/* [retval][out] */ unsigned short* result)
+HRESULT WebSecurityOrigin::port(_Out_ unsigned short* result)
 {
     if (!result)
         return E_POINTER;
@@ -121,7 +124,7 @@ HRESULT WebSecurityOrigin::port(/* [retval][out] */ unsigned short* result)
     return S_OK;
 }
         
-HRESULT WebSecurityOrigin::usage(/* [retval][out] */ unsigned long long* result)
+HRESULT WebSecurityOrigin::usage(_Out_ unsigned long long* result)
 {
     if (!result)
         return E_POINTER;
@@ -131,7 +134,7 @@ HRESULT WebSecurityOrigin::usage(/* [retval][out] */ unsigned long long* result)
     return S_OK;
 }
         
-HRESULT WebSecurityOrigin::quota(/* [retval][out] */ unsigned long long* result)
+HRESULT WebSecurityOrigin::quota(_Out_ unsigned long long* result)
 {
     if (!result)
         return E_POINTER;
@@ -140,14 +143,16 @@ HRESULT WebSecurityOrigin::quota(/* [retval][out] */ unsigned long long* result)
     return S_OK;
 }
         
-HRESULT WebSecurityOrigin::setQuota(/* [in] */ unsigned long long quota) 
+HRESULT WebSecurityOrigin::setQuota(unsigned long long quota) 
 {
     DatabaseManager::singleton().setQuota(m_securityOrigin.get(), quota);
 
     return S_OK;
 }
 
-HRESULT WebSecurityOrigin::initWithURL(/* [in] */ BSTR urlBstr)
+// IWebSecurityOrigin2 --------------------------------------------------------------
+
+HRESULT WebSecurityOrigin::initWithURL(_In_ BSTR urlBstr)
 {
     m_securityOrigin = WebCore::SecurityOrigin::create(MarshallingHelpers::BSTRToKURL(urlBstr));
 

@@ -34,7 +34,11 @@
 #include "DumpContext.h"
 #include "StructureSet.h"
 
-namespace JSC { namespace DFG {
+namespace JSC {
+
+class TrackedReferences;
+
+namespace DFG {
 
 class StructureAbstractValue {
 public:
@@ -119,6 +123,14 @@ public:
     // m_set by looking at reachability as this would mean that the new set is TOP. Instead they
     // literally assume that the set is just m_set rather than m_set plus TOP.
     bool isClobbered() const { return m_set.getReservedFlag(); }
+
+    // A finite structure abstract value is one where enumerating over it will yield all
+    // of the structures that the value may have right now. This is true so long as we're
+    // neither top nor clobbered.
+    bool isFinite() const { return !isTop() && !isClobbered(); }
+
+    // An infinite structure abstract value may currently have any structure.
+    bool isInfinite() const { return !isFinite(); }
     
     bool add(Structure* structure);
     
@@ -186,7 +198,7 @@ public:
     // meaningfully special, like for transitions.
     Structure* onlyStructure() const
     {
-        if (isTop() || isClobbered())
+        if (isInfinite())
             return nullptr;
         return m_set.onlyStructure();
     }
@@ -213,6 +225,8 @@ public:
     
     bool overlaps(const StructureSet& other) const;
     bool overlaps(const StructureAbstractValue& other) const;
+    
+    void validateReferences(const TrackedReferences&) const;
     
 private:
     static const uintptr_t clobberedFlag = StructureSet::reservedFlag;

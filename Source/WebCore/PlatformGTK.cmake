@@ -1,6 +1,27 @@
 set(WebCore_OUTPUT_NAME WebCoreGTK)
 
 list(APPEND WebCore_INCLUDE_DIRECTORIES
+    "${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}"
+    "${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/inspector"
+    "${JAVASCRIPTCORE_DIR}"
+    "${JAVASCRIPTCORE_DIR}/ForwardingHeaders"
+    "${JAVASCRIPTCORE_DIR}/API"
+    "${JAVASCRIPTCORE_DIR}/assembler"
+    "${JAVASCRIPTCORE_DIR}/bytecode"
+    "${JAVASCRIPTCORE_DIR}/bytecompiler"
+    "${JAVASCRIPTCORE_DIR}/dfg"
+    "${JAVASCRIPTCORE_DIR}/disassembler"
+    "${JAVASCRIPTCORE_DIR}/heap"
+    "${JAVASCRIPTCORE_DIR}/debugger"
+    "${JAVASCRIPTCORE_DIR}/interpreter"
+    "${JAVASCRIPTCORE_DIR}/jit"
+    "${JAVASCRIPTCORE_DIR}/llint"
+    "${JAVASCRIPTCORE_DIR}/parser"
+    "${JAVASCRIPTCORE_DIR}/profiler"
+    "${JAVASCRIPTCORE_DIR}/runtime"
+    "${JAVASCRIPTCORE_DIR}/yarr"
+    "${THIRDPARTY_DIR}/ANGLE/"
+    "${THIRDPARTY_DIR}/ANGLE/include/KHR"
     "${WEBCORE_DIR}/accessibility/atk"
     "${WEBCORE_DIR}/editing/atk"
     "${WEBCORE_DIR}/page/gtk"
@@ -24,6 +45,7 @@ list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/network/gtk"
     "${WEBCORE_DIR}/platform/network/soup"
     "${WEBCORE_DIR}/platform/text/gtk"
+    "${WTF_DIR}"
 )
 
 list(APPEND WebCore_SOURCES
@@ -64,6 +86,9 @@ list(APPEND WebCore_SOURCES
 
     platform/geoclue/GeolocationProviderGeoclue1.cpp
     platform/geoclue/GeolocationProviderGeoclue2.cpp
+
+    platform/glib/KeyedDecoderGlib.cpp
+    platform/glib/KeyedEncoderGlib.cpp
 
     platform/graphics/GLContext.cpp
     platform/graphics/GraphicsContext3DPrivate.cpp
@@ -413,7 +438,6 @@ if (ENABLE_THREADED_COMPOSITOR)
 
         page/scrolling/coordinatedgraphics/ScrollingCoordinatorCoordinatedGraphics.cpp
         page/scrolling/coordinatedgraphics/ScrollingStateNodeCoordinatedGraphics.cpp
-        page/scrolling/coordinatedgraphics/ScrollingStateScrollingNodeCoordinatedGraphics.cpp
 
         platform/graphics/texmap/coordinated/AreaAllocator.cpp
         platform/graphics/texmap/coordinated/CompositingCoordinator.cpp
@@ -469,17 +493,17 @@ if (ENABLE_PLUGIN_PROCESS_GTK2)
     )
 endif ()
 
-# Wayland protocol extension.
-add_custom_command(
-    OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.c
-    DEPENDS ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml
-    COMMAND wayland-scanner server-header < ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml > ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandServerProtocol.h
-    COMMAND wayland-scanner client-header < ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml > ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.h
-    COMMAND wayland-scanner code < ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml > ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.c
-)
-
 if (ENABLE_WAYLAND_TARGET)
-    list(APPEND WebCorePlatformGTK_SOURCES
+    # Wayland protocol extension.
+    add_custom_command(
+        OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.c
+        DEPENDS ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml
+        COMMAND wayland-scanner server-header < ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml > ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandServerProtocol.h
+        COMMAND wayland-scanner client-header < ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml > ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.h
+        COMMAND wayland-scanner code < ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml > ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.c
+    )
+
+    list(APPEND WebCore_SOURCES
         platform/graphics/wayland/PlatformDisplayWayland.cpp
         platform/graphics/wayland/WaylandEventSource.cpp
         platform/graphics/wayland/WaylandSurface.cpp

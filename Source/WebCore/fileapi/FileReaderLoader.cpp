@@ -43,7 +43,6 @@
 #include "ThreadableBlobRegistry.h"
 #include "ThreadableLoader.h"
 #include <runtime/ArrayBuffer.h>
-#include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/Base64.h>
@@ -121,11 +120,11 @@ void FileReaderLoader::terminate()
 
 void FileReaderLoader::cleanup()
 {
-    m_loader = 0;
+    m_loader = nullptr;
 
     // If we get any error, we do not need to keep a buffer around.
     if (m_errorCode) {
-        m_rawData = 0;
+        m_rawData = nullptr;
         m_stringResult = "";
     }
 }
@@ -264,13 +263,13 @@ FileError::ErrorCode FileReaderLoader::httpStatusCodeToErrorCode(int httpStatusC
     }
 }
 
-PassRefPtr<ArrayBuffer> FileReaderLoader::arrayBufferResult() const
+RefPtr<ArrayBuffer> FileReaderLoader::arrayBufferResult() const
 {
     ASSERT(m_readType == ReadAsArrayBuffer);
 
     // If the loading is not started or an error occurs, return an empty result.
     if (!m_rawData || m_errorCode)
-        return 0;
+        return nullptr;
 
     // If completed, we can simply return our buffer.
     if (isCompleted())

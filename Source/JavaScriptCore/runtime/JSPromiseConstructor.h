@@ -26,8 +26,6 @@
 #ifndef JSPromiseConstructor_h
 #define JSPromiseConstructor_h
 
-#if ENABLE(PROMISES)
-
 #include "InternalFunction.h"
 
 namespace JSC {
@@ -45,20 +43,17 @@ public:
 
     DECLARE_INFO;
 
+    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+
 protected:
+    JSPromiseConstructor(VM&, Structure*);
     void finishCreation(VM&, JSPromisePrototype*);
 
 private:
-    JSPromiseConstructor(VM&, Structure*);
     static ConstructType getConstructData(JSCell*, ConstructData&);
     static CallType getCallData(JSCell*, CallData&);
-    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
 };
 
-JSPromise* constructPromise(ExecState*, JSGlobalObject*, JSFunction*);
-
 } // namespace JSC
-
-#endif // ENABLE(PROMISES)
 
 #endif // JSPromiseConstructor_h

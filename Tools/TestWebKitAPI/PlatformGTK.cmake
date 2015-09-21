@@ -1,3 +1,6 @@
+set(TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/TestWebKitAPI")
+set(TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY_WTF "${TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY}/WTF")
+
 # This is necessary because it is possible to build TestWebKitAPI with WebKit2
 # disabled and this triggers the inclusion of the WebKit2 headers.
 add_definitions(-DBUILDING_WEBKIT2__)
@@ -117,6 +120,20 @@ target_link_libraries(TestWebKit2 ${test_webkit2_api_LIBRARIES})
 add_test(TestWebKit2 ${TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY}/WebKit2/TestWebKit2)
 set_tests_properties(TestWebKit2 PROPERTIES TIMEOUT 60)
 set_target_properties(TestWebKit2 PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY}/WebKit2)
+
+if (ENABLE_SECCOMP_FILTERS)
+    # This test needs to be in its own executable. It's a general test of the
+    # seccomp filter mechanism, and the filters it sets are incompatible with
+    # the correct operation of WebKit and the other tests.
+    add_executable(TestSeccompFilters
+        ${TESTWEBKITAPI_DIR}/Tests/WebKit2/SeccompFilters.cpp
+    )
+
+    target_link_libraries(TestSeccompFilters ${test_webkit2_api_LIBRARIES})
+    add_test(TestSeccompFilters ${TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY}/WebKit2/TestWebKit2)
+    set_tests_properties(TestSeccompFilters PROPERTIES TIMEOUT 5)
+    set_target_properties(TestSeccompFilters PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${TESTWEBKITAPI_RUNTIME_OUTPUT_DIRECTORY}/WebKit2)
+endif ()
 
 set(TestWebCoreGtk_SOURCES
     ${TESTWEBKITAPI_DIR}/Tests/WebCore/gtk/UserAgentQuirks.cpp

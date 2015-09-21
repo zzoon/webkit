@@ -57,7 +57,6 @@
 #include "SVGColor.h"
 #include "SVGPaint.h"
 #include "WebKitCSSFilterValue.h"
-#include "WebKitCSSResourceValue.h"
 #include "WebKitCSSTransformValue.h"
 
 #if ENABLE(CSS_GRID_LAYOUT)
@@ -329,8 +328,6 @@ String CSSValue::cssText() const
     case AnimationTriggerScrollClass:
         return downcast<CSSAnimationTriggerScrollValue>(*this).customCSSText();
 #endif
-    case WebKitCSSResourceClass:
-        return downcast<WebKitCSSResourceValue>(*this).customCSSText();
     case CSSContentDistributionClass:
         return downcast<CSSContentDistributionValue>(*this).customCSSText();
     }
@@ -453,9 +450,6 @@ void CSSValue::destroy()
         delete downcast<CSSAnimationTriggerScrollValue>(this);
         return;
 #endif
-    case WebKitCSSResourceClass:
-        delete downcast<WebKitCSSResourceValue>(this);
-        return;
     case CSSContentDistributionClass:
         delete downcast<CSSContentDistributionValue>(this);
         return;
@@ -463,7 +457,7 @@ void CSSValue::destroy()
     ASSERT_NOT_REACHED();
 }
 
-PassRefPtr<CSSValue> CSSValue::cloneForCSSOM() const
+RefPtr<CSSValue> CSSValue::cloneForCSSOM() const
 {
     switch (classType()) {
     case PrimitiveClass:

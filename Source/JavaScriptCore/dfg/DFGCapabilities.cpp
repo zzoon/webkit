@@ -44,28 +44,36 @@ bool isSupported()
 
 bool isSupportedForInlining(CodeBlock* codeBlock)
 {
-    return codeBlock->ownerExecutable()->isInliningCandidate();
+#if ENABLE(WEBASSEMBLY)
+    if (codeBlock->ownerExecutable()->isWebAssemblyExecutable())
+        return false;
+#endif
+    return codeBlock->ownerScriptExecutable()->isInliningCandidate();
 }
 
 bool mightCompileEval(CodeBlock* codeBlock)
 {
     return isSupported()
-        && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount();
+        && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount()
+        && codeBlock->ownerScriptExecutable()->isOkToOptimize();
 }
 bool mightCompileProgram(CodeBlock* codeBlock)
 {
     return isSupported()
-        && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount();
+        && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount()
+        && codeBlock->ownerScriptExecutable()->isOkToOptimize();
 }
 bool mightCompileFunctionForCall(CodeBlock* codeBlock)
 {
     return isSupported()
-        && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount();
+        && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount()
+        && codeBlock->ownerScriptExecutable()->isOkToOptimize();
 }
 bool mightCompileFunctionForConstruct(CodeBlock* codeBlock)
 {
     return isSupported()
-        && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount();
+        && codeBlock->instructionCount() <= Options::maximumOptimizationCandidateInstructionCount()
+        && codeBlock->ownerScriptExecutable()->isOkToOptimize();
 }
 
 bool mightInlineFunctionForCall(CodeBlock* codeBlock)
@@ -144,16 +152,8 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_put_by_val:
     case op_put_by_val_direct:
     case op_get_by_id:
-    case op_get_by_id_out_of_line:
     case op_get_array_length:
     case op_put_by_id:
-    case op_put_by_id_out_of_line:
-    case op_put_by_id_transition_direct:
-    case op_put_by_id_transition_direct_out_of_line:
-    case op_put_by_id_transition_normal:
-    case op_put_by_id_transition_normal_out_of_line:
-    case op_init_global_const_nop:
-    case op_init_global_const:
     case op_jmp:
     case op_jtrue:
     case op_jfalse:
@@ -195,6 +195,7 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_switch_char:
     case op_in:
     case op_get_scope:
+    case op_load_arrowfunction_this:
     case op_get_from_scope:
     case op_get_enumerable_length:
     case op_has_generic_property:
@@ -207,11 +208,14 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_to_index_string:
     case op_new_func:
     case op_new_func_exp:
+    case op_new_arrow_func_exp:
     case op_create_lexical_environment:
+    case op_get_parent_scope:
+    case op_catch:
         return CanCompileAndInline;
 
     case op_put_to_scope: {
-        ResolveType resolveType = ResolveModeAndType(pc[4].u.operand).type();
+        ResolveType resolveType = GetPutInfo(pc[4].u.operand).resolveType();
         // If we're writing to a readonly property we emit a Dynamic put that
         // the DFG can't currently handle.
         if (resolveType == Dynamic)
@@ -221,7 +225,7 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
 
     case op_resolve_scope: {
         // We don't compile 'catch' or 'with', so there's no point in compiling variable resolution within them.
-        ResolveType resolveType = ResolveModeAndType(pc[4].u.operand).type();
+        ResolveType resolveType = static_cast<ResolveType>(pc[4].u.operand);
         if (resolveType == Dynamic)
             return CannotCompile;
         return CanCompileAndInline;

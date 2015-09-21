@@ -41,6 +41,7 @@ OBJC_CLASS _WKActivatedElementInfo;
 
 namespace WebCore {
 class ResourceRequest;
+struct SecurityOriginData;
 struct WindowFeatures;
 }
 
@@ -56,7 +57,10 @@ class WebOpenPanelParameters;
 class WebOpenPanelResultListenerProxy;
 class WebPageProxy;
 struct NavigationActionData;
-struct SecurityOriginData;
+
+#if ENABLE(MEDIA_SESSION)
+class WebMediaSessionMetadata;
+#endif
 }
 
 namespace API {
@@ -70,7 +74,7 @@ class UIClient {
 public:
     virtual ~UIClient() { }
 
-    virtual PassRefPtr<WebKit::WebPageProxy> createNewPage(WebKit::WebPageProxy*, WebKit::WebFrameProxy*, const WebKit::SecurityOriginData&, const WebCore::ResourceRequest&, const WebCore::WindowFeatures&, const WebKit::NavigationActionData&) { return nullptr; }
+    virtual PassRefPtr<WebKit::WebPageProxy> createNewPage(WebKit::WebPageProxy*, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, const WebCore::ResourceRequest&, const WebCore::WindowFeatures&, const WebKit::NavigationActionData&) { return nullptr; }
     virtual void showPage(WebKit::WebPageProxy*) { }
     virtual void fullscreenMayReturnToInline(WebKit::WebPageProxy*) { }
     virtual void didEnterFullscreen(WebKit::WebPageProxy*) { }
@@ -81,9 +85,9 @@ public:
     virtual void focus(WebKit::WebPageProxy*) { }
     virtual void unfocus(WebKit::WebPageProxy*) { }
 
-    virtual void runJavaScriptAlert(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*, const WebKit::SecurityOriginData&, std::function<void ()> completionHandler) { completionHandler(); }
-    virtual void runJavaScriptConfirm(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*, const WebKit::SecurityOriginData&, std::function<void (bool)> completionHandler) { completionHandler(false); }
-    virtual void runJavaScriptPrompt(WebKit::WebPageProxy*, const WTF::String&, const WTF::String&, WebKit::WebFrameProxy*, const WebKit::SecurityOriginData&, std::function<void (const WTF::String&)> completionHandler) { completionHandler(WTF::String()); }
+    virtual void runJavaScriptAlert(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, std::function<void ()> completionHandler) { completionHandler(); }
+    virtual void runJavaScriptConfirm(WebKit::WebPageProxy*, const WTF::String&, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, std::function<void (bool)> completionHandler) { completionHandler(false); }
+    virtual void runJavaScriptPrompt(WebKit::WebPageProxy*, const WTF::String&, const WTF::String&, WebKit::WebFrameProxy*, const WebCore::SecurityOriginData&, std::function<void (const WTF::String&)> completionHandler) { completionHandler(WTF::String()); }
 
     virtual void setStatusText(WebKit::WebPageProxy*, const WTF::String&) { }
     virtual void mouseDidMoveOverElement(WebKit::WebPageProxy*, const WebKit::WebHitTestResult::Data&, WebKit::WebEvent::Modifiers, API::Object*) { }
@@ -150,12 +154,21 @@ public:
 
     virtual void isPlayingAudioDidChange(WebKit::WebPageProxy&) { }
 
+#if ENABLE(MEDIA_SESSION)
+    virtual void mediaSessionMetadataDidChange(WebKit::WebPageProxy&, WebKit::WebMediaSessionMetadata*) { }
+#endif
+
 #if PLATFORM(IOS)
+#if HAVE(APP_LINKS)
+    virtual bool shouldIncludeAppLinkActionsForElement(_WKActivatedElementInfo *) { return true; }
+#endif
     virtual RetainPtr<NSArray> actionsForElement(_WKActivatedElementInfo *, RetainPtr<NSArray> defaultActions) { return WTF::move(defaultActions); }
     virtual void didNotHandleTapAsClick(const WebCore::IntPoint&) { }
 #endif
 
     virtual void didClickAutoFillButton(WebKit::WebPageProxy&, API::Object*) { }
+
+    virtual void imageOrMediaDocumentSizeChanged(const WebCore::IntSize&) { }
 };
 
 } // namespace API

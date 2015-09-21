@@ -26,7 +26,6 @@
 #include "config.h"
 #include "StorageAreaMap.h"
 
-#include "SecurityOriginData.h"
 #include "StorageAreaImpl.h"
 #include "StorageAreaMapMessages.h"
 #include "StorageManagerMessages.h"
@@ -39,6 +38,7 @@
 #include <WebCore/MainFrame.h>
 #include <WebCore/Page.h>
 #include <WebCore/PageGroup.h>
+#include <WebCore/SecurityOriginData.h>
 #include <WebCore/Storage.h>
 #include <WebCore/StorageEventDispatcher.h>
 #include <WebCore/StorageMap.h>
@@ -53,9 +53,9 @@ static uint64_t generateStorageMapID()
     return ++storageMapID;
 }
 
-PassRefPtr<StorageAreaMap> StorageAreaMap::create(StorageNamespaceImpl* storageNamespace, Ref<WebCore::SecurityOrigin>&& securityOrigin)
+Ref<StorageAreaMap> StorageAreaMap::create(StorageNamespaceImpl* storageNamespace, Ref<WebCore::SecurityOrigin>&& securityOrigin)
 {
-    return adoptRef(new StorageAreaMap(storageNamespace, WTF::move(securityOrigin)));
+    return adoptRef(*new StorageAreaMap(storageNamespace, WTF::move(securityOrigin)));
 }
 
 StorageAreaMap::StorageAreaMap(StorageNamespaceImpl* storageNamespace, Ref<WebCore::SecurityOrigin>&& securityOrigin)

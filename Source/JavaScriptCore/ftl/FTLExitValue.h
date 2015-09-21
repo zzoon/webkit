@@ -34,7 +34,11 @@
 #include "VirtualRegister.h"
 #include <wtf/PrintStream.h>
 
-namespace JSC { namespace FTL {
+namespace JSC {
+
+class TrackedReferences;
+
+namespace FTL {
 
 // This is like ValueRecovery, but respects the way that the FTL does OSR
 // exit: the live non-constant non-flushed values are passed as arguments
@@ -121,7 +125,7 @@ public:
         return result;
     }
     
-    static ExitValue recovery(RecoveryOpcode opcode, unsigned leftArgument, unsigned rightArgument, ValueFormat format)
+    static ExitValue recovery(RecoveryOpcode opcode, unsigned leftArgument, unsigned rightArgument, DataFormat format)
     {
         ExitValue result;
         result.m_kind = ExitValueRecovery;
@@ -172,10 +176,10 @@ public:
         return u.recovery.rightArgument;
     }
     
-    ValueFormat recoveryFormat() const
+    DataFormat recoveryFormat() const
     {
         ASSERT(isRecovery());
-        return static_cast<ValueFormat>(u.recovery.format);
+        return static_cast<DataFormat>(u.recovery.format);
     }
     
     RecoveryOpcode recoveryOpcode() const
@@ -217,10 +221,12 @@ public:
     // that is compatible with exitArgument().format(). If it's a constant or it's dead, it
     // will claim to be a JSValue. If it's an argument then it will tell you the argument's
     // format.
-    ValueFormat valueFormat() const;
+    DataFormat dataFormat() const;
 
     void dump(PrintStream&) const;
     void dumpInContext(PrintStream&, DumpContext*) const;
+    
+    void validateReferences(const TrackedReferences&) const;
     
 private:
     ExitValueKind m_kind;

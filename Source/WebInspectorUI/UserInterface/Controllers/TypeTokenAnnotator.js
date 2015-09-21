@@ -68,8 +68,7 @@ WebInspector.TypeTokenAnnotator = class TypeTokenAnnotator extends WebInspector.
             nodesWithUpdatedTypes.forEach(this._insertTypeToken, this);
 
             var totalTime = Date.now() - startTime;
-            var timeoutTime = Math.max(100, Math.min(2000, 8 * totalTime));
-
+            var timeoutTime = Number.constrain(8 * totalTime, 500, 2000);
             this._timeoutIdentifier = setTimeout(function timeoutUpdate() {
                 this._timeoutIdentifier = null;
                 this.insertAnnotations();
@@ -105,7 +104,7 @@ WebInspector.TypeTokenAnnotator = class TypeTokenAnnotator extends WebInspector.
         // If a function does not have an explicit return statement with an argument (i.e, "return x;" instead of "return;") 
         // then don't show a return type unless we think it's a constructor.
         var scriptSyntaxTree = this._script._scriptSyntaxTree;
-        if (!node.attachments.__typeToken && (scriptSyntaxTree.containsNonEmptyReturnStatement(node.body) || !WebInspector.TypeSet.fromPayload(functionReturnType.typeSet).isContainedIn(WebInspector.TypeSet.TypeBit.Undefined))) {
+        if (!node.attachments.__typeToken && (scriptSyntaxTree.containsNonEmptyReturnStatement(node.body) || !functionReturnType.typeSet.isContainedIn(WebInspector.TypeSet.TypeBit.Undefined))) {
             var functionName = node.id ? node.id.name : null;
             var offset = node.isGetterOrSetter ? node.getterOrSetterRange[0] : node.range[0];
             this._insertToken(offset, node, true, WebInspector.TypeTokenView.TitleType.ReturnStatement, functionName);

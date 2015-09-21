@@ -132,14 +132,19 @@ void TestInvocation::setIsPixelTest(const std::string& expectedPixelHash)
     m_expectedPixelHash = expectedPixelHash;
 }
 
-bool TestInvocation::shouldLogFrameLoadDelegates()
+bool TestInvocation::shouldLogFrameLoadDelegates() const
 {
     return urlContains("loading/");
 }
 
-bool TestInvocation::shouldLogHistoryClientCallbacks()
+bool TestInvocation::shouldLogHistoryClientCallbacks() const
 {
     return urlContains("globalhistory/");
+}
+
+bool TestInvocation::shouldMakeViewportFlexible() const
+{
+    return urlContains("viewport/");
 }
 
 void TestInvocation::invoke()
@@ -163,6 +168,10 @@ void TestInvocation::invoke()
     WKRetainPtr<WKBooleanRef> dumpFrameLoadDelegatesValue = adoptWK(WKBooleanCreate(shouldLogFrameLoadDelegates()));
     WKDictionarySetItem(beginTestMessageBody.get(), dumpFrameLoadDelegatesKey.get(), dumpFrameLoadDelegatesValue.get());
 
+    WKRetainPtr<WKStringRef> useFlexibleViewportKey = adoptWK(WKStringCreateWithUTF8CString("UseFlexibleViewport"));
+    WKRetainPtr<WKBooleanRef> useFlexibleViewportValue = adoptWK(WKBooleanCreate(shouldMakeViewportFlexible()));
+    WKDictionarySetItem(beginTestMessageBody.get(), useFlexibleViewportKey.get(), useFlexibleViewportValue.get());
+
     WKRetainPtr<WKStringRef> dumpPixelsKey = adoptWK(WKStringCreateWithUTF8CString("DumpPixels"));
     WKRetainPtr<WKBooleanRef> dumpPixelsValue = adoptWK(WKBooleanCreate(m_dumpPixels));
     WKDictionarySetItem(beginTestMessageBody.get(), dumpPixelsKey.get(), dumpPixelsValue.get());
@@ -177,6 +186,8 @@ void TestInvocation::invoke()
 
     WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), beginTestMessageBody.get());
 
+    bool shouldOpenExternalURLs = false;
+
     TestController::singleton().runUntil(m_gotInitialResponse, TestController::shortTimeout);
     if (!m_gotInitialResponse) {
         m_errorMessage = "Timed out waiting for initial response from web process\n";
@@ -186,7 +197,7 @@ void TestInvocation::invoke()
     if (m_error)
         goto end;
 
-    WKPageLoadURL(TestController::singleton().mainWebView()->page(), m_url.get());
+    WKPageLoadURLWithShouldOpenExternalURLsPolicy(TestController::singleton().mainWebView()->page(), m_url.get(), shouldOpenExternalURLs);
 
     TestController::singleton().runUntil(m_gotFinalMessage, TestController::noTimeout);
     if (m_error)
@@ -266,15 +277,13 @@ void TestInvocation::dumpResults()
         dumpAudio(m_audioResult.get());
 
     if (m_dumpPixels && m_pixelResult) {
-        if (PlatformWebView::windowSnapshotEnabled()) {
-            m_gotRepaint = false;
-            WKPageForceRepaint(TestController::singleton().mainWebView()->page(), this, TestInvocation::forceRepaintDoneCallback);
-            TestController::singleton().runUntil(m_gotRepaint, TestController::shortTimeout);
-            if (!m_gotRepaint) {
-                m_errorMessage = "Timed out waiting for pre-pixel dump repaint\n";
-                m_webProcessIsUnresponsive = true;
-                return;
-            }
+        m_gotRepaint = false;
+        WKPageForceRepaint(TestController::singleton().mainWebView()->page(), this, TestInvocation::forceRepaintDoneCallback);
+        TestController::singleton().runUntil(m_gotRepaint, TestController::shortTimeout);
+        if (!m_gotRepaint) {
+            m_errorMessage = "Timed out waiting for pre-pixel dump repaint\n";
+            m_webProcessIsUnresponsive = true;
+            return;
         }
         dumpPixelsAndCompareWithExpected(m_pixelResult.get(), m_repaintRects.get());
     }
@@ -628,6 +637,20 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         return;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SetShouldDecideNavigationPolicyAfterDelay")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef value = static_cast<WKBooleanRef>(messageBody);
+        TestController::singleton().setShouldDecideNavigationPolicyAfterDelay(WKBooleanGetValue(value));
+        return;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetNavigationGesturesEnabled")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef value = static_cast<WKBooleanRef>(messageBody);
+        TestController::singleton().setNavigationGesturesEnabled(WKBooleanGetValue(value));
+        return;
+    }
+
     ASSERT_NOT_REACHED();
 }
 
@@ -638,6 +661,12 @@ WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedB
         WKBooleanRef isKeyValue = static_cast<WKBooleanRef>(messageBody);
         TestController::singleton().mainWebView()->setWindowIsKey(WKBooleanGetValue(isKeyValue));
         return 0;
+    }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "IsGeolocationClientActive")) {
+        bool isActive = TestController::singleton().isGeolocationProviderActive();
+        WKRetainPtr<WKTypeRef> result(AdoptWK, WKBooleanCreate(isActive));
+        return result;
     }
 
     if (WKStringIsEqualToUTF8CString(messageName, "IsWorkQueueEmpty")) {
@@ -670,6 +699,30 @@ WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedB
 void TestInvocation::outputText(const WTF::String& text)
 {
     m_textOutput.append(text);
+}
+
+void TestInvocation::didBeginSwipe()
+{
+    WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallDidBeginSwipeCallback"));
+    WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), 0);
+}
+
+void TestInvocation::willEndSwipe()
+{
+    WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallWillEndSwipeCallback"));
+    WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), 0);
+}
+
+void TestInvocation::didEndSwipe()
+{
+    WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallDidEndSwipeCallback"));
+    WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), 0);
+}
+
+void TestInvocation::didRemoveSwipeSnapshot()
+{
+    WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallDidRemoveSwipeSnapshotCallback"));
+    WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), 0);
 }
 
 } // namespace WTR

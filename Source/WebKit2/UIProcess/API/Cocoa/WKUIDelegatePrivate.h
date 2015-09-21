@@ -32,6 +32,8 @@
 
 @class UIScrollView;
 @class UIViewController;
+@class _WKActivatedElementInfo;
+@class _WKElementAction;
 @class _WKFrameHandle;
 
 @protocol WKUIDelegatePrivate <WKUIDelegate>
@@ -50,19 +52,25 @@ struct UIEdgeInsets;
 
 - (void)_webViewClose:(WKWebView *)webView;
 - (void)_webViewFullscreenMayReturnToInline:(WKWebView *)webView;
-- (void)_webViewDidEnterFullscreen:(WKWebView *)webView WK_AVAILABLE(WK_MAC_TBA, 8_3);
-- (void)_webViewDidExitFullscreen:(WKWebView *)webView WK_AVAILABLE(WK_MAC_TBA, 8_3);
+- (void)_webViewDidEnterFullscreen:(WKWebView *)webView WK_AVAILABLE(10_11, 8_3);
+- (void)_webViewDidExitFullscreen:(WKWebView *)webView WK_AVAILABLE(10_11, 8_3);
+
+- (void)_webView:(WKWebView *)webView imageOrMediaDocumentSizeChanged:(CGSize)size WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 #if TARGET_OS_IPHONE
-- (NSArray *)_webView:(WKWebView *)webView actionsForElement:(_WKActivatedElementInfo *)element defaultActions:(NSArray *)defaultActions;
+- (BOOL)_webView:(WKWebView *)webView shouldIncludeAppLinkActionsForElement:(_WKActivatedElementInfo *)element WK_AVAILABLE(NA, 9_0);
+- (NSArray *)_webView:(WKWebView *)webView actionsForElement:(_WKActivatedElementInfo *)element defaultActions:(WK_ARRAY(_WKElementAction *) *)defaultActions;
 - (void)_webView:(WKWebView *)webView didNotHandleTapAsClickAtPoint:(CGPoint)point;
 - (BOOL)_webView:(WKWebView *)webView shouldRequestGeolocationAuthorizationForURL:(NSURL *)url isMainFrame:(BOOL)isMainFrame mainFrameURL:(NSURL *)mainFrameURL;
-- (UIViewController *)_webView:(WKWebView *)webView previewViewControllerForURL:(NSURL *)url;
-- (void)_webView:(WKWebView *)webView commitPreviewedViewController:(UIViewController *)previewedViewController;
-- (void)_webView:(WKWebView *)webView willPreviewImageWithURL:(NSURL *)imageURL WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
-- (void)_webView:(WKWebView *)webView commitPreviewedImageWithURL:(NSURL *)imageURL WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
-- (void)_webView:(WKWebView *)webView didDismissPreviewViewController:(UIViewController *)previewedViewController;
-- (UIEdgeInsets)_webView:(WKWebView *)webView finalObscuredInsetsForScrollView:(UIScrollView *)scrollView withVelocity:(CGPoint)velocity targetContentOffset:(inout CGPoint *)targetContentOffset;
+- (UIViewController *)_webView:(WKWebView *)webView previewViewControllerForURL:(NSURL *)url WK_AVAILABLE(NA, 9_0);
+- (void)_webView:(WKWebView *)webView commitPreviewedViewController:(UIViewController *)previewedViewController WK_AVAILABLE(NA, 9_0);
+- (void)_webView:(WKWebView *)webView willPreviewImageWithURL:(NSURL *)imageURL WK_AVAILABLE(NA, 9_0);
+- (void)_webView:(WKWebView *)webView commitPreviewedImageWithURL:(NSURL *)imageURL WK_AVAILABLE(NA, 9_0);
+- (void)_webView:(WKWebView *)webView didDismissPreviewViewController:(UIViewController *)previewedViewController committing:(BOOL)committing WK_AVAILABLE(NA, 9_0);
+- (void)_webView:(WKWebView *)webView didDismissPreviewViewController:(UIViewController *)previewedViewController WK_AVAILABLE(NA, 9_0);
+- (UIEdgeInsets)_webView:(WKWebView *)webView finalObscuredInsetsForScrollView:(UIScrollView *)scrollView withVelocity:(CGPoint)velocity targetContentOffset:(inout CGPoint *)targetContentOffset WK_AVAILABLE(NA, 9_0);
+- (UIViewController *)_webView:(WKWebView *)webView previewViewControllerForURL:(NSURL *)url defaultActions:(WK_ARRAY(_WKElementAction *) *)actions elementInfo:(_WKActivatedElementInfo *)elementInfo WK_AVAILABLE(NA, 9_0);
+- (UIViewController *)_webView:(WKWebView *)webView previewViewControllerForAnimatedImageAtURL:(NSURL *)url defaultActions:(WK_ARRAY(_WKElementAction *) *)actions elementInfo:(_WKActivatedElementInfo *)elementInfo imageSize:(CGSize)imageSize WK_AVAILABLE(NA, 9_0);
 #endif
 
 @end

@@ -36,6 +36,8 @@
 #include "NetworkResourceLoaderMessages.h"
 #include "RemoteNetworkingContext.h"
 #include "SessionTracker.h"
+#include <WebCore/DNS.h>
+#include <WebCore/PingHandle.h>
 #include <WebCore/PlatformCookieJar.h>
 #include <WebCore/ResourceLoaderOptions.h>
 #include <WebCore/ResourceRequest.h>
@@ -63,8 +65,9 @@ NetworkConnectionToWebProcess::~NetworkConnectionToWebProcess()
 
 void NetworkConnectionToWebProcess::didCleanupResourceLoader(NetworkResourceLoader& loader)
 {
-    RefPtr<NetworkResourceLoader> removedLoader = m_networkResourceLoaders.take(loader.identifier());
-    ASSERT(removedLoader == &loader);
+    ASSERT(m_networkResourceLoaders.get(loader.identifier()) == &loader);
+
+    m_networkResourceLoaders.remove(loader.identifier());
 }
     
 void NetworkConnectionToWebProcess::didReceiveMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
@@ -126,6 +129,14 @@ void NetworkConnectionToWebProcess::performSynchronousLoad(const NetworkResource
     loader->start();
 }
 
+void NetworkConnectionToWebProcess::loadPing(const NetworkResourceLoadParameters& loadParameters)
+{
+    RefPtr<NetworkingContext> context = RemoteNetworkingContext::create(loadParameters.sessionID, loadParameters.shouldClearReferrerOnHTTPSToHTTPRedirect);
+
+    // PingHandle manages its own lifetime, deleting itself when its purpose has been fulfilled.
+    new PingHandle(context.get(), loadParameters.request, loadParameters.allowStoredCredentials == AllowStoredCredentials, PingHandle::UsesAsyncCallbacks::Yes);
+}
+
 void NetworkConnectionToWebProcess::removeLoadIdentifier(ResourceLoadIdentifier identifier)
 {
     RefPtr<NetworkResourceLoader> loader = m_networkResourceLoaders.get(identifier);
@@ -147,6 +158,11 @@ void NetworkConnectionToWebProcess::setDefersLoading(ResourceLoadIdentifier iden
         return;
 
     loader->setDefersLoading(defers);
+}
+
+void NetworkConnectionToWebProcess::prefetchDNS(const String& hostname)
+{
+    WebCore::prefetchDNS(hostname);
 }
 
 static NetworkStorageSession& storageSession(SessionID sessionID)
@@ -177,6 +193,11 @@ void NetworkConnectionToWebProcess::convertMainResourceLoadToDownload(uint64_t m
     }
 
     NetworkResourceLoader* loader = m_networkResourceLoaders.get(mainResourceLoadIdentifier);
+    if (!loader) {
+        // If we're trying to download a blob here loader can be null.
+        return;
+    }
+
     networkProcess.downloadManager().convertHandleToDownload(downloadID, loader->handle(), request, response);
 
     // Unblock the URL connection operation queue.

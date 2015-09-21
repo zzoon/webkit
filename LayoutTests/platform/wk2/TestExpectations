@@ -42,14 +42,11 @@
 ########################################
 ### START OF (1) Classified failures with bug reports
 
-# Flaky pixel tests due to caching issues.
-webkit.org/b/101773 fast/repaint/body-background-image.html [ ImageOnlyFailure Pass ]
-
 # AX tests that require hit testing do not work in WK2.
 webkit.org/b/71298 accessibility/loading-iframe-updates-axtree.html
-webkit.org/b/71298 platform/mac/accessibility/html-slider-indicator.html
-webkit.org/b/71298 platform/mac/accessibility/listbox-hit-test.html
-webkit.org/b/71298 platform/mac/accessibility/iframe-with-title-correct-hierarchy.html
+webkit.org/b/71298 accessibility/mac/html-slider-indicator.html
+webkit.org/b/71298 accessibility/mac/listbox-hit-test.html
+webkit.org/b/71298 accessibility/mac/iframe-with-title-correct-hierarchy.html
 
 # This test has been skipped for a long time. Temporarily marking as flaky to see what bots think.
 webkit.org/b/48354 compositing/iframes/iframe-src-change.html [ Pass Failure ]
@@ -90,26 +87,25 @@ fast/dom/tab-in-right-alignment.html
 fast/events/ime-composition-events-001.html
 fast/forms/cursor-at-editable-content-boundary.html
 fast/text/international/thai-cursor-position.html
-platform/mac/editing/input/5576619.html
-platform/mac/editing/input/bold-node.html
-platform/mac/editing/input/caret-primary-bidi.html
-platform/mac/editing/input/firstrectforcharacterrange-caret-in-br.html
-platform/mac/editing/input/firstrectforcharacterrange-plain.html
-platform/mac/editing/input/firstrectforcharacterrange-styled.html
-platform/mac/editing/input/firstrectforcharacterrange-vertical.html
-platform/mac/editing/input/hangul-enter-confirms-and-sends-keypress.html
-platform/mac/editing/input/insert-delete-smp-symbol.html
-platform/mac/editing/input/kotoeri-enter-to-confirm-and-newline.html
-platform/mac/editing/input/range-for-empty-document.html
-platform/mac/editing/input/replace-invalid-range.html
-platform/mac/editing/input/secure-input.html
-platform/mac/editing/input/text-input-controller.html
-platform/mac/editing/input/wrapped-line-char-rect.html
-platform/mac/editing/input/NSBackgroundColor-transparent.html
-platform/mac/editing/pasteboard/paste-and-match-style-selector-event.html
-platform/mac/editing/selection/25228.html
+editing/mac/input/5576619.html
+editing/mac/input/bold-node.html
+editing/mac/input/caret-primary-bidi.html
+editing/mac/input/firstrectforcharacterrange-caret-in-br.html
+editing/mac/input/firstrectforcharacterrange-plain.html
+editing/mac/input/firstrectforcharacterrange-styled.html
+editing/mac/input/firstrectforcharacterrange-vertical.html
+editing/mac/input/hangul-enter-confirms-and-sends-keypress.html
+editing/mac/input/insert-delete-smp-symbol.html
+editing/mac/input/kotoeri-enter-to-confirm-and-newline.html
+editing/mac/input/range-for-empty-document.html
+editing/mac/input/replace-invalid-range.html
+editing/mac/input/secure-input.html
+editing/mac/input/text-input-controller.html
+editing/mac/input/wrapped-line-char-rect.html
+editing/mac/input/NSBackgroundColor-transparent.html
+editing/mac/pasteboard/paste-and-match-style-selector-event.html
+editing/mac/selection/25228.html
 platform/mac/fast/dom/character-index-for-point.html
-platform/mac/fast/forms/attributed-strings.html
 platform/mac/fast/text/attributed-substring-from-range-001.html
 platform/mac/fast/text/attributed-substring-from-range-002.html
 platform/mac/fast/text/attributed-substring-from-range-in-textfield.html
@@ -169,7 +165,7 @@ transitions/default-timing-function.html
 plugins/geturlnotify-during-document-teardown.html
 plugins/open-and-close-window-with-plugin.html
 
-platform/mac/accessibility/search-predicate.html
+accessibility/mac/search-predicate.html
 
 # Sometimes fails
 # http://webkit.org/b/58990
@@ -220,6 +216,10 @@ webkit.org/b/132297 svg/custom/bug79798.html [ Skip ]
 webkit.org/b/98345 fast/parser/document-open-in-unload.html [ Skip ]
 
 webkit.org/b/141122 editing/selection/programmatic-selection-on-mac-is-directionless.html [ Pass Failure ]
+
+webkit.org/b/90980 fast/forms/textarea/textarea-state-restore.html [ Pass Timeout ]
+
+webkit.org/b/149087 http/tests/cache/disk-cache/disk-cache-cancel.html [ Pass Failure ]
 
 ### END OF (1) Classified failures with bug reports
 ########################################
@@ -419,6 +419,9 @@ fast/dynamic/window-resize-scrollbars-test.html [ Failure ]
 # This test is not the cause of the problem, just the one that happens to currently be the victim.
 svg/filters/filter-hidden-content.svg [ Pass Failure ]
 
+# No good way to test private browsing in WKTR right now
+http/tests/security/private-browsing-http-auth.html
+
 ### END OF (2) Classified failures without bug reports (yet)
 ########################################
 
@@ -533,10 +536,7 @@ storage/websql/multiple-databases-garbage-collection.html
 editing/pasteboard/copy-standalone-image.html
 
 # Mysterious failure after enabling paste tests
-platform/mac/editing/pasteboard/text-precomposed.html
-
-# An empty layer is missing.
-platform/mac/fast/forms/input-appearance-spinbutton-up.html
+editing/mac/pasteboard/text-precomposed.html
 
 # [WK2] http/tests/security/local-image-from-remote-whitelisted.html crashes
 # https://bugs.webkit.org/show_bug.cgi?id=73435
@@ -561,6 +561,29 @@ http/tests/loading/pdf-commit-load-callbacks.html
 
 # Times out unexpectedly.
 http/tests/security/feed-urls-from-remote.html
+
+# First two lines are reversed when test is flaky.
+fast/preloader/document-write-2.html [ Pass Failure ]
+
+# Test crashes from initial import of w3c IndexedDB tests
+imported/w3c/indexeddb/idbfactory_open10.htm [ Skip ]
+imported/w3c/indexeddb/idbobjectstore_createIndex4-deleteIndex-event_order.htm [ Skip ]
+imported/w3c/indexeddb/key_valid.html [ Skip ]
+
+# Test timeouts from initial import of w3c IndexedDB tests
+imported/w3c/indexeddb/interfaces.html [ Pass Timeout ]
+
+# Flaky tests from initial import of w3c IndexedDB tests
+imported/w3c/indexeddb/transaction-lifetime.htm [ Pass Failure ]
+imported/w3c/indexeddb/idbobjectstore_deleteIndex.htm [ Pass Failure ]
+imported/w3c/indexeddb/idbcursor-direction.htm [ Pass Failure ]
+imported/w3c/indexeddb/idbcursor-key.htm [ Pass Failure ]
+
+# Additional flaky idb test:
+imported/w3c/indexeddb/idbfactory_open5.htm [ Pass Failure ]
+
+# Don't run Modern IDB tests while the feature is under development
+storage/indexeddb/modern [ Skip ]
 
 ### END OF (3) Unclassified failures
 ########################################
@@ -591,7 +614,7 @@ platform/mac/plugins/undefined-property-crash.html
 platform/mac/plugins/webScriptObject-exception-deadlock.html
 
 # WebKitTestRunner doesn't have objCPlugin
-platform/mac/editing/pasteboard/5583362.html
+editing/mac/pasteboard/5583362.html [ Skip ]
 platform/mac/plugins/jsobjc-dom-wrappers.html
 platform/mac/plugins/jsobjc-simple.html
 platform/mac/plugins/throw-on-dealloc.html
@@ -681,6 +704,14 @@ fast/text/shaping
 # WebKit2 should always have IndexedDB enabled
 storage/indexeddb/properties-disabled-at-runtime.html [ Skip ]
 
+# WebKitTestRunner testRunner.setPrivateBrowsingEnabled doesn't work with NetworkProcess.
+# We explicitly Skip the following tests instead of marking them as Failure because some of these tests will naturally pass
+# as a consequence of testRunner.setPrivateBrowsingEnabled() effectively being a no-op as of the time of writing (07/08/2015).
+webkit.org/b/115274 http/tests/security/contentSecurityPolicy/report-cross-origin-no-cookies-when-private-browsing-enabled.html [ Skip ]
+webkit.org/b/115274 http/tests/security/contentSecurityPolicy/report-cross-origin-no-cookies-when-private-browsing-toggled.html [ Skip ]
+webkit.org/b/115274 http/tests/security/contentSecurityPolicy/report-same-origin-no-cookies-when-private-browsing-toggled.html [ Skip ]
+webkit.org/b/115274 http/tests/security/contentSecurityPolicy/report-same-origin-with-cookies-when-private-browsing-enabled.html [ Skip ]
+
 ### END OF (4) Features that are not supported in WebKit2 and likely never will be
 ########################################
 
@@ -690,6 +721,8 @@ storage/indexeddb/properties-disabled-at-runtime.html [ Skip ]
 # DumpRenderTree does not allow GIFs to animate, thus animated GIF tests don't work in WebKit1.
 fast/images/animated-gif-no-layout.html [ Pass ]
 fast/images/gif-loop-count.html [ Pass ]
+
+http/tests/appcache/decide-navigation-policy-after-delay.html [ Pass ]
 
 ### END OF (5) Progressions, expected successes that are expected failures in WebKit1.
 ########################################

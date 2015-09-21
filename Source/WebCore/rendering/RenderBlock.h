@@ -199,9 +199,9 @@ public:
 
     virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject* parent) const override;
 
-    static bool shouldSkipCreatingRunsForObject(RenderObject* obj)
+    static bool shouldSkipCreatingRunsForObject(RenderObject& obj)
     {
-        return obj->isFloating() || (obj->isOutOfFlowPositioned() && !obj->style().isOriginalDisplayInlineType() && !obj->container()->isRenderInline());
+        return obj.isFloating() || (obj.isOutOfFlowPositioned() && !obj.style().isOriginalDisplayInlineType() && !obj.container()->isRenderInline());
     }
 
     static TextRun constructTextRun(RenderObject* context, const FontCascade&, StringView, const RenderStyle&,
@@ -313,6 +313,8 @@ protected:
     virtual void layout() override;
 
     void layoutPositionedObjects(bool relayoutChildren, bool fixedPositionObjectsOnly = false);
+    void layoutPositionedObject(RenderBox&, bool relayoutChildren, bool fixedPositionObjectsOnly);
+    
     void markFixedPositionObjectForLayoutIfNeeded(RenderObject& child);
 
     LayoutUnit marginIntrinsicLogicalWidthForChild(RenderBox&) const;
@@ -411,11 +413,13 @@ private:
     void addChildToContinuation(RenderObject* newChild, RenderObject* beforeChild);
     virtual void addChildIgnoringContinuation(RenderObject* newChild, RenderObject* beforeChild) override;
 
-    virtual bool isSelfCollapsingBlock() const override final;
+    virtual bool isSelfCollapsingBlock() const override;
+    virtual bool childrenPreventSelfCollapsing() const;
+    
     // FIXME-BLOCKFLOW: Remove virtualizaion when all callers have moved to RenderBlockFlow
     virtual bool hasLines() const { return false; }
 
-    void insertIntoTrackedRendererMaps(RenderBox& descendant, TrackedDescendantsMap*&, TrackedContainerMap*&);
+    void insertIntoTrackedRendererMaps(RenderBox& descendant, TrackedDescendantsMap*&, TrackedContainerMap*&, bool forceNewEntry = false);
     static void removeFromTrackedRendererMaps(RenderBox& descendant, TrackedDescendantsMap*&, TrackedContainerMap*&);
 
     void createFirstLetterRenderer(RenderElement* firstLetterBlock, RenderText* currentTextChild);

@@ -78,6 +78,13 @@ static String restrictionName(MediaElementSession::BehaviorRestrictions restrict
 }
 #endif
 
+static bool pageExplicitlyAllowsElementToAutoplayInline(const HTMLMediaElement& element)
+{
+    Document& document = element.document();
+    Page* page = document.page();
+    return document.isMediaDocument() && !document.ownerElement() && page && page->allowsMediaDocumentInlinePlayback();
+}
+
 MediaElementSession::MediaElementSession(PlatformMediaSessionClient& client)
     : PlatformMediaSession(client)
     , m_restrictions(NoRestrictions)
@@ -119,6 +126,9 @@ void MediaElementSession::removeBehaviorRestriction(BehaviorRestrictions restric
 
 bool MediaElementSession::playbackPermitted(const HTMLMediaElement& element) const
 {
+    if (pageExplicitlyAllowsElementToAutoplayInline(element))
+        return true;
+
     if (m_restrictions & RequireUserGestureForRateChange && !ScriptController::processingUserGesture()) {
         LOG(Media, "MediaElementSession::playbackPermitted - returning FALSE");
         return false;
@@ -190,8 +200,8 @@ void MediaElementSession::showPlaybackTargetPicker(const HTMLMediaElement& eleme
     }
 
 #if !PLATFORM(IOS)
-    if (!element.hasVideo()) {
-        LOG(Media, "MediaElementSession::showPlaybackTargetPicker - returning early because element has no video");
+    if (element.readyState() < HTMLMediaElementEnums::HAVE_METADATA) {
+        LOG(Media, "MediaElementSession::showPlaybackTargetPicker - returning early because element is not playable");
         return;
     }
 #endif
@@ -328,13 +338,15 @@ void MediaElementSession::mediaStateDidChange(const HTMLMediaElement& element, M
 
 MediaPlayer::Preload MediaElementSession::effectivePreloadForElement(const HTMLMediaElement& element) const
 {
-    PlatformMediaSessionManager::SessionRestrictions restrictions = PlatformMediaSessionManager::sharedManager().restrictions(mediaType());
     MediaPlayer::Preload preload = element.preloadValue();
 
-    if ((restrictions & PlatformMediaSessionManager::MetadataPreloadingNotPermitted) == PlatformMediaSessionManager::MetadataPreloadingNotPermitted)
+    if (pageExplicitlyAllowsElementToAutoplayInline(element))
+        return preload;
+
+    if (m_restrictions & MetadataPreloadingNotPermitted)
         return MediaPlayer::None;
 
-    if ((restrictions & PlatformMediaSessionManager::AutoPreloadingNotPermitted) == PlatformMediaSessionManager::AutoPreloadingNotPermitted) {
+    if (m_restrictions & AutoPreloadingNotPermitted) {
         if (preload > MediaPlayer::MetaData)
             return MediaPlayer::MetaData;
     }
@@ -344,22 +356,26 @@ MediaPlayer::Preload MediaElementSession::effectivePreloadForElement(const HTMLM
 
 bool MediaElementSession::requiresFullscreenForVideoPlayback(const HTMLMediaElement& element) const
 {
-    if (!PlatformMediaSessionManager::sharedManager().sessionRestrictsInlineVideoPlayback(*this))
+    if (pageExplicitlyAllowsElementToAutoplayInline(element))
         return false;
 
     Settings* settings = element.document().settings();
     if (!settings || !settings->allowsInlineMediaPlayback())
         return true;
 
-    if (element.fastHasAttribute(HTMLNames::webkit_playsinlineAttr))
-        return false;
+    return settings->inlineMediaPlaybackRequiresPlaysInlineAttribute() && !element.fastHasAttribute(HTMLNames::webkit_playsinlineAttr);
+}
 
-#if PLATFORM(IOS)
-    if (applicationIsDumpRenderTree())
-        return false;
-#endif
+bool MediaElementSession::allowsAutomaticMediaDataLoading(const HTMLMediaElement& element) const
+{
+    if (pageExplicitlyAllowsElementToAutoplayInline(element))
+        return true;
 
-    return true;
+    Settings* settings = element.document().settings();
+    if (settings && settings->mediaDataLoadsAutomatically())
+        return true;
+
+    return false;
 }
 
 void MediaElementSession::mediaEngineUpdated(const HTMLMediaElement& element)
@@ -382,8 +398,15 @@ void MediaElementSession::mediaEngineUpdated(const HTMLMediaElement& element)
 bool MediaElementSession::allowsPictureInPicture(const HTMLMediaElement& element) const
 {
     Settings* settings = element.document().settings();
-    return settings && settings->allowsPictureInPictureMediaPlayback();
+    return settings && settings->allowsPictureInPictureMediaPlayback() && !element.webkitCurrentPlaybackTargetIsWireless();
 }
+
+#if PLATFORM(IOS)
+bool MediaElementSession::requiresPlaybackTargetRouteMonitoring() const
+{
+    return m_hasPlaybackTargetAvailabilityListeners && !client().elementIsHidden();
+}
+#endif
 
 #if ENABLE(MEDIA_SOURCE)
 const unsigned fiveMinutesOf1080PVideo = 290 * 1024 * 1024; // 290 MB is approximately 5 minutes of 8Mbps (1080p) content.

@@ -28,17 +28,13 @@
 
 #include "FloatRoundedRect.h"
 #include "GraphicsLayer.h"
-#include "PlatformCALayerClient.h"
 #include <QuartzCore/CABase.h>
 #include <wtf/CurrentTime.h>
-#include <wtf/HashMap.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/TypeCasts.h>
 #include <wtf/Vector.h>
-#include <wtf/text/StringHash.h>
-#include <wtf/text/WTFString.h>
 
 OBJC_CLASS AVPlayerLayer;
 
@@ -51,6 +47,7 @@ namespace WebCore {
 class LayerPool;
 class PlatformCALayer;
 class PlatformCAAnimation;
+class PlatformCALayerClient;
 
 typedef Vector<RefPtr<PlatformCALayer>> PlatformCALayerList;
 
@@ -229,13 +226,15 @@ public:
 
     virtual TiledBacking* tiledBacking() = 0;
 
+    virtual void drawTextAtPoint(CGContextRef, CGFloat x, CGFloat y, const char* text, size_t length) const;
+
+    static void flipContext(CGContextRef, CGFloat height);
+
 #if PLATFORM(WIN)
     virtual PlatformCALayer* rootLayer() const = 0;
     virtual void setNeedsLayout() = 0;
     virtual void setNeedsCommit() = 0;
-#ifndef NDEBUG
-    virtual void printTree() const = 0;
-#endif // NDEBUG
+    virtual String layerTreeAsString() const = 0;
 #endif // PLATFORM(WIN)
 
 #if PLATFORM(IOS)
@@ -243,7 +242,6 @@ public:
     void setBoundsOnMainThread(CGRect);
     void setPositionOnMainThread(CGPoint);
     void setAnchorPointOnMainThread(FloatPoint3D);
-    void setTileSize(const IntSize&);
 #endif
 
     virtual PassRefPtr<PlatformCALayer> createCompatibleLayer(LayerType, PlatformCALayerClient*) const = 0;

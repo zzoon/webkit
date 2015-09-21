@@ -70,6 +70,8 @@ set(WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/WebProcess/WebPage"
     "${WEBCORE_DIR}"
     "${WEBCORE_DIR}/Modules/battery"
+    "${WEBCORE_DIR}/Modules/indexeddb"
+    "${WEBCORE_DIR}/Modules/indexeddb/legacy"
     "${WEBCORE_DIR}/Modules/mediastream"
     "${WEBCORE_DIR}/Modules/networkinfo"
     "${WEBCORE_DIR}/Modules/notifications"
@@ -217,7 +219,6 @@ set(WebKit2_SOURCES
     Shared/ChildProcess.cpp
     Shared/ChildProcessProxy.cpp
     Shared/ContextMenuContextData.cpp
-    Shared/DictionaryPopupInfo.cpp
     Shared/EditorState.cpp
     Shared/FontInfo.cpp
     Shared/LayerTreeContext.cpp
@@ -225,7 +226,6 @@ set(WebKit2_SOURCES
     Shared/OriginAndDatabases.cpp
     Shared/PlatformPopupMenuData.cpp
     Shared/PrintInfo.cpp
-    Shared/SecurityOriginData.cpp
     Shared/SessionState.cpp
     Shared/SessionTracker.cpp
     Shared/ShareableBitmap.cpp
@@ -251,6 +251,7 @@ set(WebKit2_SOURCES
     Shared/WebImage.cpp
     Shared/WebKeyboardEvent.cpp
     Shared/WebKit2Initialize.cpp
+    Shared/WebMediaSessionMetadata.cpp
     Shared/WebMemorySampler.cpp
     Shared/WebMouseEvent.cpp
     Shared/WebOpenPanelParameters.cpp
@@ -342,7 +343,7 @@ set(WebKit2_SOURCES
     UIProcess/TextCheckerCompletion.cpp
     UIProcess/UserMediaPermissionRequestManagerProxy.cpp
     UIProcess/UserMediaPermissionRequestProxy.cpp
-    UIProcess/VisitedLinkProvider.cpp
+    UIProcess/VisitedLinkStore.cpp
     UIProcess/WebBackForwardList.cpp
     UIProcess/WebBatteryManagerProxy.cpp
     UIProcess/WebBatteryProvider.cpp
@@ -392,12 +393,14 @@ set(WebKit2_SOURCES
     UIProcess/API/APIFrameInfo.cpp
     UIProcess/API/APINavigation.cpp
     UIProcess/API/APINavigationData.cpp
+    UIProcess/API/APIPageConfiguration.cpp
     UIProcess/API/APIProcessPoolConfiguration.cpp
     UIProcess/API/APISession.cpp
     UIProcess/API/APISessionState.cpp
     UIProcess/API/APIUserContentExtension.cpp
     UIProcess/API/APIUserContentExtensionStore.cpp
     UIProcess/API/APIWebsiteDataStore.cpp
+    UIProcess/API/APIWindowFeatures.cpp
 
     UIProcess/API/C/WKApplicationCacheManager.cpp
     UIProcess/API/C/WKAuthenticationChallenge.cpp
@@ -425,6 +428,7 @@ set(WebKit2_SOURCES
     UIProcess/API/C/WKInspector.cpp
     UIProcess/API/C/WKKeyValueStorageManager.cpp
     UIProcess/API/C/WKMediaCacheManager.cpp
+    UIProcess/API/C/WKMediaSessionMetadata.cpp
     UIProcess/API/C/WKNavigationActionRef.cpp
     UIProcess/API/C/WKNavigationDataRef.cpp
     UIProcess/API/C/WKNavigationRef.cpp
@@ -436,6 +440,7 @@ set(WebKit2_SOURCES
     UIProcess/API/C/WKOpenPanelResultListener.cpp
     UIProcess/API/C/WKOriginDataManager.cpp
     UIProcess/API/C/WKPage.cpp
+    UIProcess/API/C/WKPageConfigurationRef.cpp
     UIProcess/API/C/WKPageGroup.cpp
     UIProcess/API/C/WKPluginSiteDataManager.cpp
     UIProcess/API/C/WKPreferences.cpp
@@ -443,9 +448,11 @@ set(WebKit2_SOURCES
     UIProcess/API/C/WKResourceCacheManager.cpp
     UIProcess/API/C/WKSessionStateRef.cpp
     UIProcess/API/C/WKTextChecker.cpp
+    UIProcess/API/C/WKUserContentControllerRef.cpp
     UIProcess/API/C/WKUserMediaPermissionRequest.cpp
     UIProcess/API/C/WKVibration.cpp
     UIProcess/API/C/WKViewportAttributes.cpp
+    UIProcess/API/C/WKWindowFeaturesRef.cpp
 
     UIProcess/Authentication/AuthenticationChallengeProxy.cpp
     UIProcess/Authentication/AuthenticationDecisionListener.cpp
@@ -615,6 +622,7 @@ set(WebKit2_SOURCES
     WebProcess/WebPage/WebDocumentLoader.cpp
     WebProcess/WebPage/WebFrame.cpp
     WebProcess/WebPage/WebInspector.cpp
+    WebProcess/WebPage/WebInspectorFrontendAPIDispatcher.cpp
     WebProcess/WebPage/WebInspectorUI.cpp
     WebProcess/WebPage/WebOpenPanelResultListener.cpp
     WebProcess/WebPage/WebPage.cpp
@@ -651,7 +659,7 @@ set(WebKit2_MESSAGES_IN_FILES
     Shared/Plugins/NPObjectMessageReceiver.messages.in
 
     UIProcess/DrawingAreaProxy.messages.in
-    UIProcess/VisitedLinkProvider.messages.in
+    UIProcess/VisitedLinkStore.messages.in
     UIProcess/WebBatteryManagerProxy.messages.in
     UIProcess/WebCookieManagerProxy.messages.in
     UIProcess/WebDatabaseManagerProxy.messages.in

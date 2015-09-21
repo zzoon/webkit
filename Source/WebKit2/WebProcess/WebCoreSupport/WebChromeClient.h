@@ -203,8 +203,8 @@ private:
     virtual bool selectItemWritingDirectionIsNatural() override;
     virtual bool selectItemAlignmentFollowsMenuWritingDirection() override;
     virtual bool hasOpenedPopup() const override;
-    virtual PassRefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const override;
-    virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const override;
+    virtual RefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const override;
+    virtual RefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const override;
 
     virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() const override;
     virtual void attachRootGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*) override;
@@ -243,6 +243,7 @@ private:
 #if PLATFORM(IOS)
     virtual void elementDidFocus(const WebCore::Node*) override;
     virtual void elementDidBlur(const WebCore::Node*) override;
+    virtual void elementDidRefocus(const WebCore::Node*) override;
 #endif
 
 #if PLATFORM(IOS)
@@ -291,11 +292,13 @@ private:
 
     virtual bool shouldUseTiledBackingForFrameView(const WebCore::FrameView*) const override;
 
-    virtual void isPlayingMediaDidChange(WebCore::MediaProducer::MediaStateFlags) override;
+    virtual void isPlayingMediaDidChange(WebCore::MediaProducer::MediaStateFlags, uint64_t) override;
     virtual void setPageActivityState(WebCore::PageActivityState::Flags) override;
 
 #if ENABLE(MEDIA_SESSION)
+    virtual void hasMediaSessionWithActiveMediaElementsDidChange(bool) override;
     virtual void mediaSessionMetadataDidChange(const WebCore::MediaSessionMetadata&) override;
+    virtual void focusedContentMediaElementDidChange(uint64_t) override;
 #endif
 
 #if ENABLE(SUBTLE_CRYPTO)
@@ -320,6 +323,13 @@ private:
     virtual void removePlaybackTargetPickerClient(uint64_t /*contextId*/) override;
     virtual void showPlaybackTargetPicker(uint64_t contextId, const WebCore::IntPoint&, bool) override;
     virtual void playbackTargetPickerClientStateDidChange(uint64_t, WebCore::MediaProducer::MediaStateFlags) override;
+#endif
+
+    virtual void imageOrMediaDocumentSizeChanged(const WebCore::IntSize&) override;
+#if ENABLE(VIDEO)
+#if USE(GSTREAMER)
+    virtual void requestInstallMissingMediaPlugins(const String& /*details*/, const String& /*description*/, WebCore::MediaPlayerRequestInstallMissingPluginsCallback&) override;
+#endif
 #endif
 
     String m_cachedToolTip;

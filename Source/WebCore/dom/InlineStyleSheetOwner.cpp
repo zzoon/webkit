@@ -123,7 +123,7 @@ void InlineStyleSheetOwner::createSheet(Element& element, const String& text)
 
     if (!isValidCSSContentType(element, m_contentType))
         return;
-    if (!document.contentSecurityPolicy()->allowInlineStyle(document.url(), m_startTextPosition.m_line))
+    if (!document.contentSecurityPolicy()->allowInlineStyle(document.url(), m_startTextPosition.m_line, element.isInUserAgentShadowTree()))
         return;
 
     RefPtr<MediaQuerySet> mediaQueries;
@@ -141,7 +141,7 @@ void InlineStyleSheetOwner::createSheet(Element& element, const String& text)
 
     m_loading = true;
 
-    m_sheet = CSSStyleSheet::createInline(element, URL(), document.inputEncoding());
+    m_sheet = CSSStyleSheet::createInline(element, URL(), m_startTextPosition, document.encoding());
     m_sheet->setMediaQueries(mediaQueries.release());
     m_sheet->setTitle(element.title());
     m_sheet->contents().parseStringAtPosition(text, m_startTextPosition, m_isParsingChildren);

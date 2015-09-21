@@ -70,56 +70,15 @@ var testNames = {};
 testNames[Buildbot.TestCategory.WebKit2] = "WK2 Tests";
 testNames[Buildbot.TestCategory.WebKit1] = "WK1 Tests";
 
-function sortedPlatforms()
-{
-    var platforms = [];
-
-    for (var platformKey in Dashboard.Platform)
-        platforms.push(Dashboard.Platform[platformKey]);
-
-    platforms.sort(function(a, b) {
-        return a.order - b.order;
-    });
-
-    return platforms;
-}
-
-function updateHiddenPlatforms()
-{
-    var hiddenPlatforms = settings.getObject("hiddenPlatforms");
-    if (!hiddenPlatforms)
-        hiddenPlatforms = [];
-
-    var platformRows = document.querySelectorAll("tr.platform");
-    for (var i = 0; i < platformRows.length; ++i)
-        platformRows[i].classList.remove("hidden");
-
-    for (var i = 0; i < hiddenPlatforms.length; ++i) {
-        var platformRow = document.querySelector("tr.platform." + hiddenPlatforms[i]);
-        if (platformRow)
-            platformRow.classList.add("hidden");
-    }
-
-    var unhideButton = document.querySelector("div.cellButton.unhide");
-    if (hiddenPlatforms.length)
-        unhideButton.classList.remove("hidden");
-    else
-        unhideButton.classList.add("hidden");
-}
-
 function unhiddenQueues()
 {
-    var hiddenPlatforms = settings.getObject("hiddenPlatforms");
-    if (!hiddenPlatforms)
-        hiddenPlatforms = [];
-
+    var hiddenPlatformFamilies = settings.getObject("hiddenPlatformFamilies") || [];
     var result = [];
-
     for (var i = 0; i < buildbots.length; ++i) {
         var buildbot = buildbots[i];
         for (var id in buildbot.queues) {
             var queue = buildbot.queues[id];
-            if (-1 === hiddenPlatforms.indexOf(queue.platform))
+            if (-1 === hiddenPlatformFamilies.indexOf(parsePlatformFamily(queue.platform)))
                 result.push(queue);
         }
     }
@@ -185,11 +144,6 @@ function buildQueuesTable()
     row.classList.add("headers");
 
     var header = document.createElement("th");
-    var unhideButton = document.createElement("div");
-    unhideButton.addEventListener("click", function () { settings.clearHiddenPlatforms(); });
-    unhideButton.textContent = "Show All Platforms";
-    unhideButton.classList.add("cellButton", "unhide", "hidden");
-    header.appendChild(unhideButton);
     row.appendChild(header);
 
     header = document.createElement("th");
@@ -204,7 +158,7 @@ function buildQueuesTable()
 
     table.appendChild(row);
 
-    var platforms = sortedPlatforms();
+    var platforms = Dashboard.sortedPlatforms;
 
     for (var i in platforms) {
         var platform = platforms[i];
@@ -227,12 +181,6 @@ function buildQueuesTable()
         var logoImage = document.createElement("img");
         logoImage.classList.add("logo");
         cell.appendChild(logoImage);
-
-        var hideButton = document.createElement("div");
-        hideButton.addEventListener("click", function (platformName) { return function () { settings.toggleHiddenPlatform(platformName); }; }(platform.name) );
-        hideButton.textContent = "hide";
-        hideButton.classList.add("cellButton", "hide");
-        cell.appendChild(hideButton);
 
         row.appendChild(cell);
 
@@ -358,7 +306,7 @@ function documentReady()
         document.body.appendChild(settingsButton);
 
         updateHiddenPlatforms();
-        settings.addSettingListener("hiddenPlatforms", updateHiddenPlatforms);
+        settings.addSettingListener("hiddenPlatformFamilies", updateHiddenPlatforms);
         settings.addSettingListener("enteredSettings", function() { 
             $('html, body').stop().animate({
                 scrollTop: $("#metrics-queues-table").offset().top

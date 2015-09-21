@@ -36,6 +36,7 @@
 #include <WebCore/TransformationMatrix.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
+#include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
 namespace IPC {
@@ -195,6 +196,9 @@ public:
 
     WebCore::IntSize contentsSize() const { return m_contentsSize; }
     void setContentsSize(const WebCore::IntSize& size) { m_contentsSize = size; };
+
+    WebCore::IntPoint scrollOrigin() const { return m_scrollOrigin; }
+    void setScrollOrigin(const WebCore::IntPoint& origin) { m_scrollOrigin = origin; };
     
     WebCore::Color pageExtendedBackgroundColor() const { return m_pageExtendedBackgroundColor; }
     void setPageExtendedBackgroundColor(WebCore::Color color) { m_pageExtendedBackgroundColor = color; }
@@ -242,6 +246,7 @@ private:
     Vector<TransactionCallbackID> m_callbackIDs;
 
     WebCore::IntSize m_contentsSize;
+    WebCore::IntPoint m_scrollOrigin;
 #if PLATFORM(MAC)
     WebCore::IntPoint m_scrollPosition;
 #endif

@@ -10,6 +10,7 @@ set(WTF_HEADERS
     ByteOrder.h
     CompilationThread.h
     Compiler.h
+    Condition.h
     CryptographicUtilities.h
     CryptographicallyRandomNumber.h
     CurrentTime.h
@@ -30,6 +31,7 @@ set(WTF_HEADERS
     GetPtr.h
     GregorianDateTime.h
     HashCountedSet.h
+    Hasher.h
     HashFunctions.h
     HashIterators.h
     HashMap.h
@@ -41,6 +43,7 @@ set(WTF_HEADERS
     IteratorAdaptors.h
     IteratorRange.h
     ListHashSet.h
+    Lock.h
     Locker.h
     MD5.h
     MainThread.h
@@ -61,6 +64,7 @@ set(WTF_HEADERS
     ParallelJobsGeneric.h
     ParallelJobsLibdispatch.h
     ParallelJobsOpenMP.h
+    ParkingLot.h
     PassRefPtr.h
     Platform.h
     PrintStream.h
@@ -80,14 +84,12 @@ set(WTF_HEADERS
     SHA1.h
     SaturatedArithmetic.h
     SegmentedVector.h
-    SpinLock.h
     StackBounds.h
     StackStats.h
     StaticConstructors.h
     StdLibExtras.h
     Stopwatch.h
     StringExtras.h
-    StringHasher.h
     StringPrintStream.h
     ThreadIdentifierDataPthreads.h
     ThreadSafeRefCounted.h
@@ -101,6 +103,7 @@ set(WTF_HEADERS
     VectorTraits.h
     WTFThreadData.h
     WeakPtr.h
+    WordLock.h
     WorkQueue.h
     dtoa.h
 
@@ -156,6 +159,7 @@ set(WTF_SOURCES
     FunctionDispatcher.cpp
     GregorianDateTime.cpp
     HashTable.cpp
+    Lock.cpp
     MD5.cpp
     MainThread.cpp
     MediaTime.cpp
@@ -164,6 +168,7 @@ set(WTF_SOURCES
     OSRandomSource.cpp
     PageBlock.cpp
     ParallelJobsGeneric.cpp
+    ParkingLot.cpp
     PrintStream.cpp
     RAMSize.cpp
     RandomNumber.cpp
@@ -177,6 +182,7 @@ set(WTF_SOURCES
     StringPrintStream.cpp
     Threading.cpp
     WTFThreadData.cpp
+    WordLock.cpp
     WorkQueue.cpp
     dtoa.cpp
 
@@ -265,6 +271,10 @@ add_library(WTF ${WTF_LIBRARY_TYPE} ${WTF_HEADERS} ${WTF_SOURCES})
 target_link_libraries(WTF ${WTF_LIBRARIES})
 set_target_properties(WTF PROPERTIES COMPILE_DEFINITIONS "BUILDING_WTF")
 set_target_properties(WTF PROPERTIES FOLDER "JavaScriptCore")
+
+if (WTF_POST_BUILD_COMMAND)
+    add_custom_command(TARGET WTF POST_BUILD COMMAND ${WTF_POST_BUILD_COMMAND} VERBATIM)
+endif ()
 
 if (WTF_OUTPUT_NAME)
     set_target_properties(WTF PROPERTIES OUTPUT_NAME ${WTF_OUTPUT_NAME})

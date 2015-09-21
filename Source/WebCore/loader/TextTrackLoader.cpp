@@ -145,13 +145,17 @@ void TextTrackLoader::notifyFinished(CachedResource* resource)
     cancelLoad();
 }
 
-bool TextTrackLoader::load(const URL& url, const String& crossOriginMode)
+bool TextTrackLoader::load(const URL& url, const String& crossOriginMode, bool isInitiatingElementInUserAgentShadowTree)
 {
     cancelLoad();
 
     ASSERT(is<Document>(m_scriptExecutionContext));
     Document* document = downcast<Document>(m_scriptExecutionContext);
-    CachedResourceRequest cueRequest(ResourceRequest(document->completeURL(url)));
+
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+    options.setContentSecurityPolicyImposition(isInitiatingElementInUserAgentShadowTree ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+
+    CachedResourceRequest cueRequest(ResourceRequest(document->completeURL(url)), options);
 
     if (!crossOriginMode.isNull()) {
         m_crossOriginMode = crossOriginMode;
@@ -183,12 +187,10 @@ void TextTrackLoader::newCuesParsed()
     m_cueLoadTimer.startOneShot(0);
 }
 
-#if ENABLE(WEBVTT_REGIONS)
 void TextTrackLoader::newRegionsParsed()
 {
     m_client.newRegionsAvailable(this);
 }
-#endif
 
 void TextTrackLoader::fileFailedToParse()
 {
@@ -214,14 +216,13 @@ void TextTrackLoader::getNewCues(Vector<RefPtr<TextTrackCue>>& outputCues)
     }
 }
 
-#if ENABLE(WEBVTT_REGIONS)
 void TextTrackLoader::getNewRegions(Vector<RefPtr<VTTRegion>>& outputRegions)
 {
     ASSERT(m_cueParser);
     if (m_cueParser)
         m_cueParser->getNewRegions(outputRegions);
 }
-#endif
+
 }
 
 #endif

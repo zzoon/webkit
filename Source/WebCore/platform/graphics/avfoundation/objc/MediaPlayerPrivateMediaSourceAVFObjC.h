@@ -96,7 +96,7 @@ private:
     virtual void load(const String& url) override;
     virtual void load(const String& url, MediaSourcePrivateClient*) override;
 #if ENABLE(MEDIA_STREAM)
-    void load(MediaStreamPrivate*) override { }
+    void load(MediaStreamPrivate&) override;
 #endif
     virtual void cancelLoad() override;
 
@@ -147,8 +147,8 @@ private:
 
     virtual void setSize(const IntSize&) override;
 
-    virtual void paint(GraphicsContext*, const FloatRect&) override;
-    virtual void paintCurrentFrameInContext(GraphicsContext*, const FloatRect&) override;
+    virtual void paint(GraphicsContext&, const FloatRect&) override;
+    virtual void paintCurrentFrameInContext(GraphicsContext&, const FloatRect&) override;
 
     virtual bool hasAvailableVideoFrame() const override;
 
@@ -181,7 +181,6 @@ private:
     void ensureLayer();
     void destroyLayer();
     bool shouldBePlaying() const;
-    void seekTimerFired();
 
     friend class MediaSourcePrivateAVFObjC;
 

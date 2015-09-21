@@ -82,9 +82,9 @@ static const auto pluginSnapshotTimerDelay = std::chrono::milliseconds { 1100 };
 
 class PluginView::URLRequest : public RefCounted<URLRequest> {
 public:
-    static PassRefPtr<PluginView::URLRequest> create(uint64_t requestID, const FrameLoadRequest& request, bool allowPopups)
+    static Ref<PluginView::URLRequest> create(uint64_t requestID, const FrameLoadRequest& request, bool allowPopups)
     {
-        return adoptRef(new URLRequest(requestID, request, allowPopups));
+        return adoptRef(*new URLRequest(requestID, request, allowPopups));
     }
 
     uint64_t requestID() const { return m_requestID; }
@@ -107,14 +107,15 @@ private:
 
 class PluginView::Stream : public RefCounted<PluginView::Stream>, NetscapePlugInStreamLoaderClient {
 public:
-    static PassRefPtr<Stream> create(PluginView* pluginView, uint64_t streamID, const ResourceRequest& request)
+    static Ref<Stream> create(PluginView* pluginView, uint64_t streamID, const ResourceRequest& request)
     {
-        return adoptRef(new Stream(pluginView, streamID, request));
+        return adoptRef(*new Stream(pluginView, streamID, request));
     }
     ~Stream();
 
     void start();
     void cancel();
+    void continueLoad();
 
     uint64_t streamID() const { return m_streamID; }
 
@@ -128,15 +129,17 @@ private:
     }
 
     // NetscapePluginStreamLoaderClient
-    virtual void didReceiveResponse(NetscapePlugInStreamLoader*, const ResourceResponse&);
-    virtual void didReceiveData(NetscapePlugInStreamLoader*, const char*, int);
-    virtual void didFail(NetscapePlugInStreamLoader*, const ResourceError&);
-    virtual void didFinishLoading(NetscapePlugInStreamLoader*);
+    void willSendRequest(NetscapePlugInStreamLoader*, ResourceRequest&&, const ResourceResponse& redirectResponse, std::function<void (ResourceRequest&&)>&&) override;
+    void didReceiveResponse(NetscapePlugInStreamLoader*, const ResourceResponse&) override;
+    void didReceiveData(NetscapePlugInStreamLoader*, const char*, int) override;
+    void didFail(NetscapePlugInStreamLoader*, const ResourceError&) override;
+    void didFinishLoading(NetscapePlugInStreamLoader*) override;
 
     PluginView* m_pluginView;
     uint64_t m_streamID;
-    const ResourceRequest m_request;
-    
+    ResourceRequest m_request;
+    std::function<void (ResourceRequest)> m_loadCallback;
+
     // True if the stream was explicitly cancelled by calling cancel().
     // (As opposed to being cancelled by the user hitting the stop button for example.
     bool m_streamWasCancelled;
@@ -166,7 +169,15 @@ void PluginView::Stream::cancel()
 
     m_streamWasCancelled = true;
     m_loader->cancel(m_loader->cancelledError());
-    m_loader = 0;
+    m_loader = nullptr;
+}
+
+void PluginView::Stream::continueLoad()
+{
+    ASSERT(m_pluginView->m_plugin);
+    ASSERT(m_loadCallback);
+
+    m_loadCallback(m_request);
 }
 
 static String buildHTTPHeaders(const ResourceResponse& response, long long& expectedContentLength)
@@ -208,6 +219,16 @@ static uint32_t lastModifiedDateMS(const ResourceResponse& response)
         return 0;
 
     return std::chrono::duration_cast<std::chrono::milliseconds>(lastModified.value().time_since_epoch()).count();
+}
+
+void PluginView::Stream::willSendRequest(NetscapePlugInStreamLoader*, ResourceRequest&& request, const ResourceResponse& redirectResponse, std::function<void (ResourceRequest&&)>&& decisionHandler)
+{
+    const URL& requestURL = request.url();
+    const URL& redirectResponseURL = redirectResponse.url();
+
+    m_loadCallback = decisionHandler;
+    m_request = request;
+    m_pluginView->m_plugin->streamWillSendRequest(m_streamID, requestURL, redirectResponseURL, redirectResponse.httpStatusCode());
 }
 
 void PluginView::Stream::didReceiveResponse(NetscapePlugInStreamLoader*, const ResourceResponse& response)
@@ -271,9 +292,9 @@ static inline WebPage* webPage(HTMLPlugInElement* pluginElement)
     return webFrame->page();
 }
 
-PassRefPtr<PluginView> PluginView::create(PassRefPtr<HTMLPlugInElement> pluginElement, PassRefPtr<Plugin> plugin, const Plugin::Parameters& parameters)
+Ref<PluginView> PluginView::create(PassRefPtr<HTMLPlugInElement> pluginElement, PassRefPtr<Plugin> plugin, const Plugin::Parameters& parameters)
 {
-    return adoptRef(new PluginView(pluginElement, plugin, parameters));
+    return adoptRef(*new PluginView(pluginElement, plugin, parameters));
 }
 
 PluginView::PluginView(PassRefPtr<HTMLPlugInElement> pluginElement, PassRefPtr<Plugin> plugin, const Plugin::Parameters& parameters)
@@ -604,7 +625,7 @@ void PluginView::initializePlugin()
 
 void PluginView::didFailToInitializePlugin()
 {
-    m_plugin = 0;
+    m_plugin = nullptr;
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     String frameURLString = frame()->loader().documentLoader()->responseURL().string();
@@ -771,13 +792,13 @@ void PluginView::setFrameRect(const WebCore::IntRect& rect)
     viewGeometryDidChange();
 }
 
-void PluginView::paint(GraphicsContext* context, const IntRect& /*dirtyRect*/)
+void PluginView::paint(GraphicsContext& context, const IntRect& /*dirtyRect*/)
 {
     if (!m_plugin || !m_isInitialized || m_pluginElement->displayState() < HTMLPlugInElement::Restarting)
         return;
 
-    if (context->paintingDisabled()) {
-        if (context->updatingControlTints())
+    if (context.paintingDisabled()) {
+        if (context.updatingControlTints())
             m_plugin->updateControlTints(context);
         return;
     }
@@ -789,14 +810,14 @@ void PluginView::paint(GraphicsContext* context, const IntRect& /*dirtyRect*/)
         return;
 
     if (m_transientPaintingSnapshot) {
-        m_transientPaintingSnapshot->paint(*context, contentsScaleFactor(), frameRect().location(), m_transientPaintingSnapshot->bounds());
+        m_transientPaintingSnapshot->paint(context, contentsScaleFactor(), frameRect().location(), m_transientPaintingSnapshot->bounds());
         return;
     }
     
-    GraphicsContextStateSaver stateSaver(*context);
+    GraphicsContextStateSaver stateSaver(context);
 
     // Translate the coordinate system so that the origin is in the top-left corner of the plug-in.
-    context->translate(frameRect().location().x(), frameRect().location().y());
+    context.translate(frameRect().location().x(), frameRect().location().y());
 
     m_plugin->paint(context, paintRect);
 }
@@ -1404,6 +1425,15 @@ void PluginView::cancelStreamLoad(uint64_t streamID)
     ASSERT(!m_streams.contains(streamID));
 }
 
+void PluginView::continueStreamLoad(uint64_t streamID)
+{
+    RefPtr<Stream> stream = m_streams.get(streamID);
+    if (!stream)
+        return;
+
+    stream->continueLoad();
+}
+
 void PluginView::cancelManualStreamLoad()
 {
     if (!frame())
@@ -1572,9 +1602,9 @@ void PluginView::setCookiesForURL(const String& urlString, const String& cookieS
 
 bool PluginView::getAuthenticationInfo(const ProtectionSpace& protectionSpace, String& username, String& password)
 {
-    Credential credential = CredentialStorage::get(protectionSpace);
+    Credential credential = CredentialStorage::defaultCredentialStorage().get(protectionSpace);
     if (credential.isEmpty())
-        credential = CredentialStorage::getFromPersistentStorage(protectionSpace);
+        credential = CredentialStorage::defaultCredentialStorage().getFromPersistentStorage(protectionSpace);
 
     if (!credential.hasPassword())
         return false;
@@ -1826,7 +1856,7 @@ bool PluginView::shouldCreateTransientPaintingSnapshot() const
         return false;
 
     if (FrameView* frameView = frame()->view()) {
-        if (frameView->paintBehavior() & (PaintBehaviorSelectionOnly | PaintBehaviorForceBlackText)) {
+        if (frameView->paintBehavior() & (PaintBehaviorSelectionOnly | PaintBehaviorSelectionAndBackgroundsOnly | PaintBehaviorForceBlackText)) {
             // This paint behavior is used when drawing the find indicator and there's no need to
             // snapshot plug-ins, because they can never be painted as part of the find indicator.
             return false;

@@ -309,6 +309,13 @@ RefPtr<Font> FontCache::systemFallbackForCharacters(const FontDescription& descr
     return fontData.release();
 }
 
+Vector<String> FontCache::systemFontFamilies()
+{
+    // FIXME: <https://webkit.org/b/147017> Web Inspector: [Win] Allow inspector to retrieve a list of system fonts
+    Vector<String> fontFamilies;
+    return fontFamilies;
+}
+
 RefPtr<Font> FontCache::fontFromDescriptionAndLogFont(const FontDescription& fontDescription, const LOGFONT& font, AtomicString& outFontFamilyName)
 {
     AtomicString familyName = String(font.lfFaceName, wcsnlen(font.lfFaceName, LF_FACESIZE));
@@ -535,7 +542,7 @@ static int CALLBACK traitsInFamilyEnumProc(CONST LOGFONT* logFont, CONST TEXTMET
     procData->m_traitsMasks.add(traitsMask);
     return 1;
 }
-void FontCache::getTraitsInFamily(const AtomicString& familyName, Vector<unsigned>& traitsMasks)
+Vector<FontTraitsMask> FontCache::getTraitsInFamily(const AtomicString& familyName)
 {
     HWndDC hdc(0);
 
@@ -548,7 +555,11 @@ void FontCache::getTraitsInFamily(const AtomicString& familyName, Vector<unsigne
 
     TraitsInFamilyProcData procData(familyName);
     EnumFontFamiliesEx(hdc, &logFont, traitsInFamilyEnumProc, reinterpret_cast<LPARAM>(&procData), 0);
-    copyToVector(procData.m_traitsMasks, traitsMasks);
+    Vector<FontTraitsMask> result;
+    result.reserveInitialCapacity(procData.m_traitsMasks.size());
+    for (unsigned mask : procData.m_traitsMasks)
+        result.uncheckedAppend(static_cast<FontTraitsMask>(mask));
+    return result;
 }
 
 std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family)

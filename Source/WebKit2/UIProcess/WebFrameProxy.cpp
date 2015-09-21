@@ -57,11 +57,11 @@ WebFrameProxy::~WebFrameProxy()
 
 void WebFrameProxy::webProcessWillShutDown()
 {
-    m_page = 0;
+    m_page = nullptr;
 
     if (m_activeListener) {
         m_activeListener->invalidate();
-        m_activeListener = 0;
+        m_activeListener = nullptr;
     }
 }
 
@@ -110,6 +110,11 @@ bool WebFrameProxy::isDisplayingStandaloneImageDocument() const
     return Image::supportsType(m_MIMEType);
 }
 
+bool WebFrameProxy::isDisplayingStandaloneMediaDocument() const
+{
+    return MIMETypeRegistry::isSupportedMediaMIMEType(m_MIMEType);
+}
+
 bool WebFrameProxy::isDisplayingMarkupDocument() const
 {
     // FIXME: This check should be moved to somewhere in WebCore.
@@ -139,7 +144,7 @@ void WebFrameProxy::didFailProvisionalLoad()
     m_frameLoadState.didFailProvisionalLoad();
 }
 
-void WebFrameProxy::didCommitLoad(const String& contentType, WebCertificateInfo& certificateInfo)
+void WebFrameProxy::didCommitLoad(const String& contentType, WebCertificateInfo& certificateInfo, bool containsPluginDocument)
 {
     m_frameLoadState.didCommitLoad();
 
@@ -147,6 +152,7 @@ void WebFrameProxy::didCommitLoad(const String& contentType, WebCertificateInfo&
     m_MIMEType = contentType;
     m_isFrameSet = false;
     m_certificateInfo = &certificateInfo;
+    m_containsPluginDocument = containsPluginDocument;
 }
 
 void WebFrameProxy::didFinishLoad()

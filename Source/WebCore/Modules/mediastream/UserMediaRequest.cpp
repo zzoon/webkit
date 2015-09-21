@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2011 Ericsson AB. All rights reserved.
  * Copyright (C) 2012 Google Inc. All rights reserved.
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  * Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,6 +41,7 @@
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
+#include "JSMediaDeviceInfo.h"
 #include "JSMediaStream.h"
 #include "JSNavigatorUserMediaError.h"
 #include "MediaConstraintsImpl.h"
@@ -121,8 +122,12 @@ void UserMediaRequest::start()
     RealtimeMediaSourceCenter::singleton().validateRequestConstraints(this, m_audioConstraints, m_videoConstraints);
 }
 
-void UserMediaRequest::constraintsValidated()
+void UserMediaRequest::constraintsValidated(const Vector<RefPtr<RealtimeMediaSource>>& videoTracks, const Vector<RefPtr<RealtimeMediaSource>>& audioTracks)
 {
+    for (auto& audioTrack : audioTracks)
+        m_audioDeviceUIDs.append(audioTrack->id());
+    for (auto& videoTrack : videoTracks)
+        m_videoDeviceUIDs.append(videoTrack->id());
     RefPtr<UserMediaRequest> protectedThis(this);
     callOnMainThread([protectedThis] {
         // 2 - The constraints are valid, ask the user for access to media.
@@ -131,8 +136,10 @@ void UserMediaRequest::constraintsValidated()
     });
 }
 
-void UserMediaRequest::userMediaAccessGranted()
+void UserMediaRequest::userMediaAccessGranted(const String& videoDeviceUID, const String& audioDeviceUID)
 {
+    m_chosenVideoDeviceUID = videoDeviceUID;
+    m_chosenAudioDeviceUID = audioDeviceUID;
     RefPtr<UserMediaRequest> protectedThis(this);
     callOnMainThread([protectedThis] {
         // 3 - the user granted access, ask platform to create the media stream descriptors.

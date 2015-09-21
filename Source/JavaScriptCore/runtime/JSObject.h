@@ -75,7 +75,6 @@ COMPILE_ASSERT(None < FirstInternalAttribute, None_is_below_FirstInternalAttribu
 COMPILE_ASSERT(ReadOnly < FirstInternalAttribute, ReadOnly_is_below_FirstInternalAttribute);
 COMPILE_ASSERT(DontEnum < FirstInternalAttribute, DontEnum_is_below_FirstInternalAttribute);
 COMPILE_ASSERT(DontDelete < FirstInternalAttribute, DontDelete_is_below_FirstInternalAttribute);
-COMPILE_ASSERT(Function < FirstInternalAttribute, Function_is_below_FirstInternalAttribute);
 COMPILE_ASSERT(Accessor < FirstInternalAttribute, Accessor_is_below_FirstInternalAttribute);
 
 class JSFinalObject;
@@ -222,7 +221,7 @@ public:
         }
     }
         
-    JSValue tryGetIndexQuickly(unsigned i)
+    JSValue tryGetIndexQuickly(unsigned i) const
     {
         switch (indexingType()) {
         case ALL_BLANK_INDEXING_TYPES:
@@ -268,7 +267,7 @@ public:
         return JSValue();
     }
         
-    JSValue getIndex(ExecState* exec, unsigned i)
+    JSValue getIndex(ExecState* exec, unsigned i) const
     {
         if (JSValue result = tryGetIndexQuickly(i))
             return result;
@@ -467,8 +466,8 @@ public:
     void putDirectAccessor(ExecState*, PropertyName, JSValue, unsigned attributes);
     JS_EXPORT_PRIVATE void putDirectCustomAccessor(VM&, PropertyName, JSValue, unsigned attributes);
 
-    void putGetter(ExecState*, PropertyName, JSValue);
-    void putSetter(ExecState*, PropertyName, JSValue);
+    void putGetter(ExecState*, PropertyName, JSValue, unsigned attributes);
+    void putSetter(ExecState*, PropertyName, JSValue, unsigned attributes);
 
     JS_EXPORT_PRIVATE bool hasProperty(ExecState*, PropertyName) const;
     JS_EXPORT_PRIVATE bool hasProperty(ExecState*, unsigned propertyName) const;
@@ -598,12 +597,6 @@ public:
     JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool shouldThrow);
 
     bool isGlobalObject() const;
-    bool isVariableObject() const;
-    bool isStaticScopeObject() const;
-    bool isNameScopeObject() const;
-    bool isCatchScopeObject() const;
-    bool isFunctionNameScopeObject() const;
-    bool isActivationObject() const;
     bool isErrorInstance() const;
     bool isWithScope() const;
 
@@ -630,10 +623,7 @@ public:
     void setStructureAndReallocateStorageIfNecessary(VM&, unsigned oldCapacity, Structure*);
     void setStructureAndReallocateStorageIfNecessary(VM&, Structure*);
 
-    void convertToDictionary(VM& vm)
-    {
-        setStructure(vm, Structure::toCacheableDictionaryTransition(vm, structure(vm)));
-    }
+    JS_EXPORT_PRIVATE void convertToDictionary(VM&);
 
     void flattenDictionaryObject(VM& vm)
     {
@@ -1018,27 +1008,6 @@ inline bool JSObject::isGlobalObject() const
     return type() == GlobalObjectType;
 }
 
-inline bool JSObject::isVariableObject() const
-{
-    return type() == GlobalObjectType || type() == ActivationObjectType;
-}
-
-inline bool JSObject::isStaticScopeObject() const
-{
-    JSType type = this->type();
-    return type == NameScopeObjectType || type == ActivationObjectType;
-}
-
-inline bool JSObject::isNameScopeObject() const
-{
-    return type() == NameScopeObjectType;
-}
-
-inline bool JSObject::isActivationObject() const
-{
-    return type() == ActivationObjectType;
-}
-
 inline bool JSObject::isErrorInstance() const
 {
     return type() == ErrorInstanceType;
@@ -1294,7 +1263,12 @@ inline bool JSObject::putDirectInternal(VM& vm, PropertyName propertyName, JSVal
     if ((mode == PutModePut) && !isExtensible())
         return false;
 
-    structure = Structure::addPropertyTransition(vm, structure, propertyName, attributes, offset, slot.context());
+    // We want the structure transition watchpoint to fire after this object has switched
+    // structure. This allows adaptive watchpoints to observe if the new structure is the one
+    // we want.
+    DeferredStructureTransitionWatchpointFire deferredWatchpointFire;
+    
+    structure = Structure::addPropertyTransition(vm, structure, propertyName, attributes, offset, slot.context(), &deferredWatchpointFire);
     
     validateOffset(offset);
     ASSERT(structure->isValidOffset(offset));

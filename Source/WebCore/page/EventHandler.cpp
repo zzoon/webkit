@@ -287,17 +287,22 @@ static inline ScrollGranularity wheelGranularityToScrollGranularity(unsigned del
     }
 }
 
-static inline bool didScrollInScrollableAreaForSingleAxis(ScrollableArea* scrollableArea, WheelEvent* wheelEvent, ScrollEventAxis axis)
+static inline bool didScrollInScrollableArea(ScrollableArea* scrollableArea, WheelEvent* wheelEvent)
 {
-    float delta = axis == ScrollEventAxis::Vertical ? wheelEvent->deltaY() : wheelEvent->deltaX();
-    ScrollDirection negativeDirection = axis == ScrollEventAxis::Vertical ? ScrollUp : ScrollLeft;
-    ScrollDirection positiveDirection = axis == ScrollEventAxis::Vertical ? ScrollDown : ScrollRight;
-    return scrollableArea->scroll(delta < 0 ? negativeDirection : positiveDirection, wheelGranularityToScrollGranularity(wheelEvent->deltaMode()), delta > 0 ? delta : -delta);
+    ScrollGranularity scrollGranularity = wheelGranularityToScrollGranularity(wheelEvent->deltaMode());
+    bool didHandleWheelEvent = false;
+    if (float absoluteDelta = std::abs(wheelEvent->deltaX()))
+        didHandleWheelEvent |= scrollableArea->scroll(wheelEvent->deltaX() > 0 ? ScrollRight : ScrollLeft, scrollGranularity, absoluteDelta);
+    
+    if (float absoluteDelta = std::abs(wheelEvent->deltaY()))
+        didHandleWheelEvent |= scrollableArea->scroll(wheelEvent->deltaY() > 0 ? ScrollDown : ScrollUp, scrollGranularity, absoluteDelta);
+    
+    return didHandleWheelEvent;
 }
 
-static inline bool handleWheelEventInAppropriateEnclosingBoxForSingleAxis(Node* startNode, WheelEvent* wheelEvent, Element** stopElement, ScrollEventAxis axis)
+static inline bool handleWheelEventInAppropriateEnclosingBox(Node* startNode, WheelEvent* wheelEvent, Element** stopElement, const FloatSize& filteredPlatformDelta)
 {
-    bool shouldHandleEvent = (axis == ScrollEventAxis::Vertical && wheelEvent->deltaY()) || (axis == ScrollEventAxis::Horizontal && wheelEvent->deltaX());
+    bool shouldHandleEvent = wheelEvent->deltaX() || wheelEvent->deltaY();
 #if PLATFORM(MAC)
     shouldHandleEvent |= wheelEvent->phase() == PlatformWheelEventPhaseEnded;
 #if ENABLE(CSS_SCROLL_SNAP)
@@ -309,7 +314,7 @@ static inline bool handleWheelEventInAppropriateEnclosingBoxForSingleAxis(Node* 
 
     RenderBox& initialEnclosingBox = startNode->renderer()->enclosingBox();
     if (initialEnclosingBox.isListBox())
-        return didScrollInScrollableAreaForSingleAxis(static_cast<RenderListBox*>(&initialEnclosingBox), wheelEvent, axis);
+        return didScrollInScrollableArea(static_cast<RenderListBox*>(&initialEnclosingBox), wheelEvent);
 
     RenderBox* currentEnclosingBox = &initialEnclosingBox;
     while (currentEnclosingBox) {
@@ -317,9 +322,9 @@ static inline bool handleWheelEventInAppropriateEnclosingBoxForSingleAxis(Node* 
             const PlatformWheelEvent* platformEvent = wheelEvent->wheelEvent();
             bool scrollingWasHandled;
             if (platformEvent != nullptr)
-                scrollingWasHandled = boxLayer->handleWheelEvent(axis == ScrollEventAxis::Vertical ? platformEvent->copyIgnoringHorizontalDelta() : platformEvent->copyIgnoringVerticalDelta());
+                scrollingWasHandled = boxLayer->handleWheelEvent(platformEvent->copyWithDeltas(filteredPlatformDelta.width(), filteredPlatformDelta.height()));
             else
-                scrollingWasHandled = didScrollInScrollableAreaForSingleAxis(boxLayer, wheelEvent, axis);
+                scrollingWasHandled = didScrollInScrollableArea(boxLayer, wheelEvent);
 
             if (scrollingWasHandled) {
                 if (stopElement)
@@ -485,7 +490,7 @@ void EventHandler::clear()
     m_mousePositionIsUnknown = true;
     m_lastKnownMousePosition = IntPoint();
     m_lastKnownMouseGlobalPosition = IntPoint();
-    m_mousePressNode = 0;
+    m_mousePressNode = nullptr;
     m_mousePressed = false;
     m_capturesDragging = false;
     m_capturingMouseEventsElement = nullptr;
@@ -494,7 +499,7 @@ void EventHandler::clear()
 #endif
 #if ENABLE(TOUCH_EVENTS) && !ENABLE(IOS_TOUCH_EVENTS)
     m_originatingTouchPointTargets.clear();
-    m_originatingTouchPointDocument.clear();
+    m_originatingTouchPointDocument = nullptr;
     m_originatingTouchPointTargetKey = 0;
 #endif
     m_maxMouseMovedDuration = 0;
@@ -633,8 +638,14 @@ void EventHandler::selectClosestContextualWordFromMouseEvent(const MouseEventWit
 void EventHandler::selectClosestContextualWordOrLinkFromMouseEvent(const MouseEventWithHitTestResults& result)
 {
     Element* urlElement = result.hitTestResult().URLElement();
-    if (!urlElement || !isDraggableLink(*urlElement))
+    if (!urlElement || !isDraggableLink(*urlElement)) {
+        if (Node* targetNode = result.targetNode()) {
+            if (isEditableNode(*targetNode))
+                return selectClosestWordFromMouseEvent(result);
+        }
+
         return selectClosestContextualWordFromMouseEvent(result);
+    }
 
     Node* targetNode = result.targetNode();
 
@@ -1805,7 +1816,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
         // If a mouse event handler changes the input element type to one that has a widget associated,
         // we'd like to EventHandler::handleMousePressEvent to pass the event to the widget and thus the
         // event target node can't still be the shadow node.
-        if (is<ShadowRoot>(*mouseEvent.targetNode()) && is<HTMLInputElement>(*downcast<ShadowRoot>(*mouseEvent.targetNode()).hostElement()))
+        if (is<ShadowRoot>(*mouseEvent.targetNode()) && is<HTMLInputElement>(*downcast<ShadowRoot>(*mouseEvent.targetNode()).host()))
             mouseEvent = m_frame.document()->prepareMouseEvent(HitTestRequest(), documentPoint, platformMouseEvent);
 
         FrameView* view = m_frame.view();
@@ -2090,7 +2101,7 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& platformMou
 
     // If an immediate action began or was completed using this series of mouse events, then we should send mouseup to
     // the DOM and return now so that we don't perform our own default behaviors.
-    if (m_immediateActionStage == ImmediateActionStage::ActionCompleted || m_immediateActionStage == ImmediateActionStage::ActionUpdated) {
+    if (m_immediateActionStage == ImmediateActionStage::ActionCompleted || m_immediateActionStage == ImmediateActionStage::ActionUpdated || m_immediateActionStage == ImmediateActionStage::ActionCancelledAfterUpdate) {
         m_immediateActionStage = ImmediateActionStage::None;
         return !dispatchMouseEvent(eventNames().mouseupEvent, m_lastElementUnderMouse.get(), true, m_clickCount, platformMouseEvent, false);
     }
@@ -2664,7 +2675,7 @@ void EventHandler::platformPrepareForWheelEvents(const PlatformWheelEvent&, cons
 
 void EventHandler::platformRecordWheelEvent(const PlatformWheelEvent& event)
 {
-    m_frame.mainFrame().wheelEventDeltaTracker()->recordWheelEventDelta(event);
+    m_frame.mainFrame().wheelEventDeltaFilter()->updateFromDelta(FloatSize(event.deltaX(), event.deltaY()));
 }
 
 bool EventHandler::platformCompleteWheelEvent(const PlatformWheelEvent& event, ContainerNode*, ScrollableArea*)
@@ -2769,7 +2780,7 @@ void EventHandler::clearLatchedState()
 #if PLATFORM(MAC)
     m_frame.mainFrame().resetLatchingState();
 #endif
-    m_frame.mainFrame().wheelEventDeltaTracker()->endTrackingDeltas();
+    m_frame.mainFrame().wheelEventDeltaFilter()->endFilteringDeltas();
 }
 
 void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEvent)
@@ -2777,25 +2788,24 @@ void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEv
     if (!startNode || !wheelEvent)
         return;
     
-    DominantScrollGestureDirection dominantDirection = DominantScrollGestureDirection::None;
-
+    FloatSize filteredPlatformDelta(wheelEvent->deltaX(), wheelEvent->deltaY());
+    if (const PlatformWheelEvent* platformWheelEvent = wheelEvent->wheelEvent()) {
+        filteredPlatformDelta.setWidth(platformWheelEvent->deltaX());
+        filteredPlatformDelta.setHeight(platformWheelEvent->deltaY());
+    }
+    
 #if PLATFORM(MAC)
     ScrollLatchingState* latchedState = m_frame.mainFrame().latchingState();
     Element* stopElement = latchedState ? latchedState->previousWheelScrolledElement() : nullptr;
 
-    // Workaround for scrolling issues <rdar://problem/14758615>.
-    if (m_frame.mainFrame().wheelEventDeltaTracker()->isTrackingDeltas())
-        dominantDirection = m_frame.mainFrame().wheelEventDeltaTracker()->dominantScrollGestureDirection();
+    if (m_frame.mainFrame().wheelEventDeltaFilter()->isFilteringDeltas())
+        filteredPlatformDelta = m_frame.mainFrame().wheelEventDeltaFilter()->filteredDelta();
 #else
     Element* stopElement = nullptr;
 #endif
     
-    // Break up into two scrolls if we need to.  Diagonal movement on 
-    // a MacBook pro is an example of a 2-dimensional mouse wheel event (where both deltaX and deltaY can be set).
-    if (dominantDirection != DominantScrollGestureDirection::Vertical && handleWheelEventInAppropriateEnclosingBoxForSingleAxis(startNode, wheelEvent, &stopElement, ScrollEventAxis::Horizontal))
-        wheelEvent->setDefaultHandled();
     
-    if (dominantDirection != DominantScrollGestureDirection::Horizontal && handleWheelEventInAppropriateEnclosingBoxForSingleAxis(startNode, wheelEvent, &stopElement, ScrollEventAxis::Vertical))
+    if (handleWheelEventInAppropriateEnclosingBox(startNode, wheelEvent, &stopElement, filteredPlatformDelta))
         wheelEvent->setDefaultHandled();
     
 #if PLATFORM(MAC)
@@ -3994,7 +4004,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
     }
     m_touchPressed = touches->length() > 0;
     if (allTouchReleased)
-        m_originatingTouchPointDocument.clear();
+        m_originatingTouchPointDocument = nullptr;
 
     // Now iterate the changedTouches list and m_targets within it, sending events to the targets as required.
     bool swallowedEvent = false;

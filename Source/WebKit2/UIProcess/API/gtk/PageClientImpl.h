@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2010 Apple Inc. All rights reserved.
  * Portions Copyright (c) 2010 Motorola Mobility, Inc.  All rights reserved.
@@ -58,7 +59,7 @@ private:
     virtual void displayView() override;
     virtual bool canScrollView() override { return false; }
     virtual void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset) override;
-    virtual void requestScroll(const WebCore::FloatPoint& scrollPosition, bool isProgrammaticScroll) override;
+    virtual void requestScroll(const WebCore::FloatPoint& scrollPosition, const WebCore::IntPoint& scrollOrigin, bool isProgrammaticScroll) override;
     virtual WebCore::IntSize viewSize() override;
     virtual bool isViewWindowActive() override;
     virtual bool isViewFocused() override;
@@ -81,15 +82,12 @@ private:
     virtual WebCore::IntPoint screenToRootView(const WebCore::IntPoint&) override;
     virtual WebCore::IntRect rootViewToScreen(const WebCore::IntRect&) override;
     virtual void doneWithKeyEvent(const NativeWebKeyboardEvent&, bool wasEventHandled) override;
-    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) override;
-    virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) override;
+    virtual RefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) override;
+    virtual RefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) override;
 #if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassRefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& intialColor, const WebCore::IntRect&) override;
+    virtual RefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& intialColor, const WebCore::IntRect&) override;
 #endif
-    virtual void setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorLifetime = WebCore::TextIndicatorLifetime::Permanent) override;
-    virtual void clearTextIndicator(WebCore::TextIndicatorDismissalAnimation = WebCore::TextIndicatorDismissalAnimation::FadeOut) override;
-    virtual void setTextIndicatorAnimationProgress(float) override;
-    virtual void updateTextInputState() override;
+    virtual void selectionDidChange() override;
 #if ENABLE(DRAG_SUPPORT)
     virtual void startDrag(const WebCore::DragData&, PassRefPtr<ShareableBitmap> dragImage) override;
 #endif
@@ -125,6 +123,7 @@ private:
     virtual void navigationGestureDidEnd(bool, WebBackForwardListItem&) override;
     virtual void navigationGestureDidEnd() override;
     virtual void willRecordNavigationSnapshot(WebBackForwardListItem&) override;
+    virtual void didRemoveNavigationGestureSnapshot() override;
 
     virtual void didFirstVisuallyNonEmptyLayoutForMainFrame() override;
     virtual void didFinishLoadForMainFrame() override;
@@ -133,6 +132,13 @@ private:
     virtual void doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled) override;
 
     virtual void didChangeBackgroundColor() override;
+
+    virtual void refView() override;
+    virtual void derefView() override;
+
+#if ENABLE(VIDEO)
+    virtual bool decicePolicyForInstallMissingMediaPluginsPermissionRequest(InstallMissingMediaPluginsPermissionRequest&) override;
+#endif
 
     // Members of PageClientImpl class
     GtkWidget* m_viewWidget;

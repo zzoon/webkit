@@ -27,6 +27,7 @@
 #define PlatformCALayerWin_h
 
 #include "PlatformCALayer.h"
+#include <wtf/HashMap.h>
 
 namespace WebCore {
 
@@ -147,10 +148,9 @@ public:
     virtual PlatformCALayer* rootLayer() const override;
     virtual void setNeedsLayout() override;
     virtual void setNeedsCommit() override;
+    virtual void drawTextAtPoint(CGContextRef, CGFloat x, CGFloat y, const char* text, size_t length) const override;
 
-#ifndef NDEBUG
-    virtual void printTree() const override;
-#endif
+    virtual String layerTreeAsString() const override;
 
     virtual PassRefPtr<PlatformCALayer> clone(PlatformCALayerClient* owner) const override;
 

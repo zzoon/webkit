@@ -185,7 +185,7 @@ inline void StyledElement::setInlineStyleFromString(const AtomicString& newStyle
     // We reconstruct the property set instead of mutating if there is no CSSOM wrapper.
     // This makes wrapperless property sets immutable and so cacheable.
     if (inlineStyle && !is<MutableStyleProperties>(*inlineStyle))
-        inlineStyle.clear();
+        inlineStyle = nullptr;
 
     if (!inlineStyle)
         inlineStyle = CSSParser::parseInlineStyleDeclaration(newStyleString, this);
@@ -202,8 +202,8 @@ void StyledElement::styleAttributeChanged(const AtomicString& newStyleString, At
     if (newStyleString.isNull()) {
         if (PropertySetCSSStyleDeclaration* cssomWrapper = inlineStyleCSSOMWrapper())
             cssomWrapper->clearParentElement();
-        ensureUniqueElementData().m_inlineStyle.clear();
-    } else if (reason == ModifiedByCloning || document().contentSecurityPolicy()->allowInlineStyle(document().url(), startLineNumber))
+        ensureUniqueElementData().m_inlineStyle = nullptr;
+    } else if (reason == ModifiedByCloning || document().contentSecurityPolicy()->allowInlineStyle(document().url(), startLineNumber, isInUserAgentShadowTree()))
         setInlineStyleFromString(newStyleString);
 
     elementData()->setStyleAttributeIsDirty(false);
@@ -214,29 +214,27 @@ void StyledElement::styleAttributeChanged(const AtomicString& newStyleString, At
 
 void StyledElement::inlineStyleChanged()
 {
-    setNeedsStyleRecalc(InlineStyleChange);
-    ASSERT(elementData());
-    elementData()->setStyleAttributeIsDirty(true);
+    invalidateStyleAttribute();
     InspectorInstrumentation::didInvalidateStyleAttr(document(), *this);
 }
     
 bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, CSSValueID identifier, bool important)
 {
-    ensureMutableInlineStyle().setProperty(propertyID, cssValuePool().createIdentifierValue(identifier), important);
+    ensureMutableInlineStyle().setProperty(propertyID, CSSValuePool::singleton().createIdentifierValue(identifier), important);
     inlineStyleChanged();
     return true;
 }
 
 bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, CSSPropertyID identifier, bool important)
 {
-    ensureMutableInlineStyle().setProperty(propertyID, cssValuePool().createIdentifierValue(identifier), important);
+    ensureMutableInlineStyle().setProperty(propertyID, CSSValuePool::singleton().createIdentifierValue(identifier), important);
     inlineStyleChanged();
     return true;
 }
 
 bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, double value, CSSPrimitiveValue::UnitTypes unit, bool important)
 {
-    ensureMutableInlineStyle().setProperty(propertyID, cssValuePool().createValue(value, unit), important);
+    ensureMutableInlineStyle().setProperty(propertyID, CSSValuePool::singleton().createValue(value, unit), important);
     inlineStyleChanged();
     return true;
 }
@@ -363,12 +361,12 @@ void StyledElement::rebuildPresentationAttributeStyle()
 
 void StyledElement::addPropertyToPresentationAttributeStyle(MutableStyleProperties& style, CSSPropertyID propertyID, CSSValueID identifier)
 {
-    style.setProperty(propertyID, cssValuePool().createIdentifierValue(identifier));
+    style.setProperty(propertyID, CSSValuePool::singleton().createIdentifierValue(identifier));
 }
 
 void StyledElement::addPropertyToPresentationAttributeStyle(MutableStyleProperties& style, CSSPropertyID propertyID, double value, CSSPrimitiveValue::UnitTypes unit)
 {
-    style.setProperty(propertyID, cssValuePool().createValue(value, unit));
+    style.setProperty(propertyID, CSSValuePool::singleton().createValue(value, unit));
 }
     
 void StyledElement::addPropertyToPresentationAttributeStyle(MutableStyleProperties& style, CSSPropertyID propertyID, const String& value)

@@ -33,6 +33,7 @@
 #if ENABLE(STREAMS_API)
 
 #include "ExceptionCode.h"
+#include "ReadableJSStream.h"
 #include "ReadableStreamReader.h"
 #include "ScriptExecutionContext.h"
 #include <runtime/JSCJSValueInlines.h>
@@ -41,6 +42,11 @@
 namespace WebCore {
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, readableStreamCounter, ("ReadableStream"));
+
+RefPtr<ReadableStream> ReadableStream::create(JSC::ExecState& state, JSC::JSValue value, const Dictionary& strategy)
+{
+    return RefPtr<ReadableStream>(ReadableJSStream::create(state, value, strategy));
+}
 
 ReadableStream::ReadableStream(ScriptExecutionContext& scriptExecutionContext)
     : ActiveDOMObject(&scriptExecutionContext)
@@ -84,33 +90,36 @@ void ReadableStream::close()
 
 void ReadableStream::releaseReader()
 {
-    if (m_closedPromise)
-        m_closedPromise.value().resolve(nullptr);
-
     for (auto& request : m_readRequests)
-        request.endCallback();
-
-    clearCallbacks();
+        request.resolveEnd();
     if (m_reader)
         m_releasedReaders.append(WTF::move(m_reader));
+
+    if (m_closedPromise)
+        m_closedPromise.value().resolve(nullptr);
+    clearCallbacks();
 }
 
 void ReadableStream::changeStateToErrored()
 {
     if (m_state != State::Readable)
         return;
+
+    clearValues();
+
     m_state = State::Errored;
 
+    if (!m_reader)
+        return;
+
     JSC::JSValue error = this->error();
+    for (auto& request : m_readRequests)
+        request.reject(error);
+    m_releasedReaders.append(WTF::move(m_reader));
+
     if (m_closedPromise)
         m_closedPromise.value().reject(error);
-
-    for (auto& request : m_readRequests)
-        request.failureCallback(error);
-
     clearCallbacks();
-    if (m_reader)
-        releaseReader();
 }
 
 void ReadableStream::start()
@@ -191,6 +200,8 @@ void ReadableStream::cancelNoCheck(JSC::JSValue reason, CancelPromise&& promise)
     }
     ASSERT(m_state == State::Readable);
 
+    clearValues();
+
     m_cancelPromise = WTF::move(promise);
 
     close();
@@ -230,25 +241,25 @@ void ReadableStream::closed(ClosedPromise&& promise)
     m_closedPromise = WTF::move(promise);
 }
 
-void ReadableStream::read(ReadSuccessCallback&& successCallback, ReadEndCallback&& endCallback, FailureCallback&& failureCallback)
+void ReadableStream::read(ReadPromise&& readPromise)
 {
     if (m_state == State::Closed) {
-        endCallback();
+        readPromise.resolveEnd();
         return;
     }
     if (m_state == State::Errored) {
-        failureCallback(error());
+        readPromise.reject(error());
         return;
     }
     if (hasValue()) {
-        successCallback(read());
+        readPromise.resolve(read());
         if (!m_closeRequested)
             pull();
         else if (!hasValue())
             close();
         return;
     }
-    m_readRequests.append({ WTF::move(successCallback), WTF::move(endCallback), WTF::move(failureCallback) });
+    m_readRequests.append(WTF::move(readPromise));
     pull();
 }
 
@@ -257,7 +268,7 @@ bool ReadableStream::resolveReadCallback(JSC::JSValue value)
     if (m_readRequests.isEmpty())
         return false;
 
-    m_readRequests.takeFirst().successCallback(value);
+    m_readRequests.takeFirst().resolve(value);
     return true;
 }
 

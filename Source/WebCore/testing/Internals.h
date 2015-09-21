@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,17 +44,19 @@ namespace WebCore {
 class AudioContext;
 class ClientRect;
 class ClientRectList;
+class DOMPath;
 class DOMStringList;
+class DOMURL;
 class DOMWindow;
 class Document;
 class Element;
 class File;
 class Frame;
 class HTMLMediaElement;
-class InspectorFrontendChannelDummy;
-class InspectorFrontendClientDummy;
+class InspectorStubFrontend;
 class InternalSettings;
 class MallocStatistics;
+class MediaSession;
 class MemoryInfo;
 class Node;
 class Page;
@@ -95,6 +97,7 @@ public:
     bool isStyleSheetLoadingSubresources(Element* link);
     void setOverrideCachePolicy(const String&);
     void setOverrideResourceLoadPriority(const String&);
+    void setStrictRawResourceValidationPolicyDisabled(bool);
 
     void clearMemoryCache();
     void pruneMemoryCacheToSize(unsigned size);
@@ -106,6 +109,7 @@ public:
     PassRefPtr<CSSComputedStyleDeclaration> computedStyleIncludingVisitedInfo(Node*, ExceptionCode&) const;
 
     Node* ensureShadowRoot(Element* host, ExceptionCode&);
+    Node* ensureUserAgentShadowRoot(Element* host, ExceptionCode&);
     Node* createShadowRoot(Element* host, ExceptionCode&);
     Node* shadowRoot(Element* host, ExceptionCode&);
     String shadowRootType(const Node*, ExceptionCode&) const;
@@ -260,7 +264,7 @@ public:
     unsigned numberOfLiveDocuments() const;
 
     Vector<String> consoleMessageArgumentCounts() const;
-    PassRefPtr<DOMWindow> openDummyInspectorFrontend(const String& url);
+    RefPtr<DOMWindow> openDummyInspectorFrontend(const String& url);
     void closeDummyInspectorFrontend();
     void setJavaScriptProfilingEnabled(bool enabled, ExceptionCode&);
     void setInspectorIsUnderTest(bool isUnderTest, ExceptionCode&);
@@ -276,6 +280,7 @@ public:
 
     void setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode&);
     void setPageZoomFactor(float zoomFactor, ExceptionCode&);
+    void setTextZoomFactor(float zoomFactor, ExceptionCode&);
 
     void setUseFixedLayout(bool useFixedLayout, ExceptionCode&);
     void setFixedLayoutSize(int width, int height, ExceptionCode&);
@@ -321,6 +326,8 @@ public:
 
     PassRefPtr<ArrayBuffer> serializeObject(PassRefPtr<SerializedScriptValue>) const;
     PassRefPtr<SerializedScriptValue> deserializeBuffer(PassRefPtr<ArrayBuffer>) const;
+
+    bool isFromCurrentWorld(Deprecated::ScriptValue) const;
 
     void setUsesOverlayScrollbars(bool enabled);
 
@@ -375,6 +382,7 @@ public:
 #if ENABLE(MEDIA_SOURCE)
     WEBCORE_TESTSUPPORT_EXPORT void initializeMockMediaSource();
     Vector<String> bufferedSamplesForTrackID(SourceBuffer*, const AtomicString&);
+    void setShouldGenerateTimestamps(SourceBuffer*, bool);
 #endif
 
 #if ENABLE(VIDEO)
@@ -386,6 +394,14 @@ public:
     void setMediaElementRestrictions(HTMLMediaElement*, const String& restrictions, ExceptionCode&);
     void postRemoteControlCommand(const String&, ExceptionCode&);
     bool elementIsBlockingDisplaySleep(Element*) const;
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+    void sendMediaSessionStartOfInterruptionNotification(const String&);
+    void sendMediaSessionEndOfInterruptionNotification(const String&);
+    String mediaSessionCurrentState(MediaSession*) const;
+    double mediaElementPlayerVolume(HTMLMediaElement*) const;
+    void sendMediaControlEvent(const String&);
 #endif
 
 #if ENABLE(WEB_AUDIO)
@@ -401,6 +417,8 @@ public:
     void setPageMuted(bool);
     bool isPagePlayingAudio();
 
+    void setPageDefersLoading(bool);
+
     RefPtr<File> createFile(const String&);
     void queueMicroTask(int);
     bool testPreloaderSettingViewport();
@@ -413,6 +431,12 @@ public:
     String scrollSnapOffsets(Element*, ExceptionCode&);
 #endif
 
+    String pathStringWithShrinkWrappedRects(Vector<double> rectComponents, double radius, ExceptionCode&);
+
+    String getCurrentMediaControlsStatusForElement(HTMLMediaElement*);
+
+    String userVisibleString(const DOMURL*);
+
 private:
     explicit Internals(Document*);
     Document* contextDocument() const;
@@ -420,9 +444,7 @@ private:
 
     RenderedDocumentMarker* markerAt(Node*, const String& markerType, unsigned index, ExceptionCode&);
 
-    RefPtr<DOMWindow> m_frontendWindow;
-    std::unique_ptr<InspectorFrontendClientDummy> m_frontendClient;
-    std::unique_ptr<InspectorFrontendChannelDummy> m_frontendChannel;
+    std::unique_ptr<InspectorStubFrontend> m_inspectorFrontend;
 };
 
 } // namespace WebCore

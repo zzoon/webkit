@@ -61,7 +61,7 @@ private:
     virtual void displayView() override;
     virtual bool canScrollView() override;
     virtual void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset) override;
-    virtual void requestScroll(const WebCore::FloatPoint& scrollPosition, bool isProgrammaticScroll) override;
+    virtual void requestScroll(const WebCore::FloatPoint& scrollPosition, const WebCore::IntPoint& scrollOrigin, bool isProgrammaticScroll) override;
 
     virtual WebCore::IntSize viewSize() override;
     virtual bool isViewWindowActive() override;
@@ -120,15 +120,15 @@ private:
 
     virtual void doneWithKeyEvent(const NativeWebKeyboardEvent&, bool wasEventHandled) override;
 
-    virtual PassRefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) override;
-    virtual PassRefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) override;
+    virtual RefPtr<WebPopupMenuProxy> createPopupMenuProxy(WebPageProxy*) override;
+    virtual RefPtr<WebContextMenuProxy> createContextMenuProxy(WebPageProxy*) override;
 
 #if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassRefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) override;
+    virtual RefPtr<WebColorPicker> createColorPicker(WebPageProxy*, const WebCore::Color& initialColor, const WebCore::IntRect&) override;
 #endif
 
-    virtual void setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorLifetime = WebCore::TextIndicatorLifetime::Permanent) override;
-    virtual void clearTextIndicator(WebCore::TextIndicatorDismissalAnimation = WebCore::TextIndicatorDismissalAnimation::FadeOut) override;
+    virtual void setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorWindowLifetime) override;
+    virtual void clearTextIndicator(WebCore::TextIndicatorWindowDismissalAnimation) override;
     virtual void setTextIndicatorAnimationProgress(float) override;
 
     virtual void enterAcceleratedCompositingMode(const LayerTreeContext&) override;
@@ -145,7 +145,7 @@ private:
 
     virtual void makeFirstResponder() override;
     
-    virtual void didPerformDictionaryLookup(const DictionaryPopupInfo&) override;
+    virtual void didPerformDictionaryLookup(const WebCore::DictionaryPopupInfo&) override;
     virtual void dismissContentRelativeChildWindows(bool withAnimation = true) override;
 
     virtual void showCorrectionPanel(WebCore::AlternativeTextType, const WebCore::FloatRect& boundingBoxOfReplacedString, const String& replacedString, const String& replacementString, const Vector<String>& alternativeReplacementStrings) override;
@@ -188,6 +188,7 @@ private:
     virtual void navigationGestureDidEnd(bool willNavigate, WebBackForwardListItem&) override;
     virtual void navigationGestureDidEnd() override;
     virtual void willRecordNavigationSnapshot(WebBackForwardListItem&) override;
+    virtual void didRemoveNavigationGestureSnapshot() override;
 
     NSView *activeView() const;
     NSWindow *activeWindow() const;
@@ -216,6 +217,9 @@ private:
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     virtual WebCore::WebMediaSessionManager& mediaSessionManager() override;
 #endif
+
+    virtual void refView() override;
+    virtual void derefView() override;
 };
 
 } // namespace WebKit

@@ -51,6 +51,7 @@ struct IDBDatabaseMetadata;
 struct IDBGetResult;
 struct IDBKeyData;
 struct IDBKeyRangeData;
+struct SecurityOriginData;
 }
 
 namespace WebKit {
@@ -58,8 +59,6 @@ namespace WebKit {
 class AsyncTask;
 class DatabaseProcessIDBConnection;
 class UniqueIDBDatabaseBackingStore;
-
-struct SecurityOriginData;
 
 enum class UniqueIDBDatabaseShutdownType {
     NormalShutdown,
@@ -134,10 +133,10 @@ private:
     String filenameForDatabaseName() const;
 
     // Returns a string that is appropriate for use as a unique filename
-    String databaseFilenameIdentifier(const SecurityOriginData&) const;
+    String databaseFilenameIdentifier(const WebCore::SecurityOriginData&) const;
 
     // Returns true if this origin can use the same databases as the given origin.
-    bool canShareDatabases(const SecurityOriginData&, const SecurityOriginData&) const;
+    bool canShareDatabases(const WebCore::SecurityOriginData&, const WebCore::SecurityOriginData&) const;
 
     void postTransactionOperation(const IDBIdentifier& transactionIdentifier, std::unique_ptr<AsyncTask>, std::function<void (bool)> successCallback);
     
@@ -210,10 +209,10 @@ private:
     RefPtr<UniqueIDBDatabaseBackingStore> m_backingStore;
 
     Deque<std::unique_ptr<AsyncTask>> m_databaseTasks;
-    Mutex m_databaseTaskMutex;
+    Lock m_databaseTaskMutex;
 
     Deque<std::unique_ptr<AsyncTask>> m_mainThreadTasks;
-    Mutex m_mainThreadTaskMutex;
+    Lock m_mainThreadTaskMutex;
 };
 
 } // namespace WebKit

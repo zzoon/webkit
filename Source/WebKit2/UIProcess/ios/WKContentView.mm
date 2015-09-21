@@ -28,6 +28,7 @@
 
 #if PLATFORM(IOS)
 
+#import "APIPageConfiguration.h"
 #import "ApplicationStateTracker.h"
 #import "PageClientImplIOS.h"
 #import "RemoteLayerTreeDrawingAreaProxy.h"
@@ -177,13 +178,15 @@ private:
     HistoricalVelocityData _historicalKinematicData;
 
     RetainPtr<NSUndoManager> _undoManager;
+
+    std::unique_ptr<ApplicationStateTracker> _applicationStateTracker;
 }
 
-- (instancetype)_commonInitializationWithProcessPool:(WebKit::WebProcessPool&)processPool configuration:(WebKit::WebPageConfiguration)webPageConfiguration
+- (instancetype)_commonInitializationWithProcessPool:(WebKit::WebProcessPool&)processPool configuration:(Ref<API::PageConfiguration>&&)configuration
 {
     ASSERT(_pageClient);
 
-    _page = processPool.createWebPage(*_pageClient, WTF::move(webPageConfiguration));
+    _page = processPool.createWebPage(*_pageClient, WTF::move(configuration));
     _page->initializeWebPage();
     _page->setIntrinsicDeviceScaleFactor(WKGetScaleFactorForScreen([UIScreen mainScreen]));
     _page->setUseFixedLayout(true);
@@ -210,15 +213,13 @@ private:
 
     self.layer.hitTestsAsOpaque = YES;
 
-    ApplicationStateTracker::singleton().addListener(self, @selector(_applicationDidEnterBackground), @selector(_applicationWillEnterForeground));
-
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_applicationWillResignActive:) name:UIApplicationWillResignActiveNotification object:[UIApplication sharedApplication]];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_applicationDidBecomeActive:) name:UIApplicationDidBecomeActiveNotification object:[UIApplication sharedApplication]];
 
     return self;
 }
 
-- (instancetype)initWithFrame:(CGRect)frame processPool:(WebKit::WebProcessPool&)processPool configuration:(WebKit::WebPageConfiguration)webPageConfiguration webView:(WKWebView *)webView
+- (instancetype)initWithFrame:(CGRect)frame processPool:(WebKit::WebProcessPool&)processPool configuration:(Ref<API::PageConfiguration>&&)configuration webView:(WKWebView *)webView
 {
     if (!(self = [super initWithFrame:frame]))
         return nil;
@@ -228,19 +229,7 @@ private:
     _pageClient = std::make_unique<PageClientImpl>(self, webView);
     _webView = webView;
 
-    return [self _commonInitializationWithProcessPool:processPool configuration:webPageConfiguration];
-}
-
-- (instancetype)initWithFrame:(CGRect)frame processPool:(WebKit::WebProcessPool&)processPool configuration:(WebKit::WebPageConfiguration)webPageConfiguration wkView:(WKView *)wkView
-{
-    if (!(self = [super initWithFrame:frame]))
-        return nil;
-
-    InitializeWebKit2();
-
-    _pageClient = std::make_unique<PageClientImpl>(self, wkView);
-
-    return [self _commonInitializationWithProcessPool:processPool configuration:webPageConfiguration];
+    return [self _commonInitializationWithProcessPool:processPool configuration:WTF::move(configuration)];
 }
 
 - (void)dealloc
@@ -268,21 +257,27 @@ private:
 
     if (window) {
         [defaultCenter removeObserver:self name:UIWindowDidMoveToScreenNotification object:window];
-#if HAVE(LINK_PREVIEW)
-        if (_webView._allowsLinkPreview)
-            [self _unregisterPreviewInWindow:window];
-#endif
+
+        if (!newWindow) {
+            ASSERT(_applicationStateTracker);
+            _applicationStateTracker = nullptr;
+        }
     }
 
     if (newWindow) {
         [defaultCenter addObserver:self selector:@selector(_windowDidMoveToScreenNotification:) name:UIWindowDidMoveToScreenNotification object:newWindow];
-#if HAVE(LINK_PREVIEW)
-        if (_webView._allowsLinkPreview)
-            [self _registerPreviewInWindow:newWindow];
-#endif
 
         [self _updateForScreen:newWindow.screen];
     }
+}
+
+- (void)didMoveToWindow
+{
+    if (!self.window)
+        return;
+
+    ASSERT(!_applicationStateTracker);
+    _applicationStateTracker = std::make_unique<ApplicationStateTracker>(self, @selector(_applicationDidEnterBackground), @selector(_applicationWillEnterForeground));
 }
 
 - (WKBrowsingContextController *)browsingContextController
@@ -305,7 +300,10 @@ private:
 
 - (BOOL)isBackground
 {
-    return ApplicationStateTracker::singleton().isInBackground();
+    if (!_applicationStateTracker)
+        return YES;
+
+    return _applicationStateTracker->isInBackground();
 }
 
 - (void)_showInspectorHighlight:(const WebCore::Highlight&)highlight
@@ -477,14 +475,21 @@ private:
 - (void)_didCommitLayerTree:(const WebKit::RemoteLayerTreeTransaction&)layerTreeTransaction
 {
     CGSize contentsSize = layerTreeTransaction.contentsSize();
-    CGRect contentBounds = { CGPointZero, contentsSize };
-    CGRect oldBounds = [self bounds];
+    CGPoint scrollOrigin = -layerTreeTransaction.scrollOrigin();
+    CGRect contentBounds = { scrollOrigin, contentsSize };
 
-    BOOL boundsChanged = !CGRectEqualToRect(oldBounds, contentBounds);
+    BOOL boundsChanged = !CGRectEqualToRect([self bounds], contentBounds);
     if (boundsChanged)
         [self setBounds:contentBounds];
 
     [_webView _didCommitLayerTree:layerTreeTransaction];
+
+    if (_interactionViewsContainerView) {
+        FloatPoint scaledOrigin = layerTreeTransaction.scrollOrigin();
+        float scale = [[_webView scrollView] zoomScale];
+        scaledOrigin.scale(scale, scale);
+        [_interactionViewsContainerView setFrame:CGRectMake(scaledOrigin.x(), scaledOrigin.y(), 0, 0)];
+    }
     
     if (boundsChanged) {
         FloatRect fixedPositionRect = _page->computeCustomFixedPositionRect(_page->unobscuredContentRect(), [[_webView scrollView] zoomScale]);

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 Eric Seidel (eric@webkit.org)
- * Copyright (C) 2008, 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2008-2012, 2015 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies).
  * Copyright (C) 2012 Samsung Electronics. All rights reserved.
  *
@@ -118,8 +118,8 @@ public:
     virtual bool selectItemWritingDirectionIsNatural() override { return false; }
     virtual bool selectItemAlignmentFollowsMenuWritingDirection() override { return false; }
     virtual bool hasOpenedPopup() const override { return false; }
-    virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const override;
-    virtual PassRefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const override;
+    virtual RefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const override;
+    virtual RefPtr<SearchPopupMenu> createSearchPopupMenu(PopupMenuClient*) const override;
 
     virtual void setStatusbarText(const String&) override { }
 
@@ -343,7 +343,7 @@ public:
     virtual void didFinishLoad() override { }
     virtual void prepareForDataSourceReplacement() override { }
 
-    virtual PassRefPtr<DocumentLoader> createDocumentLoader(const ResourceRequest&, const SubstituteData&) override;
+    virtual Ref<DocumentLoader> createDocumentLoader(const ResourceRequest&, const SubstituteData&) override;
     virtual void updateCachedDocumentLoader(DocumentLoader&) override { }
     virtual void setTitle(const StringWithDirection&, const URL&) override { }
 
@@ -370,8 +370,8 @@ public:
     virtual void didDisplayInsecureContent() override { }
     virtual void didRunInsecureContent(SecurityOrigin*, const URL&) override { }
     virtual void didDetectXSS(const URL&, bool) override { }
-    virtual PassRefPtr<Frame> createFrame(const URL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int) override;
-    virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const URL&, const Vector<String>&, const Vector<String>&, const String&, bool) override;
+    virtual RefPtr<Frame> createFrame(const URL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int) override;
+    virtual RefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const URL&, const Vector<String>&, const Vector<String>&, const String&, bool) override;
     virtual void recreatePlugin(Widget*) override;
     virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const URL&, const Vector<String>&, const Vector<String>&) override;
 
@@ -593,10 +593,9 @@ public:
     EmptyInspectorClient() { }
     virtual ~EmptyInspectorClient() { }
 
-    virtual void inspectorDestroyed() override { }
+    virtual void inspectedPageDestroyed() override { }
     
-    virtual Inspector::FrontendChannel* openInspectorFrontend(InspectorController*) override { return 0; }
-    virtual void closeInspectorFrontend() override { }
+    virtual Inspector::FrontendChannel* openLocalFrontend(InspectorController*) override { return 0; }
     virtual void bringFrontendToFront() override { }
 
     virtual void highlight() override { }

@@ -43,7 +43,7 @@ class ResourceRequest;
 
 class SubresourceLoader final : public ResourceLoader {
 public:
-    WEBCORE_EXPORT static PassRefPtr<SubresourceLoader> create(Frame*, CachedResource*, const ResourceRequest&, const ResourceLoaderOptions&);
+    WEBCORE_EXPORT static RefPtr<SubresourceLoader> create(Frame*, CachedResource*, const ResourceRequest&, const ResourceLoaderOptions&);
 
     virtual ~SubresourceLoader();
 
@@ -63,7 +63,7 @@ private:
 
     virtual bool init(const ResourceRequest&) override;
 
-    virtual void willSendRequest(ResourceRequest&, const ResourceResponse& redirectResponse) override;
+    virtual void willSendRequestInternal(ResourceRequest&, const ResourceResponse& redirectResponse) override;
     virtual void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent) override;
     virtual void didReceiveResponse(const ResourceResponse&) override;
     virtual void didReceiveData(const char*, unsigned, long long encodedDataLength, DataPayloadType) override;
@@ -106,6 +106,9 @@ private:
     };
 
     class RequestCountTracker {
+#if !COMPILER(MSVC)
+        WTF_MAKE_FAST_ALLOCATED;
+#endif
     public:
         RequestCountTracker(CachedResourceLoader&, CachedResource*);
         ~RequestCountTracker();

@@ -41,7 +41,11 @@
 #include "ValueProfile.h"
 #include "VirtualRegister.h"
 
-namespace JSC { namespace FTL {
+namespace JSC {
+
+class TrackedReferences;
+
+namespace FTL {
 
 // Tracks one OSR exit site within the FTL JIT. OSR exit in FTL works by deconstructing
 // the crazy that is OSR down to simple SSA CFG primitives that any compiler backend
@@ -131,7 +135,7 @@ namespace JSC { namespace FTL {
 
 struct OSRExit : public DFG::OSRExitBase {
     OSRExit(
-        ExitKind, ValueFormat profileValueFormat, MethodOfGettingAValueProfile,
+        ExitKind, DataFormat profileDataFormat, MethodOfGettingAValueProfile,
         CodeOrigin, CodeOrigin originForProfile,
         unsigned numberOfArguments, unsigned numberOfLocals);
     
@@ -142,7 +146,7 @@ struct OSRExit : public DFG::OSRExitBase {
     // method of getting a value profile. Note that all of the ExitArgument's
     // are already aware of this possible off-by-one, so there is no need to
     // correct them.
-    ValueFormat m_profileValueFormat;
+    DataFormat m_profileDataFormat;
     MethodOfGettingAValueProfile m_valueProfile;
     
     // Offset within the exit stubs of the stub for this exit.
@@ -159,6 +163,8 @@ struct OSRExit : public DFG::OSRExitBase {
     {
         OSRExitBase::considerAddingAsFrequentExitSite(profiledCodeBlock, ExitFromFTL);
     }
+    
+    void validateReferences(const TrackedReferences&);
 };
 
 } } // namespace JSC::FTL

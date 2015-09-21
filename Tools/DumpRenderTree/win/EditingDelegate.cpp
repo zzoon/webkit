@@ -42,19 +42,21 @@
 using std::wstring;
 
 EditingDelegate::EditingDelegate()
-    : m_refCount(1)
-    , m_acceptsEditing(true)
 {
 }
 
 // IUnknown
-HRESULT EditingDelegate::QueryInterface(REFIID riid, void** ppvObject)
+HRESULT EditingDelegate::QueryInterface(_In_ REFIID riid, _COM_Outptr_ void** ppvObject)
 {
-    *ppvObject = 0;
+    if (!ppvObject)
+        return E_POINTER;
+    *ppvObject = nullptr;
     if (IsEqualGUID(riid, IID_IUnknown))
-        *ppvObject = static_cast<IWebEditingDelegate*>(this);
+        *ppvObject = static_cast<IWebEditingDelegate2*>(this);
     else if (IsEqualGUID(riid, IID_IWebEditingDelegate))
         *ppvObject = static_cast<IWebEditingDelegate*>(this);
+    else if (IsEqualGUID(riid, IID_IWebEditingDelegate2))
+        *ppvObject = static_cast<IWebEditingDelegate2*>(this);
     else if (IsEqualGUID(riid, IID_IWebNotificationObserver))
         *ppvObject = static_cast<IWebNotificationObserver*>(this);
     else
@@ -64,12 +66,12 @@ HRESULT EditingDelegate::QueryInterface(REFIID riid, void** ppvObject)
     return S_OK;
 }
 
-ULONG EditingDelegate::AddRef(void)
+ULONG EditingDelegate::AddRef()
 {
     return ++m_refCount;
 }
 
-ULONG EditingDelegate::Release(void)
+ULONG EditingDelegate::Release()
 {
     ULONG newRef = --m_refCount;
     if (!newRef)
@@ -122,7 +124,7 @@ static std::string dump(IDOMRange* range)
     return buffer;
 }
 
-HRESULT EditingDelegate::shouldBeginEditingInDOMRange(IWebView* /*webView*/, IDOMRange* range, BOOL* result)
+HRESULT EditingDelegate::shouldBeginEditingInDOMRange(_In_opt_ IWebView*, _In_opt_ IDOMRange* range, _Out_ BOOL* result)
 {
     if (!result) {
         ASSERT_NOT_REACHED();
@@ -136,7 +138,7 @@ HRESULT EditingDelegate::shouldBeginEditingInDOMRange(IWebView* /*webView*/, IDO
     return S_OK;
 }
 
-HRESULT EditingDelegate::shouldEndEditingInDOMRange(IWebView* /*webView*/, IDOMRange* range, BOOL* result)
+HRESULT EditingDelegate::shouldEndEditingInDOMRange(_In_opt_ IWebView*, _In_opt_ IDOMRange* range, _Out_ BOOL* result)
 {
     if (!result) {
         ASSERT_NOT_REACHED();
@@ -150,13 +152,24 @@ HRESULT EditingDelegate::shouldEndEditingInDOMRange(IWebView* /*webView*/, IDOMR
     return S_OK;
 }
 
-HRESULT EditingDelegate::shouldInsertNode(IWebView* /*webView*/, IDOMNode* node, IDOMRange* range, WebViewInsertAction action, BOOL* result)
+// IWebEditingDelegate
+HRESULT EditingDelegate::shouldInsertNode(_In_opt_ IWebView* webView, _In_opt_ IDOMNode* node, _In_opt_ IDOMRange* range, WebViewInsertAction action)
+{
+    BOOL ignore;
+    return shouldInsertNode(webView, node, range, action, &ignore);
+}
+
+// IWebEditingDelegate2
+HRESULT EditingDelegate::shouldInsertNode(_In_opt_ IWebView* /*webView*/, _In_opt_ IDOMNode* node, _In_opt_ IDOMRange* range, WebViewInsertAction action, _Out_ BOOL* result)
 {
     static const char* insertActionString[] = {
         "WebViewInsertActionTyped",
         "WebViewInsertActionPasted",
         "WebViewInsertActionDropped",
     };
+
+    if (!result)
+        return E_POINTER;
 
     if (::gTestRunner->dumpEditingCallbacks() && !done)
         printf("EDITING DELEGATE: shouldInsertNode:%s replacingDOMRange:%s givenAction:%s\n", dumpPath(node).c_str(), dump(range).c_str(), insertActionString[action]);
@@ -165,7 +178,7 @@ HRESULT EditingDelegate::shouldInsertNode(IWebView* /*webView*/, IDOMNode* node,
     return S_OK;
 }
 
-HRESULT EditingDelegate::shouldInsertText(IWebView* /*webView*/, BSTR text, IDOMRange* range, WebViewInsertAction action, BOOL* result)
+HRESULT EditingDelegate::shouldInsertText(_In_opt_ IWebView* /*webView*/, _In_ BSTR text, _In_opt_ IDOMRange* range, WebViewInsertAction action, _Out_ BOOL* result)
 {
     if (!result) {
         ASSERT_NOT_REACHED();
@@ -187,7 +200,7 @@ HRESULT EditingDelegate::shouldInsertText(IWebView* /*webView*/, BSTR text, IDOM
     return S_OK;
 }
 
-HRESULT EditingDelegate::shouldDeleteDOMRange(IWebView* /*webView*/, IDOMRange* range, BOOL* result)
+HRESULT EditingDelegate::shouldDeleteDOMRange(_In_opt_ IWebView* /*webView*/, _In_opt_ IDOMRange* range, _Out_ BOOL* result)
 {
     if (!result) {
         ASSERT_NOT_REACHED();
@@ -201,8 +214,8 @@ HRESULT EditingDelegate::shouldDeleteDOMRange(IWebView* /*webView*/, IDOMRange* 
     return S_OK;
 }
 
-HRESULT EditingDelegate::shouldChangeSelectedDOMRange(IWebView* /*webView*/, IDOMRange* currentRange, IDOMRange* proposedRange,
-    WebSelectionAffinity selectionAffinity, BOOL stillSelecting, BOOL* result)
+HRESULT EditingDelegate::shouldChangeSelectedDOMRange(_In_opt_ IWebView* /*webView*/, _In_opt_ IDOMRange* currentRange, _In_opt_ IDOMRange* proposedRange,
+    WebSelectionAffinity selectionAffinity, BOOL stillSelecting, _Out_ BOOL* result)
 {
     if (!result) {
         ASSERT_NOT_REACHED();
@@ -225,7 +238,7 @@ HRESULT EditingDelegate::shouldChangeSelectedDOMRange(IWebView* /*webView*/, IDO
     return S_OK;
 }
 
-HRESULT EditingDelegate::shouldApplyStyle(IWebView* /*webView*/, IDOMCSSStyleDeclaration* style, IDOMRange* range, BOOL* result)
+HRESULT EditingDelegate::shouldApplyStyle(_In_opt_ IWebView* /*webView*/, _In_opt_ IDOMCSSStyleDeclaration* style, _In_opt_ IDOMRange* range, _Out_ BOOL* result)
 {
     if (!result) {
         ASSERT_NOT_REACHED();
@@ -239,7 +252,8 @@ HRESULT EditingDelegate::shouldApplyStyle(IWebView* /*webView*/, IDOMCSSStyleDec
     return S_OK;
 }
 
-HRESULT EditingDelegate::shouldChangeTypingStyle(IWebView* /*webView*/, IDOMCSSStyleDeclaration* currentStyle, IDOMCSSStyleDeclaration* proposedStyle, BOOL* result)
+HRESULT EditingDelegate::shouldChangeTypingStyle(_In_opt_ IWebView* /*webView*/, _In_opt_ IDOMCSSStyleDeclaration* currentStyle,
+    _In_opt_ IDOMCSSStyleDeclaration* proposedStyle, _Out_ BOOL* result)
 {
     if (!result) {
         ASSERT_NOT_REACHED();
@@ -253,7 +267,7 @@ HRESULT EditingDelegate::shouldChangeTypingStyle(IWebView* /*webView*/, IDOMCSSS
     return S_OK;
 }
 
-HRESULT EditingDelegate::doPlatformCommand(IWebView* /*webView*/, BSTR command, BOOL* result)
+HRESULT EditingDelegate::doPlatformCommand(_In_opt_ IWebView* /*webView*/, _In_ BSTR command, _Out_ BOOL* result)
 {
     if (!result) {
         ASSERT_NOT_REACHED();
@@ -269,8 +283,11 @@ HRESULT EditingDelegate::doPlatformCommand(IWebView* /*webView*/, BSTR command, 
     return S_OK;
 }
 
-HRESULT EditingDelegate::webViewDidBeginEditing(IWebNotification* notification)
+HRESULT EditingDelegate::webViewDidBeginEditing(_In_opt_ IWebNotification* notification)
 {
+    if (!notification)
+        return S_OK;
+
     if (::gTestRunner->dumpEditingCallbacks() && !done) {
         _bstr_t name;
         notification->name(&name.GetBSTR());
@@ -279,8 +296,11 @@ HRESULT EditingDelegate::webViewDidBeginEditing(IWebNotification* notification)
     return S_OK;
 }
 
-HRESULT EditingDelegate::webViewDidChange(IWebNotification* notification)
+HRESULT EditingDelegate::webViewDidChange(_In_opt_ IWebNotification* notification)
 {
+    if (!notification)
+        return S_OK;
+
     if (::gTestRunner->dumpEditingCallbacks() && !done) {
         _bstr_t name;
         notification->name(&name.GetBSTR());
@@ -289,8 +309,11 @@ HRESULT EditingDelegate::webViewDidChange(IWebNotification* notification)
     return S_OK;
 }
 
-HRESULT EditingDelegate::webViewDidEndEditing(IWebNotification* notification)
+HRESULT EditingDelegate::webViewDidEndEditing(_In_opt_ IWebNotification* notification)
 {
+    if (!notification)
+        return S_OK;
+
     if (::gTestRunner->dumpEditingCallbacks() && !done) {
         _bstr_t name;
         notification->name(&name.GetBSTR());
@@ -299,8 +322,11 @@ HRESULT EditingDelegate::webViewDidEndEditing(IWebNotification* notification)
     return S_OK;
 }
 
-HRESULT EditingDelegate::webViewDidChangeTypingStyle(IWebNotification* notification)
+HRESULT EditingDelegate::webViewDidChangeTypingStyle(_In_opt_ IWebNotification* notification)
 {
+    if (!notification)
+        return S_OK;
+
     if (::gTestRunner->dumpEditingCallbacks() && !done) {
         _bstr_t name;
         notification->name(&name.GetBSTR());
@@ -309,14 +335,25 @@ HRESULT EditingDelegate::webViewDidChangeTypingStyle(IWebNotification* notificat
     return S_OK;
 }
 
-HRESULT EditingDelegate::webViewDidChangeSelection(IWebNotification* notification)
+HRESULT EditingDelegate::webViewDidChangeSelection(_In_opt_ IWebNotification* notification)
 {
+    if (!notification)
+        return S_OK;
+
     if (::gTestRunner->dumpEditingCallbacks() && !done) {
         _bstr_t name;
         notification->name(&name.GetBSTR());
         printf("EDITING DELEGATE: webViewDidChangeSelection:%s\n", static_cast<const char*>(name));
     }
     return S_OK;
+}
+
+HRESULT EditingDelegate::undoManagerForWebView(_In_opt_ IWebView*, _COM_Outptr_opt_ IWebUndoManager** undoManager)
+{
+    if (!undoManager)
+        return E_POINTER;
+    *undoManager = nullptr;
+    return E_NOTIMPL;
 }
 
 static int indexOfFirstWordCharacter(const TCHAR* text)
@@ -335,12 +372,8 @@ static int wordLength(const TCHAR* text)
     return cursor - text;
 };
 
-HRESULT EditingDelegate::checkSpellingOfString(
-            /* [in] */ IWebView* view,
-            /* [in] */ LPCTSTR text,
-            /* [in] */ int length,
-            /* [out] */ int* misspellingLocation,
-            /* [out] */ int* misspellingLength)
+HRESULT EditingDelegate::checkSpellingOfString(_In_opt_ IWebView* view, _In_ LPCTSTR text,
+    int length, _Out_ int* misspellingLocation, _Out_ int* misspellingLength)
 {
     static const TCHAR* misspelledWords[] = {
         // These words are known misspelled words in webkit tests.
@@ -372,10 +405,17 @@ HRESULT EditingDelegate::checkSpellingOfString(
         0,
     };
 
+    if (!misspellingLocation || !misspellingLength)
+        return E_POINTER;
+
+    *misspellingLocation = 0;
+    *misspellingLength = 0;
+
     wstring textString(text, length);
     int wordStart = indexOfFirstWordCharacter(textString.c_str());
     if (-1 == wordStart)
         return S_OK;
+
     wstring word = textString.substr(wordStart, wordLength(textString.c_str() + wordStart));
     for (size_t i = 0; misspelledWords[i]; ++i) {
         if (word == misspelledWords[i]) {
@@ -388,7 +428,25 @@ HRESULT EditingDelegate::checkSpellingOfString(
     return S_OK;
 }
 
-HRESULT EditingDelegate::onNotify(IWebNotification* notification)
+HRESULT EditingDelegate::checkGrammarOfString(_In_opt_ IWebView*, _In_ LPCTSTR text, int length, _COM_Outptr_opt_ IEnumWebGrammarDetails** details,
+    _Out_ int* badGrammarLocation, _Out_ int* badGrammarLength)
+{
+    if (!details)
+        return E_POINTER;
+    *details = nullptr;
+    return E_NOTIMPL;
+}
+
+HRESULT EditingDelegate::guessesForWord(_In_ BSTR word, _COM_Outptr_opt_ IEnumSpellingGuesses** guesses)
+{
+    if (!guesses)
+        return E_POINTER;
+    *guesses = nullptr;
+    return E_NOTIMPL;
+}
+
+
+HRESULT EditingDelegate::onNotify(_In_opt_ IWebNotification* notification)
 {
     _bstr_t notificationName;
     HRESULT hr = notification->name(&notificationName.GetBSTR());

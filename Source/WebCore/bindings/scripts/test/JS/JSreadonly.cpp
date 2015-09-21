@@ -90,15 +90,16 @@ void JSreadonlyConstructor::finishCreation(VM& vm, JSDOMGlobalObject* globalObje
 {
     Base::finishCreation(vm);
     ASSERT(inherits(info()));
-    putDirect(vm, vm.propertyNames->prototype, JSreadonly::getPrototype(vm, globalObject), DontDelete | ReadOnly);
-    putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontDelete | DontEnum);
+    putDirect(vm, vm.propertyNames->prototype, JSreadonly::getPrototype(vm, globalObject), DontDelete | ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("readonly"))), ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
 
 /* Hash table for prototype */
 
 static const HashTableValue JSreadonlyPrototypeTableValues[] =
 {
-    { "constructor", DontEnum | ReadOnly, NoIntrinsic, (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsreadonlyConstructor), (intptr_t) static_cast<PutPropertySlot::PutValueFunc>(0) },
+    { "constructor", DontEnum | ReadOnly, NoIntrinsic, { (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsreadonlyConstructor), (intptr_t) static_cast<PutPropertySlot::PutValueFunc>(0) } },
 };
 
 const ClassInfo JSreadonlyPrototype::s_info = { "readonlyPrototype", &Base::s_info, 0, CREATE_METHOD_TABLE(JSreadonlyPrototype) };
@@ -138,12 +139,12 @@ JSreadonly::~JSreadonly()
     releaseImpl();
 }
 
-EncodedJSValue jsreadonlyConstructor(ExecState* exec, JSObject* baseValue, EncodedJSValue, PropertyName)
+EncodedJSValue jsreadonlyConstructor(ExecState* state, JSObject* baseValue, EncodedJSValue, PropertyName)
 {
     JSreadonlyPrototype* domObject = jsDynamicCast<JSreadonlyPrototype*>(baseValue);
     if (!domObject)
-        return throwVMTypeError(exec);
-    return JSValue::encode(JSreadonly::getConstructor(exec->vm(), domObject->globalObject()));
+        return throwVMTypeError(state);
+    return JSValue::encode(JSreadonly::getConstructor(state->vm(), domObject->globalObject()));
 }
 
 JSValue JSreadonly::getConstructor(VM& vm, JSGlobalObject* globalObject)
@@ -151,18 +152,25 @@ JSValue JSreadonly::getConstructor(VM& vm, JSGlobalObject* globalObject)
     return getDOMConstructor<JSreadonlyConstructor>(vm, jsCast<JSDOMGlobalObject*>(globalObject));
 }
 
-bool JSreadonlyOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handle, void*, SlotVisitor& visitor)
+bool JSreadonlyOwner::isReachableFromOpaqueRoots(JSC::JSCell& cell, void*, SlotVisitor& visitor)
 {
-    UNUSED_PARAM(handle);
+    UNUSED_PARAM(cell);
     UNUSED_PARAM(visitor);
     return false;
 }
 
-void JSreadonlyOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
+void JSreadonlyOwner::finalize(JSC::JSCell*& cell, void* context)
 {
-    auto* jsreadonly = jsCast<JSreadonly*>(handle.slot()->asCell());
+    auto& wrapper = jsCast<JSreadonly&>(*cell);
     auto& world = *static_cast<DOMWrapperWorld*>(context);
-    uncacheWrapper(world, &jsreadonly->impl(), jsreadonly);
+    uncacheWrapper(world, &wrapper.impl(), &wrapper);
+}
+
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, readonly* impl)
+{
+    if (!impl)
+        return jsNull();
+    return createNewWrapper<JSreadonly>(globalObject, impl);
 }
 
 JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, readonly* impl)

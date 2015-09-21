@@ -59,6 +59,7 @@ struct PluginInfo;
 namespace WebKit {
 
 class DownloadProxyMap;
+class NetworkProcessProxy;
 class WebBackForwardListItem;
 class WebPageGroup;
 class WebProcessPool;
@@ -83,16 +84,16 @@ public:
     WebProcessPool& processPool() { return m_processPool; }
 
     static WebPageProxy* webPage(uint64_t pageID);
-    Ref<WebPageProxy> createWebPage(PageClient&, const WebPageConfiguration&);
+    Ref<WebPageProxy> createWebPage(PageClient&, Ref<API::PageConfiguration>&&);
     void addExistingWebPage(WebPageProxy*, uint64_t pageID);
     void removeWebPage(uint64_t pageID);
 
     WTF::IteratorRange<WebPageProxyMap::const_iterator::Values> pages() const { return m_pageMap.values(); }
     unsigned pageCount() const { return m_pageMap.size(); }
 
-    void addVisitedLinkProvider(VisitedLinkProvider&);
+    void addVisitedLinkStore(VisitedLinkStore&);
     void addWebUserContentControllerProxy(WebUserContentControllerProxy&);
-    void didDestroyVisitedLinkProvider(VisitedLinkProvider&);
+    void didDestroyVisitedLinkStore(VisitedLinkStore&);
     void didDestroyWebUserContentControllerProxy(WebUserContentControllerProxy&);
 
     WebBackForwardListItem* webBackForwardItem(uint64_t itemID) const;
@@ -149,6 +150,10 @@ public:
     void setIsHoldingLockedFiles(bool);
 
     ProcessThrottler& throttler() { return m_throttler; }
+
+#if ENABLE(NETWORK_PROCESS)
+    void reinstateNetworkProcessAssertionState(NetworkProcessProxy&);
+#endif
 
 private:
     explicit WebProcessProxy(WebProcessPool&);
@@ -233,7 +238,7 @@ private:
     WebFrameProxyMap m_frameMap;
     WebBackForwardListItemMap m_backForwardListItemMap;
 
-    HashSet<VisitedLinkProvider*> m_visitedLinkProviders;
+    HashSet<VisitedLinkStore*> m_visitedLinkStores;
     HashSet<WebUserContentControllerProxy*> m_webUserContentControllerProxies;
 
     std::unique_ptr<DownloadProxyMap> m_downloadProxyMap;

@@ -47,7 +47,7 @@ SpellCheckRequest::SpellCheckRequest(PassRefPtr<Range> checkingRange, PassRefPtr
     : m_checker(0)
     , m_checkingRange(checkingRange)
     , m_paragraphRange(paragraphRange)
-    , m_rootEditableElement(m_checkingRange->startContainer()->rootEditableElement())
+    , m_rootEditableElement(m_checkingRange->startContainer().rootEditableElement())
     , m_requestData(unrequestedTextCheckingSequence, text, mask, processType)
 {
 }
@@ -150,8 +150,8 @@ bool SpellChecker::isCheckable(Range* range) const
 {
     if (!range || !range->firstNode() || !range->firstNode()->renderer())
         return false;
-    const Node* node = range->startContainer();
-    if (is<Element>(node) && !downcast<Element>(*node).isSpellCheckingEnabled())
+    const Node& node = range->startContainer();
+    if (is<Element>(node) && !downcast<Element>(node).isSpellCheckingEnabled())
         return false;
     return true;
 }
@@ -214,7 +214,7 @@ void SpellChecker::didCheck(int sequence, const Vector<TextCheckingResult>& resu
     if (m_lastProcessedSequence < sequence)
         m_lastProcessedSequence = sequence;
 
-    m_processingRequest.clear();
+    m_processingRequest = nullptr;
     if (!m_requestQueue.isEmpty())
         m_timerToProcessQueuedRequest.startOneShot(0);
 }

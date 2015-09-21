@@ -33,10 +33,7 @@
 #include "HTMLTrackElement.h"
 #include "ScriptExecutionContext.h"
 #include "TextTrackCueList.h"
-
-#if ENABLE(WEBVTT_REGIONS)
 #include "VTTRegionList.h"
-#endif
 
 namespace WebCore {
 
@@ -99,7 +96,7 @@ void LoadableTextTrack::loadTimerFired()
     // mode being the state of the media element's crossorigin content attribute, the origin being the
     // origin of the media element's Document, and the default origin behaviour set to fail.
     m_loader = std::make_unique<TextTrackLoader>(static_cast<TextTrackLoaderClient&>(*this), static_cast<ScriptExecutionContext*>(&m_trackElement->document()));
-    if (!m_loader->load(m_url, m_trackElement->mediaElementCrossOriginAttribute()))
+    if (!m_loader->load(m_url, m_trackElement->mediaElementCrossOriginAttribute(), m_trackElement->isInUserAgentShadowTree()))
         m_trackElement->didCompleteLoad(HTMLTrackElement::Failure);
 }
 
@@ -132,7 +129,6 @@ void LoadableTextTrack::cueLoadingCompleted(TextTrackLoader* loader, bool loadin
     m_trackElement->didCompleteLoad(loadingFailed ? HTMLTrackElement::Failure : HTMLTrackElement::Success);
 }
 
-#if ENABLE(WEBVTT_REGIONS)
 void LoadableTextTrack::newRegionsAvailable(TextTrackLoader* loader)
 {
     ASSERT_UNUSED(loader, m_loader.get() == loader);
@@ -145,7 +141,6 @@ void LoadableTextTrack::newRegionsAvailable(TextTrackLoader* loader)
         regions()->add(newRegions[i]);
     }
 }
-#endif
 
 AtomicString LoadableTextTrack::id() const
 {

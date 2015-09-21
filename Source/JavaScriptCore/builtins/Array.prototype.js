@@ -27,6 +27,7 @@
 function reduce(callback /*, initialValue */)
 {
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.reduce requires that |this| not be null");
 
@@ -34,7 +35,7 @@ function reduce(callback /*, initialValue */)
         throw new @TypeError("Array.prototype.reduce requires that |this| not be undefined");
 
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (typeof callback !== "function")
         throw new @TypeError("Array.prototype.reduce callback must be a function");
@@ -64,6 +65,7 @@ function reduce(callback /*, initialValue */)
 function reduceRight(callback /*, initialValue */)
 {
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.reduceRight requires that |this| not be null");
 
@@ -71,7 +73,7 @@ function reduceRight(callback /*, initialValue */)
         throw new @TypeError("Array.prototype.reduceRight requires that |this| not be undefined");
 
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (typeof callback !== "function")
         throw new @TypeError("Array.prototype.reduceRight callback must be a function");
@@ -98,8 +100,10 @@ function reduceRight(callback /*, initialValue */)
     return accumulator;
 }
 
-function every(callback /*, thisArg */) {
+function every(callback /*, thisArg */)
+{
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.every requires that |this| not be null");
     
@@ -107,7 +111,7 @@ function every(callback /*, thisArg */) {
         throw new @TypeError("Array.prototype.every requires that |this| not be undefined");
     
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (typeof callback !== "function")
         throw new @TypeError("Array.prototype.every callback must be a function");
@@ -124,8 +128,10 @@ function every(callback /*, thisArg */) {
     return true;
 }
 
-function forEach(callback /*, thisArg */) {
+function forEach(callback /*, thisArg */)
+{
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.forEach requires that |this| not be null");
     
@@ -133,7 +139,7 @@ function forEach(callback /*, thisArg */) {
         throw new @TypeError("Array.prototype.forEach requires that |this| not be undefined");
     
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (typeof callback !== "function")
         throw new @TypeError("Array.prototype.forEach callback must be a function");
@@ -146,8 +152,10 @@ function forEach(callback /*, thisArg */) {
     }
 }
 
-function filter(callback /*, thisArg */) {
+function filter(callback /*, thisArg */)
+{
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.filter requires that |this| not be null");
     
@@ -155,7 +163,7 @@ function filter(callback /*, thisArg */) {
         throw new @TypeError("Array.prototype.filter requires that |this| not be undefined");
     
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (typeof callback !== "function")
         throw new @TypeError("Array.prototype.filter callback must be a function");
@@ -175,8 +183,10 @@ function filter(callback /*, thisArg */) {
     return result;
 }
 
-function map(callback /*, thisArg */) {
+function map(callback /*, thisArg */)
+{
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.map requires that |this| not be null");
     
@@ -184,7 +194,7 @@ function map(callback /*, thisArg */) {
         throw new @TypeError("Array.prototype.map requires that |this| not be undefined");
     
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (typeof callback !== "function")
         throw new @TypeError("Array.prototype.map callback must be a function");
@@ -202,8 +212,10 @@ function map(callback /*, thisArg */) {
     return result;
 }
 
-function some(callback /*, thisArg */) {
+function some(callback /*, thisArg */)
+{
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.some requires that |this| not be null");
     
@@ -211,7 +223,7 @@ function some(callback /*, thisArg */) {
         throw new @TypeError("Array.prototype.some requires that |this| not be undefined");
     
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (typeof callback !== "function")
         throw new @TypeError("Array.prototype.some callback must be a function");
@@ -229,13 +241,14 @@ function some(callback /*, thisArg */) {
 function fill(value /* [, start [, end]] */)
 {
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.fill requires that |this| not be null");
     
     if (this === undefined)
         throw new @TypeError("Array.prototype.fill requires that |this| not be undefined");
     var O = @Object(this);
-    var len = @ToLength(O.length);
+    var len = @toLength(O.length);
     var relativeStart = 0;
     if (arguments.length > 1 && arguments[1] !== undefined)
         relativeStart = arguments[1] | 0;
@@ -267,8 +280,10 @@ function fill(value /* [, start [, end]] */)
     return O;
 }
 
-function find(callback /*, thisArg */) {
+function find(callback /*, thisArg */)
+{
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.find requires that |this| not be null");
     
@@ -276,7 +291,7 @@ function find(callback /*, thisArg */) {
         throw new @TypeError("Array.prototype.find requires that |this| not be undefined");
     
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (typeof callback !== "function")
         throw new @TypeError("Array.prototype.find callback must be a function");
@@ -290,8 +305,10 @@ function find(callback /*, thisArg */) {
     return undefined;
 }
 
-function findIndex(callback /*, thisArg */) {
+function findIndex(callback /*, thisArg */)
+{
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.findIndex requires that |this| not be null");
     
@@ -299,7 +316,7 @@ function findIndex(callback /*, thisArg */) {
         throw new @TypeError("Array.prototype.findIndex requires that |this| not be undefined");
     
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (typeof callback !== "function")
         throw new @TypeError("Array.prototype.findIndex callback must be a function");
@@ -312,8 +329,10 @@ function findIndex(callback /*, thisArg */) {
     return -1;
 }
 
-function includes(searchElement /*, fromIndex*/) {
+function includes(searchElement /*, fromIndex*/)
+{
     "use strict";
+
     if (this === null)
         throw new @TypeError("Array.prototype.includes requires that |this| not be null");
 
@@ -321,7 +340,7 @@ function includes(searchElement /*, fromIndex*/) {
         throw new @TypeError("Array.prototype.includes requires that |this| not be undefined");
 
     var array = @Object(this);
-    var length = @ToLength(array.length);
+    var length = @toLength(array.length);
 
     if (length === 0)
         return false;
@@ -604,12 +623,12 @@ function copyWithin(target, start /*, end */)
         throw new @TypeError("Array.copyWithin requires that |this| not be null or undefined");
     var thisObject = @Object(this);
 
-    var length = @ToLength(thisObject.length);
+    var length = @toLength(thisObject.length);
 
-    var relativeTarget = @ToInteger(target);
+    var relativeTarget = @toInteger(target);
     var to = (relativeTarget < 0) ? maxWithPositives(length + relativeTarget, 0) : minWithMaybeNegativeZeroAndPositive(relativeTarget, length);
 
-    var relativeStart = @ToInteger(start);
+    var relativeStart = @toInteger(start);
     var from = (relativeStart < 0) ? maxWithPositives(length + relativeStart, 0) : minWithMaybeNegativeZeroAndPositive(relativeStart, length);
 
     var relativeEnd;
@@ -618,7 +637,7 @@ function copyWithin(target, start /*, end */)
         if (end === undefined)
             relativeEnd = length;
         else
-            relativeEnd = @ToInteger(end);
+            relativeEnd = @toInteger(end);
     } else
         relativeEnd = length;
 

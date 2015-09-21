@@ -30,6 +30,11 @@ ControllerIOS.prototype = {
     MinimumTimelineWidth: 200,
     ButtonWidth: 42,
 
+    get idiom()
+    {
+        return "ios";
+    },
+
     addVideoListeners: function() {
         Controller.prototype.addVideoListeners.call(this);
 
@@ -49,9 +54,24 @@ ControllerIOS.prototype = {
     createBase: function() {
         Controller.prototype.createBase.call(this);
 
-        var startPlaybackButton = this.controls.startPlaybackButton = document.createElement('button');
+        var startPlaybackButton = this.controls.startPlaybackButton = document.createElement('div');
         startPlaybackButton.setAttribute('pseudo', '-webkit-media-controls-start-playback-button');
         startPlaybackButton.setAttribute('aria-label', this.UIString('Start Playback'));
+        startPlaybackButton.setAttribute('role', 'button');
+
+        var startPlaybackBackground = document.createElement('div');
+        startPlaybackBackground.setAttribute('pseudo', '-webkit-media-controls-start-playback-background');
+        startPlaybackBackground.classList.add('webkit-media-controls-start-playback-background');
+        startPlaybackButton.appendChild(startPlaybackBackground);
+
+        var startPlaybackTint = document.createElement('div');
+        startPlaybackTint.setAttribute('pseudo', '-webkit-media-controls-start-playback-tint');
+        startPlaybackButton.appendChild(startPlaybackTint);
+
+        var startPlaybackGlyph = document.createElement('div');
+        startPlaybackGlyph.setAttribute('pseudo', '-webkit-media-controls-start-playback-glyph');
+        startPlaybackGlyph.classList.add('webkit-media-controls-start-playback-glyph');
+        startPlaybackButton.appendChild(startPlaybackGlyph);
 
         this.listenFor(this.base, 'gesturestart', this.handleBaseGestureStart);
         this.listenFor(this.base, 'gesturechange', this.handleBaseGestureChange);
@@ -179,8 +199,7 @@ ControllerIOS.prototype = {
             // Hide the scrubber on audio until the user starts playing.
             this.controls.timelineBox.classList.add(this.ClassNames.hidden);
         } else {
-            if (Controller.gSimulatePictureInPictureAvailable || ('webkitSupportsPresentationMode' in this.video && this.video.webkitSupportsPresentationMode('picture-in-picture')))
-                this.controls.panel.appendChild(this.controls.pictureInPictureButton);
+            this.updatePictureInPictureButton();
             this.controls.panel.appendChild(this.controls.fullscreenButton);
         }
     },
@@ -456,10 +475,13 @@ ControllerIOS.prototype = {
 
     handleStartPlaybackButtonTouchStart: function(event) {
         this.controls.startPlaybackButton.classList.add('active');
+        this.controls.startPlaybackButton.querySelector('.webkit-media-controls-start-playback-background').classList.add('active');
     },
 
     handleStartPlaybackButtonTouchEnd: function(event) {
         this.controls.startPlaybackButton.classList.remove('active');
+        this.controls.startPlaybackButton.querySelector('.webkit-media-controls-start-playback-background').classList.remove('active');
+
         if (this.video.error)
             return true;
 
@@ -516,6 +538,7 @@ ControllerIOS.prototype = {
     updateStatusDisplay: function(event)
     {
         this.controls.startPlaybackButton.classList.toggle(this.ClassNames.failed, this.video.error !== null);
+        this.controls.startPlaybackButton.querySelector(".webkit-media-controls-start-playback-glyph").classList.toggle(this.ClassNames.failed, this.video.error !== null);
         Controller.prototype.updateStatusDisplay.call(this, event);
     },
 
@@ -555,12 +578,23 @@ ControllerIOS.prototype = {
         Controller.prototype.setShouldListenForPlaybackTargetAvailabilityEvent.call(this, shouldListen);
     },
 
+    updatePictureInPictureButton: function()
+    {
+        var shouldShowPictureInPictureButton = Controller.gSimulatePictureInPictureAvailable || ('webkitSupportsPresentationMode' in this.video && this.video.webkitSupportsPresentationMode('picture-in-picture'));
+        if (shouldShowPictureInPictureButton) {
+            this.controls.panel.appendChild(this.controls.pictureInPictureButton);
+            this.controls.pictureInPictureButton.classList.remove(this.ClassNames.hidden);
+        } else
+            this.controls.pictureInPictureButton.classList.add(this.ClassNames.hidden);
+    },
+
     handlePresentationModeChange: function(event)
     {
         var presentationMode = this.presentationMode();
 
         switch (presentationMode) {
             case 'inline':
+                this.controls.panel.classList.remove(this.ClassNames.pictureInPicture);
                 this.controls.panelContainer.classList.remove(this.ClassNames.pictureInPicture);
                 this.controls.inlinePlaybackPlaceholder.classList.add(this.ClassNames.hidden);
                 this.controls.inlinePlaybackPlaceholder.classList.remove(this.ClassNames.pictureInPicture);
@@ -570,6 +604,7 @@ ControllerIOS.prototype = {
                 this.controls.pictureInPictureButton.classList.remove(this.ClassNames.returnFromPictureInPicture);
                 break;
             case 'picture-in-picture':
+                this.controls.panel.classList.add(this.ClassNames.pictureInPicture);
                 this.controls.panelContainer.classList.add(this.ClassNames.pictureInPicture);
                 this.controls.inlinePlaybackPlaceholder.classList.add(this.ClassNames.pictureInPicture);
                 this.controls.inlinePlaybackPlaceholder.classList.remove(this.ClassNames.hidden);
@@ -582,6 +617,7 @@ ControllerIOS.prototype = {
                 this.controls.pictureInPictureButton.classList.add(this.ClassNames.returnFromPictureInPicture);
                 break;
             default:
+                this.controls.panel.classList.remove(this.ClassNames.pictureInPicture);
                 this.controls.panelContainer.classList.remove(this.ClassNames.pictureInPicture);
                 this.controls.inlinePlaybackPlaceholder.classList.remove(this.ClassNames.pictureInPicture);
                 this.controls.inlinePlaybackPlaceholderTextTop.classList.remove(this.ClassNames.pictureInPicture);
@@ -612,6 +648,21 @@ ControllerIOS.prototype = {
         return Controller.prototype.controlsAlwaysVisible.call(this);
     },
 
+    // Due to the bad way we are faking inheritance here, in particular the extends method
+    // on Controller.prototype, we don't copy getters and setters from the prototype. This
+    // means we have to implement them again, here in the subclass.
+    // FIXME: Use ES6 classes!
+
+    get scrubbing()
+    {
+        return Object.getOwnPropertyDescriptor(Controller.prototype, "scrubbing").get.call(this);
+    },
+
+    set scrubbing(flag)
+    {
+        Object.getOwnPropertyDescriptor(Controller.prototype, "scrubbing").set.call(this, flag);
+    },
+
     get pageScaleFactor()
     {
         return this._pageScaleFactor;
@@ -629,12 +680,20 @@ ControllerIOS.prototype = {
         if (this.controls.startPlaybackButton)
             this.controls.startPlaybackButton.style.webkitTransform = scaleTransform;
         if (this.controls.panel) {
-            var bottomAligment = -2 * scaleValue;
-            this.controls.panel.style.bottom = bottomAligment + "px";
-            this.controls.panel.style.paddingBottom = -(newScaleFactor * bottomAligment) + "px";
-            this.controls.panel.style.width = Math.round(newScaleFactor * 100) + "%";
-            this.controls.panel.style.webkitTransform = scaleTransform;
-
+            if (scaleValue > 1) {
+                this.controls.panel.style.width = "100%";
+                this.controls.panel.style.zoom = scaleValue;
+                this.controls.panel.style.webkitTransform = "scale(1)";
+                this.controls.timelineBox.style.webkitTextSizeAdjust = (100 * scaleValue) + "%";
+            } else {
+                var bottomAligment = -2 * scaleValue;
+                this.controls.panel.style.bottom = bottomAligment + "px";
+                this.controls.panel.style.paddingBottom = -(newScaleFactor * bottomAligment) + "px";
+                this.controls.panel.style.width = Math.round(newScaleFactor * 100) + "%";
+                this.controls.panel.style.webkitTransform = scaleTransform;
+                this.controls.timelineBox.style.webkitTextSizeAdjust = "auto";
+                this.controls.panel.style.zoom = 1;
+            }
             this.controls.panelBackground.style.height = (50 * scaleValue) + "px";
 
             this.setNeedsTimelineMetricsUpdate();

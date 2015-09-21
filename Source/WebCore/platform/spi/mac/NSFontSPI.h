@@ -23,6 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
+#import <wtf/Platform.h>
+
+#if PLATFORM(MAC)
+
 #if USE(APPLE_INTERNAL_SDK)
 
 #import <AppKit/NSFontDescriptor_Private.h>
@@ -30,10 +34,7 @@
 
 #else
 
-@interface NSFont (Private)
-+ (NSFont *)findFontLike:(NSFont *)aFont forCharacter:(UInt32)c inLanguage:(id) language;
-+ (NSFont *)findFontLike:(NSFont *)aFont forString:(NSString *)string withRange:(NSRange)range inLanguage:(id) language;
-
+@interface NSFont ()
 + (NSFont *)systemFontOfSize:(CGFloat)size weight:(CGFloat)weight;
 @end
 
@@ -47,6 +48,8 @@ extern const CGFloat NSFontWeightSemibold;
 extern const CGFloat NSFontWeightBold;
 extern const CGFloat NSFontWeightHeavy;
 extern const CGFloat NSFontWeightBlack;
+#endif
+
 #endif
 
 #endif

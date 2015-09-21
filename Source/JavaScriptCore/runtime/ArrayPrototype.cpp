@@ -119,21 +119,19 @@ void ArrayPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
     JSC_BUILTIN_FUNCTION("includes", arrayPrototypeIncludesCodeGenerator, DontEnum);
     JSC_BUILTIN_FUNCTION("copyWithin", arrayPrototypeCopyWithinCodeGenerator, DontEnum);
     
-    if (!globalObject->runtimeFlags().isSymbolDisabled()) {
-        JSObject* unscopables = constructEmptyObject(globalObject->globalExec(), globalObject->nullPrototypeObjectStructure());
-        const char* unscopableNames[] = {
-            "copyWithin",
-            "entries",
-            "fill",
-            "find",
-            "findIndex",
-            "keys",
-            "values"
-        };
-        for (const char* unscopableName : unscopableNames)
-            unscopables->putDirect(vm, Identifier::fromString(&vm, unscopableName), jsBoolean(true));
-        putDirectWithoutTransition(vm, vm.propertyNames->unscopablesSymbol, unscopables, DontEnum | ReadOnly);
-    }
+    JSObject* unscopables = constructEmptyObject(globalObject->globalExec(), globalObject->nullPrototypeObjectStructure());
+    const char* unscopableNames[] = {
+        "copyWithin",
+        "entries",
+        "fill",
+        "find",
+        "findIndex",
+        "keys",
+        "values"
+    };
+    for (const char* unscopableName : unscopableNames)
+        unscopables->putDirect(vm, Identifier::fromString(&vm, unscopableName), jsBoolean(true));
+    putDirectWithoutTransition(vm, vm.propertyNames->unscopablesSymbol, unscopables, DontEnum | ReadOnly);
 }
 
 // ------------------------------ Array Functions ----------------------------
@@ -506,8 +504,12 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncConcat(ExecState* exec)
     JSValue curArg = thisValue.toObject(exec);
     Checked<unsigned, RecordOverflow> finalArraySize = 0;
 
+    JSArray* currentArray = nullptr;
+    JSArray* previousArray = nullptr;
     for (unsigned i = 0; ; ++i) {
-        if (JSArray* currentArray = jsDynamicCast<JSArray*>(curArg)) {
+        previousArray = currentArray;
+        currentArray = jsDynamicCast<JSArray*>(curArg);
+        if (currentArray) {
             // Can't use JSArray::length here because this might be a RuntimeArray!
             finalArraySize += getLength(exec, currentArray);
             if (exec->hadException())
@@ -521,6 +523,12 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncConcat(ExecState* exec)
 
     if (finalArraySize.hasOverflowed())
         return JSValue::encode(throwOutOfMemoryError(exec));
+
+    if (argCount == 1 && previousArray && currentArray && finalArraySize.unsafeGet() < MIN_SPARSE_ARRAY_INDEX) {
+        IndexingType type = JSArray::fastConcatType(exec->vm(), *previousArray, *currentArray);
+        if (type != NonArray)
+            return previousArray->fastConcatWith(*exec, *currentArray);
+    }
 
     JSArray* arr = constructEmptyArray(exec, nullptr, finalArraySize.unsafeGet());
     if (exec->hadException())

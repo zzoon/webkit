@@ -238,7 +238,7 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
 
     switch (item->action()) {
     case ContextMenuItemTagOpenLinkInNewWindow:
-        openNewWindow(m_context.hitTestResult().absoluteLinkURL(), frame, ShouldOpenExternalURLsPolicy::ShouldAllow);
+        openNewWindow(m_context.hitTestResult().absoluteLinkURL(), frame, ShouldOpenExternalURLsPolicy::ShouldAllowExternalSchemes);
         break;
     case ContextMenuItemTagDownloadLinkToDisk:
         // FIXME: Some day we should be able to do this from within WebCore. (Bug 117709)
@@ -406,7 +406,7 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
             openNewWindow(m_context.hitTestResult().absoluteLinkURL(), frame, ShouldOpenExternalURLsPolicy::ShouldAllow);
         break;
     case ContextMenuItemTagOpenLinkInThisWindow:
-        frame->loader().loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_context.hitTestResult().absoluteLinkURL(), frame->loader().outgoingReferrer()), LockHistory::No, LockBackForwardList::No, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes, NewFrameOpenerPolicy::Suppress, ShouldOpenExternalURLsPolicy::ShouldAllow), nullptr, nullptr);
+        frame->loader().loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_context.hitTestResult().absoluteLinkURL(), frame->loader().outgoingReferrer()), LockHistory::No, LockBackForwardList::No, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes, NewFrameOpenerPolicy::Suppress, ShouldOpenExternalURLsPolicy::ShouldAllowExternalSchemes), nullptr, nullptr);
         break;
     case ContextMenuItemTagBold:
         frame->editor().command("ToggleBold").execute();
@@ -423,7 +423,7 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
         break;
     case ContextMenuItemTagStartSpeaking: {
         RefPtr<Range> selectedRange = frame->selection().toNormalizedRange();
-        if (!selectedRange || selectedRange->collapsed(IGNORE_EXCEPTION)) {
+        if (!selectedRange || selectedRange->collapsed()) {
             Document& document = m_context.hitTestResult().innerNonSharedNode()->document();
             selectedRange = document.createRange();
             selectedRange->selectNode(document.documentElement(), IGNORE_EXCEPTION);

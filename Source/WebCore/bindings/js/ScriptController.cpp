@@ -102,7 +102,7 @@ ScriptController::~ScriptController()
     if (m_cacheableBindingRootObject) {
         JSLockHolder lock(JSDOMWindowBase::commonVM());
         m_cacheableBindingRootObject->invalidate();
-        m_cacheableBindingRootObject = 0;
+        m_cacheableBindingRootObject = nullptr;
     }
 
     // It's likely that destroying m_windowShells will create a lot of garbage.
@@ -180,7 +180,7 @@ Deprecated::ScriptValue ScriptController::evaluate(const ScriptSourceCode& sourc
     return evaluateInWorld(sourceCode, mainThreadNormalWorld());
 }
 
-PassRefPtr<DOMWrapperWorld> ScriptController::createWorld()
+Ref<DOMWrapperWorld> ScriptController::createWorld()
 {
     return DOMWrapperWorld::create(JSDOMWindow::commonVM());
 }
@@ -258,7 +258,7 @@ JSDOMWindowShell* ScriptController::initScript(DOMWrapperWorld& world)
         if (shouldBypassMainWorldContentSecurityPolicy)
             windowShell->window()->setEvalEnabled(true);
         else
-            windowShell->window()->setEvalEnabled(m_frame.document()->contentSecurityPolicy()->allowEval(0, ContentSecurityPolicy::SuppressReport), m_frame.document()->contentSecurityPolicy()->evalDisabledErrorMessage());
+            windowShell->window()->setEvalEnabled(m_frame.document()->contentSecurityPolicy()->allowEval(0, shouldBypassMainWorldContentSecurityPolicy, ContentSecurityPolicy::ReportingStatus::SuppressReport), m_frame.document()->contentSecurityPolicy()->evalDisabledErrorMessage());
     }
 
     if (Page* page = m_frame.page()) {
@@ -304,6 +304,11 @@ void ScriptController::disableEval(const String& errorMessage)
 bool ScriptController::processingUserGesture()
 {
     return UserGestureIndicator::processingUserGesture();
+}
+
+bool ScriptController::processingUserGestureForMedia()
+{
+    return UserGestureIndicator::processingUserGestureForMedia();
 }
 
 bool ScriptController::canAccessFromCurrentOrigin(Frame *frame)
@@ -370,7 +375,7 @@ Bindings::RootObject* ScriptController::bindingRootObject()
     return m_bindingRootObject.get();
 }
 
-PassRefPtr<Bindings::RootObject> ScriptController::createRootObject(void* nativeHandle)
+RefPtr<Bindings::RootObject> ScriptController::createRootObject(void* nativeHandle)
 {
     RootObjectMap::iterator it = m_rootObjects.find(nativeHandle);
     if (it != m_rootObjects.end())
@@ -379,7 +384,7 @@ PassRefPtr<Bindings::RootObject> ScriptController::createRootObject(void* native
     RefPtr<Bindings::RootObject> rootObject = Bindings::RootObject::create(nativeHandle, globalObject(pluginWorld()));
 
     m_rootObjects.set(nativeHandle, rootObject);
-    return rootObject.release();
+    return rootObject;
 }
 
 void ScriptController::collectIsolatedContexts(Vector<std::pair<JSC::ExecState*, SecurityOrigin*>>& result)
@@ -427,7 +432,7 @@ NPObject* ScriptController::createScriptObjectForPluginElement(HTMLPlugInElement
 #endif
 
 #if !PLATFORM(COCOA)
-PassRefPtr<JSC::Bindings::Instance> ScriptController::createScriptInstanceForWidget(Widget* widget)
+RefPtr<JSC::Bindings::Instance> ScriptController::createScriptInstanceForWidget(Widget* widget)
 {
     if (!is<PluginViewBase>(*widget))
         return nullptr;
@@ -489,7 +494,7 @@ void ScriptController::clearScriptObjects()
 
     if (m_bindingRootObject) {
         m_bindingRootObject->invalidate();
-        m_bindingRootObject = 0;
+        m_bindingRootObject = nullptr;
     }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -498,7 +503,7 @@ void ScriptController::clearScriptObjects()
         // script object properly.
         // This shouldn't cause any problems for plugins since they should have already been stopped and destroyed at this point.
         _NPN_DeallocateObject(m_windowScriptNPObject);
-        m_windowScriptNPObject = 0;
+        m_windowScriptNPObject = nullptr;
     }
 #endif
 }

@@ -194,7 +194,7 @@ public:
         LayoutUnit m_negativeMargin;
 
     public:
-        MarginInfo(RenderBlockFlow&, LayoutUnit beforeBorderPadding, LayoutUnit afterBorderPadding);
+        MarginInfo(const RenderBlockFlow&, LayoutUnit beforeBorderPadding, LayoutUnit afterBorderPadding);
 
         void setAtBeforeSideOfBlock(bool b) { m_atBeforeSideOfBlock = b; }
         void setAtAfterSideOfBlock(bool b) { m_atAfterSideOfBlock = b; }
@@ -249,11 +249,15 @@ public:
     void updateStaticInlinePositionForChild(RenderBox& child, LayoutUnit logicalTop);
 
     LayoutUnit collapseMargins(RenderBox& child, MarginInfo&);
+    LayoutUnit collapseMarginsWithChildInfo(RenderBox* child, RenderObject* prevSibling, MarginInfo&);
+
     LayoutUnit clearFloatsIfNeeded(RenderBox& child, MarginInfo&, LayoutUnit oldTopPosMargin, LayoutUnit oldTopNegMargin, LayoutUnit yPos);
     LayoutUnit estimateLogicalTopPosition(RenderBox& child, const MarginInfo&, LayoutUnit& estimateWithoutPagination);
     void marginBeforeEstimateForChild(RenderBox&, LayoutUnit&, LayoutUnit&, bool&) const;
     void handleAfterSideOfBlock(LayoutUnit top, LayoutUnit bottom, MarginInfo&);
     void setCollapsedBottomMargin(const MarginInfo&);
+
+    virtual bool childrenPreventSelfCollapsing() const override final;
 
     bool shouldBreakAtLineToAvoidWidow() const { return hasRareBlockFlowData() && rareBlockFlowData()->m_lineBreakToAvoidWidow >= 0; }
     void clearShouldBreakAtLineToAvoidWidow() const;
@@ -537,7 +541,7 @@ private:
 // line layout code is separated from RenderBlock and RenderBlockFlow.
 // START METHODS DEFINED IN RenderBlockLineLayout
 public:
-    static void appendRunsForObject(BidiRunList<BidiRun>&, int start, int end, RenderObject*, InlineBidiResolver&);
+    static void appendRunsForObject(BidiRunList<BidiRun>*, int start, int end, RenderObject&, InlineBidiResolver&);
     RootInlineBox* createAndAppendRootInlineBox();
 
     LayoutUnit startAlignedOffsetForLine(LayoutUnit position, bool shouldIndentText);
@@ -584,7 +588,7 @@ private:
     // line, i.e., that it can't be re-used.
     bool lineWidthForPaginatedLineChanged(RootInlineBox*, LayoutUnit lineDelta, RenderFlowThread*) const;
     void updateLogicalWidthForAlignment(const ETextAlign&, const RootInlineBox*, BidiRun* trailingSpaceRun, float& logicalLeft, float& totalLogicalWidth, float& availableLogicalWidth, int expansionOpportunityCount);
-
+    void marginCollapseLinesFromStart(LineLayoutState&, RootInlineBox* stopLine);
 // END METHODS DEFINED IN RenderBlockLineLayout
 
     bool namedFlowFragmentNeedsUpdate() const;

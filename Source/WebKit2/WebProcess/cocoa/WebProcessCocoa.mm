@@ -169,6 +169,11 @@ void WebProcess::platformInitializeWebProcess(WebProcessCreationParameters&& par
 #if (TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
     _CFNetworkSetATSContext(parameters.networkATSContext.get());
 #endif
+
+#if TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000
+    // Priority decay on iOS 9 is impacting page load time so we fix the priority of the WebProcess' main thread (rdar://problem/22003112).
+    pthread_set_fixedpriority_self();
+#endif
 }
 
 void WebProcess::initializeProcessName(const ChildProcessInitializationParameters& parameters)
@@ -208,11 +213,15 @@ void WebProcess::initializeSandbox(const ChildProcessInitializationParameters& p
 #if ENABLE(WEB_PROCESS_SANDBOX)
 #if ENABLE(MANUAL_SANDBOXING)
     // Need to override the default, because service has a different bundle ID.
-    NSBundle *webkit2Bundle = [NSBundle bundleForClass:NSClassFromString(@"WKView")];
-#if PLATFORM(IOS)
-    sandboxParameters.setOverrideSandboxProfilePath([webkit2Bundle pathForResource:@"com.apple.WebKit.WebContent" ofType:@"sb"]);
+#if WK_API_ENABLED
+    NSBundle *webKit2Bundle = [NSBundle bundleForClass:NSClassFromString(@"WKWebView")];
 #else
-    sandboxParameters.setOverrideSandboxProfilePath([webkit2Bundle pathForResource:@"com.apple.WebProcess" ofType:@"sb"]);
+    NSBundle *webKit2Bundle = [NSBundle bundleForClass:NSClassFromString(@"WKView")];
+#endif
+#if PLATFORM(IOS)
+    sandboxParameters.setOverrideSandboxProfilePath([webKit2Bundle pathForResource:@"com.apple.WebKit.WebContent" ofType:@"sb"]);
+#else
+    sandboxParameters.setOverrideSandboxProfilePath([webKit2Bundle pathForResource:@"com.apple.WebProcess" ofType:@"sb"]);
 #endif
     ChildProcess::initializeSandbox(parameters, sandboxParameters);
 #endif

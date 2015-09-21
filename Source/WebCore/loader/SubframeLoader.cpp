@@ -125,8 +125,9 @@ bool SubframeLoader::pluginIsLoadable(HTMLPlugInImageElement& pluginElement, con
         String declaredMimeType = document()->isPluginDocument() && document()->ownerElement() ?
             document()->ownerElement()->fastGetAttribute(HTMLNames::typeAttr) :
             pluginElement.fastGetAttribute(HTMLNames::typeAttr);
-        if (!document()->contentSecurityPolicy()->allowObjectFromSource(url)
-            || !document()->contentSecurityPolicy()->allowPluginType(mimeType, declaredMimeType, url)) {
+        bool isInUserAgentShadowTree = pluginElement.isInUserAgentShadowTree();
+        if (!document()->contentSecurityPolicy()->allowObjectFromSource(url, isInUserAgentShadowTree)
+            || !document()->contentSecurityPolicy()->allowPluginType(mimeType, declaredMimeType, url, isInUserAgentShadowTree)) {
             RenderEmbeddedObject* renderer = pluginElement.renderEmbeddedObject();
             renderer->setPluginUnavailabilityReason(RenderEmbeddedObject::PluginBlockedByContentSecurityPolicy);
             return false;
@@ -144,7 +145,7 @@ bool SubframeLoader::requestPlugin(HTMLPlugInImageElement& ownerElement, const U
     // Application plug-ins are plug-ins implemented by the user agent, for example Qt plug-ins,
     // as opposed to third-party code such as Flash. The user agent decides whether or not they are
     // permitted, rather than WebKit.
-    if ((!allowPlugins(AboutToInstantiatePlugin) && !MIMETypeRegistry::isApplicationPluginMIMEType(mimeType)))
+    if ((!allowPlugins() && !MIMETypeRegistry::isApplicationPluginMIMEType(mimeType)))
         return false;
 
     if (!pluginIsLoadable(ownerElement, url, mimeType))
@@ -253,8 +254,9 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, H
         }
 
         const char javaAppletMimeType[] = "application/x-java-applet";
-        if (!element.document().contentSecurityPolicy()->allowObjectFromSource(codeBaseURL)
-            || !element.document().contentSecurityPolicy()->allowPluginType(javaAppletMimeType, javaAppletMimeType, codeBaseURL))
+        bool isInUserAgentShadowTree = element.isInUserAgentShadowTree();
+        if (!element.document().contentSecurityPolicy()->allowObjectFromSource(codeBaseURL, isInUserAgentShadowTree)
+            || !element.document().contentSecurityPolicy()->allowPluginType(javaAppletMimeType, javaAppletMimeType, codeBaseURL, isInUserAgentShadowTree))
             return nullptr;
     }
 
@@ -263,7 +265,7 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, H
     URL baseURL = completeURL(baseURLString);
 
     RefPtr<Widget> widget;
-    if (allowPlugins(AboutToInstantiatePlugin))
+    if (allowPlugins())
         widget = m_frame.loader().client().createJavaAppletWidget(size, &element, baseURL, paramNames, paramValues);
 
     logPluginRequest(document()->page(), element.serviceType(), String(), widget);
@@ -318,7 +320,13 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement& ownerElement, const U
         return nullptr;
 
     String referrerToUse = SecurityPolicy::generateReferrerHeader(ownerElement.document().referrerPolicy(), url, referrer);
+
+    // Prevent initial empty document load from triggering load events.
+    m_frame.document()->incrementLoadEventDelayCount();
+
     RefPtr<Frame> frame = m_frame.loader().client().createFrame(url, name, &ownerElement, referrerToUse, allowsScrolling, marginWidth, marginHeight);
+
+    m_frame.document()->decrementLoadEventDelayCount();
 
     if (!frame)  {
         m_frame.loader().checkCallImplicitClose();
@@ -355,7 +363,7 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement& ownerElement, const U
     return frame.get();
 }
 
-bool SubframeLoader::allowPlugins(ReasonForCallingAllowPlugins)
+bool SubframeLoader::allowPlugins()
 {
     return m_frame.settings().arePluginsEnabled();
 }
@@ -389,10 +397,12 @@ Document* SubframeLoader::document() const
 
 bool SubframeLoader::loadPlugin(HTMLPlugInImageElement& pluginElement, const URL& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues, bool useFallback)
 {
-    RenderEmbeddedObject* renderer = pluginElement.renderEmbeddedObject();
+    if (useFallback)
+        return false;
 
+    RenderEmbeddedObject* renderer = pluginElement.renderEmbeddedObject();
     // FIXME: This code should not depend on renderer!
-    if (!renderer || useFallback)
+    if (!renderer)
         return false;
 
     pluginElement.subframeLoaderWillCreatePlugIn(url);
@@ -406,7 +416,11 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement& pluginElement, const URL
         loadManually = false;
 #endif
 
+    WeakPtr<RenderWidget> weakRenderer = renderer->createWeakPtr();
+    // createPlugin *may* cause this renderer to disappear from underneath.
     RefPtr<Widget> widget = m_frame.loader().client().createPlugin(contentSize, &pluginElement, url, paramNames, paramValues, mimeType, loadManually);
+    if (!weakRenderer)
+        return false;
 
     if (!widget) {
         if (!renderer->isPluginUnavailable())

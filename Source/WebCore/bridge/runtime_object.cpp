@@ -37,9 +37,9 @@ namespace Bindings {
 
 WEBCORE_EXPORT const ClassInfo RuntimeObject::s_info = { "RuntimeObject", &Base::s_info, 0, CREATE_METHOD_TABLE(RuntimeObject) };
 
-RuntimeObject::RuntimeObject(VM& vm, Structure* structure, PassRefPtr<Instance> instance)
+RuntimeObject::RuntimeObject(VM& vm, Structure* structure, RefPtr<Instance>&& instance)
     : JSDestructibleObject(vm, structure)
-    , m_instance(instance)
+    , m_instance(WTF::move(instance))
 {
 }
 
@@ -59,7 +59,7 @@ void RuntimeObject::invalidate()
     ASSERT(m_instance);
     if (m_instance)
         m_instance->willInvalidateRuntimeObject();
-    m_instance = 0;
+    m_instance = nullptr;
 }
 
 EncodedJSValue RuntimeObject::fallbackObjectGetter(ExecState* exec, JSObject* slotBase, EncodedJSValue, PropertyName propertyName)

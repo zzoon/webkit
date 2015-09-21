@@ -81,6 +81,8 @@ WebSocketChannel::WebSocketChannel(Document* document, WebSocketChannelClient* c
     , m_outgoingFrameQueueStatus(OutgoingFrameQueueOpen)
     , m_blobLoaderStatus(BlobLoaderNotStarted)
 {
+    ASSERT(m_document);
+
     if (Page* page = m_document->page())
         m_identifier = page->progress().createUniqueIdentifier();
 
@@ -103,8 +105,13 @@ void WebSocketChannel::connect(const URL& url, const String& protocol)
         m_handshake->addExtensionProcessor(m_deflateFramer.createExtensionProcessor());
     if (m_identifier)
         InspectorInstrumentation::didCreateWebSocket(m_document, m_identifier, url, m_document->url(), protocol);
-    ref();
-    m_handle = SocketStreamHandle::create(m_handshake->url(), this);
+
+    if (Frame* frame = m_document->frame()) {
+        if (NetworkingContext* networkingContext = frame->loader().networkingContext()) {
+            ref();
+            m_handle = SocketStreamHandle::create(m_handshake->url(), this, *networkingContext);
+        }
+    }
 }
 
 String WebSocketChannel::subprotocol()
@@ -194,7 +201,14 @@ void WebSocketChannel::fail(const String& reason)
     ASSERT(!m_suspended);
     if (m_document) {
         InspectorInstrumentation::didReceiveWebSocketFrameError(m_document, m_identifier, reason);
-        m_document->addConsoleMessage(MessageSource::Network, MessageLevel::Error, "WebSocket connection to '" + m_handshake->url().stringCenterEllipsizedToLength() + "' failed: " + reason);
+
+        String consoleMessage;
+        if (m_handshake)
+            consoleMessage = makeString("WebSocket connection to '", m_handshake->url().stringCenterEllipsizedToLength(), "' failed: ", reason);
+        else
+            consoleMessage = makeString("WebSocket connection failed: ", reason);
+
+        m_document->addConsoleMessage(MessageSource::Network, MessageLevel::Error, consoleMessage);
     }
 
     // Hybi-10 specification explicitly states we must not continue to handle incoming data
@@ -211,7 +225,8 @@ void WebSocketChannel::fail(const String& reason)
     if (m_handle && !m_closed)
         m_handle->disconnect(); // Will call didClose().
 
-    ASSERT(m_closed);
+    // We should be closed by now, but if we never got a handshake then we never even opened.
+    ASSERT(m_closed || !m_handshake);
 }
 
 void WebSocketChannel::disconnect()

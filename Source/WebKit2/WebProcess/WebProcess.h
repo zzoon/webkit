@@ -64,6 +64,7 @@ class CertificateInfo;
 class PageGroup;
 class ResourceRequest;
 struct PluginInfo;
+struct SecurityOriginData;
 }
 
 namespace WebKit {
@@ -79,7 +80,6 @@ class WebIconDatabaseProxy;
 class WebPage;
 class WebPageGroupProxy;
 class WebProcessSupplement;
-struct SecurityOriginData;
 struct WebPageCreationParameters;
 struct WebPageGroupData;
 struct WebPreferencesStore;
@@ -214,6 +214,8 @@ public:
     bool hasRichContentServices() const { return m_hasRichContentServices; }
 #endif
 
+    void prefetchDNS(const String&);
+
 private:
     WebProcess();
     ~WebProcess();
@@ -273,7 +275,7 @@ private:
 
     void fetchWebsiteData(WebCore::SessionID, uint64_t websiteDataTypes, uint64_t callbackID);
     void deleteWebsiteData(WebCore::SessionID, uint64_t websiteDataTypes, std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID);
-    void deleteWebsiteDataForOrigins(WebCore::SessionID, uint64_t websiteDataTypes, const Vector<WebKit::SecurityOriginData>& origins, uint64_t callbackID);
+    void deleteWebsiteDataForOrigins(WebCore::SessionID, uint64_t websiteDataTypes, const Vector<WebCore::SecurityOriginData>& origins, uint64_t callbackID);
 
 #if USE(SOUP)
     void setIgnoreTLSErrors(bool);

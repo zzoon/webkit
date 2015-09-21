@@ -90,6 +90,8 @@ public:
 
     Document* document() const; // ASSERTs if document no longer exists.
 
+    const Document* hostingDocument() const override;
+
     AudioDestinationNode* destination() { return m_destinationNode.get(); }
     size_t currentSampleFrame() const { return m_destinationNode->currentSampleFrame(); }
     double currentTime() const { return m_destinationNode->currentTime(); }
@@ -378,7 +380,7 @@ private:
     unsigned m_connectionCount { 0 };
 
     // Graph locking.
-    Mutex m_contextGraphMutex;
+    Lock m_contextGraphMutex;
     volatile ThreadIdentifier m_audioThread { 0 };
     volatile ThreadIdentifier m_graphOwnerThread; // if the lock is held then this is the thread which owns it, otherwise == UndefinedThreadIdentifier
 

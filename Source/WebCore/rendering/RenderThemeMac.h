@@ -61,7 +61,6 @@ public:
     virtual Color platformInactiveListBoxSelectionBackgroundColor() const override;
     virtual Color platformInactiveListBoxSelectionForegroundColor() const override;
     virtual Color platformFocusRingColor() const override;
-    virtual int platformFocusRingMaxWidth() const override;
 
     virtual ScrollbarControlSize scrollbarControlSizeForPart(ControlPart) override { return SmallScrollbar; }
 
@@ -108,7 +107,7 @@ protected:
     virtual ~RenderThemeMac();
 
     // System fonts.
-    virtual void updateCachedSystemFontDescription(CSSValueID, FontDescription&) const override;
+    virtual void updateCachedSystemFontDescription(CSSValueID, FontCascadeDescription&) const override;
 
 #if ENABLE(VIDEO)
     // Media controls
@@ -131,7 +130,7 @@ protected:
     virtual bool paintMenuList(const RenderObject&, const PaintInfo&, const FloatRect&) override;
     virtual void adjustMenuListStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
-    virtual bool paintMenuListButtonDecorations(const RenderObject&, const PaintInfo&, const FloatRect&) override;
+    virtual bool paintMenuListButtonDecorations(const RenderBox&, const PaintInfo&, const FloatRect&) override;
     virtual void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
     virtual void adjustProgressBarStyle(StyleResolver&, RenderStyle&, Element*) const override;
@@ -162,7 +161,6 @@ protected:
     virtual bool supportsClosedCaptioning() const override { return true; }
 #endif
 
-    virtual bool shouldShowPlaceholderWhenFocused() const override;
     virtual bool shouldHaveCapsLockIndicator(HTMLInputElement&) const override;
 
     virtual bool paintSnapshottedPluginOverlay(const RenderObject&, const PaintInfo&, const IntRect&) override;
@@ -197,6 +195,7 @@ private:
 
     // Helpers for adjusting appearance and for painting
 
+    void paintCellAndSetFocusedElementNeedsRepaintIfNecessary(NSCell*, const RenderObject&, const PaintInfo&, const FloatRect&);
     void setPopupButtonCellState(const RenderObject&, const IntSize&);
     const IntSize* popupButtonSizes() const;
     const int* popupButtonMargins() const;

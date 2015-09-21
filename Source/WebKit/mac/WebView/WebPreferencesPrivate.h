@@ -53,8 +53,6 @@ typedef enum {
 } WebStorageBlockingPolicy;
 
 typedef enum {
-    WebKitJavaScriptRuntimeFlagsSymbolDisabled = 1u << 0,
-    WebKitJavaScriptRuntimeFlagsPromiseDisabled = 1u << 1,
     WebKitJavaScriptRuntimeFlagsAllEnabled = 0
 } WebKitJavaScriptRuntimeFlags;
 
@@ -249,6 +247,9 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 
 - (void)setMediaPlaybackAllowsInline:(BOOL)flag;
 - (BOOL)mediaPlaybackAllowsInline;
+
+- (void)setInlineMediaPlaybackRequiresPlaysInlineAttribute:(BOOL)flag;
+- (BOOL)inlineMediaPlaybackRequiresPlaysInlineAttribute;
 
 - (void)setMediaControlsScaleWithPageZoom:(BOOL)flag;
 - (BOOL)mediaControlsScaleWithPageZoom;
@@ -452,6 +453,7 @@ extern NSString *WebPreferencesCacheModelChangedInternalNotification;
 - (BOOL)httpEquivEnabled;
 
 @property (nonatomic) BOOL javaScriptMarkupEnabled;
+@property (nonatomic) BOOL mediaDataLoadsAutomatically;
 
 #if TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED < 80000
 - (void)_setAllowCompositingLayerVisualDegradation:(BOOL)flag;

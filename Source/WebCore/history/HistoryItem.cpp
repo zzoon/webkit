@@ -196,10 +196,10 @@ void HistoryItem::reset()
 
     m_itemSequenceNumber = generateSequenceNumber();
 
-    m_stateObject = 0;
+    m_stateObject = nullptr;
     m_documentSequenceNumber = generateSequenceNumber();
 
-    m_formData = 0;
+    m_formData = nullptr;
     m_formContentType = String();
 
     clearChildren();
@@ -351,6 +351,16 @@ void HistoryItem::clearDocumentState()
     m_documentState.clear();
 }
 
+void HistoryItem::setShouldOpenExternalURLsPolicy(ShouldOpenExternalURLsPolicy policy)
+{
+    m_shouldOpenExternalURLsPolicy = policy;
+}
+
+ShouldOpenExternalURLsPolicy HistoryItem::shouldOpenExternalURLsPolicy() const
+{
+    return m_shouldOpenExternalURLsPolicy;
+}
+
 bool HistoryItem::isTargetItem() const
 {
     return m_isTargetItem;
@@ -361,9 +371,9 @@ void HistoryItem::setIsTargetItem(bool flag)
     m_isTargetItem = flag;
 }
 
-void HistoryItem::setStateObject(PassRefPtr<SerializedScriptValue> object)
+void HistoryItem::setStateObject(RefPtr<SerializedScriptValue>&& object)
 {
-    m_stateObject = object;
+    m_stateObject = WTF::move(object);
 }
 
 void HistoryItem::addChildItem(Ref<HistoryItem>&& child)
@@ -524,14 +534,14 @@ void HistoryItem::setFormInfoFromRequest(const ResourceRequest& request)
         m_formData = request.httpBody();
         m_formContentType = request.httpContentType();
     } else {
-        m_formData = 0;
+        m_formData = nullptr;
         m_formContentType = String();
     }
 }
 
-void HistoryItem::setFormData(PassRefPtr<FormData> formData)
+void HistoryItem::setFormData(RefPtr<FormData>&& formData)
 {
-    m_formData = formData;
+    m_formData = WTF::move(formData);
 }
 
 void HistoryItem::setFormContentType(const String& formContentType)
@@ -569,6 +579,11 @@ Vector<String>* HistoryItem::redirectURLs() const
 void HistoryItem::setRedirectURLs(std::unique_ptr<Vector<String>> redirectURLs)
 {
     m_redirectURLs = WTF::move(redirectURLs);
+}
+
+void HistoryItem::notifyChanged()
+{
+    notifyHistoryItemChanged(this);
 }
 
 #ifndef NDEBUG

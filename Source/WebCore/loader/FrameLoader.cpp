@@ -257,7 +257,7 @@ FrameLoader::~FrameLoader()
 void FrameLoader::init()
 {
     // This somewhat odd set of steps gives the frame an initial empty document.
-    setPolicyDocumentLoader(m_client.createDocumentLoader(ResourceRequest(URL(ParsedURLString, emptyString())), SubstituteData()).get());
+    setPolicyDocumentLoader(m_client.createDocumentLoader(ResourceRequest(URL(ParsedURLString, emptyString())), SubstituteData()).ptr());
     setProvisionalDocumentLoader(m_policyDocumentLoader.get());
     m_provisionalDocumentLoader->startLoadingMainResource();
 
@@ -276,7 +276,7 @@ void FrameLoader::initForSynthesizedDocument(const URL&)
     // FrameLoader::checkCompleted() will overwrite the URL of the document to be activeDocumentLoader()->documentURL().
 
     RefPtr<DocumentLoader> loader = m_client.createDocumentLoader(ResourceRequest(URL(ParsedURLString, emptyString())), SubstituteData());
-    loader->setFrame(&m_frame);
+    loader->attachToFrame(m_frame);
     loader->setResponse(ResourceResponse(URL(), ASCIILiteral("text/html"), 0, String()));
     loader->setCommitted(true);
     setDocumentLoader(loader.get());
@@ -692,7 +692,7 @@ void FrameLoader::didBeginDocument(bool dispatch)
 
     if (m_pendingStateObject) {
         m_frame.document()->statePopped(m_pendingStateObject.get());
-        m_pendingStateObject.clear();
+        m_pendingStateObject = nullptr;
     }
 
     if (dispatch)
@@ -753,6 +753,8 @@ void FrameLoader::finishedParsing()
 
     m_client.dispatchDidFinishDocumentLoad();
 
+    scrollToFragmentWithParentBoundary(m_frame.document()->url());
+
     checkCompleted();
 
     if (!m_frame.view())
@@ -761,7 +763,6 @@ void FrameLoader::finishedParsing()
     // Check if the scrollbars are really needed for the content.
     // If not, remove them, relayout, and repaint.
     m_frame.view()->restoreScrollbar();
-    scrollToFragmentWithParentBoundary(m_frame.document()->url());
 }
 
 void FrameLoader::loadDone()
@@ -818,7 +819,7 @@ void FrameLoader::checkCompleted()
 
     // OK, completed.
     m_isComplete = true;
-    m_requestedHistoryItem = 0;
+    m_requestedHistoryItem = nullptr;
     m_frame.document()->setReadyState(Document::Complete);
 
 #if PLATFORM(IOS)
@@ -1137,7 +1138,7 @@ void FrameLoader::setupForReplace()
     m_client.revertToProvisionalState(m_documentLoader.get());
     setState(FrameStateProvisional);
     m_provisionalDocumentLoader = m_documentLoader;
-    m_documentLoader = 0;
+    m_documentLoader = nullptr;
     detachChildren();
 }
 
@@ -1187,6 +1188,15 @@ void FrameLoader::loadFrameRequest(const FrameLoadRequest& request, Event* event
     }
 }
 
+static ShouldOpenExternalURLsPolicy shouldOpenExternalURLsPolicyToApply(Frame& sourceFrame, ShouldOpenExternalURLsPolicy propagatedPolicy)
+{
+    if (!sourceFrame.isMainFrame())
+        return ShouldOpenExternalURLsPolicy::ShouldNotAllow;
+    if (ScriptController::processingUserGesture())
+        return ShouldOpenExternalURLsPolicy::ShouldAllow;
+    return propagatedPolicy;
+}
+
 void FrameLoader::loadURL(const FrameLoadRequest& frameLoadRequest, const String& referrer, FrameLoadType newLoadType, Event* event, PassRefPtr<FormState> prpFormState)
 {
     if (m_inStopAllLoaders)
@@ -1233,6 +1243,7 @@ void FrameLoader::loadURL(const FrameLoadRequest& frameLoadRequest, const String
     NavigationAction action(request, newLoadType, isFormSubmission, event, frameLoadRequest.shouldOpenExternalURLsPolicy());
 
     if (!targetFrame && !frameName.isEmpty()) {
+        action = action.copyWithShouldOpenExternalURLsPolicy(shouldOpenExternalURLsPolicyToApply(m_frame, frameLoadRequest.shouldOpenExternalURLsPolicy()));
         policyChecker().checkNewWindowPolicy(action, request, formState.release(), frameName, [this, allowNavigationToInvalidURL, openerPolicy](const ResourceRequest& request, PassRefPtr<FormState> formState, const String& frameName, const NavigationAction& action, bool shouldContinue) {
             continueLoadAfterNewWindowPolicy(request, formState, frameName, action, shouldContinue, allowNavigationToInvalidURL, openerPolicy);
         });
@@ -1315,16 +1326,16 @@ void FrameLoader::load(const FrameLoadRequest& passedRequest)
     if (!request.hasSubstituteData())
         request.setSubstituteData(defaultSubstituteDataForURL(request.resourceRequest().url()));
 
-    RefPtr<DocumentLoader> loader = m_client.createDocumentLoader(request.resourceRequest(), request.substituteData());
-    applyShouldOpenExternalURLsPolicyToNewDocumentLoader(*loader, request.shouldOpenExternalURLsPolicy());
+    Ref<DocumentLoader> loader = m_client.createDocumentLoader(request.resourceRequest(), request.substituteData());
+    applyShouldOpenExternalURLsPolicyToNewDocumentLoader(loader, request.shouldOpenExternalURLsPolicy());
 
-    load(loader.get());
+    load(loader.ptr());
 }
 
 void FrameLoader::loadWithNavigationAction(const ResourceRequest& request, const NavigationAction& action, LockHistory lockHistory, FrameLoadType type, PassRefPtr<FormState> formState, AllowNavigationToInvalidURL allowNavigationToInvalidURL)
 {
-    RefPtr<DocumentLoader> loader = m_client.createDocumentLoader(request, defaultSubstituteDataForURL(request.url()));
-    applyShouldOpenExternalURLsPolicyToNewDocumentLoader(*loader, action.shouldOpenExternalURLsPolicy());
+    Ref<DocumentLoader> loader = m_client.createDocumentLoader(request, defaultSubstituteDataForURL(request.url()));
+    applyShouldOpenExternalURLsPolicyToNewDocumentLoader(loader, action.shouldOpenExternalURLsPolicy());
 
     if (lockHistory == LockHistory::Yes && m_documentLoader)
         loader->setClientRedirectSourceForHistory(m_documentLoader->didCreateGlobalHistoryEntry() ? m_documentLoader->urlForHistory().string() : m_documentLoader->clientRedirectSourceForHistory());
@@ -1333,7 +1344,7 @@ void FrameLoader::loadWithNavigationAction(const ResourceRequest& request, const
     if (m_documentLoader)
         loader->setOverrideEncoding(m_documentLoader->overrideEncoding());
 
-    loadWithDocumentLoader(loader.get(), type, formState, allowNavigationToInvalidURL);
+    loadWithDocumentLoader(loader.ptr(), type, formState, allowNavigationToInvalidURL);
 }
 
 void FrameLoader::load(DocumentLoader* newDocumentLoader)
@@ -1544,14 +1555,14 @@ void FrameLoader::reloadWithOverrideEncoding(const String& encoding)
     // We should ask the user for confirmation in this case.
     request.setCachePolicy(ReturnCacheDataElseLoad);
 
-    RefPtr<DocumentLoader> loader = m_client.createDocumentLoader(request, defaultSubstituteDataForURL(request.url()));
-    applyShouldOpenExternalURLsPolicyToNewDocumentLoader(*loader, m_documentLoader->shouldOpenExternalURLsPolicyToPropagate());
+    Ref<DocumentLoader> loader = m_client.createDocumentLoader(request, defaultSubstituteDataForURL(request.url()));
+    applyShouldOpenExternalURLsPolicyToNewDocumentLoader(loader, m_documentLoader->shouldOpenExternalURLsPolicyToPropagate());
 
-    setPolicyDocumentLoader(loader.get());
+    setPolicyDocumentLoader(loader.ptr());
 
     loader->setOverrideEncoding(encoding);
 
-    loadWithDocumentLoader(loader.get(), FrameLoadType::Reload, 0, AllowNavigationToInvalidURL::Yes);
+    loadWithDocumentLoader(loader.ptr(), FrameLoadType::Reload, 0, AllowNavigationToInvalidURL::Yes);
 }
 
 void FrameLoader::reload(bool endToEndReload)
@@ -1572,8 +1583,8 @@ void FrameLoader::reload(bool endToEndReload)
 
     // Create a new document loader for the reload, this will become m_documentLoader eventually,
     // but first it has to be the "policy" document loader, and then the "provisional" document loader.
-    RefPtr<DocumentLoader> loader = m_client.createDocumentLoader(initialRequest, defaultSubstituteDataForURL(initialRequest.url()));
-    applyShouldOpenExternalURLsPolicyToNewDocumentLoader(*loader, m_documentLoader->shouldOpenExternalURLsPolicyToPropagate());
+    Ref<DocumentLoader> loader = m_client.createDocumentLoader(initialRequest, defaultSubstituteDataForURL(initialRequest.url()));
+    applyShouldOpenExternalURLsPolicyToNewDocumentLoader(loader, m_documentLoader->shouldOpenExternalURLsPolicyToPropagate());
 
     ResourceRequest& request = loader->request();
 
@@ -1586,7 +1597,7 @@ void FrameLoader::reload(bool endToEndReload)
 
     loader->setOverrideEncoding(m_documentLoader->overrideEncoding());
     
-    loadWithDocumentLoader(loader.get(), endToEndReload ? FrameLoadType::ReloadFromOrigin : FrameLoadType::Reload, 0, AllowNavigationToInvalidURL::Yes);
+    loadWithDocumentLoader(loader.ptr(), endToEndReload ? FrameLoadType::ReloadFromOrigin : FrameLoadType::Reload, 0, AllowNavigationToInvalidURL::Yes);
 }
 
 void FrameLoader::stopAllLoaders(ClearProvisionalItemPolicy clearProvisionalItemPolicy)
@@ -1697,7 +1708,7 @@ void FrameLoader::setPolicyDocumentLoader(DocumentLoader* loader)
         return;
 
     if (loader)
-        loader->setFrame(&m_frame);
+        loader->attachToFrame(m_frame);
     if (m_policyDocumentLoader
             && m_policyDocumentLoader != m_provisionalDocumentLoader
             && m_policyDocumentLoader != m_documentLoader)
@@ -1937,7 +1948,7 @@ void FrameLoader::transitionToCommitted(CachedPage* cachedPage)
             if (cachedPage) {
                 DocumentLoader* cachedDocumentLoader = cachedPage->documentLoader();
                 ASSERT(cachedDocumentLoader);
-                cachedDocumentLoader->setFrame(&m_frame);
+                cachedDocumentLoader->attachToFrame(m_frame);
                 m_client.transitionToCommittedFromCachedFrame(cachedPage->cachedMainFrame());
             } else
                 m_client.transitionToCommittedForNewPage();
@@ -2280,8 +2291,13 @@ void FrameLoader::checkLoadCompleteForThisFrame()
             if (AXObjectCache* cache = m_frame.document()->existingAXObjectCache())
                 cache->frameLoadingEventNotification(&m_frame, loadingEvent);
 
-            if (page && m_frame.isMainFrame())
-                page->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::pageLoadedKey(), emptyString(), error.isNull() ? DiagnosticLoggingResultPass : DiagnosticLoggingResultFail, ShouldSample::Yes);
+            // The above calls to dispatchDidFinishLoad() might have detached the Frame
+            // from its Page and also might have caused Page to be deleted.
+            // Don't assume 'page' is still available to use.
+            if (m_frame.isMainFrame() && m_frame.page()) {
+                ASSERT(&m_frame.page()->mainFrame() == &m_frame);
+                m_frame.page()->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::pageLoadedKey(), emptyString(), error.isNull() ? DiagnosticLoggingResultPass : DiagnosticLoggingResultFail, ShouldSample::Yes);
+            }
 
             return;
         }
@@ -2967,20 +2983,20 @@ void FrameLoader::continueLoadAfterNavigationPolicy(const ResourceRequest& reque
     if (!m_frame.page())
         return;
 
-    if (Page* page = m_frame.page()) {
-        if (m_frame.isMainFrame())
-            page->inspectorController().resume();
-    }
-
     setProvisionalDocumentLoader(m_policyDocumentLoader.get());
     m_loadType = type;
     setState(FrameStateProvisional);
 
     setPolicyDocumentLoader(0);
 
-    if (isBackForwardLoadType(type) && history().provisionalItem()->isInPageCache()) {
-        loadProvisionalItemFromCachedPage();
-        return;
+    if (isBackForwardLoadType(type)) {
+        auto& diagnosticLoggingClient = m_frame.mainFrame().diagnosticLoggingClient();
+        if (history().provisionalItem()->isInPageCache()) {
+            diagnosticLoggingClient.logDiagnosticMessageWithResult(DiagnosticLoggingKeys::pageCacheKey(), DiagnosticLoggingKeys::retrievalKey(), DiagnosticLoggingResultPass, ShouldSample::Yes);
+            loadProvisionalItemFromCachedPage();
+            return;
+        }
+        diagnosticLoggingClient.logDiagnosticMessageWithResult(DiagnosticLoggingKeys::pageCacheKey(), DiagnosticLoggingKeys::retrievalKey(), DiagnosticLoggingResultFail, ShouldSample::Yes);
     }
 
     if (!formState) {
@@ -3176,7 +3192,7 @@ void FrameLoader::loadSameDocumentItem(HistoryItem& item)
     if (FrameView* view = m_frame.view())
         view->setWasScrolledByUser(false);
 
-    history().setCurrentItem(item);
+    history().setCurrentItem(&item);
         
     // loadInSameDocument() actually changes the URL and notifies load delegates of a "fake" load
     loadInSameDocument(item.url(), item.stateObject(), false);
@@ -3213,7 +3229,11 @@ void FrameLoader::loadDifferentDocumentItem(HistoryItem& item, FrameLoadType loa
 
     if (!item.referrer().isNull())
         request.setHTTPReferrer(item.referrer());
-    
+
+    ShouldOpenExternalURLsPolicy shouldOpenExternalURLsPolicy = shouldOpenExternalURLsPolicyToApply(m_frame, item.shouldOpenExternalURLsPolicy());
+    bool isFormSubmission = false;
+    Event* event = nullptr;
+
     // If this was a repost that failed the page cache, we might try to repost the form.
     NavigationAction action;
     if (formData) {
@@ -3239,10 +3259,10 @@ void FrameLoader::loadDifferentDocumentItem(HistoryItem& item, FrameLoadType loa
         
         if (cacheLoadPolicy == MayAttemptCacheOnlyLoadForFormSubmissionItem) {
             request.setCachePolicy(ReturnCacheDataDontLoad);
-            action = NavigationAction(request, loadType, false);
+            action = NavigationAction(request, loadType, isFormSubmission, event, shouldOpenExternalURLsPolicy);
         } else {
             request.setCachePolicy(ReturnCacheDataElseLoad);
-            action = NavigationAction(request, NavigationType::FormResubmitted);
+            action = NavigationAction(request, NavigationType::FormResubmitted, event, shouldOpenExternalURLsPolicy);
         }
     } else {
         switch (loadType) {
@@ -3267,7 +3287,7 @@ void FrameLoader::loadDifferentDocumentItem(HistoryItem& item, FrameLoadType loa
 
         ResourceRequest requestForOriginalURL(request);
         requestForOriginalURL.setURL(itemOriginalURL);
-        action = NavigationAction(requestForOriginalURL, loadType, false);
+        action = NavigationAction(requestForOriginalURL, loadType, isFormSubmission, event, shouldOpenExternalURLsPolicy);
     }
 
     loadWithNavigationAction(request, action, LockHistory::No, loadType, 0, AllowNavigationToInvalidURL::Yes);
@@ -3448,16 +3468,12 @@ void FrameLoader::clearTestingOverrides()
 {
     m_overrideCachePolicyForTesting = Nullopt;
     m_overrideResourceLoadPriorityForTesting = Nullopt;
+    m_isStrictRawResourceValidationPolicyDisabledForTesting = false;
 }
 
 void FrameLoader::applyShouldOpenExternalURLsPolicyToNewDocumentLoader(DocumentLoader& documentLoader, ShouldOpenExternalURLsPolicy propagatedPolicy)
 {
-    if (!m_frame.isMainFrame())
-        documentLoader.setShouldOpenExternalURLsPolicy(ShouldOpenExternalURLsPolicy::ShouldNotAllow);
-    else if (ScriptController::processingUserGesture())
-        documentLoader.setShouldOpenExternalURLsPolicy(ShouldOpenExternalURLsPolicy::ShouldAllow);
-    else
-        documentLoader.setShouldOpenExternalURLsPolicy(propagatedPolicy);
+    documentLoader.setShouldOpenExternalURLsPolicy(shouldOpenExternalURLsPolicyToApply(m_frame, propagatedPolicy));
 }
 
 bool FrameLoaderClient::hasHTMLView() const
@@ -3499,7 +3515,8 @@ RefPtr<Frame> createWindow(Frame& openerFrame, Frame& lookupFrame, const FrameLo
     if (!oldPage)
         return nullptr;
 
-    Page* page = oldPage->chrome().createWindow(&openerFrame, requestWithReferrer, features, NavigationAction(requestWithReferrer.resourceRequest()));
+    ShouldOpenExternalURLsPolicy shouldOpenExternalURLsPolicy = shouldOpenExternalURLsPolicyToApply(openerFrame, request.shouldOpenExternalURLsPolicy());
+    Page* page = oldPage->chrome().createWindow(&openerFrame, requestWithReferrer, features, NavigationAction(requestWithReferrer.resourceRequest(), shouldOpenExternalURLsPolicy));
     if (!page)
         return nullptr;
 
@@ -3536,15 +3553,15 @@ RefPtr<Frame> createWindow(Frame& openerFrame, Frame& lookupFrame, const FrameLo
 #if !PLATFORM(IOS)
     FloatSize viewportSize = page->chrome().pageRect().size();
     FloatRect windowRect = page->chrome().windowRect();
-    if (features.xSet)
-        windowRect.setX(features.x);
-    if (features.ySet)
-        windowRect.setY(features.y);
+    if (features.x)
+        windowRect.setX(*features.x);
+    if (features.y)
+        windowRect.setY(*features.y);
     // Zero width and height mean using default size, not minumum one.
-    if (features.widthSet && features.width)
-        windowRect.setWidth(features.width + (windowRect.width() - viewportSize.width()));
-    if (features.heightSet && features.height)
-        windowRect.setHeight(features.height + (windowRect.height() - viewportSize.height()));
+    if (features.width && *features.width)
+        windowRect.setWidth(*features.width + (windowRect.width() - viewportSize.width()));
+    if (features.height && *features.height)
+        windowRect.setHeight(*features.height + (windowRect.height() - viewportSize.height()));
 
     // Ensure non-NaN values, minimum size as well as being within valid screen area.
     FloatRect newWindowRect = DOMWindow::adjustWindowRect(page, windowRect);
@@ -3556,10 +3573,10 @@ RefPtr<Frame> createWindow(Frame& openerFrame, Frame& lookupFrame, const FrameLo
     // On iOS, width and height refer to the viewport dimensions.
     ViewportArguments arguments;
     // Zero width and height mean using default size, not minimum one.
-    if (features.widthSet && features.width)
-        arguments.width = features.width;
-    if (features.heightSet && features.height)
-        arguments.height = features.height;
+    if (features.width && *features.width)
+        arguments.width = *features.width;
+    if (features.height && *features.height)
+        arguments.height = *features.height;
     frame->setViewportArguments(arguments);
 #endif
 

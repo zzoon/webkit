@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -80,7 +80,7 @@ static const unsigned outOfLineGrowthFactor = 2;
 struct PropertyMapEntry {
     UniquedStringImpl* key;
     PropertyOffset offset;
-    unsigned attributes;
+    uint8_t attributes;
 
     PropertyMapEntry()
         : key(nullptr)
@@ -94,7 +94,33 @@ struct PropertyMapEntry {
         , offset(offset)
         , attributes(attributes)
     {
+        ASSERT(this->attributes == attributes);
     }
+};
+
+class StructureFireDetail : public FireDetail {
+public:
+    StructureFireDetail(const Structure* structure)
+        : m_structure(structure)
+    {
+    }
+    
+    virtual void dump(PrintStream& out) const override;
+
+private:
+    const Structure* m_structure;
+};
+
+class DeferredStructureTransitionWatchpointFire {
+    WTF_MAKE_NONCOPYABLE(DeferredStructureTransitionWatchpointFire);
+public:
+    JS_EXPORT_PRIVATE DeferredStructureTransitionWatchpointFire();
+    JS_EXPORT_PRIVATE ~DeferredStructureTransitionWatchpointFire();
+    
+    void add(const Structure*);
+    
+private:
+    const Structure* m_structure;
 };
 
 class Structure final : public JSCell {
@@ -137,13 +163,13 @@ public:
 
     static void dumpStatistics();
 
-    JS_EXPORT_PRIVATE static Structure* addPropertyTransition(VM&, Structure*, PropertyName, unsigned attributes, PropertyOffset&, PutPropertySlot::Context = PutPropertySlot::UnknownContext);
+    JS_EXPORT_PRIVATE static Structure* addPropertyTransition(VM&, Structure*, PropertyName, unsigned attributes, PropertyOffset&, PutPropertySlot::Context = PutPropertySlot::UnknownContext, DeferredStructureTransitionWatchpointFire* = nullptr);
     static Structure* addPropertyTransitionToExistingStructureConcurrently(Structure*, UniquedStringImpl* uid, unsigned attributes, PropertyOffset&);
     JS_EXPORT_PRIVATE static Structure* addPropertyTransitionToExistingStructure(Structure*, PropertyName, unsigned attributes, PropertyOffset&);
     static Structure* removePropertyTransition(VM&, Structure*, PropertyName, PropertyOffset&);
     JS_EXPORT_PRIVATE static Structure* changePrototypeTransition(VM&, Structure*, JSValue prototype);
     JS_EXPORT_PRIVATE static Structure* attributeChangeTransition(VM&, Structure*, PropertyName, unsigned attributes);
-    JS_EXPORT_PRIVATE static Structure* toCacheableDictionaryTransition(VM&, Structure*);
+    JS_EXPORT_PRIVATE static Structure* toCacheableDictionaryTransition(VM&, Structure*, DeferredStructureTransitionWatchpointFire* = nullptr);
     static Structure* toUncacheableDictionaryTransition(VM&, Structure*);
     JS_EXPORT_PRIVATE static Structure* sealTransition(VM&, Structure*);
     JS_EXPORT_PRIVATE static Structure* freezeTransition(VM&, Structure*);
@@ -169,7 +195,19 @@ public:
     bool isDictionary() const { return dictionaryKind() != NoneDictionaryKind; }
     bool isUncacheableDictionary() const { return dictionaryKind() == UncachedDictionaryKind; }
   
-    bool propertyAccessesAreCacheable() { return dictionaryKind() != UncachedDictionaryKind && !typeInfo().prohibitsPropertyCaching(); }
+    bool propertyAccessesAreCacheable()
+    {
+        return dictionaryKind() != UncachedDictionaryKind
+            && !typeInfo().prohibitsPropertyCaching()
+            && !(typeInfo().hasImpureGetOwnPropertySlot() && !typeInfo().newImpurePropertyFiresWatchpoints());
+    }
+    
+    bool needImpurePropertyWatchpoint()
+    {
+        return propertyAccessesAreCacheable()
+            && typeInfo().hasImpureGetOwnPropertySlot()
+            && typeInfo().newImpurePropertyFiresWatchpoints();
+    }
 
     // We use SlowPath in GetByIdStatus for structures that may get new impure properties later to prevent
     // DFG from inlining property accesses since structures don't transition when a new impure property appears.
@@ -177,7 +215,7 @@ public:
     {
         return typeInfo().hasImpureGetOwnPropertySlot();
     }
-
+    
     // Type accessors.
     TypeInfo typeInfo() const { ASSERT(structure()->classInfo() == info()); return m_blob.typeInfo(m_outOfLineTypeFlags); }
     bool isObject() const { return typeInfo().isObject(); }
@@ -388,6 +426,17 @@ public:
         // watching it. We should come up with a comprehensive story for not watching things that
         // aren't profitable to watch.
         // https://bugs.webkit.org/show_bug.cgi?id=133625
+        
+        // - We don't watch Structures that either decided not to be watched, or whose predecessors
+        //   decided not to be watched. This happens either when a transition is fired while being
+        //   watched.
+        if (transitionWatchpointIsLikelyToBeFired())
+            return false;
+
+        // - Don't watch Structures that had been dictionaries.
+        if (hasBeenDictionary())
+            return false;
+        
         return true;
     }
     
@@ -402,7 +451,7 @@ public:
         m_transitionWatchpointSet.add(watchpoint);
     }
     
-    void didTransitionFromThisStructure() const;
+    void didTransitionFromThisStructure(DeferredStructureTransitionWatchpointFire* = nullptr) const;
     
     InlineWatchpointSet& transitionWatchpointSet() const
     {
@@ -477,15 +526,17 @@ public:
     DEFINE_BITFIELD(bool, hasBeenFlattenedBefore, HasBeenFlattenedBefore, 1, 24);
     DEFINE_BITFIELD(bool, hasCustomGetterSetterProperties, HasCustomGetterSetterProperties, 1, 25);
     DEFINE_BITFIELD(bool, didWatchInternalProperties, DidWatchInternalProperties, 1, 26);
+    DEFINE_BITFIELD(bool, transitionWatchpointIsLikelyToBeFired, TransitionWatchpointIsLikelyToBeFired, 1, 27);
+    DEFINE_BITFIELD(bool, hasBeenDictionary, HasBeenDictionary, 1, 28);
 
 private:
     friend class LLIntOffsetsExtractor;
 
     JS_EXPORT_PRIVATE Structure(VM&, JSGlobalObject*, JSValue prototype, const TypeInfo&, const ClassInfo*, IndexingType, unsigned inlineCapacity);
     Structure(VM&);
-    Structure(VM&, Structure*);
+    Structure(VM&, Structure*, DeferredStructureTransitionWatchpointFire*);
 
-    static Structure* create(VM&, Structure*);
+    static Structure* create(VM&, Structure*, DeferredStructureTransitionWatchpointFire* = nullptr);
     
     static Structure* addPropertyTransitionToExistingStructureImpl(Structure*, UniquedStringImpl* uid, unsigned attributes, PropertyOffset&);
 
@@ -495,7 +546,7 @@ private:
     // to unlock it.
     void findStructuresAndMapForMaterialization(Vector<Structure*, 8>& structures, Structure*&, PropertyTable*&);
     
-    static Structure* toDictionaryTransition(VM&, Structure*, DictionaryKind);
+    static Structure* toDictionaryTransition(VM&, Structure*, DictionaryKind, DeferredStructureTransitionWatchpointFire* = nullptr);
 
     PropertyOffset add(VM&, PropertyName, unsigned attributes);
     PropertyOffset remove(PropertyName);

@@ -136,7 +136,7 @@ MediaPlayerPrivateMediaSourceAVFObjC::MediaPlayerPrivateMediaSourceAVFObjC(Media
     : m_player(player)
     , m_weakPtrFactory(this)
     , m_synchronizer(adoptNS([allocAVSampleBufferRenderSynchronizerInstance() init]))
-    , m_seekTimer(*this, &MediaPlayerPrivateMediaSourceAVFObjC::seekTimerFired)
+    , m_seekTimer(*this, &MediaPlayerPrivateMediaSourceAVFObjC::seekInternal)
     , m_session(nullptr)
     , m_networkState(MediaPlayer::Empty)
     , m_readyState(MediaPlayer::HaveNothing)
@@ -210,9 +210,9 @@ bool MediaPlayerPrivateMediaSourceAVFObjC::isAvailable()
         && class_getInstanceMethod(getAVSampleBufferAudioRendererClass(), @selector(setMuted:));
 }
 
-static HashSet<String> mimeTypeCache()
+static const HashSet<String>& mimeTypeCache()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<String>, cache, ());
+    static NeverDestroyed<HashSet<String>> cache;
     static bool typeListInitialized = false;
 
     if (typeListInitialized)
@@ -221,7 +221,7 @@ static HashSet<String> mimeTypeCache()
 
     NSArray *types = [getAVURLAssetClass() audiovisualMIMETypes];
     for (NSString *mimeType in types)
-        cache.add(mimeType);
+        cache.get().add(mimeType);
     
     return cache;
 } 
@@ -236,8 +236,12 @@ MediaPlayer::SupportsType MediaPlayerPrivateMediaSourceAVFObjC::supportsType(con
     // This engine does not support non-media-source sources.
     if (!parameters.isMediaSource)
         return MediaPlayer::IsNotSupported;
+#if ENABLE(MEDIA_STREAM)
+    if (parameters.isMediaStream)
+        return MediaPlayer::IsNotSupported;
+#endif
 
-    if (!mimeTypeCache().contains(parameters.type))
+    if (parameters.type.isEmpty() || !mimeTypeCache().contains(parameters.type))
         return MediaPlayer::IsNotSupported;
 
     // The spec says:
@@ -265,6 +269,13 @@ void MediaPlayerPrivateMediaSourceAVFObjC::load(const String& url, MediaSourcePr
 
     m_mediaSourcePrivate = MediaSourcePrivateAVFObjC::create(this, client);
 }
+
+#if ENABLE(MEDIA_STREAM)
+void MediaPlayerPrivateMediaSourceAVFObjC::load(MediaStreamPrivate&)
+{
+    setNetworkState(MediaPlayer::FormatError);
+}
+#endif
 
 void MediaPlayerPrivateMediaSourceAVFObjC::cancelLoad()
 {
@@ -411,11 +422,6 @@ void MediaPlayerPrivateMediaSourceAVFObjC::seekWithTolerance(const MediaTime& ti
     m_seekTimer.startOneShot(0);
 }
 
-void MediaPlayerPrivateMediaSourceAVFObjC::seekTimerFired()
-{
-    seekInternal();
-}
-
 void MediaPlayerPrivateMediaSourceAVFObjC::seekInternal()
 {
     std::unique_ptr<PendingSeek> pendingSeek;
@@ -519,12 +525,12 @@ void MediaPlayerPrivateMediaSourceAVFObjC::setSize(const IntSize&)
     // No-op.
 }
 
-void MediaPlayerPrivateMediaSourceAVFObjC::paint(GraphicsContext*, const FloatRect&)
+void MediaPlayerPrivateMediaSourceAVFObjC::paint(GraphicsContext&, const FloatRect&)
 {
     // FIXME(125157): Implement painting.
 }
 
-void MediaPlayerPrivateMediaSourceAVFObjC::paintCurrentFrameInContext(GraphicsContext*, const FloatRect&)
+void MediaPlayerPrivateMediaSourceAVFObjC::paintCurrentFrameInContext(GraphicsContext&, const FloatRect&)
 {
     // FIXME(125157): Implement painting.
 }

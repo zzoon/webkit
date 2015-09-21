@@ -33,14 +33,17 @@
 #if ENABLE(STREAMS_API)
 
 #include "DOMWrapperWorld.h"
+#include "Dictionary.h"
 #include "ExceptionCode.h"
 #include "JSDOMPromise.h"
 #include "JSReadableStream.h"
 #include "JSReadableStreamController.h"
 #include "ScriptExecutionContext.h"
+#include "ScriptState.h"
 #include <runtime/Error.h>
 #include <runtime/Exception.h>
 #include <runtime/JSCJSValueInlines.h>
+#include <runtime/JSNativeStdFunction.h>
 #include <runtime/JSPromise.h>
 #include <runtime/JSString.h>
 #include <runtime/StructureInlines.h>
@@ -48,11 +51,6 @@
 using namespace JSC;
 
 namespace WebCore {
-
-static inline JSValue getPropertyFromObject(ExecState& exec, JSObject& object, const char* identifier)
-{
-    return object.get(&exec, Identifier::fromString(&exec, identifier));
-}
 
 static inline JSValue callFunction(ExecState& exec, JSValue jsFunction, JSValue thisValue, const ArgList& arguments)
 {
@@ -100,10 +98,19 @@ JSDOMGlobalObject* ReadableJSStream::globalObject()
     return jsDynamicCast<JSDOMGlobalObject*>(m_source->globalObject());
 }
 
+static inline JSFunction* createGenericErrorRejectedFunction(ExecState& state, ReadableJSStream& readableStream)
+{
+    RefPtr<ReadableJSStream> stream = &readableStream;
+    return JSNativeStdFunction::create(state.vm(), state.callee()->globalObject(), 1, String(), [stream](ExecState* state) {
+        stream->storeError(*state, state->argument(0));
+        return JSValue::encode(jsUndefined());
+    });
+}
+
 static inline JSFunction* createStartResultFulfilledFunction(ExecState& state, ReadableStream& readableStream)
 {
     RefPtr<ReadableStream> stream = &readableStream;
-    return JSFunction::create(state.vm(), state.callee()->globalObject(), 1, String(), [stream](ExecState*) {
+    return JSNativeStdFunction::create(state.vm(), state.callee()->globalObject(), 1, String(), [stream](ExecState*) {
         stream->start();
         return JSValue::encode(jsUndefined());
     });
@@ -115,6 +122,19 @@ static inline void startReadableStreamAsync(ReadableStream& stream)
     stream.scriptExecutionContext()->postTask([protectedStream](ScriptExecutionContext&) {
         protectedStream->start();
     });
+}
+
+JSC::JSValue ReadableEnqueuingStream<ReadableJSStreamValue>::read()
+{
+    ReadableJSStreamValue chunk = m_queue.takeFirst();
+    m_totalQueueSize -= chunk.size;
+    return chunk.value.get();
+}
+
+void ReadableEnqueuingStream<ReadableJSStreamValue>::enqueueChunk(ReadableJSStreamValue&& chunk)
+{
+    m_totalQueueSize += chunk.size;
+    m_queue.append(WTF::move(chunk));
 }
 
 void ReadableJSStream::doStart(ExecState& exec)
@@ -131,13 +151,13 @@ void ReadableJSStream::doStart(ExecState& exec)
         return;
     }
 
-    thenPromise(exec, promise, createStartResultFulfilledFunction(exec, *this), m_errorFunction.get());
+    thenPromise(exec, promise, createStartResultFulfilledFunction(exec, *this), createGenericErrorRejectedFunction(exec, *this));
 }
 
-static inline JSFunction* createPullResultFulfilledFunction(ExecState& exec, ReadableJSStream& stream)
+static inline JSFunction* createPullResultFulfilledFunction(ExecState& exec, ReadableStream& stream)
 {
-    RefPtr<ReadableJSStream> protectedStream = &stream;
-    return JSFunction::create(exec.vm(), exec.callee()->globalObject(), 0, String(), [protectedStream](ExecState*) {
+    RefPtr<ReadableStream> protectedStream = &stream;
+    return JSNativeStdFunction::create(exec.vm(), exec.callee()->globalObject(), 0, String(), [protectedStream](ExecState*) {
         protectedStream->finishPulling();
         return JSValue::encode(jsUndefined());
     });
@@ -151,7 +171,7 @@ bool ReadableJSStream::doPull()
     JSPromise* promise = invoke(state, "pull", jsController(state, globalObject()));
 
     if (promise)
-        thenPromise(state, promise, createPullResultFulfilledFunction(state, *this), m_errorFunction.get());
+        thenPromise(state, promise, createPullResultFulfilledFunction(state, *this), createGenericErrorRejectedFunction(state, *this));
 
     if (state.hadException()) {
         storeException(state);
@@ -162,10 +182,10 @@ bool ReadableJSStream::doPull()
     return !promise;
 }
 
-static JSFunction* createCancelResultFulfilledFunction(ExecState& exec, ReadableJSStream& stream)
+static JSFunction* createCancelResultFulfilledFunction(ExecState& exec, ReadableStream& stream)
 {
-    RefPtr<ReadableJSStream> protectedStream = &stream;
-    return JSFunction::create(exec.vm(), exec.callee()->globalObject(), 1, String(), [protectedStream](ExecState*) {
+    RefPtr<ReadableStream> protectedStream = &stream;
+    return JSNativeStdFunction::create(exec.vm(), exec.callee()->globalObject(), 1, String(), [protectedStream](ExecState*) {
         protectedStream->notifyCancelSucceeded();
         return JSValue::encode(jsUndefined());
     });
@@ -174,7 +194,7 @@ static JSFunction* createCancelResultFulfilledFunction(ExecState& exec, Readable
 static JSFunction* createCancelResultRejectedFunction(ExecState& exec, ReadableJSStream& stream)
 {
     RefPtr<ReadableJSStream> protectedStream = &stream;
-    return JSFunction::create(exec.vm(), exec.callee()->globalObject(), 1, String(), [protectedStream](ExecState* exec) {
+    return JSNativeStdFunction::create(exec.vm(), exec.callee()->globalObject(), 1, String(), [protectedStream](ExecState* exec) {
         protectedStream->storeError(*exec, exec->argument(0));
         protectedStream->notifyCancelFailed();
         return JSValue::encode(jsUndefined());
@@ -199,66 +219,43 @@ bool ReadableJSStream::doCancel(JSValue reason)
     return !promise;
 }
 
-static inline double normalizeHighWaterMark(ExecState& exec, JSObject& strategy)
+RefPtr<ReadableJSStream> ReadableJSStream::create(JSC::ExecState& state, JSC::JSValue source, const Dictionary& strategy)
 {
-    JSValue jsHighWaterMark = getPropertyFromObject(exec, strategy, "highWaterMark");
-
-    if (exec.hadException())
-        return 0;
-
-    if (jsHighWaterMark.isUndefined())
-        return 1;
-
-    double highWaterMark = jsHighWaterMark.toNumber(&exec);
-
-    if (exec.hadException())
-        return 0;
-
-    if (std::isnan(highWaterMark)) {
-        throwVMError(&exec, createTypeError(&exec, ASCIILiteral("Value is NaN")));
-        return 0;
-    }
-    if (highWaterMark < 0) {
-        throwVMError(&exec, createRangeError(&exec, ASCIILiteral("Not a positive value")));
-        return 0;
-    }
-    return highWaterMark;
-}
-
-RefPtr<ReadableJSStream> ReadableJSStream::create(ExecState& state, ScriptExecutionContext& scriptExecutionContext)
-{
-    // FIXME: We should consider reducing the binding code herei (using Dictionary/regular binding constructor and/or improving the IDL generator). 
     JSObject* jsSource;
-    JSValue value = state.argument(0);
-    if (value.isObject())
-        jsSource = value.getObject();
-    else if (!value.isUndefined()) {
-        throwVMError(&state, createTypeError(&state, ASCIILiteral("First argument, if any, should be an object")));
+    if (source.isObject())
+        jsSource = source.getObject();
+    else if (!source.isUndefined()) {
+        throwVMTypeError(&state, "Argument 1 of ReadableStream constructor must be an object");
         return nullptr;
     } else
         jsSource = JSFinalObject::create(state.vm(), JSFinalObject::createStructure(state.vm(), state.callee()->globalObject(), jsNull(), 1));
 
     double highWaterMark = 1;
     JSFunction* sizeFunction = nullptr;
-    value = state.argument(1);
-    if (value.isObject()) {
-        JSObject& strategyObject = *value.getObject();
-        highWaterMark = normalizeHighWaterMark(state, strategyObject);
-        if (state.hadException())
+    if (!strategy.isUndefinedOrNull()) {
+        if (strategy.get("highWaterMark", highWaterMark)) {
+            if (std::isnan(highWaterMark)) {
+                throwVMTypeError(&state, "'highWaterMark' of Argument 2 of ReadableStream constructor cannot be NaN");
+                return nullptr;
+            }
+            if (highWaterMark < 0) {
+                throwVMRangeError(&state, "'highWaterMark' of Argument 2 of ReadableStream constructor cannot be negative");
+                return nullptr;
+            }
+
+        } else if (state.hadException())
             return nullptr;
 
-        if (!(sizeFunction = jsDynamicCast<JSFunction*>(getPropertyFromObject(state, strategyObject, "size")))) {
-            if (!state.hadException())
-                throwVMError(&state, createTypeError(&state, ASCIILiteral("size parameter should be a function")));
+        if (strategy.get("size", sizeFunction)) {
+            if (!sizeFunction) {
+                throwVMTypeError(&state, "'size' of Argument 2 of ReadableStream constructor must be a function");
+                return nullptr;
+            }
+        } else if (state.hadException())
             return nullptr;
-        }
-        
-    } else if (!value.isUndefined()) {
-        throwVMError(&state, createTypeError(&state, ASCIILiteral("Second argument, if any, should be an object")));
-        return nullptr;
     }
 
-    RefPtr<ReadableJSStream> readableStream = adoptRef(*new ReadableJSStream(scriptExecutionContext, state, jsSource, highWaterMark, sizeFunction));
+    RefPtr<ReadableJSStream> readableStream = adoptRef(*new ReadableJSStream(state, jsSource, highWaterMark, sizeFunction));
     readableStream->doStart(state);
 
     if (state.hadException())
@@ -267,17 +264,10 @@ RefPtr<ReadableJSStream> ReadableJSStream::create(ExecState& state, ScriptExecut
     return readableStream;
 }
 
-ReadableJSStream::ReadableJSStream(ScriptExecutionContext& scriptExecutionContext, ExecState& state, JSObject* source, double highWaterMark, JSFunction* sizeFunction)
-    : ReadableStream(scriptExecutionContext)
-    , m_highWaterMark(highWaterMark)
+ReadableJSStream::ReadableJSStream(ExecState& state, JSObject* source, double highWaterMark, JSFunction* sizeFunction)
+    : ReadableEnqueuingStream<ReadableJSStreamValue>(*scriptExecutionContextFromExecState(&state), highWaterMark)
 {
     m_source.set(state.vm(), source);
-    // We do not take a Ref to the stream as this would cause a Ref cycle.
-    // The resolution callback used jointly with m_errorFunction as promise callbacks should protect the stream instead.
-    m_errorFunction.set(state.vm(), JSFunction::create(state.vm(), state.callee()->globalObject(), 1, String(), [this](ExecState* state) {
-        storeError(*state, state->argument(0));
-        return JSValue::encode(jsUndefined());
-    }));
     if (sizeFunction)
         m_sizeFunction.set(state.vm(), sizeFunction);
 }
@@ -323,21 +313,6 @@ void ReadableJSStream::storeError(JSC::ExecState& exec, JSValue error)
     changeStateToErrored();
 }
 
-bool ReadableJSStream::hasValue() const
-{
-    return m_chunkQueue.size();
-}
-
-JSValue ReadableJSStream::read()
-{
-    ASSERT(hasValue());
-
-    Chunk chunk = m_chunkQueue.takeFirst();
-    m_totalQueueSize -= chunk.size;
-
-    return chunk.value.get();
-}
-
 void ReadableJSStream::enqueue(JSC::ExecState& state, JSC::JSValue chunk)
 {
     if (isErrored()) {
@@ -360,8 +335,7 @@ void ReadableJSStream::enqueue(JSC::ExecState& state, JSC::JSValue chunk)
     if (state.hadException())
         return;
 
-    m_chunkQueue.append({ JSC::Strong<JSC::Unknown>(state.vm(), chunk), size });
-    m_totalQueueSize += size;
+    enqueueChunk({ JSC::Strong<JSC::Unknown>(state.vm(), chunk), size });
 
     pull();
 }

@@ -33,10 +33,10 @@ public:
     void invalidateRequests();
 
     // Create a request to be presented to the user.
-    PassRefPtr<UserMediaPermissionRequestProxy> createRequest(uint64_t userMediaID, bool audio, bool video);
+    PassRefPtr<UserMediaPermissionRequestProxy> createRequest(uint64_t userMediaID, bool audio, bool video, const Vector<String>& deviceUIDsVideo, const Vector<String>& deviceUIDsAudio);
 
     // Called by UserMediaPermissionRequestProxy when a decision is made by the user.
-    void didReceiveUserMediaPermissionDecision(uint64_t, bool allow);
+    void didReceiveUserMediaPermissionDecision(uint64_t, bool allow, const String& videoDeviceUID, const String& audioDeviceUID);
 
 private:
     HashMap<uint64_t, RefPtr<UserMediaPermissionRequestProxy>> m_pendingRequests;

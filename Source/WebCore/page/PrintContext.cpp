@@ -201,7 +201,7 @@ void PrintContext::spoolPage(GraphicsContext& ctx, int pageNumber, float width)
     ctx.scale(FloatSize(scale, scale));
     ctx.translate(-pageRect.x(), -pageRect.y());
     ctx.clip(pageRect);
-    m_frame->view()->paintContents(&ctx, pageRect);
+    m_frame->view()->paintContents(ctx, pageRect);
     ctx.restore();
 }
 
@@ -211,7 +211,7 @@ void PrintContext::spoolRect(GraphicsContext& ctx, const IntRect& rect)
     ctx.save();
     ctx.translate(-rect.x(), -rect.y());
     ctx.clip(rect);
-    m_frame->view()->paintContents(&ctx, rect);
+    m_frame->view()->paintContents(ctx, rect);
     ctx.restore();
 }
 
@@ -250,8 +250,8 @@ int PrintContext::pageNumberForElement(Element* element, const FloatSize& pageSi
     scaledPageSize.scale(frame->view()->contentsSize().width() / pageRect.width());
     printContext.computePageRectsWithPageSize(scaledPageSize, false);
 
-    int top = box->pixelSnappedOffsetTop();
-    int left = box->pixelSnappedOffsetLeft();
+    int top = roundToInt(box->offsetTop());
+    int left = roundToInt(box->offsetLeft());
     size_t pageNumber = 0;
     for (; pageNumber < printContext.pageCount(); pageNumber++) {
         const IntRect& page = printContext.pageRect(pageNumber);

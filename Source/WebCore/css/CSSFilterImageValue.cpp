@@ -50,7 +50,7 @@ CSSFilterImageValue::~CSSFilterImageValue()
 String CSSFilterImageValue::customCSSText() const
 {
     StringBuilder result;
-    result.appendLiteral("-webkit-filter(");
+    result.appendLiteral("filter(");
     result.append(m_imageValue->cssText());
     result.appendLiteral(", ");
     result.append(m_filterValue->cssText());
@@ -60,8 +60,12 @@ String CSSFilterImageValue::customCSSText() const
 
 FloatSize CSSFilterImageValue::fixedSize(const RenderElement* renderer)
 {
+    // FIXME: Skip Content Security Policy check when filter is applied to an element in a user agent shadow tree.
+    // See <https://bugs.webkit.org/show_bug.cgi?id=146663>.
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+
     CachedResourceLoader& cachedResourceLoader = renderer->document().cachedResourceLoader();
-    CachedImage* cachedImage = cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader);
+    CachedImage* cachedImage = cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader, options);
 
     if (!cachedImage)
         return FloatSize();
@@ -79,11 +83,11 @@ bool CSSFilterImageValue::knownToBeOpaque(const RenderElement*) const
     return false;
 }
 
-void CSSFilterImageValue::loadSubimages(CachedResourceLoader& cachedResourceLoader)
+void CSSFilterImageValue::loadSubimages(CachedResourceLoader& cachedResourceLoader, const ResourceLoaderOptions& options)
 {
     CachedResourceHandle<CachedImage> oldCachedImage = m_cachedImage;
 
-    m_cachedImage = CSSImageGeneratorValue::cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader);
+    m_cachedImage = CSSImageGeneratorValue::cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader, options);
 
     if (m_cachedImage != oldCachedImage) {
         if (oldCachedImage)
@@ -95,13 +99,17 @@ void CSSFilterImageValue::loadSubimages(CachedResourceLoader& cachedResourceLoad
     m_filterSubimageObserver.setReady(true);
 }
 
-PassRefPtr<Image> CSSFilterImageValue::image(RenderElement* renderer, const FloatSize& size)
+RefPtr<Image> CSSFilterImageValue::image(RenderElement* renderer, const FloatSize& size)
 {
     if (size.isEmpty())
         return nullptr;
 
+    // FIXME: Skip Content Security Policy check when filter is applied to an element in a user agent shadow tree.
+    // See <https://bugs.webkit.org/show_bug.cgi?id=146663>.
+    ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+
     CachedResourceLoader& cachedResourceLoader = renderer->document().cachedResourceLoader();
-    CachedImage* cachedImage = cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader);
+    CachedImage* cachedImage = cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader, options);
 
     if (!cachedImage)
         return Image::nullImage();
@@ -115,12 +123,13 @@ PassRefPtr<Image> CSSFilterImageValue::image(RenderElement* renderer, const Floa
     std::unique_ptr<ImageBuffer> texture = ImageBuffer::create(size);
     if (!texture)
         return Image::nullImage();
-    texture->context()->drawImage(image, ColorSpaceDeviceRGB, IntPoint());
+    FloatRect imageRect = FloatRect(FloatPoint(), size);
+    texture->context().drawImage(image, ColorSpaceDeviceRGB, imageRect);
 
     RefPtr<FilterEffectRenderer> filterRenderer = FilterEffectRenderer::create();
     filterRenderer->setSourceImage(WTF::move(texture));
-    filterRenderer->setSourceImageRect(FloatRect(FloatPoint(), size));
-    filterRenderer->setFilterRegion(FloatRect(FloatPoint(), size));
+    filterRenderer->setSourceImageRect(imageRect);
+    filterRenderer->setFilterRegion(imageRect);
     if (!filterRenderer->build(renderer, m_filterOperations, FilterFunction))
         return Image::nullImage();
     filterRenderer->apply();

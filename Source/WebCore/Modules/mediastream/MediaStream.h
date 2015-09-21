@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
  * Copyright (C) 2011, 2015 Ericsson AB. All rights reserved.
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  * Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,13 +44,16 @@
 
 namespace WebCore {
 
-class MediaStream final : public RefCounted<MediaStream>, public URLRegistrable, public ScriptWrappable, public MediaStreamPrivateClient, public EventTargetWithInlineData, public ContextDestructionObserver, public MediaStreamTrack::Observer {
+class MediaStream final : public URLRegistrable, public ScriptWrappable, public MediaStreamPrivateClient, public EventTargetWithInlineData, public ContextDestructionObserver, public MediaStreamTrack::Observer {
 public:
     class Observer {
     public:
         virtual ~Observer() { }
         virtual void didAddOrRemoveTrack() = 0;
     };
+
+    static void setRegistry(URLRegistry&);
+    static MediaStream* lookUp(const URL&);
 
     static Ref<MediaStream> create(ScriptExecutionContext&);
     static Ref<MediaStream> create(ScriptExecutionContext&, MediaStream*);
@@ -64,8 +67,8 @@ public:
     void removeTrack(MediaStreamTrack*);
     MediaStreamTrack* getTrackById(String);
 
-    Vector<RefPtr<MediaStreamTrack>> getAudioTracks() const;
-    Vector<RefPtr<MediaStreamTrack>> getVideoTracks() const;
+    Vector<RefPtr<MediaStreamTrack>> getAudioTracks();
+    Vector<RefPtr<MediaStreamTrack>> getVideoTracks();
     Vector<RefPtr<MediaStreamTrack>> getTracks() const;
 
     RefPtr<MediaStream> clone();
@@ -78,8 +81,8 @@ public:
     virtual EventTargetInterface eventTargetInterface() const final { return MediaStreamEventTargetInterfaceType; }
     virtual ScriptExecutionContext* scriptExecutionContext() const final { return ContextDestructionObserver::scriptExecutionContext(); }
 
-    using RefCounted<MediaStream>::ref;
-    using RefCounted<MediaStream>::deref;
+    using RefCounted<MediaStreamPrivateClient>::ref;
+    using RefCounted<MediaStreamPrivateClient>::deref;
 
     // URLRegistrable
     virtual URLRegistry& registry() const override;

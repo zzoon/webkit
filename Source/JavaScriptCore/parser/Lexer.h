@@ -33,32 +33,6 @@
 
 namespace JSC {
 
-class Keywords {
-public:
-    bool isKeyword(const Identifier& ident) const
-    {
-        return m_keywordTable.entry(ident);
-    }
-    
-    const HashTableValue* getKeyword(const Identifier& ident) const
-    {
-        return m_keywordTable.entry(ident);
-    }
-
-    explicit Keywords(VM&);
-
-    ~Keywords()
-    {
-        m_keywordTable.deleteTable();
-    }
-    
-private:
-    friend class VM;
-    
-    VM& m_vm;
-    const HashTable m_keywordTable;
-};
-
 enum LexerFlags {
     LexerFlagsIgnoreReservedWords = 1, 
     LexerFlagsDontBuildStrings = 2,
@@ -66,6 +40,8 @@ enum LexerFlags {
 };
 
 struct ParsedUnicodeEscapeValue;
+
+bool isLexerKeyword(const Identifier&);
 
 template <typename T>
 class Lexer {
@@ -84,12 +60,10 @@ public:
 
     // Functions to set up parsing.
     void setCode(const SourceCode&, ParserArena*);
-    void setIsReparsing() { m_isReparsing = true; }
-    bool isReparsing() const { return m_isReparsing; }
+    void setIsReparsingFunction() { m_isReparsingFunction = true; }
+    bool isReparsingFunction() const { return m_isReparsingFunction; }
 
-#if ENABLE(ES6_ARROWFUNCTION_SYNTAX)
     void setTokenPosition(JSToken* tokenRecord);
-#endif
     JSTokenType lex(JSToken*, unsigned, bool strictMode);
     bool nextTokenIsColon();
     int lineNumber() const { return m_lineNumber; }
@@ -224,7 +198,7 @@ private:
     const T* m_lineStart;
     JSTextPosition m_positionBeforeLastNewline;
     JSTokenLocation m_lastTockenLocation;
-    bool m_isReparsing;
+    bool m_isReparsingFunction;
     bool m_atLineStart;
     bool m_error;
     String m_lexErrorMessage;

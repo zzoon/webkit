@@ -197,18 +197,19 @@ void reifyInlinedCallFrames(CCallHelpers& jit, const OSRExitBase& exit)
             jit.storePtr(AssemblyHelpers::TrustedImmPtr(trueReturnPC), AssemblyHelpers::addressFor(inlineCallFrame->stackOffset + virtualRegisterForArgument(inlineCallFrame->arguments.size()).offset()));
                          
         jit.storePtr(AssemblyHelpers::TrustedImmPtr(baselineCodeBlock), AssemblyHelpers::addressFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::CodeBlock)));
+        jit.emitSaveCalleeSavesFor(baselineCodeBlock, static_cast<VirtualRegister>(inlineCallFrame->stackOffset));
         if (!inlineCallFrame->isVarargs())
             jit.store32(AssemblyHelpers::TrustedImm32(inlineCallFrame->arguments.size()), AssemblyHelpers::payloadFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::ArgumentCount)));
 #if USE(JSVALUE64)
         jit.store64(callerFrameGPR, AssemblyHelpers::addressForByteOffset(inlineCallFrame->callerFrameOffset()));
-        uint32_t locationBits = CallFrame::Location::encodeAsBytecodeOffset(codeOrigin.bytecodeIndex);
+        uint32_t locationBits = CallSiteIndex(codeOrigin.bytecodeIndex).bits();
         jit.store32(AssemblyHelpers::TrustedImm32(locationBits), AssemblyHelpers::tagFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::ArgumentCount)));
         if (!inlineCallFrame->isClosureCall)
             jit.store64(AssemblyHelpers::TrustedImm64(JSValue::encode(JSValue(inlineCallFrame->calleeConstant()))), AssemblyHelpers::addressFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::Callee)));
 #else // USE(JSVALUE64) // so this is the 32-bit part
         jit.storePtr(callerFrameGPR, AssemblyHelpers::addressForByteOffset(inlineCallFrame->callerFrameOffset()));
         Instruction* instruction = baselineCodeBlock->instructions().begin() + codeOrigin.bytecodeIndex;
-        uint32_t locationBits = CallFrame::Location::encodeAsBytecodeInstruction(instruction);
+        uint32_t locationBits = CallSiteIndex(instruction).bits();
         jit.store32(AssemblyHelpers::TrustedImm32(locationBits), AssemblyHelpers::tagFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::ArgumentCount)));
         jit.store32(AssemblyHelpers::TrustedImm32(JSValue::CellTag), AssemblyHelpers::tagFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::Callee)));
         if (!inlineCallFrame->isClosureCall)
@@ -217,10 +218,10 @@ void reifyInlinedCallFrames(CCallHelpers& jit, const OSRExitBase& exit)
     }
 
 #if USE(JSVALUE64)
-    uint32_t locationBits = CallFrame::Location::encodeAsBytecodeOffset(codeOrigin.bytecodeIndex);
+    uint32_t locationBits = CallSiteIndex(codeOrigin.bytecodeIndex).bits();
 #else
     Instruction* instruction = jit.baselineCodeBlock()->instructions().begin() + codeOrigin.bytecodeIndex;
-    uint32_t locationBits = CallFrame::Location::encodeAsBytecodeInstruction(instruction);
+    uint32_t locationBits = CallSiteIndex(instruction).bits();
 #endif
     jit.store32(AssemblyHelpers::TrustedImm32(locationBits), AssemblyHelpers::tagFor((VirtualRegister)(JSStack::ArgumentCount)));
 }
@@ -247,17 +248,17 @@ static void osrWriteBarrier(CCallHelpers& jit, GPRReg owner, GPRReg scratch)
 }
 #endif // ENABLE(GGC)
 
-void adjustAndJumpToTarget(CCallHelpers& jit, const OSRExitBase& exit)
+void adjustAndJumpToTarget(CCallHelpers& jit, const OSRExitBase& exit, bool isExitingToOpCatch)
 {
 #if ENABLE(GGC) 
-    jit.move(AssemblyHelpers::TrustedImmPtr(jit.codeBlock()->ownerExecutable()), GPRInfo::nonArgGPR0);
-    osrWriteBarrier(jit, GPRInfo::nonArgGPR0, GPRInfo::nonArgGPR1);
+    jit.move(AssemblyHelpers::TrustedImmPtr(jit.codeBlock()->ownerExecutable()), GPRInfo::argumentGPR1);
+    osrWriteBarrier(jit, GPRInfo::argumentGPR1, GPRInfo::nonArgGPR0);
     InlineCallFrameSet* inlineCallFrames = jit.codeBlock()->jitCode()->dfgCommon()->inlineCallFrames.get();
     if (inlineCallFrames) {
         for (InlineCallFrame* inlineCallFrame : *inlineCallFrames) {
             ScriptExecutable* ownerExecutable = inlineCallFrame->executable.get();
-            jit.move(AssemblyHelpers::TrustedImmPtr(ownerExecutable), GPRInfo::nonArgGPR0); 
-            osrWriteBarrier(jit, GPRInfo::nonArgGPR0, GPRInfo::nonArgGPR1);
+            jit.move(AssemblyHelpers::TrustedImmPtr(ownerExecutable), GPRInfo::argumentGPR1);
+            osrWriteBarrier(jit, GPRInfo::argumentGPR1, GPRInfo::nonArgGPR0);
         }
     }
 #endif
@@ -276,9 +277,11 @@ void adjustAndJumpToTarget(CCallHelpers& jit, const OSRExitBase& exit)
     void* jumpTarget = baselineCodeBlock->jitCode()->executableAddressAtOffset(mapping->m_machineCodeOffset);
 
     jit.addPtr(AssemblyHelpers::TrustedImm32(JIT::stackPointerOffsetFor(baselineCodeBlock) * sizeof(Register)), GPRInfo::callFrameRegister, AssemblyHelpers::stackPointerRegister);
+    if (isExitingToOpCatch) {
+        // Since we're jumping to op_catch, we need to set callFrameForCatch.
+        jit.storePtr(GPRInfo::callFrameRegister, jit.vm()->addressOfCallFrameForCatch());
+    }
     
-    jit.jitAssertTagsInPlace();
-
     jit.move(AssemblyHelpers::TrustedImmPtr(jumpTarget), GPRInfo::regT2);
     jit.jump(GPRInfo::regT2);
 }

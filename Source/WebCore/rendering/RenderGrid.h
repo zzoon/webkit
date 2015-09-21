@@ -49,6 +49,7 @@ public:
 
     Element& element() const { return downcast<Element>(nodeForNonAnonymous()); }
 
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
     virtual void layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight = 0) override;
 
     virtual bool avoidsFloats() const override { return true; }
@@ -61,7 +62,6 @@ private:
     virtual const char* renderName() const override;
     virtual bool isRenderGrid() const override { return true; }
     virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const override;
-    virtual void computePreferredLogicalWidths() override;
 
     class GridIterator;
     class GridSizingData;
@@ -95,6 +95,7 @@ private:
     };
     enum TrackSizeComputationPhase {
         ResolveIntrinsicMinimums,
+        ResolveContentBasedMinimums,
         ResolveMaxContentMinimums,
         ResolveIntrinsicMaximums,
         ResolveMaxContentMaximums,
@@ -117,12 +118,13 @@ private:
     GridTrackSize gridTrackSize(GridTrackSizingDirection, unsigned) const;
 
     LayoutUnit logicalContentHeightForChild(RenderBox&, Vector<GridTrack>&);
+    LayoutUnit minSizeForChild(RenderBox&, GridTrackSizingDirection, Vector<GridTrack>& columnTracks);
     LayoutUnit minContentForChild(RenderBox&, GridTrackSizingDirection, Vector<GridTrack>& columnTracks);
     LayoutUnit maxContentForChild(RenderBox&, GridTrackSizingDirection, Vector<GridTrack>& columnTracks);
     GridAxisPosition columnAxisPositionForChild(const RenderBox&) const;
     GridAxisPosition rowAxisPositionForChild(const RenderBox&) const;
-    LayoutUnit rowPositionForChild(const RenderBox&) const;
-    LayoutUnit columnPositionForChild(const RenderBox&) const;
+    LayoutUnit columnAxisOffsetForChild(const RenderBox&) const;
+    LayoutUnit rowAxisOffsetForChild(const RenderBox&) const;
     LayoutPoint findChildLogicalPosition(const RenderBox&) const;
     GridCoordinate cachedGridCoordinate(const RenderBox&) const;
 
@@ -130,12 +132,16 @@ private:
     LayoutUnit gridAreaBreadthForChild(const RenderBox& child, GridTrackSizingDirection, const Vector<GridTrack>&) const;
 
     virtual void paintChildren(PaintInfo& forSelf, const LayoutPoint& paintOffset, PaintInfo& forChild, bool usePrintRect) override;
-    bool allowedToStretchLogicalHeightForChild(const RenderBox&) const;
     bool needToStretchChildLogicalHeight(const RenderBox&) const;
     LayoutUnit marginLogicalHeightForChild(const RenderBox&) const;
     LayoutUnit computeMarginLogicalHeightForChild(const RenderBox&) const;
     LayoutUnit availableAlignmentSpaceForChildBeforeStretching(LayoutUnit gridAreaBreadthForChild, const RenderBox&) const;
-    void applyStretchAlignmentToChildIfNeeded(RenderBox&, LayoutUnit gridAreaBreadthForChild);
+    void applyStretchAlignmentToChildIfNeeded(RenderBox&);
+    bool hasAutoMarginsInColumnAxis(const RenderBox&) const;
+    bool hasAutoMarginsInRowAxis(const RenderBox&) const;
+    void resetAutoMarginsAndLogicalTopInColumnAxis(RenderBox& child);
+    void updateAutoMarginsInColumnAxisIfNeeded(RenderBox&);
+    void updateAutoMarginsInRowAxisIfNeeded(RenderBox&);
 
 #ifndef NDEBUG
     bool tracksAreWiderThanMinTrackBreadth(GridTrackSizingDirection, const Vector<GridTrack>&);

@@ -29,7 +29,9 @@
 #if PLATFORM(MAC)
 
 #import "CoreGraphicsSPI.h"
+#import "GeometryUtilities.h"
 #import "GraphicsContext.h"
+#import "PathUtilities.h"
 #import "QuartzCoreSPI.h"
 #import "TextIndicator.h"
 #import "WebActionDisablingCALayerDelegate.h"
@@ -42,8 +44,6 @@ const CFTimeInterval fadeOutAnimationDuration = 0.3;
 
 #if ENABLE(LEGACY_TEXT_INDICATOR_STYLE)
 const CGFloat midBounceScale = 1.5;
-const CGFloat horizontalBorder = 3;
-const CGFloat verticalBorder = 1;
 const CGFloat borderWidth = 1.0;
 const CGFloat cornerRadius = 3;
 const CGFloat dropShadowOffsetX = 0;
@@ -51,8 +51,6 @@ const CGFloat dropShadowOffsetY = 1;
 const CGFloat dropShadowBlurRadius = 1.5;
 #else
 const CGFloat midBounceScale = 1.25;
-const CGFloat horizontalBorder = 2;
-const CGFloat verticalBorder = 1;
 const CGFloat borderWidth = 0;
 const CGFloat cornerRadius = 0;
 const CGFloat dropShadowOffsetX = 0;
@@ -91,6 +89,73 @@ using namespace WebCore;
 
 @synthesize fadingOut = _fadingOut;
 
+static bool indicatorWantsBounce(const TextIndicator& indicator)
+{
+    switch (indicator.presentationTransition()) {
+    case TextIndicatorPresentationTransition::BounceAndCrossfade:
+    case TextIndicatorPresentationTransition::Bounce:
+        return true;
+
+    case TextIndicatorPresentationTransition::FadeIn:
+    case TextIndicatorPresentationTransition::None:
+        return false;
+    }
+
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+static bool indicatorWantsContentCrossfade(const TextIndicator& indicator)
+{
+    if (!indicator.data().contentImageWithHighlight)
+        return false;
+
+    switch (indicator.presentationTransition()) {
+    case TextIndicatorPresentationTransition::BounceAndCrossfade:
+        return true;
+
+    case TextIndicatorPresentationTransition::Bounce:
+    case TextIndicatorPresentationTransition::FadeIn:
+    case TextIndicatorPresentationTransition::None:
+        return false;
+    }
+
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+static bool indicatorWantsFadeIn(const TextIndicator& indicator)
+{
+    switch (indicator.presentationTransition()) {
+    case TextIndicatorPresentationTransition::FadeIn:
+        return true;
+
+    case TextIndicatorPresentationTransition::Bounce:
+    case TextIndicatorPresentationTransition::BounceAndCrossfade:
+    case TextIndicatorPresentationTransition::None:
+        return false;
+    }
+
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+static bool indicatorWantsManualAnimation(const TextIndicator& indicator)
+{
+    switch (indicator.presentationTransition()) {
+    case TextIndicatorPresentationTransition::FadeIn:
+        return true;
+
+    case TextIndicatorPresentationTransition::Bounce:
+    case TextIndicatorPresentationTransition::BounceAndCrossfade:
+    case TextIndicatorPresentationTransition::None:
+        return false;
+    }
+
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
 - (instancetype)initWithFrame:(NSRect)frame textIndicator:(PassRefPtr<TextIndicator>)textIndicator margin:(NSSize)margin offset:(NSPoint)offset
 {
     if (!(self = [super initWithFrame:frame]))
@@ -105,7 +170,7 @@ using namespace WebCore;
     FloatSize contentsImageLogicalSize = _textIndicator->contentImage()->size();
     contentsImageLogicalSize.scale(1 / _textIndicator->contentImageScaleFactor());
     RetainPtr<CGImageRef> contentsImage;
-    if (_textIndicator->wantsContentCrossfade())
+    if (indicatorWantsContentCrossfade(*_textIndicator))
         contentsImage = _textIndicator->contentImageWithHighlight()->getCGImageRef();
     else
         contentsImage = _textIndicator->contentImage()->getCGImageRef();
@@ -120,14 +185,23 @@ using namespace WebCore;
     RetainPtr<CGColorRef> gradientDarkColor = [NSColor colorWithDeviceRed:.929 green:.8 blue:0 alpha:1].CGColor;
     RetainPtr<CGColorRef> gradientLightColor = [NSColor colorWithDeviceRed:.949 green:.937 blue:0 alpha:1].CGColor;
 
-    for (const auto& textRect : _textIndicator->textRectsInBoundingRectCoordinates()) {
-        FloatRect offsetTextRect = textRect;
+    Vector<FloatRect> textRectsInBoundingRectCoordinates = _textIndicator->textRectsInBoundingRectCoordinates();
+
+    Vector<Path> paths = PathUtilities::pathsWithShrinkWrappedRects(textRectsInBoundingRectCoordinates, cornerRadius);
+
+    for (const auto& path : paths) {
+        FloatRect pathBoundingRect = path.boundingRect();
+
+        Path translatedPath;
+        AffineTransform transform;
+        transform.translate(-pathBoundingRect.x(), -pathBoundingRect.y());
+        translatedPath.addPath(path, transform);
+
+        FloatRect offsetTextRect = pathBoundingRect;
         offsetTextRect.move(offset.x, offset.y);
 
         FloatRect bounceLayerRect = offsetTextRect;
         bounceLayerRect.move(_margin.width, _margin.height);
-        bounceLayerRect.inflateX(horizontalBorder);
-        bounceLayerRect.inflateY(verticalBorder);
 
         RetainPtr<CALayer> bounceLayer = adoptNS([[CALayer alloc] init]);
         [bounceLayer setDelegate:[WebActionDisablingCALayerDelegate shared]];
@@ -136,22 +210,15 @@ using namespace WebCore;
         [bounceLayers addObject:bounceLayer.get()];
 
         FloatRect yellowHighlightRect(FloatPoint(), bounceLayerRect.size());
-        // FIXME (138888): Ideally we wouldn't remove the margin in this case, but we need to
-        // ensure that the yellow highlight and contentImageWithHighlight overlap precisely.
-        if (!_textIndicator->wantsMargin()) {
-            yellowHighlightRect.inflateX(-horizontalBorder);
-            yellowHighlightRect.inflateY(-verticalBorder);
-        }
 
         RetainPtr<CALayer> dropShadowLayer = adoptNS([[CALayer alloc] init]);
         [dropShadowLayer setDelegate:[WebActionDisablingCALayerDelegate shared]];
         [dropShadowLayer setShadowColor:dropShadowColor.get()];
         [dropShadowLayer setShadowRadius:dropShadowBlurRadius];
         [dropShadowLayer setShadowOffset:CGSizeMake(dropShadowOffsetX, dropShadowOffsetY)];
-        [dropShadowLayer setShadowPathIsBounds:YES];
+        [dropShadowLayer setShadowPath:translatedPath.platformPath()];
         [dropShadowLayer setShadowOpacity:1];
         [dropShadowLayer setFrame:yellowHighlightRect];
-        [dropShadowLayer setCornerRadius:cornerRadius];
         [bounceLayer addSublayer:dropShadowLayer.get()];
         [bounceLayer setValue:dropShadowLayer.get() forKey:dropShadowLayerKey];
 
@@ -161,11 +228,10 @@ using namespace WebCore;
         [rimShadowLayer setFrame:yellowHighlightRect];
         [rimShadowLayer setShadowColor:rimShadowColor.get()];
         [rimShadowLayer setShadowRadius:rimShadowBlurRadius];
-        [rimShadowLayer setShadowPathIsBounds:YES];
+        [rimShadowLayer setShadowPath:translatedPath.platformPath()];
         [rimShadowLayer setShadowOffset:CGSizeZero];
         [rimShadowLayer setShadowOpacity:1];
         [rimShadowLayer setFrame:yellowHighlightRect];
-        [rimShadowLayer setCornerRadius:cornerRadius];
         [bounceLayer addSublayer:rimShadowLayer.get()];
         [bounceLayer setValue:rimShadowLayer.get() forKey:rimShadowLayerKey];
 #endif
@@ -182,13 +248,15 @@ using namespace WebCore;
         [textLayer setDelegate:[WebActionDisablingCALayerDelegate shared]];
         [textLayer setContents:(id)contentsImage.get()];
 
-        FloatRect imageRect = textRect;
-        imageRect.move(_textIndicator->textBoundingRectInRootViewCoordinates().location() - _textIndicator->selectionRectInRootViewCoordinates().location());
+        RetainPtr<CAShapeLayer> maskLayer = adoptNS([[CAShapeLayer alloc] init]);
+        [maskLayer setPath:translatedPath.platformPath()];
+        [textLayer setMask:maskLayer.get()];
+
+        FloatRect imageRect = pathBoundingRect;
         [textLayer setContentsRect:CGRectMake(imageRect.x() / contentsImageLogicalSize.width(), imageRect.y() / contentsImageLogicalSize.height(), imageRect.width() / contentsImageLogicalSize.width(), imageRect.height() / contentsImageLogicalSize.height())];
         [textLayer setContentsGravity:kCAGravityCenter];
         [textLayer setContentsScale:_textIndicator->contentImageScaleFactor()];
         [textLayer setFrame:yellowHighlightRect];
-        [textLayer setCornerRadius:cornerRadius];
         [bounceLayer setValue:textLayer.get() forKey:textLayerKey];
         [bounceLayer addSublayer:textLayer.get()];
     }
@@ -250,8 +318,8 @@ static RetainPtr<CABasicAnimation> createFadeInAnimation(CFTimeInterval duration
 
 - (CFTimeInterval)_animationDuration
 {
-    if (_textIndicator->wantsBounce()) {
-        if (_textIndicator->wantsContentCrossfade())
+    if (indicatorWantsBounce(*_textIndicator)) {
+        if (indicatorWantsContentCrossfade(*_textIndicator))
             return bounceWithCrossfadeAnimationDuration;
         return bounceAnimationDuration;
     }
@@ -266,9 +334,9 @@ static RetainPtr<CABasicAnimation> createFadeInAnimation(CFTimeInterval duration
 
 - (void)present
 {
-    bool wantsBounce = _textIndicator->wantsBounce();
-    bool wantsCrossfade = _textIndicator->wantsContentCrossfade();
-    bool wantsFadeIn = _textIndicator->wantsFadeIn();
+    bool wantsBounce = indicatorWantsBounce(*_textIndicator);
+    bool wantsCrossfade = indicatorWantsContentCrossfade(*_textIndicator);
+    bool wantsFadeIn = indicatorWantsFadeIn(*_textIndicator);
     CFTimeInterval animationDuration = [self _animationDuration];
 
     _hasCompletedAnimation = false;
@@ -288,7 +356,7 @@ static RetainPtr<CABasicAnimation> createFadeInAnimation(CFTimeInterval duration
 
     [CATransaction begin];
     for (CALayer *bounceLayer in _bounceLayers.get()) {
-        if (_textIndicator->wantsManualAnimation())
+        if (indicatorWantsManualAnimation(*_textIndicator))
             bounceLayer.speed = 0;
 
         if (!wantsFadeIn)
@@ -360,7 +428,7 @@ TextIndicatorWindow::TextIndicatorWindow(NSView *targetView)
 
 TextIndicatorWindow::~TextIndicatorWindow()
 {
-    clearTextIndicator(TextIndicatorDismissalAnimation::FadeOut);
+    clearTextIndicator(TextIndicatorWindowDismissalAnimation::FadeOut);
 }
 
 void TextIndicatorWindow::setAnimationProgress(float progress)
@@ -371,14 +439,14 @@ void TextIndicatorWindow::setAnimationProgress(float progress)
     [m_textIndicatorView setAnimationProgress:progress];
 }
 
-void TextIndicatorWindow::clearTextIndicator(TextIndicatorDismissalAnimation animation)
+void TextIndicatorWindow::clearTextIndicator(TextIndicatorWindowDismissalAnimation animation)
 {
     RefPtr<TextIndicator> textIndicator = WTF::move(m_textIndicator);
 
     if ([m_textIndicatorView isFadingOut])
         return;
 
-    if (textIndicator && textIndicator->wantsManualAnimation() && [m_textIndicatorView hasCompletedAnimation] && animation == TextIndicatorDismissalAnimation::FadeOut) {
+    if (textIndicator && indicatorWantsManualAnimation(*textIndicator) && [m_textIndicatorView hasCompletedAnimation] && animation == TextIndicatorWindowDismissalAnimation::FadeOut) {
         startFadeOut();
         return;
     }
@@ -386,7 +454,7 @@ void TextIndicatorWindow::clearTextIndicator(TextIndicatorDismissalAnimation ani
     closeWindow();
 }
 
-void TextIndicatorWindow::setTextIndicator(Ref<TextIndicator> textIndicator, CGRect textBoundingRectInScreenCoordinates, TextIndicatorLifetime lifetime)
+void TextIndicatorWindow::setTextIndicator(Ref<TextIndicator> textIndicator, CGRect textBoundingRectInScreenCoordinates, TextIndicatorWindowLifetime lifetime)
 {
     if (m_textIndicator == textIndicator.ptr())
         return;
@@ -395,10 +463,10 @@ void TextIndicatorWindow::setTextIndicator(Ref<TextIndicator> textIndicator, CGR
 
     m_textIndicator = textIndicator.ptr();
 
-    CGFloat horizontalMargin = dropShadowBlurRadius * 2 + horizontalBorder;
-    CGFloat verticalMargin = dropShadowBlurRadius * 2 + verticalBorder;
+    CGFloat horizontalMargin = dropShadowBlurRadius * 2 + TextIndicator::defaultHorizontalMargin;
+    CGFloat verticalMargin = dropShadowBlurRadius * 2 + TextIndicator::defaultVerticalMargin;
     
-    if (m_textIndicator->wantsBounce()) {
+    if (indicatorWantsBounce(*m_textIndicator)) {
         horizontalMargin = std::max(horizontalMargin, textBoundingRectInScreenCoordinates.size.width * (midBounceScale - 1) + horizontalMargin);
         verticalMargin = std::max(verticalMargin, textBoundingRectInScreenCoordinates.size.height * (midBounceScale - 1) + verticalMargin);
     }
@@ -425,7 +493,7 @@ void TextIndicatorWindow::setTextIndicator(Ref<TextIndicator> textIndicator, CGR
     if (m_textIndicator->presentationTransition() != TextIndicatorPresentationTransition::None)
         [m_textIndicatorView present];
 
-    if (lifetime == TextIndicatorLifetime::Temporary)
+    if (lifetime == TextIndicatorWindowLifetime::Temporary)
         m_temporaryTextIndicatorTimer.startOneShot(timeBeforeFadeStarts);
 }
 

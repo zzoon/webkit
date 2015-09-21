@@ -106,9 +106,6 @@ class HTMLMediaElement
     , private TextTrackClient
     , private VideoTrackClient
 #endif
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    , public PlatformTextTrackMenuClient
-#endif
 {
 public:
     MediaPlayer* player() const { return m_player.get(); }
@@ -147,7 +144,9 @@ public:
     MediaPlayerEnums::MovieLoadType movieLoadType() const;
     
     bool inActiveDocument() const { return m_inActiveDocument; }
-    
+
+    const Document* hostingDocument() const override { return &document(); }
+
 // DOM API
 // error state
     PassRefPtr<MediaError> error() const;
@@ -302,12 +301,6 @@ public:
     virtual Vector<RefPtr<PlatformTextTrack>> outOfBandTrackSources() override;
 #endif
 
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    virtual void setSelectedTextTrack(PassRefPtr<PlatformTextTrack>) override;
-    virtual Vector<RefPtr<PlatformTextTrack>> platformTextTracks() override;
-    PlatformTextTrackMenuInterface* platformTextTrackMenu();
-#endif
-
     struct TrackGroup;
     void configureTextTrackGroupForLanguage(const TrackGroup&) const;
     void configureTextTracks();
@@ -342,9 +335,7 @@ public:
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     void webkitShowPlaybackTargetPicker();
-    bool webkitCurrentPlaybackTargetIsWireless() const;
-
-    virtual bool addEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, bool useCapture) override;
+    virtual bool addEventListener(const AtomicString& eventType, RefPtr<EventListener>&&, bool useCapture) override;
     virtual bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture) override;
 
     virtual void wirelessRoutesAvailableDidChange() override;
@@ -353,6 +344,7 @@ public:
     virtual void setWirelessPlaybackTarget(Ref<MediaPlaybackTarget>&&) override;
     virtual void setShouldPlayToPlaybackTarget(bool) override;
 #endif
+    bool webkitCurrentPlaybackTargetIsWireless() const;
 
     // EventTarget function.
     // Both Node (via HTMLElement) and ActiveDOMObject define this method, which
@@ -419,11 +411,18 @@ public:
     void mediaLoadingFailedFatally(MediaPlayerEnums::NetworkState);
 
 #if ENABLE(MEDIA_SESSION)
+    WEBCORE_EXPORT double playerVolume() const;
+
     const String& kind() const { return m_kind; }
     void setKind(const String& kind) { m_kind = kind; }
 
     MediaSession* session() const;
     void setSession(MediaSession*);
+
+    void setShouldDuck(bool);
+
+    static HTMLMediaElement* elementWithID(uint64_t);
+    uint64_t elementID() const { return m_elementID; }
 #endif
 
 #if ENABLE(MEDIA_SOURCE)
@@ -435,6 +434,7 @@ public:
 
 #if ENABLE(MEDIA_CONTROLS_SCRIPT)
     void pageScaleFactorChanged();
+    WEBCORE_EXPORT String getCurrentMediaControlsStatus();
 #endif
 
     MediaControlsHost* mediaControlsHost() { return m_mediaControlsHost.get(); }
@@ -446,6 +446,8 @@ public:
     virtual MediaProducer::MediaStateFlags mediaState() const override;
 
     void layoutSizeChanged();
+
+    void allowsMediaDocumentInlinePlaybackChanged();
 
 protected:
     HTMLMediaElement(const QualifiedName&, Document&, bool);
@@ -485,6 +487,9 @@ private:
 
     virtual bool alwaysCreateUserAgentShadowRoot() const override { return true; }
 
+    // FIXME: Shadow DOM spec says we should be able to create shadow root on audio and video elements
+    virtual bool canHaveUserAgentShadowRoot() const override final { return true; }
+
     virtual bool hasCustomFocusLogic() const override;
     virtual bool supportsFocus() const override;
     virtual bool isMouseFocusable() const override;
@@ -503,6 +508,8 @@ private:
     void suspend(ReasonForSuspension) override;
     void resume() override;
     void stop() override;
+    void stopWithoutDestroyingMediaPlayer();
+    virtual void contextDestroyed() override;
     
     virtual void mediaVolumeDidChange() override;
 
@@ -546,6 +553,10 @@ private:
     virtual RefPtr<ArrayBuffer> mediaPlayerCachedKeyForKeyId(const String& keyId) const override;
     virtual bool mediaPlayerKeyNeeded(MediaPlayer*, Uint8Array*) override;
     virtual String mediaPlayerMediaKeysStorageDirectory() const override;
+#endif
+    
+#if ENABLE(MEDIA_STREAM)
+    virtual String mediaPlayerMediaDeviceIdentifierStorageDirectory() const override;
 #endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
@@ -602,6 +613,10 @@ private:
     virtual double mediaPlayerRequestedPlaybackRate() const override final;
     virtual VideoFullscreenMode mediaPlayerFullscreenMode() const override final { return fullscreenMode(); }
 
+#if USE(GSTREAMER)
+    virtual void requestInstallMissingPlugins(const String& details, const String& description, MediaPlayerRequestInstallMissingPluginsCallback&) override final;
+#endif
+
     void pendingActionTimerFired();
     void progressEventTimerFired();
     void playbackProgressTimerFired();
@@ -615,7 +630,7 @@ private:
     void seekInternal(const MediaTime&);
     void seekWithTolerance(const MediaTime&, const MediaTime& negativeTolerance, const MediaTime& positiveTolerance, bool fromDOM);
     void finishSeek();
-    void checkIfSeekNeeded();
+    void clearSeeking();
     void addPlayedRange(const MediaTime& start, const MediaTime& end);
     
     void scheduleTimeupdateEvent(bool periodicEvent);
@@ -777,6 +792,7 @@ private:
         MediaTime positiveTolerance;
     };
     std::unique_ptr<PendingSeek> m_pendingSeek;
+    SeekType m_pendingSeekType { NoSeek };
 
     double m_volume;
     bool m_volumeInitialized;
@@ -816,6 +832,8 @@ private:
 #if ENABLE(MEDIA_SESSION)
     String m_kind;
     RefPtr<MediaSession> m_session;
+    bool m_shouldDuck { false };
+    uint64_t m_elementID;
 #endif
 
 #if ENABLE(MEDIA_SOURCE)
@@ -918,10 +936,6 @@ private:
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
     RefPtr<MediaKeys> m_mediaKeys;
-#endif
-
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    RefPtr<PlatformTextTrackMenuInterface> m_platformMenu;
 #endif
 
     std::unique_ptr<MediaElementSession> m_mediaSession;
