@@ -77,22 +77,22 @@ EncodedJSValue JSC_HOST_CALL constructJSRTCPeerConnection(ExecState* exec)
     return JSValue::encode(CREATE_DOM_WRAPPER(jsConstructor->globalObject(), RTCPeerConnection, peerConnection.get()));
 }
 
-static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(const Dictionary&, RTCPeerConnection::OfferAnswerResolveCallback, RTCPeerConnection::RejectCallback), JSDOMGlobalObject* globalObject, ExecState* exec)
+static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(const Dictionary&, RTCPeerConnection::OfferAnswerResolveCallback, RTCPeerConnection::RejectCallback), JSDOMGlobalObject* globalObject, ExecState& exec)
 {
     Dictionary options;
 
-    if (exec->argumentCount() > 1 && exec->argument(0).isFunction() && exec->argument(1).isFunction()) {
+    if (exec.argumentCount() > 1 && exec.argument(0).isFunction() && exec.argument(1).isFunction()) {
         // legacy callbacks mode
-        if (exec->argumentCount() > 2) {
-            options = Dictionary(exec, exec->argument(2));
+        if (exec.argumentCount() > 2) {
+            options = Dictionary(&exec, exec.argument(2));
             if (!options.isObject()) {
-                throwVMError(exec, createTypeError(exec, "Third argument must be a valid Dictionary"));
+                throwVMError(&exec, createTypeError(&exec, "Third argument must be a valid Dictionary"));
                 return jsUndefined();
             }
         }
 
-        RefPtr<RTCSessionDescriptionCallback> sessionDescriptionCallback = JSRTCSessionDescriptionCallback::create(asObject(exec->argument(0)), globalObject);
-        RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec->argument(1)), globalObject);
+        RefPtr<RTCSessionDescriptionCallback> sessionDescriptionCallback = JSRTCSessionDescriptionCallback::create(asObject(exec.argument(0)), globalObject);
+        RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec.argument(1)), globalObject);
 
         RefPtr<RTCPeerConnection> protectedImpl = &impl;
         auto resolveCallback = [protectedImpl, sessionDescriptionCallback](RTCSessionDescription& description) mutable {
@@ -114,16 +114,16 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnect
     }
 
     // Promised-based mode
-    if (exec->argumentCount()) {
-        options = Dictionary(exec, exec->argument(0));
+    if (exec.argumentCount()) {
+        options = Dictionary(&exec, exec.argument(0));
         if (!options.isObject()) {
-            throwVMError(exec, createTypeError(exec, "First argument must be a valid Dictionary"));
+            throwVMError(&exec, createTypeError(&exec, "First argument must be a valid Dictionary"));
             return jsUndefined();
         }
     }
 
-    JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(exec, globalObject);
-    DeferredWrapper wrapper(exec, globalObject, promiseDeferred);
+    JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(&exec, globalObject);
+    DeferredWrapper wrapper(&exec, globalObject, promiseDeferred);
 
     auto resolveCallback = [wrapper](RTCSessionDescription &description) mutable {
         wrapper.resolve(&description);
@@ -137,28 +137,28 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnect
     return promiseDeferred->promise();
 }
 
-JSValue JSRTCPeerConnection::createOffer(ExecState* exec)
+JSValue JSRTCPeerConnection::createOffer(ExecState& exec)
 {
     return createOfferOrAnswer(impl(), &RTCPeerConnection::createOffer, globalObject(), exec);
 }
 
-JSValue JSRTCPeerConnection::createAnswer(ExecState* exec)
+JSValue JSRTCPeerConnection::createAnswer(ExecState& exec)
 {
     return createOfferOrAnswer(impl(), &RTCPeerConnection::createAnswer, globalObject(), exec);
 }
 
-static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(RTCSessionDescription*, RTCPeerConnection::VoidResolveCallback, RTCPeerConnection::RejectCallback), JSDOMGlobalObject* globalObject, ExecState* exec)
+static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(RTCSessionDescription*, RTCPeerConnection::VoidResolveCallback, RTCPeerConnection::RejectCallback), JSDOMGlobalObject* globalObject, ExecState& exec)
 {
-    RefPtr<RTCSessionDescription> description = JSRTCSessionDescription::toWrapped(exec->argument(0));
+    RefPtr<RTCSessionDescription> description = JSRTCSessionDescription::toWrapped(exec.argument(0));
     if (!description) {
-        throwVMError(exec, createTypeError(exec, "First argument must be a RTCSessionDescription"));
+        throwVMError(&exec, createTypeError(&exec, "First argument must be a RTCSessionDescription"));
         return jsUndefined();
     }
 
-    if (exec->argumentCount() > 2 && exec->argument(1).isFunction() && exec->argument(2).isFunction()) {
+    if (exec.argumentCount() > 2 && exec.argument(1).isFunction() && exec.argument(2).isFunction()) {
         // legacy callbacks mode
-        RefPtr<VoidCallback> voidCallback = JSVoidCallback::create(asObject(exec->argument(1)), globalObject);
-        RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec->argument(2)), globalObject);
+        RefPtr<VoidCallback> voidCallback = JSVoidCallback::create(asObject(exec.argument(1)), globalObject);
+        RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec.argument(2)), globalObject);
 
         RefPtr<RTCPeerConnection> protectedImpl = &impl;
         auto resolveCallback = [protectedImpl, voidCallback]() mutable {
@@ -179,8 +179,8 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPee
     }
 
     // Promised-based mode
-    JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(exec, globalObject);
-    DeferredWrapper wrapper(exec, globalObject, promiseDeferred);
+    JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(&exec, globalObject);
+    DeferredWrapper wrapper(&exec, globalObject, promiseDeferred);
 
     auto resolveCallback = [wrapper]() mutable {
         wrapper.resolve(false);
@@ -194,28 +194,28 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPee
     return promiseDeferred->promise();
 }
 
-JSValue JSRTCPeerConnection::setLocalDescription(ExecState* exec)
+JSValue JSRTCPeerConnection::setLocalDescription(ExecState& exec)
 {
     return setLocalOrRemoteDescription(impl(), &RTCPeerConnection::setLocalDescription, globalObject(), exec);
 }
 
-JSValue JSRTCPeerConnection::setRemoteDescription(ExecState* exec)
+JSValue JSRTCPeerConnection::setRemoteDescription(ExecState& exec)
 {
     return setLocalOrRemoteDescription(impl(), &RTCPeerConnection::setRemoteDescription, globalObject(), exec);
 }
 
-JSValue JSRTCPeerConnection::addIceCandidate(ExecState* exec)
+JSValue JSRTCPeerConnection::addIceCandidate(ExecState& exec)
 {
-    RefPtr<RTCIceCandidate> candidate = JSRTCIceCandidate::toWrapped(exec->argument(0));
+    RefPtr<RTCIceCandidate> candidate = JSRTCIceCandidate::toWrapped(exec.argument(0));
     if (!candidate) {
-        throwVMError(exec, createTypeError(exec, "First argument must be a RTCIceCandidate"));
+        throwVMError(&exec, createTypeError(&exec, "First argument must be a RTCIceCandidate"));
         return jsUndefined();
     }
 
-    if (exec->argumentCount() > 2 && exec->argument(1).isFunction() && exec->argument(2).isFunction()) {
+    if (exec.argumentCount() > 2 && exec.argument(1).isFunction() && exec.argument(2).isFunction()) {
         // legacy callbacks mode
-        RefPtr<VoidCallback> voidCallback = JSVoidCallback::create(asObject(exec->argument(1)), globalObject());
-        RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec->argument(2)), globalObject());
+        RefPtr<VoidCallback> voidCallback = JSVoidCallback::create(asObject(exec.argument(1)), globalObject());
+        RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec.argument(2)), globalObject());
 
         RefPtr<RTCPeerConnection> protectedImpl = &impl();
         auto resolveCallback = [protectedImpl, voidCallback]() mutable {
@@ -236,8 +236,8 @@ JSValue JSRTCPeerConnection::addIceCandidate(ExecState* exec)
     }
 
     // Promised-based mode
-    JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(exec, globalObject());
-    DeferredWrapper wrapper(exec, globalObject(), promiseDeferred);
+    JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(&exec, globalObject());
+    DeferredWrapper wrapper(&exec, globalObject(), promiseDeferred);
 
     auto resolveCallback = [wrapper]() mutable {
         wrapper.resolve(false);
