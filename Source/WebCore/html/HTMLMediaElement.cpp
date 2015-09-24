@@ -5658,10 +5658,6 @@ void HTMLMediaElement::createMediaPlayer()
         m_mediaSource->close();
 #endif
 
-#if ENABLE(MEDIA_STREAM)
-    m_mediaStreamSrcObject = nullptr;
-#endif
-
 #if ENABLE(VIDEO_TRACK)
     forgetResourceSpecificTracks();
 #endif
