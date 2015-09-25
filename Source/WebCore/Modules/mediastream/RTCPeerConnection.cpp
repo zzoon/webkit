@@ -280,13 +280,6 @@ void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResol
         return;
     }
 
-    if (!remoteDescription()) {
-        // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("InvalidStateError (no remote description)");
-        rejectCallback(*error);
-        return;
-    }
-
     m_backend->addIceCandidate(rtcCandidate, resolveCallback, rejectCallback);
 }
 

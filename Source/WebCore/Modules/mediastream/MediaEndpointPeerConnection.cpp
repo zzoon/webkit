@@ -609,6 +609,13 @@ void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate,
 
 void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
 {
+    if (!remoteDescription()) {
+        // FIXME: Error type?
+        RefPtr<DOMError> error = DOMError::create("InvalidStateError (no remote description)");
+        rejectCallback(*error);
+        return;
+    }
+
     String json = iceCandidateFromSDP(rtcCandidate->candidate());
     RefPtr<IceCandidate> candidate = MediaEndpointConfigurationConversions::iceCandidateFromJSON(json);
     if (!candidate) {
