@@ -320,6 +320,21 @@ void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* des
     });
 }
 
+static void updateSendSources(const Vector<RefPtr<PeerMediaDescription>>& localMediaDescriptions, const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions, const Vector<RefPtr<RTCRtpSender>>& senders)
+{
+    for (unsigned i = 0; i < remoteMediaDescriptions.size(); ++i) {
+        if (remoteMediaDescriptions[i]->type() != "audio" && remoteMediaDescriptions[i]->type() != "video")
+            continue;
+
+        if (localMediaDescriptions.size() <= i)
+            return;
+
+        size_t index = indexOfSenderWithTrackId(senders, localMediaDescriptions[i]->mediaStreamTrackId());
+        if (index != notFound)
+            remoteMediaDescriptions[i]->setSource(senders[index]->track()->source());
+    }
+}
+
 static bool allSendersRepresented(const Vector<RefPtr<RTCRtpSender>>& senders, const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions)
 {
     for (auto& sender : senders) {
@@ -389,6 +404,8 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
     }
 
     if (internalRemoteDescription()) {
+        updateSendSources(parsedConfiguration->mediaDescriptions(), internalRemoteDescription()->configuration()->mediaDescriptions(), m_client->getSenders());
+
         if (m_mediaEndpoint->prepareToSend(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpointPrepareResult::Failed) {
             // FIXME: Error type?
             RefPtr<DOMError> error = DOMError::create("IncompatibleSessionDescriptionError (send configuration)");
@@ -531,13 +548,12 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
 
         mediaDescription->setPayloads(filterPayloads(mediaDescription->payloads(),
             mediaDescription->type() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads));
-
-        RefPtr<RTCRtpSender> sender = takeFirstSenderOfType(senders, mediaDescription->type());
-        if (sender)
-            mediaDescription->setSource(sender->track()->source());
     }
 
     bool isInitiator = descriptionType == SessionDescription::Type::Answer;
+
+    if (internalLocalDescription())
+        updateSendSources(internalLocalDescription()->configuration()->mediaDescriptions(), parsedConfiguration->mediaDescriptions(), senders);
 
     if (m_mediaEndpoint->prepareToSend(parsedConfiguration.get(), isInitiator) == MediaEndpointPrepareResult::Failed) {
         // FIXME: Error type?
