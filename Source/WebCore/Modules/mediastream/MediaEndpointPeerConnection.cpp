@@ -111,6 +111,15 @@ MediaEndpointPeerConnection::~MediaEndpointPeerConnection()
 {
 }
 
+static size_t indexOfSenderWithTrackId(const Vector<RefPtr<RTCRtpSender>>& senders, const String& trackId)
+{
+    for (size_t i = 0; i < senders.size(); ++i) {
+        if (senders[i]->track()->id() == trackId)
+            return i;
+    }
+    return notFound;
+}
+
 static RefPtr<RTCRtpSender> takeFirstSenderOfType(Vector<RefPtr<RTCRtpSender>>& senders, const String& type)
 {
     for (unsigned i = 0; i < senders.size(); ++i) {
@@ -129,10 +138,10 @@ static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDesc
     // description. Mark media descriptions that don't have a sender/track (anymore) as "available".
     for (auto& mdesc : mediaDescriptions) {
         const String& mdescTrackId = mdesc->mediaStreamTrackId();
-        bool foundSender = senders.removeFirstMatching([mdescTrackId](const RefPtr<RTCRtpSender>& sender) -> bool {
-            return sender->track()->id() == mdescTrackId;
-        });
-        if (!foundSender) {
+        size_t index = indexOfSenderWithTrackId(senders, mdescTrackId);
+        if (index != notFound)
+            senders.remove(index);
+        else {
             mdesc->setMediaStreamId(emptyString());
             mdesc->setMediaStreamTrackId(emptyString());
             mdesc->clearSsrcs();
