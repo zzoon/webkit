@@ -279,6 +279,8 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptio
         else {
             localMediaDescription = PeerMediaDescription::create();
             localMediaDescription->setType(remoteMediaDescription->type());
+            localMediaDescription->setPort(9);
+            localMediaDescription->setAddress("0.0.0.0");
             localMediaDescription->setDtlsSetup(remoteMediaDescription->dtlsSetup() == "active" ? "passive" : "active");
             localMediaDescription->setDtlsFingerprintHashFunction("sha-256");
             localMediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
