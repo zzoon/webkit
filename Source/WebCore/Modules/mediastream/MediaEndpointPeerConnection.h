@@ -44,6 +44,9 @@ namespace WebCore {
 
 class DOMWrapperWorld;
 
+typedef Vector<RefPtr<PeerMediaDescription>> MediaDescriptionVector;
+typedef Vector<RefPtr<RTCRtpSender>> RtpSenderVector;
+
 class MediaEndpointPeerConnection : public PeerConnectionBackend, public MediaEndpointClient {
 public:
     MediaEndpointPeerConnection(PeerConnectionBackendClient*);
@@ -72,6 +75,7 @@ public:
     void clearNegotiationNeededState() override { m_negotiationNeeded = false; };
 
 private:
+
     void enqueueOperation(std::function<void ()>);
     void completeQueuedOperation();
 

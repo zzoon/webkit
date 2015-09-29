@@ -111,7 +111,7 @@ MediaEndpointPeerConnection::~MediaEndpointPeerConnection()
 {
 }
 
-static size_t indexOfSenderWithTrackId(const Vector<RefPtr<RTCRtpSender>>& senders, const String& trackId)
+static size_t indexOfSenderWithTrackId(const RtpSenderVector& senders, const String& trackId)
 {
     for (size_t i = 0; i < senders.size(); ++i) {
         if (senders[i]->track()->id() == trackId)
@@ -120,7 +120,7 @@ static size_t indexOfSenderWithTrackId(const Vector<RefPtr<RTCRtpSender>>& sende
     return notFound;
 }
 
-static RefPtr<RTCRtpSender> takeFirstSenderOfType(Vector<RefPtr<RTCRtpSender>>& senders, const String& type)
+static RefPtr<RTCRtpSender> takeFirstSenderOfType(RtpSenderVector& senders, const String& type)
 {
     for (unsigned i = 0; i < senders.size(); ++i) {
         if (senders[i]->track()->kind() == type) {
@@ -132,7 +132,7 @@ static RefPtr<RTCRtpSender> takeFirstSenderOfType(Vector<RefPtr<RTCRtpSender>>& 
     return nullptr;
 }
 
-static void updateMediaDescriptionsWithSenders(const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions, Vector<RefPtr<RTCRtpSender>>& senders)
+static void updateMediaDescriptionsWithSenders(const MediaDescriptionVector& mediaDescriptions, RtpSenderVector& senders)
 {
     // Remove any sender(s) from the senders list that already have their tracks represented by a media
     // description. Mark media descriptions that don't have a sender/track (anymore) as "available".
@@ -198,7 +198,7 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
 
     configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
-    Vector<RefPtr<RTCRtpSender>> senders = m_client->getSenders();
+    RtpSenderVector senders = m_client->getSenders();
     updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
 
     // Add media descriptions for remaining senders.
@@ -269,7 +269,7 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptio
 
     configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
-    const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
+    const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
     for (unsigned i = 0; i < remoteMediaDescriptions.size(); ++i) {
         RefPtr<PeerMediaDescription> remoteMediaDescription = remoteMediaDescriptions[i];
         RefPtr<PeerMediaDescription> localMediaDescription;
@@ -302,7 +302,7 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptio
             localMediaDescription->setDtlsSetup("passive");
     }
 
-    Vector<RefPtr<RTCRtpSender>> senders = m_client->getSenders();
+    RtpSenderVector senders = m_client->getSenders();
     updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
 
     String json = MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get());
@@ -320,7 +320,7 @@ void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* des
     });
 }
 
-static void updateSendSources(const Vector<RefPtr<PeerMediaDescription>>& localMediaDescriptions, const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions, const Vector<RefPtr<RTCRtpSender>>& senders)
+static void updateSendSources(const MediaDescriptionVector& localMediaDescriptions, const MediaDescriptionVector& remoteMediaDescriptions, const RtpSenderVector& senders)
 {
     for (unsigned i = 0; i < remoteMediaDescriptions.size(); ++i) {
         if (remoteMediaDescriptions[i]->type() != "audio" && remoteMediaDescriptions[i]->type() != "video")
@@ -335,7 +335,7 @@ static void updateSendSources(const Vector<RefPtr<PeerMediaDescription>>& localM
     }
 }
 
-static bool allSendersRepresented(const Vector<RefPtr<RTCRtpSender>>& senders, const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions)
+static bool allSendersRepresented(const RtpSenderVector& senders, const MediaDescriptionVector& mediaDescriptions)
 {
     for (auto& sender : senders) {
         bool senderIsRepresented = false;
@@ -540,7 +540,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
         return;
     }
 
-    Vector<RefPtr<RTCRtpSender>> senders = m_client->getSenders();
+    RtpSenderVector senders = m_client->getSenders();
 
     for (auto& mediaDescription : parsedConfiguration->mediaDescriptions()) {
         if (mediaDescription->type() != "audio" && mediaDescription->type() != "video")
@@ -653,7 +653,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
         return;
     }
 
-    const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
+    const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
     unsigned mdescIndex = rtcCandidate->sdpMLineIndex();
 
     if (mdescIndex >= remoteMediaDescriptions.size()) {
@@ -848,7 +848,7 @@ void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
 {
     ASSERT(scriptExecutionContext()->isContextThread());
 
-    const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions = internalLocalDescription()->configuration()->mediaDescriptions();
+    const MediaDescriptionVector& mediaDescriptions = internalLocalDescription()->configuration()->mediaDescriptions();
     mediaDescriptions[mdescIndex]->setIceCandidateGatheringDone(true);
 
     for (auto& mdesc : mediaDescriptions) {
@@ -866,7 +866,7 @@ void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<Re
     if (m_client->internalSignalingState() == SignalingState::Closed)
         return;
 
-    const Vector<RefPtr<PeerMediaDescription>>& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
+    const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
 
     if (mdescIndex >= remoteMediaDescriptions.size()) {
         printf("Warning: No remote configuration for incoming source.\n");
