@@ -154,7 +154,7 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, SetLocalOrRe
 {
     RefPtr<RTCSessionDescription> description = JSRTCSessionDescription::toWrapped(exec.argument(0));
     if (!description) {
-        throwVMError(&exec, createTypeError(&exec, "First argument must be a RTCSessionDescription"));
+        throwVMError(&exec, createTypeError(&exec, "First argument must be an RTCSessionDescription"));
         return jsUndefined();
     }
 
@@ -211,7 +211,7 @@ JSValue JSRTCPeerConnection::addIceCandidate(ExecState& exec)
 {
     RefPtr<RTCIceCandidate> candidate = JSRTCIceCandidate::toWrapped(exec.argument(0));
     if (!candidate) {
-        throwVMError(&exec, createTypeError(&exec, "First argument must be a RTCIceCandidate"));
+        throwVMError(&exec, createTypeError(&exec, "First argument must be an RTCIceCandidate"));
         return jsUndefined();
     }
 
