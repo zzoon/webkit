@@ -44,6 +44,9 @@ using namespace JSC;
 
 namespace WebCore {
 
+typedef void (RTCPeerConnection::*CreateOfferOrAnswerFunction)(const Dictionary&, RTCPeerConnection::OfferAnswerResolveCallback, RTCPeerConnection::RejectCallback);
+typedef void (RTCPeerConnection::*SetLocalOrRemoteDescriptionFunction)(RTCSessionDescription*, RTCPeerConnection::VoidResolveCallback, RTCPeerConnection::RejectCallback);
+
 EncodedJSValue JSC_HOST_CALL constructJSRTCPeerConnection(ExecState* exec)
 {
     // Spec says that we must have at least one arument, the RTCConfiguration.
@@ -77,7 +80,7 @@ EncodedJSValue JSC_HOST_CALL constructJSRTCPeerConnection(ExecState* exec)
     return JSValue::encode(CREATE_DOM_WRAPPER(jsConstructor->globalObject(), RTCPeerConnection, peerConnection.get()));
 }
 
-static JSValue createOfferOrAnswer(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(const Dictionary&, RTCPeerConnection::OfferAnswerResolveCallback, RTCPeerConnection::RejectCallback), JSDOMGlobalObject* globalObject, ExecState& exec)
+static JSValue createOfferOrAnswer(RTCPeerConnection& impl, CreateOfferOrAnswerFunction implFunction, JSDOMGlobalObject* globalObject, ExecState& exec)
 {
     Dictionary options;
 
@@ -147,7 +150,7 @@ JSValue JSRTCPeerConnection::createAnswer(ExecState& exec)
     return createOfferOrAnswer(impl(), &RTCPeerConnection::createAnswer, globalObject(), exec);
 }
 
-static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, void (RTCPeerConnection::*implFunction)(RTCSessionDescription*, RTCPeerConnection::VoidResolveCallback, RTCPeerConnection::RejectCallback), JSDOMGlobalObject* globalObject, ExecState& exec)
+static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, SetLocalOrRemoteDescriptionFunction implFunction, JSDOMGlobalObject* globalObject, ExecState& exec)
 {
     RefPtr<RTCSessionDescription> description = JSRTCSessionDescription::toWrapped(exec.argument(0));
     if (!description) {
