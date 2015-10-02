@@ -85,7 +85,7 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, CreateOfferOrAnswerF
     Dictionary options;
 
     if (exec.argumentCount() > 1 && exec.argument(0).isFunction() && exec.argument(1).isFunction()) {
-        // legacy callbacks mode
+        // Legacy callbacks mode
         if (exec.argumentCount() > 2) {
             options = Dictionary(&exec, exec.argument(2));
             if (!options.isObject()) {
@@ -159,7 +159,7 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, SetLocalOrRe
     }
 
     if (exec.argumentCount() > 2 && exec.argument(1).isFunction() && exec.argument(2).isFunction()) {
-        // legacy callbacks mode
+        // Legacy callbacks mode
         RefPtr<VoidCallback> voidCallback = JSVoidCallback::create(asObject(exec.argument(1)), globalObject);
         RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec.argument(2)), globalObject);
 
@@ -216,7 +216,7 @@ JSValue JSRTCPeerConnection::addIceCandidate(ExecState& exec)
     }
 
     if (exec.argumentCount() > 2 && exec.argument(1).isFunction() && exec.argument(2).isFunction()) {
-        // legacy callbacks mode
+        // Legacy callbacks mode
         RefPtr<VoidCallback> voidCallback = JSVoidCallback::create(asObject(exec.argument(1)), globalObject());
         RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec.argument(2)), globalObject());
 
