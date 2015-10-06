@@ -145,6 +145,11 @@ JSValue JSRTCPeerConnection::createAnswer(ExecState& exec)
 
 static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, SetLocalOrRemoteDescriptionFunction implFunction, JSDOMGlobalObject* globalObject, ExecState& exec)
 {
+    if (exec.argumentCount() < 1) {
+        throwVMError(&exec, createNotEnoughArgumentsError(&exec));
+        return jsUndefined();
+    }
+
     RefPtr<RTCSessionDescription> description = JSRTCSessionDescription::toWrapped(exec.argument(0));
     if (!description) {
         throwVMError(&exec, createTypeError(&exec, "First argument must be an RTCSessionDescription"));
@@ -195,6 +200,11 @@ JSValue JSRTCPeerConnection::setRemoteDescription(ExecState& exec)
 
 JSValue JSRTCPeerConnection::addIceCandidate(ExecState& exec)
 {
+    if (exec.argumentCount() < 1) {
+        throwVMError(&exec, createNotEnoughArgumentsError(&exec));
+        return jsUndefined();
+    }
+
     RefPtr<RTCIceCandidate> candidate = JSRTCIceCandidate::toWrapped(exec.argument(0));
     if (!candidate) {
         throwVMError(&exec, createTypeError(&exec, "First argument must be an RTCIceCandidate"));
