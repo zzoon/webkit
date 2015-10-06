@@ -177,8 +177,9 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, SessionDescr
         promise.reject(DOMError::create("Invalid createOffer argument"));
         return;
     }
+    ASSERT(options);
 
-    m_backend->createOffer(options, WTF::move(promise));
+    m_backend->createOffer(*options, WTF::move(promise));
 }
 
 void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, SessionDescriptionPromise&& promise)
@@ -201,7 +202,7 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, SessionDes
         return;
     }
 
-    m_backend->createAnswer(options, WTF::move(promise));
+    m_backend->createAnswer(*options, WTF::move(promise));
 }
 
 void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, PeerConnection::VoidPromise&& promise)

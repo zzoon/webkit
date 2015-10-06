@@ -80,8 +80,8 @@ public:
     WEBCORE_EXPORT static CreatePeerConnectionBackend create;
     virtual ~PeerConnectionBackend() { }
 
-    virtual void createOffer(const RefPtr<RTCOfferOptions>&, PeerConnection::SessionDescriptionPromise&&) = 0;
-    virtual void createAnswer(const RefPtr<RTCAnswerOptions>&, PeerConnection::SessionDescriptionPromise&&) = 0;
+    virtual void createOffer(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&&) = 0;
+    virtual void createAnswer(RTCAnswerOptions&, PeerConnection::SessionDescriptionPromise&&) = 0;
 
     virtual void setLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) = 0;
     virtual RefPtr<RTCSessionDescription> localDescription() const = 0;

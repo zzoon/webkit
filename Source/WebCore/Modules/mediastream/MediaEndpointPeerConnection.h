@@ -52,8 +52,8 @@ public:
     MediaEndpointPeerConnection(PeerConnectionBackendClient*);
     ~MediaEndpointPeerConnection();
 
-    void createOffer(const RefPtr<RTCOfferOptions>&, PeerConnection::SessionDescriptionPromise&&) override;
-    void createAnswer(const RefPtr<RTCAnswerOptions>&, PeerConnection::SessionDescriptionPromise&&) override;
+    void createOffer(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&&) override;
+    void createAnswer(RTCAnswerOptions&, PeerConnection::SessionDescriptionPromise&&) override;
 
     void setLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) override;
     RefPtr<RTCSessionDescription> localDescription() const override;
@@ -79,8 +79,8 @@ private:
     void enqueueOperation(std::function<void ()>);
     void completeQueuedOperation();
 
-    void queuedCreateOffer(const RefPtr<RTCOfferOptions>&, PeerConnection::SessionDescriptionPromise&);
-    void queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, PeerConnection::SessionDescriptionPromise&);
+    void queuedCreateOffer(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&);
+    void queuedCreateAnswer(RTCAnswerOptions&, PeerConnection::SessionDescriptionPromise&);
 
     void queuedSetLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&);
     void queuedSetRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&);

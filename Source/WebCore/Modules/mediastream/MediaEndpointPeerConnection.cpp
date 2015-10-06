@@ -218,17 +218,17 @@ void MediaEndpointPeerConnection::completeQueuedOperation()
         callOnMainThread(m_operationsQueue[0]);
 }
 
-void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& options, SessionDescriptionPromise&& promise)
+void MediaEndpointPeerConnection::createOffer(RTCOfferOptions& options, SessionDescriptionPromise&& promise)
 {
-    const RefPtr<RTCOfferOptions> protectedOptions = options;
+    const RefPtr<RTCOfferOptions> protectedOptions = &options;
     RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTF::move(promise));
 
     enqueueOperation([this, protectedOptions, wrappedPromise]() {
-        queuedCreateOffer(protectedOptions, wrappedPromise->promise());
+        queuedCreateOffer(*protectedOptions, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions>& options, SessionDescriptionPromise& promise)
+void MediaEndpointPeerConnection::queuedCreateOffer(RTCOfferOptions& options, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
@@ -264,9 +264,9 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
         configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
     }
 
-    int extraMediaDescriptionCount = options->offerToReceiveAudio() + options->offerToReceiveVideo();
+    int extraMediaDescriptionCount = options.offerToReceiveAudio() + options.offerToReceiveVideo();
     for (int i = 0; i < extraMediaDescriptionCount; ++i) {
-        String type = i < options->offerToReceiveAudio() ? "audio" : "video";
+        String type = i < options.offerToReceiveAudio() ? "audio" : "video";
         RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
 
         mediaDescription->setType(type);
@@ -291,17 +291,17 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
     completeQueuedOperation();
 }
 
-void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>& options, SessionDescriptionPromise&& promise)
+void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, SessionDescriptionPromise&& promise)
 {
-    const RefPtr<RTCAnswerOptions> protectedOptions = options;
+    const RefPtr<RTCAnswerOptions> protectedOptions = &options;
     RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTF::move(promise));
 
     enqueueOperation([this, protectedOptions, wrappedPromise]() mutable {
-        queuedCreateAnswer(protectedOptions, wrappedPromise->promise());
+        queuedCreateAnswer(*protectedOptions, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, SessionDescriptionPromise& promise)
+void MediaEndpointPeerConnection::queuedCreateAnswer(RTCAnswerOptions&, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
