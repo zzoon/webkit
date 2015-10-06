@@ -253,20 +253,6 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::pendingRemoteDescription() cons
     return m_backend->pendingRemoteDescription();
 }
 
-void RTCPeerConnection::updateIce(const Dictionary& rtcConfiguration, ExceptionCode& ec)
-{
-    if (m_signalingState == SignalingState::Closed) {
-        ec = INVALID_STATE_ERR;
-        return;
-    }
-
-    m_configuration = RTCConfiguration::create(rtcConfiguration, ec);
-    if (ec)
-        return;
-
-    m_backend->setConfiguration(*m_configuration);
-}
-
 void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidPromise&& promise)
 {
     if (m_signalingState == SignalingState::Closed) {
@@ -339,6 +325,20 @@ String RTCPeerConnection::iceConnectionState() const
 RTCConfiguration* RTCPeerConnection::getConfiguration() const
 {
     return m_configuration.get();
+}
+
+void RTCPeerConnection::setConfiguration(const Dictionary& rtcConfiguration, ExceptionCode& ec)
+{
+    if (m_signalingState == SignalingState::Closed) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+
+    m_configuration = RTCConfiguration::create(rtcConfiguration, ec);
+    if (ec)
+        return;
+
+    m_backend->setConfiguration(*m_configuration);
 }
 
 void RTCPeerConnection::getStats(PassRefPtr<RTCStatsCallback>, PassRefPtr<RTCPeerConnectionErrorCallback>, PassRefPtr<MediaStreamTrack>)

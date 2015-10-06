@@ -75,7 +75,6 @@
 
     readonly attribute DOMString signalingState;
 
-    [RaisesException] void updateIce(Dictionary configuration);
     [Custom, RaisesException] Promise addIceCandidate(RTCIceCandidate candidate);
     // Legacy signature: void addIceCandidate(RTCIceCandidate candidate
     //                                        VoidCallback successCallback,
@@ -85,6 +84,7 @@
     readonly attribute DOMString iceConnectionState;
 
     RTCConfiguration getConfiguration();
+    [RaisesException] void setConfiguration(Dictionary configuration);
 
     void getStats(RTCStatsCallback successCallback, RTCPeerConnectionErrorCallback failureCallback, [Default=Undefined] optional MediaStreamTrack selector);
 

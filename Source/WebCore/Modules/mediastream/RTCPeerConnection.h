@@ -83,13 +83,13 @@ public:
 
     String signalingState() const;
 
-    void updateIce(const Dictionary& rtcConfiguration, ExceptionCode&);
     void addIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&&);
 
     String iceGatheringState() const;
     String iceConnectionState() const;
 
     RTCConfiguration* getConfiguration() const;
+    void setConfiguration(const Dictionary& rtcConfiguration, ExceptionCode&);
 
     void getStats(PassRefPtr<RTCStatsCallback> successCallback, PassRefPtr<RTCPeerConnectionErrorCallback>, PassRefPtr<MediaStreamTrack> selector);
 
