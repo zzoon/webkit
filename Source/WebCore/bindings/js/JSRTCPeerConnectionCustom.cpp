@@ -44,8 +44,8 @@ using namespace JSC;
 
 namespace WebCore {
 
-typedef void (RTCPeerConnection::*CreateOfferOrAnswerFunction)(const Dictionary&, RTCPeerConnection::OfferAnswerResolveCallback, RTCPeerConnection::RejectCallback);
-typedef void (RTCPeerConnection::*SetLocalOrRemoteDescriptionFunction)(RTCSessionDescription*, RTCPeerConnection::VoidResolveCallback, RTCPeerConnection::RejectCallback);
+typedef void (RTCPeerConnection::*CreateOfferOrAnswerFunction)(const Dictionary&, PeerConnection::SessionDescriptionPromise&&);
+typedef void (RTCPeerConnection::*SetLocalOrRemoteDescriptionFunction)(RTCSessionDescription*, PeerConnection::VoidPromise&&);
 
 EncodedJSValue JSC_HOST_CALL constructJSRTCPeerConnection(ExecState* exec)
 {
@@ -98,20 +98,20 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, CreateOfferOrAnswerF
         RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec.argument(1)), globalObject);
 
         RefPtr<RTCPeerConnection> protectedImpl = &impl;
-        auto resolveCallback = [protectedImpl, sessionDescriptionCallback](RTCSessionDescription& description) mutable {
-            RefPtr<RTCSessionDescription> protectedDescription = &description;
+        auto resolveCallback = [protectedImpl, sessionDescriptionCallback](RefPtr<RTCSessionDescription> description) mutable {
+            RefPtr<RTCSessionDescription> protectedDescription = description;
             protectedImpl->scriptExecutionContext()->postTask([sessionDescriptionCallback, protectedDescription](ScriptExecutionContext&) mutable {
                 sessionDescriptionCallback->handleEvent(protectedDescription.get());
             });
         };
-        auto rejectCallback = [protectedImpl, errorCallback](DOMError& error) mutable {
-            RefPtr<DOMError> protectedError = &error;
+        auto rejectCallback = [protectedImpl, errorCallback](RefPtr<DOMError> error) mutable {
+            RefPtr<DOMError> protectedError = error;
             protectedImpl->scriptExecutionContext()->postTask([errorCallback, protectedError](ScriptExecutionContext&) mutable {
                 errorCallback->handleEvent(protectedError.get());
             });
         };
 
-        (impl.*implFunction)(options, WTF::move(resolveCallback), WTF::move(rejectCallback));
+        (impl.*implFunction)(options, PeerConnection::SessionDescriptionPromise(WTF::move(resolveCallback), WTF::move(rejectCallback)));
 
         return jsUndefined();
     }
@@ -128,14 +128,7 @@ static JSValue createOfferOrAnswer(RTCPeerConnection& impl, CreateOfferOrAnswerF
     JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(&exec, globalObject);
     DeferredWrapper wrapper(&exec, globalObject, promiseDeferred);
 
-    auto resolveCallback = [wrapper](RTCSessionDescription &description) mutable {
-        wrapper.resolve(&description);
-    };
-    auto rejectCallback = [wrapper](DOMError& error) mutable {
-        wrapper.reject(&error);
-    };
-
-    (impl.*implFunction)(options, WTF::move(resolveCallback), WTF::move(rejectCallback));
+    (impl.*implFunction)(options, PeerConnection::SessionDescriptionPromise(WTF::move(wrapper)));
 
     return promiseDeferred->promise();
 }
@@ -164,19 +157,19 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, SetLocalOrRe
         RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec.argument(2)), globalObject);
 
         RefPtr<RTCPeerConnection> protectedImpl = &impl;
-        auto resolveCallback = [protectedImpl, voidCallback]() mutable {
+        auto resolveCallback = [protectedImpl, voidCallback](std::nullptr_t) mutable {
             protectedImpl->scriptExecutionContext()->postTask([voidCallback](ScriptExecutionContext&) mutable {
                 voidCallback->handleEvent();
             });
         };
-        auto rejectCallback = [protectedImpl, errorCallback](DOMError& error) mutable {
-            RefPtr<DOMError> protectedError = &error;
+        auto rejectCallback = [protectedImpl, errorCallback](RefPtr<DOMError> error) mutable {
+            RefPtr<DOMError> protectedError = error;
             protectedImpl->scriptExecutionContext()->postTask([errorCallback, protectedError](ScriptExecutionContext&) mutable {
                 errorCallback->handleEvent(protectedError.get());
             });
         };
 
-        (impl.*implFunction)(description.get() , WTF::move(resolveCallback), WTF::move(rejectCallback));
+        (impl.*implFunction)(description.get() , PeerConnection::VoidPromise(WTF::move(resolveCallback), WTF::move(rejectCallback)));
 
         return jsUndefined();
     }
@@ -185,14 +178,7 @@ static JSValue setLocalOrRemoteDescription(RTCPeerConnection& impl, SetLocalOrRe
     JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(&exec, globalObject);
     DeferredWrapper wrapper(&exec, globalObject, promiseDeferred);
 
-    auto resolveCallback = [wrapper]() mutable {
-        wrapper.resolve(false);
-    };
-    auto rejectCallback = [wrapper](DOMError& error) mutable {
-        wrapper.reject(&error);
-    };
-
-    (impl.*implFunction)(description.get(), WTF::move(resolveCallback), WTF::move(rejectCallback));
+    (impl.*implFunction)(description.get(), PeerConnection::VoidPromise(WTF::move(wrapper)));
 
     return promiseDeferred->promise();
 }
@@ -221,19 +207,19 @@ JSValue JSRTCPeerConnection::addIceCandidate(ExecState& exec)
         RefPtr<RTCPeerConnectionErrorCallback> errorCallback = JSRTCPeerConnectionErrorCallback::create(asObject(exec.argument(2)), globalObject());
 
         RefPtr<RTCPeerConnection> protectedImpl = &impl();
-        auto resolveCallback = [protectedImpl, voidCallback]() mutable {
+        auto resolveCallback = [protectedImpl, voidCallback](std::nullptr_t) mutable {
             protectedImpl->scriptExecutionContext()->postTask([voidCallback](ScriptExecutionContext&) mutable {
                 voidCallback->handleEvent();
             });
         };
-        auto rejectCallback = [protectedImpl, errorCallback](DOMError& error) mutable {
-            RefPtr<DOMError> protectedError = &error;
+        auto rejectCallback = [protectedImpl, errorCallback](RefPtr<DOMError> error) mutable {
+            RefPtr<DOMError> protectedError = error;
             protectedImpl->scriptExecutionContext()->postTask([errorCallback, protectedError](ScriptExecutionContext&) mutable {
                 errorCallback->handleEvent(protectedError.get());
             });
         };
 
-        impl().addIceCandidate(candidate.get() , WTF::move(resolveCallback), WTF::move(rejectCallback));
+        impl().addIceCandidate(candidate.get(), PeerConnection::VoidPromise(WTF::move(resolveCallback), WTF::move(rejectCallback)));
 
         return jsUndefined();
     }
@@ -242,14 +228,7 @@ JSValue JSRTCPeerConnection::addIceCandidate(ExecState& exec)
     JSPromiseDeferred* promiseDeferred = JSPromiseDeferred::create(&exec, globalObject());
     DeferredWrapper wrapper(&exec, globalObject(), promiseDeferred);
 
-    auto resolveCallback = [wrapper]() mutable {
-        wrapper.resolve(false);
-    };
-    auto rejectCallback = [wrapper](DOMError& error) mutable {
-        wrapper.reject(&error);
-    };
-
-    impl().addIceCandidate(candidate.get(), WTF::move(resolveCallback), WTF::move(rejectCallback));
+    impl().addIceCandidate(candidate.get(), PeerConnection::VoidPromise(WTF::move(wrapper)));
 
     return promiseDeferred->promise();
 }

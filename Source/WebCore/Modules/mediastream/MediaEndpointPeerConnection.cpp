@@ -35,6 +35,8 @@
 
 #include "CryptoDigest.h"
 #include "DOMError.h"
+#include "JSDOMError.h"
+#include "JSRTCSessionDescription.h"
 #include "MediaEndpointConfigurationConversions.h"
 #include "MediaStreamTrack.h"
 #include "PeerConnectionBackend.h"
@@ -62,6 +64,7 @@
 
 namespace WebCore {
 
+using namespace PeerConnection;
 using namespace PeerConnectionStates;
 
 static std::unique_ptr<PeerConnectionBackend> createMediaEndpointPeerConnection(PeerConnectionBackendClient* client)
@@ -70,6 +73,40 @@ static std::unique_ptr<PeerConnectionBackend> createMediaEndpointPeerConnection(
 }
 
 CreatePeerConnectionBackend PeerConnectionBackend::create = createMediaEndpointPeerConnection;
+
+class WrappedSessionDescriptionPromise : public RefCounted<WrappedSessionDescriptionPromise> {
+public:
+    static Ref<WrappedSessionDescriptionPromise> create(SessionDescriptionPromise&& promise)
+    {
+        return *adoptRef(new WrappedSessionDescriptionPromise(WTF::move(promise)));
+    }
+
+    SessionDescriptionPromise& promise() { return m_promise; }
+
+private:
+    WrappedSessionDescriptionPromise(SessionDescriptionPromise&& promise)
+        : m_promise(WTF::move(promise))
+    { }
+
+    SessionDescriptionPromise m_promise;
+};
+
+class WrappedVoidPromise : public RefCounted<WrappedVoidPromise> {
+public:
+    static Ref<WrappedVoidPromise> create(VoidPromise&& promise)
+    {
+        return *adoptRef(new WrappedVoidPromise(WTF::move(promise)));
+    }
+
+    VoidPromise& promise() { return m_promise; }
+
+private:
+    WrappedVoidPromise(VoidPromise&& promise)
+        : m_promise(WTF::move(promise))
+    { }
+
+    VoidPromise m_promise;
+};
 
 static String randomString(size_t length)
 {
@@ -181,15 +218,17 @@ void MediaEndpointPeerConnection::completeQueuedOperation()
         callOnMainThread(m_operationsQueue[0]);
 }
 
-void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& options, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::createOffer(const RefPtr<RTCOfferOptions>& options, SessionDescriptionPromise&& promise)
 {
-    RefPtr<RTCOfferOptions> protectedOptions = options;
-    enqueueOperation([this, protectedOptions, resolveCallback, rejectCallback]() {
-        queuedCreateOffer(protectedOptions, resolveCallback, rejectCallback);
+    const RefPtr<RTCOfferOptions> protectedOptions = options;
+    RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTF::move(promise));
+
+    enqueueOperation([this, protectedOptions, wrappedPromise]() {
+        queuedCreateOffer(protectedOptions, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions>& options, OfferAnswerResolveCallback resolveCallback, RejectCallback)
+void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions>& options, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
@@ -248,19 +287,21 @@ void MediaEndpointPeerConnection::queuedCreateOffer(const RefPtr<RTCOfferOptions
     String json = MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get());
     RefPtr<RTCSessionDescription> offer = RTCSessionDescription::create("offer", toSDP(json));
 
-    resolveCallback(*offer);
+    promise.resolve(offer);
     completeQueuedOperation();
 }
 
-void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>& options, OfferAnswerResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::createAnswer(const RefPtr<RTCAnswerOptions>& options, SessionDescriptionPromise&& promise)
 {
-    RefPtr<RTCAnswerOptions> protectedOptions = options;
-    enqueueOperation([this, protectedOptions, resolveCallback, rejectCallback]() {
-        queuedCreateAnswer(protectedOptions, resolveCallback, rejectCallback);
+    const RefPtr<RTCAnswerOptions> protectedOptions = options;
+    RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTF::move(promise));
+
+    enqueueOperation([this, protectedOptions, wrappedPromise]() mutable {
+        queuedCreateAnswer(protectedOptions, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback resolveCallback, RejectCallback)
+void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
@@ -308,15 +349,17 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(const RefPtr<RTCAnswerOptio
     String json = MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get());
     RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", toSDP(json));
 
-    resolveCallback(*answer);
+    promise.resolve(answer);
     completeQueuedOperation();
 }
 
-void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidPromise&& promise)
 {
     RefPtr<RTCSessionDescription> protectedDescription = description;
-    enqueueOperation([this, protectedDescription, resolveCallback, rejectCallback]() {
-        queuedSetLocalDescription(protectedDescription.get(), resolveCallback, rejectCallback);
+    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
+
+    enqueueOperation([this, protectedDescription, wrappedPromise]() {
+        queuedSetLocalDescription(protectedDescription.get(), wrappedPromise->promise());
     });
 }
 
@@ -351,7 +394,7 @@ static bool allSendersRepresented(const RtpSenderVector& senders, const MediaDes
     return true;
 }
 
-void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, VoidPromise& promise)
 {
     if (m_client->internalSignalingState() == SignalingState::Closed)
         return;
@@ -360,8 +403,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
 
     if (!localDescriptionTypeValidForState(descriptionType)) {
         // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (bad description type for current state)");
-        rejectCallback(*error);
+        promise.reject(DOMError::create("InvalidSessionDescriptionError (bad description type for current state)"));
         completeQueuedOperation();
         return;
     }
@@ -371,8 +413,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
 
     if (!parsedConfiguration) {
         // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
-        rejectCallback(*error);
+        promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
         completeQueuedOperation();
         return;
     }
@@ -396,8 +437,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
 
         } else if (prepareResult == MediaEndpointPrepareResult::Failed) {
             // FIXME: Error type?
-            RefPtr<DOMError> error = DOMError::create("IncompatibleSessionDescriptionError (receive configuration)");
-            rejectCallback(*error);
+            promise.reject(DOMError::create("IncompatibleSessionDescriptionError (receive configuration)"));
             completeQueuedOperation();
             return;
         }
@@ -408,8 +448,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
 
         if (m_mediaEndpoint->prepareToSend(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpointPrepareResult::Failed) {
             // FIXME: Error type?
-            RefPtr<DOMError> error = DOMError::create("IncompatibleSessionDescriptionError (send configuration)");
-            rejectCallback(*error);
+            promise.reject(DOMError::create("IncompatibleSessionDescriptionError (send configuration)"));
             completeQueuedOperation();
             return;
         }
@@ -463,7 +502,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
     if (m_client->internalSignalingState() == SignalingState::Stable && m_negotiationNeeded)
         m_client->scheduleNegotiationNeededEvent();
 
-    resolveCallback();
+    promise.resolve(nullptr);
     completeQueuedOperation();
 }
 
@@ -507,15 +546,17 @@ static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayl
     return filteredPayloads;
 }
 
-void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidPromise&& promise)
 {
     RefPtr<RTCSessionDescription> protectedDescription = description;
-    enqueueOperation([this, protectedDescription, resolveCallback, rejectCallback]() {
-        queuedSetRemoteDescription(protectedDescription.get(), resolveCallback, rejectCallback);
+    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
+
+    enqueueOperation([this, protectedDescription, wrappedPromise]() {
+        queuedSetRemoteDescription(protectedDescription.get(), wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* description, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* description, VoidPromise& promise)
 {
     if (m_client->internalSignalingState() == SignalingState::Closed)
         return;
@@ -524,8 +565,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
 
     if (!remoteDescriptionTypeValidForState(descriptionType)) {
         // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (bad description type for current state)");
-        rejectCallback(*error);
+        promise.reject(DOMError::create("InvalidSessionDescriptionError (bad description type for current state)"));
         return;
     }
 
@@ -534,8 +574,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
 
     if (!parsedConfiguration) {
         // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
-        rejectCallback(*error);
+        promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
         completeQueuedOperation();
         return;
     }
@@ -557,8 +596,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
 
     if (m_mediaEndpoint->prepareToSend(parsedConfiguration.get(), isInitiator) == MediaEndpointPrepareResult::Failed) {
         // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("IncompatibleSessionDescriptionError (send configuration)");
-        rejectCallback(*error);
+        promise.reject(DOMError::create("IncompatibleSessionDescriptionError (send configuration)"));
         completeQueuedOperation();
         return;
     }
@@ -600,7 +638,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
         m_client->fireEvent(Event::create(eventNames().signalingstatechangeEvent, false, false));
     }
 
-    resolveCallback();
+    promise.resolve(nullptr);
     completeQueuedOperation();
 }
 
@@ -626,20 +664,22 @@ void MediaEndpointPeerConnection::setConfiguration(RTCConfiguration& configurati
     m_mediaEndpoint->setConfiguration(createMediaEndpointInit(configuration));
 }
 
-void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, PeerConnection::VoidPromise&& promise)
 {
     RefPtr<RTCIceCandidate> protectedCandidate = rtcCandidate;
-    enqueueOperation([this, protectedCandidate, resolveCallback, rejectCallback]() {
-        queuedAddIceCandidate(protectedCandidate.get(), resolveCallback, rejectCallback);
+    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
+
+    enqueueOperation([this, protectedCandidate, wrappedPromise]() {
+        queuedAddIceCandidate(protectedCandidate.get(), wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, VoidResolveCallback resolveCallback, RejectCallback rejectCallback)
+void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, PeerConnection::VoidPromise& promise)
 {
     if (!remoteDescription()) {
         // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("InvalidStateError (no remote description)");
-        rejectCallback(*error);
+        promise.reject(DOMError::create("InvalidStateError (no remote description)"));
+        completeQueuedOperation();
         return;
     }
 
@@ -647,8 +687,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
     RefPtr<IceCandidate> candidate = MediaEndpointConfigurationConversions::iceCandidateFromJSON(json);
     if (!candidate) {
         // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("SyntaxError (malformed candidate)");
-        rejectCallback(*error);
+        promise.reject(DOMError::create("SyntaxError (malformed candidate)"));
         completeQueuedOperation();
         return;
     }
@@ -658,8 +697,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
 
     if (mdescIndex >= remoteMediaDescriptions.size()) {
         // FIXME: Error type?
-        RefPtr<DOMError> error = DOMError::create("InvalidSdpMlineIndex (sdpMLineIndex out of range");
-        rejectCallback(*error);
+        promise.reject(DOMError::create("InvalidSdpMlineIndex (sdpMLineIndex out of range"));
         completeQueuedOperation();
         return;
     }
@@ -669,7 +707,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
 
     m_mediaEndpoint->addRemoteCandidate(*candidate, mdescIndex, mdesc.iceUfrag(), mdesc.icePassword());
 
-    resolveCallback();
+    promise.resolve(nullptr);
     completeQueuedOperation();
 }
 

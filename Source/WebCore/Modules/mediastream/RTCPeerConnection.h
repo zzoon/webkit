@@ -62,25 +62,21 @@ public:
     static RefPtr<RTCPeerConnection> create(ScriptExecutionContext&, const Dictionary& rtcConfiguration, ExceptionCode&);
     ~RTCPeerConnection();
 
-    typedef std::function<void(RTCSessionDescription&)> OfferAnswerResolveCallback;
-    typedef std::function<void()> VoidResolveCallback;
-    typedef std::function<void(DOMError&)> RejectCallback;
-
     Vector<RefPtr<RTCRtpSender>> getSenders() const;
     Vector<RefPtr<RTCRtpReceiver>> getReceivers() const;
 
     RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, const MediaStream* stream, ExceptionCode&);
     void removeTrack(RTCRtpSender*, ExceptionCode&);
 
-    void createOffer(const Dictionary& offerOptions, OfferAnswerResolveCallback, RejectCallback);
-    void createAnswer(const Dictionary& answerOptions, OfferAnswerResolveCallback, RejectCallback);
+    void createOffer(const Dictionary& offerOptions, PeerConnection::SessionDescriptionPromise&&);
+    void createAnswer(const Dictionary& answerOptions, PeerConnection::SessionDescriptionPromise&&);
 
-    void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
+    void setLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&);
     RefPtr<RTCSessionDescription> localDescription() const;
     RefPtr<RTCSessionDescription> currentLocalDescription() const;
     RefPtr<RTCSessionDescription> pendingLocalDescription() const;
 
-    void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
+    void setRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&);
     RefPtr<RTCSessionDescription> remoteDescription() const;
     RefPtr<RTCSessionDescription> currentRemoteDescription() const;
     RefPtr<RTCSessionDescription> pendingRemoteDescription() const;
@@ -88,7 +84,7 @@ public:
     String signalingState() const;
 
     void updateIce(const Dictionary& rtcConfiguration, ExceptionCode&);
-    void addIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback);
+    void addIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&&);
 
     String iceGatheringState() const;
     String iceConnectionState() const;

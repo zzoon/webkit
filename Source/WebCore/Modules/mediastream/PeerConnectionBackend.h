@@ -34,6 +34,7 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "PeerConnectionStates.h"
+#include "JSDOMPromise.h"
 
 namespace WebCore {
 
@@ -47,6 +48,11 @@ class RTCOfferOptions;
 class RTCRtpSender;
 class RTCSessionDescription;
 class ScriptExecutionContext;
+
+namespace PeerConnection {
+typedef DOMPromiseWithCallback<RefPtr<RTCSessionDescription>, RefPtr<DOMError>> SessionDescriptionPromise;
+typedef DOMPromiseWithCallback<std::nullptr_t, RefPtr<DOMError>> VoidPromise;
+}
 
 class PeerConnectionBackendClient {
 public:
@@ -74,25 +80,21 @@ public:
     WEBCORE_EXPORT static CreatePeerConnectionBackend create;
     virtual ~PeerConnectionBackend() { }
 
-    typedef std::function<void(RTCSessionDescription&)> OfferAnswerResolveCallback;
-    typedef std::function<void()> VoidResolveCallback;
-    typedef std::function<void(DOMError&)> RejectCallback;
+    virtual void createOffer(const RefPtr<RTCOfferOptions>&, PeerConnection::SessionDescriptionPromise&&) = 0;
+    virtual void createAnswer(const RefPtr<RTCAnswerOptions>&, PeerConnection::SessionDescriptionPromise&&) = 0;
 
-    virtual void createOffer(const RefPtr<RTCOfferOptions>&, OfferAnswerResolveCallback, RejectCallback) = 0;
-    virtual void createAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback, RejectCallback) = 0;
-
-    virtual void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) = 0;
+    virtual void setLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) = 0;
     virtual RefPtr<RTCSessionDescription> localDescription() const = 0;
     virtual RefPtr<RTCSessionDescription> currentLocalDescription() const = 0;
     virtual RefPtr<RTCSessionDescription> pendingLocalDescription() const = 0;
 
-    virtual void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) = 0;
+    virtual void setRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) = 0;
     virtual RefPtr<RTCSessionDescription> remoteDescription() const = 0;
     virtual RefPtr<RTCSessionDescription> currentRemoteDescription() const = 0;
     virtual RefPtr<RTCSessionDescription> pendingRemoteDescription() const = 0;
 
     virtual void setConfiguration(RTCConfiguration&) = 0;
-    virtual void addIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback) = 0;
+    virtual void addIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&&) = 0;
 
     virtual void stop() = 0;
 

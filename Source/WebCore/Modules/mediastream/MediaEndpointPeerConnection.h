@@ -52,21 +52,21 @@ public:
     MediaEndpointPeerConnection(PeerConnectionBackendClient*);
     ~MediaEndpointPeerConnection();
 
-    void createOffer(const RefPtr<RTCOfferOptions>&, OfferAnswerResolveCallback, RejectCallback) override;
-    void createAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback, RejectCallback) override;
+    void createOffer(const RefPtr<RTCOfferOptions>&, PeerConnection::SessionDescriptionPromise&&) override;
+    void createAnswer(const RefPtr<RTCAnswerOptions>&, PeerConnection::SessionDescriptionPromise&&) override;
 
-    void setLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) override;
+    void setLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) override;
     RefPtr<RTCSessionDescription> localDescription() const override;
     RefPtr<RTCSessionDescription> currentLocalDescription() const override;
     RefPtr<RTCSessionDescription> pendingLocalDescription() const override;
 
-    void setRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback) override;
+    void setRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) override;
     RefPtr<RTCSessionDescription> remoteDescription() const override;
     RefPtr<RTCSessionDescription> currentRemoteDescription() const override;
     RefPtr<RTCSessionDescription> pendingRemoteDescription() const override;
 
     void setConfiguration(RTCConfiguration&) override;
-    void addIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback) override;
+    void addIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&&) override;
 
     void stop() override;
 
@@ -79,13 +79,13 @@ private:
     void enqueueOperation(std::function<void ()>);
     void completeQueuedOperation();
 
-    void queuedCreateOffer(const RefPtr<RTCOfferOptions>&, OfferAnswerResolveCallback, RejectCallback);
-    void queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, OfferAnswerResolveCallback, RejectCallback);
+    void queuedCreateOffer(const RefPtr<RTCOfferOptions>&, PeerConnection::SessionDescriptionPromise&);
+    void queuedCreateAnswer(const RefPtr<RTCAnswerOptions>&, PeerConnection::SessionDescriptionPromise&);
 
-    void queuedSetLocalDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
-    void queuedSetRemoteDescription(RTCSessionDescription*, VoidResolveCallback, RejectCallback);
+    void queuedSetLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&);
+    void queuedSetRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&);
 
-    void queuedAddIceCandidate(RTCIceCandidate*, VoidResolveCallback, RejectCallback);
+    void queuedAddIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&);
 
     bool localDescriptionTypeValidForState(SessionDescription::Type) const;
     bool remoteDescriptionTypeValidForState(SessionDescription::Type) const;
