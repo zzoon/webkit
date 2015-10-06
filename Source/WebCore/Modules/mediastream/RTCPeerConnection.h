@@ -38,6 +38,8 @@
 #include "ActiveDOMObject.h"
 #include "Dictionary.h"
 #include "EventTarget.h"
+// FIXME: Workaround for bindings generator bug (bindings for variadic types are not included properly)
+#include "JSMediaStream.h"
 #include "PeerConnectionBackend.h"
 #include "ScriptWrappable.h"
 #include <wtf/HashMap.h>
@@ -65,7 +67,7 @@ public:
     Vector<RefPtr<RTCRtpSender>> getSenders() const;
     Vector<RefPtr<RTCRtpReceiver>> getReceivers() const;
 
-    RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, const MediaStream* stream, ExceptionCode&);
+    RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, Vector<MediaStream*>, ExceptionCode&);
     void removeTrack(RTCRtpSender*, ExceptionCode&);
 
     void createOffer(const Dictionary& offerOptions, PeerConnection::SessionDescriptionPromise&&);

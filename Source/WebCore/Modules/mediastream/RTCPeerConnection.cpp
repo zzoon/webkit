@@ -129,10 +129,16 @@ Vector<RefPtr<RTCRtpReceiver>> RTCPeerConnection::getReceivers() const
     return receivers;
 }
 
-RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, const MediaStream* stream, ExceptionCode& ec)
+RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, Vector<MediaStream*> streams, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingState::Closed) {
         ec = INVALID_STATE_ERR;
+        return nullptr;
+    }
+
+    // Require at least one stream until https://github.com/w3c/webrtc-pc/issues/288 is resolved
+    if (!streams.size()) {
+        ec = NOT_SUPPORTED_ERR;
         return nullptr;
     }
 
@@ -143,7 +149,7 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
     }
 
     const String& trackId = track->id();
-    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track), stream->id());
+    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track), streams[0]->id());
     m_senderSet.add(trackId, sender);
 
     m_backend->markAsNeedingNegotiation();
