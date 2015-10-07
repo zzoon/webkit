@@ -118,13 +118,13 @@ private:
     const char* activeDOMObjectName() const override;
     bool canSuspendForPageCache() const override;
 
+    // PeerConnectionBackendClient
     void setSignalingState(PeerConnectionStates::SignalingState);
     void updateIceGatheringState(PeerConnectionStates::IceGatheringState);
     void updateIceConnectionState(PeerConnectionStates::IceConnectionState);
 
     void scheduleNegotiationNeededEvent() const;
 
-    // PeerConnectionBackendClient
     ScriptExecutionContext* context() const override { return scriptExecutionContext(); };
     void fireEvent(PassRefPtr<Event>) override;
     PeerConnectionStates::SignalingState internalSignalingState() const { return m_signalingState; }
