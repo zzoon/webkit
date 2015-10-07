@@ -38,9 +38,6 @@ namespace WebCore {
 
 class Dictionary;
 
-// FIXME: The WebRTC spec (as of 2015-04-13) only has a RTCOfferOptions, but a pending pull request
-// reintroduces RTCOfferAnswerOptions as a common base for RTCOfferOptions and RTCAnswerOptions.
-// This feature needs to be updated accordingly when that discussion is resolved.
 class RTCOfferAnswerOptions : public RefCounted<RTCOfferAnswerOptions> {
 public:
     virtual ~RTCOfferAnswerOptions() { }
