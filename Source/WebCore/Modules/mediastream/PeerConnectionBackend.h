@@ -33,8 +33,8 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "PeerConnectionStates.h"
 #include "JSDOMPromise.h"
+#include "PeerConnectionStates.h"
 
 namespace WebCore {
 
