@@ -304,17 +304,18 @@ RTCConfiguration* RTCPeerConnection::getConfiguration() const
     return m_configuration.get();
 }
 
-void RTCPeerConnection::setConfiguration(const Dictionary& rtcConfiguration, ExceptionCode& ec)
+void RTCPeerConnection::setConfiguration(const Dictionary& configuration, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingState::Closed) {
         ec = INVALID_STATE_ERR;
         return;
     }
 
-    m_configuration = RTCConfiguration::create(rtcConfiguration, ec);
+    RefPtr<RTCConfiguration> newConfiguration = RTCConfiguration::create(configuration, ec);
     if (ec)
         return;
 
+    m_configuration = WTF::move(newConfiguration);
     m_backend->setConfiguration(*m_configuration);
 }
 

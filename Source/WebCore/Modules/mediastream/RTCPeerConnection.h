@@ -91,7 +91,7 @@ public:
     String iceConnectionState() const;
 
     RTCConfiguration* getConfiguration() const;
-    void setConfiguration(const Dictionary& rtcConfiguration, ExceptionCode&);
+    void setConfiguration(const Dictionary& configuration, ExceptionCode&);
 
     void getStats(PassRefPtr<RTCStatsCallback> successCallback, PassRefPtr<RTCPeerConnectionErrorCallback>, PassRefPtr<MediaStreamTrack> selector);
 
