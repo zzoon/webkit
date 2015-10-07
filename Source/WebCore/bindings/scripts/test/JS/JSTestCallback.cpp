@@ -62,14 +62,14 @@ JSTestCallback::~JSTestCallback()
 class JSTestCallbackConstructor : public DOMConstructorObject {
 private:
     JSTestCallbackConstructor(JSC::Structure*, JSDOMGlobalObject*);
-    void finishCreation(JSC::VM&, JSDOMGlobalObject*);
+    void finishCreation(JSC::VM&, JSDOMGlobalObject&);
 
 public:
     typedef DOMConstructorObject Base;
     static JSTestCallbackConstructor* create(JSC::VM& vm, JSC::Structure* structure, JSDOMGlobalObject* globalObject)
     {
         JSTestCallbackConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestCallbackConstructor>(vm.heap)) JSTestCallbackConstructor(structure, globalObject);
-        ptr->finishCreation(vm, globalObject);
+        ptr->finishCreation(vm, *globalObject);
         return ptr;
     }
 
@@ -95,11 +95,11 @@ COMPILE_ASSERT(2 == TestCallback::CONSTANT2, TestCallbackEnumCONSTANT2IsWrongUse
 const ClassInfo JSTestCallbackConstructor::s_info = { "TestCallbackConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestCallbackConstructor) };
 
 JSTestCallbackConstructor::JSTestCallbackConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
-    : DOMConstructorObject(structure, globalObject)
+    : Base(structure, globalObject)
 {
 }
 
-void JSTestCallbackConstructor::finishCreation(VM& vm, JSDOMGlobalObject* globalObject)
+void JSTestCallbackConstructor::finishCreation(VM& vm, JSDOMGlobalObject& globalObject)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(info()));

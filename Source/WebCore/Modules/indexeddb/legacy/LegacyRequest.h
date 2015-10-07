@@ -58,12 +58,12 @@ public:
     static Ref<LegacyRequest> create(ScriptExecutionContext*, PassRefPtr<LegacyAny> source, IDBDatabaseBackend::TaskType, LegacyTransaction*);
     virtual ~LegacyRequest();
 
-    virtual PassRefPtr<IDBAny> result(ExceptionCode&) const override final;
+    virtual RefPtr<IDBAny> result(ExceptionCode&) const override final;
     PassRefPtr<LegacyAny> legacyResult(ExceptionCode&);
     virtual unsigned short errorCode(ExceptionCode&) const override final;
-    virtual PassRefPtr<DOMError> error(ExceptionCode&) const override final;
-    virtual PassRefPtr<IDBAny> source() const override final;
-    virtual PassRefPtr<IDBTransaction> transaction() const override final;
+    virtual RefPtr<DOMError> error(ExceptionCode&) const override final;
+    virtual RefPtr<IDBAny> source() const override final;
+    virtual RefPtr<IDBTransaction> transaction() const override final;
     virtual const String& readyState() const override final;
 
     void preventPropagation() { m_preventPropagation = true; }
@@ -119,7 +119,7 @@ protected:
     RefPtr<DOMError> m_error;
     bool m_contextStopped;
     RefPtr<LegacyTransaction> m_transaction;
-    ReadyState m_readyState;
+    IDBRequestReadyState m_readyState;
     bool m_requestAborted; // May be aborted by transaction then receive async onsuccess; ignore vs. assert.
 
 private:

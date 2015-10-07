@@ -39,7 +39,6 @@
 #include "ElementRareData.h"
 #include "ElementTraversal.h"
 #include "EventDispatcher.h"
-#include "EventException.h"
 #include "EventHandler.h"
 #include "FrameView.h"
 #include "HTMLCollection.h"
@@ -103,13 +102,11 @@ void Node::dumpStatistics()
     size_t textNodes = 0;
     size_t cdataNodes = 0;
     size_t commentNodes = 0;
-    size_t entityReferenceNodes = 0;
     size_t entityNodes = 0;
     size_t piNodes = 0;
     size_t documentNodes = 0;
     size_t docTypeNodes = 0;
     size_t fragmentNodes = 0;
-    size_t xpathNSNodes = 0;
     size_t shadowRootNodes = 0;
 
     HashMap<String, size_t> perTagCount;
@@ -168,10 +165,6 @@ void Node::dumpStatistics()
                 ++commentNodes;
                 break;
             }
-            case ENTITY_REFERENCE_NODE: {
-                ++entityReferenceNodes;
-                break;
-            }
             case ENTITY_NODE: {
                 ++entityNodes;
                 break;
@@ -195,10 +188,6 @@ void Node::dumpStatistics()
                     ++fragmentNodes;
                 break;
             }
-            case XPATH_NAMESPACE_NODE: {
-                ++xpathNSNodes;
-                break;
-            }
         }
     }
 
@@ -211,13 +200,11 @@ void Node::dumpStatistics()
     printf("  Number of Text nodes: %zu\n", textNodes);
     printf("  Number of CDATASection nodes: %zu\n", cdataNodes);
     printf("  Number of Comment nodes: %zu\n", commentNodes);
-    printf("  Number of EntityReference nodes: %zu\n", entityReferenceNodes);
     printf("  Number of Entity nodes: %zu\n", entityNodes);
     printf("  Number of ProcessingInstruction nodes: %zu\n", piNodes);
     printf("  Number of Document nodes: %zu\n", documentNodes);
     printf("  Number of DocumentType nodes: %zu\n", docTypeNodes);
     printf("  Number of DocumentFragment nodes: %zu\n", fragmentNodes);
-    printf("  Number of XPathNS nodes: %zu\n", xpathNSNodes);
     printf("  Number of ShadowRoot nodes: %zu\n", shadowRootNodes);
 
     printf("Element tag name distibution:\n");
@@ -384,14 +371,8 @@ String Node::nodeValue() const
     return String();
 }
 
-void Node::setNodeValue(const String& /*nodeValue*/, ExceptionCode& ec)
+void Node::setNodeValue(const String& /*nodeValue*/, ExceptionCode&)
 {
-    // NO_MODIFICATION_ALLOWED_ERR: Raised when the node is readonly
-    if (isReadOnlyNode()) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
-        return;
-    }
-
     // By default, setting nodeValue has no effect.
 }
 
@@ -760,9 +741,34 @@ void Node::derefEventTarget()
     deref();
 }
 
+// FIXME: Factor into iterator.
+static ContainerNode* traverseStyleParent(Node& node)
+{
+    auto* parent = node.parentNode();
+    if (!parent) {
+        if (is<ShadowRoot>(node))
+            return downcast<ShadowRoot>(node).host();
+        return nullptr;
+    }
+#if ENABLE(SHADOW_DOM)
+    if (auto* shadowRoot = parent->shadowRoot()) {
+        if (auto* assignedSlot = shadowRoot->findAssignedSlot(node))
+            return assignedSlot;
+    }
+#endif
+    return parent;
+}
+
+static ContainerNode* traverseFirstStyleParent(Node& node)
+{
+    if (is<PseudoElement>(node))
+        return downcast<PseudoElement>(node).hostElement();
+    return traverseStyleParent(node);
+}
+
 inline void Node::updateAncestorsForStyleRecalc()
 {
-    if (ContainerNode* ancestor = is<PseudoElement>(*this) ? downcast<PseudoElement>(*this).hostElement() : parentOrShadowHostNode()) {
+    if (auto* ancestor = traverseFirstStyleParent(*this)) {
         ancestor->setDirectChildNeedsStyleRecalc();
 
         if (is<Element>(*ancestor) && downcast<Element>(*ancestor).childrenAffectedByPropertyBasedBackwardPositionalRules()) {
@@ -770,8 +776,11 @@ inline void Node::updateAncestorsForStyleRecalc()
                 ancestor->setStyleChange(FullStyleChange);
         }
 
-        for (; ancestor && !ancestor->childNeedsStyleRecalc(); ancestor = ancestor->parentOrShadowHostNode())
+        for (; ancestor; ancestor = traverseStyleParent(*ancestor)) {
+            if (ancestor->childNeedsStyleRecalc())
+                break;
             ancestor->setChildNeedsStyleRecalc();
+        }
     }
 
     Document& document = this->document();
@@ -887,11 +896,6 @@ void Node::checkSetPrefix(const AtomicString& prefix, ExceptionCode& ec)
 
     if (!prefix.isEmpty() && !Document::isValidName(prefix)) {
         ec = INVALID_CHARACTER_ERR;
-        return;
-    }
-
-    if (isReadOnlyNode()) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
         return;
     }
 
@@ -1422,7 +1426,6 @@ static void appendTextContent(const Node* node, bool convertBRsToNewlines, bool&
         }
         FALLTHROUGH;
     case Node::ATTRIBUTE_NODE:
-    case Node::ENTITY_REFERENCE_NODE:
     case Node::DOCUMENT_FRAGMENT_NODE:
         isNullString = false;
         for (Node* child = node->firstChild(); child; child = child->nextSibling()) {
@@ -1434,7 +1437,6 @@ static void appendTextContent(const Node* node, bool convertBRsToNewlines, bool&
 
     case Node::DOCUMENT_NODE:
     case Node::DOCUMENT_TYPE_NODE:
-    case Node::XPATH_NAMESPACE_NODE:
         break;
     }
 }
@@ -1458,7 +1460,6 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
             return;
         case ELEMENT_NODE:
         case ATTRIBUTE_NODE:
-        case ENTITY_REFERENCE_NODE:
         case DOCUMENT_FRAGMENT_NODE: {
             Ref<ContainerNode> container(downcast<ContainerNode>(*this));
             ChildListMutationScope mutation(container);
@@ -1469,7 +1470,6 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
         }
         case DOCUMENT_NODE:
         case DOCUMENT_TYPE_NODE:
-        case XPATH_NAMESPACE_NODE:
             // Do nothing.
             return;
     }
@@ -1478,7 +1478,6 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
 
 Element* Node::ancestorElement() const
 {
-    // In theory, there can be EntityReference nodes between elements, but this is currently not supported.
     for (ContainerNode* ancestor = parentNode(); ancestor; ancestor = ancestor->parentNode()) {
         if (is<Element>(*ancestor))
             return downcast<Element>(ancestor);

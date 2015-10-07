@@ -197,6 +197,12 @@ void DrawingAreaImpl::setLayerTreeStateIsFrozen(bool isFrozen)
 
 void DrawingAreaImpl::forceRepaint()
 {
+    if (m_inUpdateBackingStoreState) {
+        m_forceRepaintAfterBackingStoreStateUpdate = true;
+        return;
+    }
+
+    m_forceRepaintAfterBackingStoreStateUpdate = false;
     setNeedsDisplay();
 
     m_webPage.layoutIfNeeded();
@@ -375,6 +381,8 @@ void DrawingAreaImpl::updateBackingStoreState(uint64_t stateID, bool respondImme
     }
 
     m_inUpdateBackingStoreState = false;
+    if (m_forceRepaintAfterBackingStoreStateUpdate)
+        forceRepaint();
 }
 
 void DrawingAreaImpl::sendDidUpdateBackingStoreState()
@@ -460,7 +468,7 @@ void DrawingAreaImpl::enterAcceleratedCompositingMode(GraphicsLayer* graphicsLay
     ASSERT(!m_layerTreeHost);
 
     m_layerTreeHost = LayerTreeHost::create(&m_webPage);
-#if USE(TEXTURE_MAPPER_GL) && PLATFORM(GTK)
+#if USE(TEXTURE_MAPPER) && PLATFORM(GTK)
     if (m_nativeSurfaceHandleForCompositing)
         m_layerTreeHost->setNativeSurfaceHandleForCompositing(m_nativeSurfaceHandleForCompositing);
 #endif
@@ -679,14 +687,15 @@ void DrawingAreaImpl::attachViewOverlayGraphicsLayer(WebCore::Frame* frame, WebC
     m_layerTreeHost->setViewOverlayRootLayer(viewOverlayRootLayer);
 }
 
-#if USE(TEXTURE_MAPPER_GL) && PLATFORM(GTK)
+#if USE(TEXTURE_MAPPER) && PLATFORM(GTK)
 void DrawingAreaImpl::setNativeSurfaceHandleForCompositing(uint64_t handle)
 {
     m_nativeSurfaceHandleForCompositing = handle;
-    m_webPage.corePage()->settings().setAcceleratedCompositingEnabled(true);
 
-    if (m_layerTreeHost)
+    if (m_layerTreeHost) {
+        m_webPage.corePage()->settings().setAcceleratedCompositingEnabled(true);
         m_layerTreeHost->setNativeSurfaceHandleForCompositing(handle);
+    }
 }
 #endif
 

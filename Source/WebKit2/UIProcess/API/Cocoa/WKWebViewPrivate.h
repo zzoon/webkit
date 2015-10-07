@@ -212,4 +212,18 @@ typedef NS_ENUM(NSInteger, _WKPaginationMode) {
 
 @end
 
+
+@interface WKWebView (WKTesting)
+
+#if TARGET_OS_IPHONE
+@property (nonatomic, readonly) CGRect _contentVisibleRect WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+- (CGPoint)_convertPointFromContentsToView:(CGPoint)point WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+- (CGPoint)_convertPointFromViewToContents:(CGPoint)point WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+#endif
+
+- (void)_doAfterNextPresentationUpdate:(void (^)(void))updateBlock WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+
+@end
+
+
 #endif

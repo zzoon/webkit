@@ -30,7 +30,6 @@
 #ifndef FrameLoaderClient_h
 #define FrameLoaderClient_h
 
-#include "DNS.h"
 #include "FrameLoaderTypes.h"
 #include "IconURL.h"
 #include "LayoutMilestones.h"
@@ -229,6 +228,7 @@ namespace WebCore {
 
         virtual ResourceError cancelledError(const ResourceRequest&) = 0;
         virtual ResourceError blockedError(const ResourceRequest&) = 0;
+        virtual ResourceError blockedByContentBlockerError(const ResourceRequest&) = 0;
         virtual ResourceError cannotShowURLError(const ResourceRequest&) = 0;
         virtual ResourceError interruptedForPolicyChangeError(const ResourceRequest&) = 0;
 
@@ -346,7 +346,6 @@ namespace WebCore {
 #if ENABLE(CONTENT_FILTERING)
         virtual void contentFilterDidBlockLoad(ContentFilterUnblockHandler) { }
 #endif
-        virtual void prefetchDNS(const String& hostname) { WebCore::prefetchDNS(hostname); }
     };
 
 } // namespace WebCore

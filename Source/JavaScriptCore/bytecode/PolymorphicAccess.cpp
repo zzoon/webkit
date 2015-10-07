@@ -61,6 +61,7 @@ struct AccessGenerationState {
     Vector<std::function<void(LinkBuffer&)>> callbacks;
     const Identifier* ident;
     std::unique_ptr<WatchpointsOnStructureStubInfo> watchpoints;
+    Vector<WriteBarrier<JSCell>> weakReferences;
 
     Watchpoint* addWatchpoint(const ObjectPropertyCondition& condition = ObjectPropertyCondition())
     {
@@ -251,6 +252,11 @@ JSObject* AccessCase::alternateBase() const
     return conditionSet().slotBaseCondition().object();
 }
 
+bool AccessCase::couldStillSucceed() const
+{
+    return m_conditionSet.structuresEnsureValidityAssumingImpurePropertyWatchpoint();
+}
+
 bool AccessCase::canReplace(const AccessCase& other)
 {
     // We could do a lot better here, but for now we just do something obvious.
@@ -375,6 +381,7 @@ void AccessCase::generate(AccessGenerationState& state)
     
     CCallHelpers& jit = *state.jit;
     VM& vm = *jit.vm();
+    CodeBlock* codeBlock = jit.codeBlock();
     StructureStubInfo& stubInfo = *state.stubInfo;
     const Identifier& ident = *state.ident;
     JSValueRegs valueRegs = state.valueRegs;
@@ -398,7 +405,14 @@ void AccessCase::generate(AccessGenerationState& state)
             continue;
         }
 
-        RELEASE_ASSERT(condition.structureEnsuresValidityAssumingImpurePropertyWatchpoint(structure));
+        if (!condition.structureEnsuresValidityAssumingImpurePropertyWatchpoint(structure)) {
+            dataLog("This condition is no longer met: ", condition, "\n");
+            RELEASE_ASSERT_NOT_REACHED();
+        }
+
+        // We will emit code that has a weak reference that isn't otherwise listed anywhere.
+        state.weakReferences.append(WriteBarrier<JSCell>(vm, codeBlock->ownerExecutable(), structure));
+        
         jit.move(CCallHelpers::TrustedImmPtr(condition.object()), scratchGPR);
         state.failAndRepatch.append(
             jit.branchStructure(
@@ -691,6 +705,15 @@ void AccessCase::generate(AccessGenerationState& state)
     }
 
     case Replace: {
+        if (InferredType* type = structure()->inferredTypeFor(ident.impl())) {
+            if (verbose)
+                dataLog("Have type: ", type->descriptor(), "\n");
+            state.failAndRepatch.append(
+                jit.branchIfNotType(
+                    valueRegs, scratchGPR, type->descriptor(), CCallHelpers::DoNotHaveTagRegisters));
+        } else if (verbose)
+            dataLog("Don't have type.\n");
+        
         if (isInlineOffset(m_offset)) {
             jit.storeValue(
                 valueRegs,
@@ -714,6 +737,15 @@ void AccessCase::generate(AccessGenerationState& state)
         RELEASE_ASSERT(GPRInfo::numberOfRegisters >= 6 || !structure()->outOfLineCapacity() || structure()->outOfLineCapacity() == newStructure()->outOfLineCapacity());
         RELEASE_ASSERT(!structure()->couldHaveIndexingHeader());
 
+        if (InferredType* type = newStructure()->inferredTypeFor(ident.impl())) {
+            if (verbose)
+                dataLog("Have type: ", type->descriptor(), "\n");
+            state.failAndRepatch.append(
+                jit.branchIfNotType(
+                    valueRegs, scratchGPR, type->descriptor(), CCallHelpers::DoNotHaveTagRegisters));
+        } else if (verbose)
+            dataLog("Don't have type.\n");
+        
         CCallHelpers::JumpList slowPath;
 
         ScratchRegisterAllocator allocator(stubInfo.patch.usedRegisters);
@@ -808,7 +840,6 @@ void AccessCase::generate(AccessGenerationState& state)
         if (newStructure()->outOfLineCapacity() != structure()->outOfLineCapacity())
             scratchBuffer = vm.scratchBufferForSize(allocator.desiredScratchBufferSizeForCall());
 
-#if ENABLE(GGC)
         if (newStructure()->outOfLineCapacity() != structure()->outOfLineCapacity()) {
             CCallHelpers::Call callFlushWriteBarrierBuffer;
             CCallHelpers::Jump ownerIsRememberedOrInEden = jit.jumpIfIsRememberedOrInEden(baseGPR);
@@ -851,7 +882,6 @@ void AccessCase::generate(AccessGenerationState& state)
                     linkBuffer.link(callFlushWriteBarrierBuffer, operationFlushWriteBarrierBuffer);
                 });
         }
-#endif // ENABLE(GGC)
         
         allocator.restoreReusedRegistersByPopping(jit, numberOfPaddingBytes);
         state.succeed();
@@ -961,6 +991,11 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerateWithCases(
     // then adding the new cases.
     ListType newCases;
     for (auto& oldCase : m_list) {
+        // Ignore old cases that cannot possibly succeed anymore.
+        if (!oldCase->couldStillSucceed())
+            continue;
+
+        // Figure out if this is replaced by any new cases.
         bool found = false;
         for (auto& caseToAdd : casesToAdd) {
             if (caseToAdd->canReplace(*oldCase)) {
@@ -968,8 +1003,10 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerateWithCases(
                 break;
             }
         }
-        if (!found)
-            newCases.append(oldCase->clone());
+        if (found)
+            continue;
+        
+        newCases.append(oldCase->clone());
     }
     for (auto& caseToAdd : casesToAdd)
         newCases.append(WTF::move(caseToAdd));
@@ -1005,6 +1042,12 @@ bool PolymorphicAccess::visitWeak(VM& vm) const
     for (unsigned i = 0; i < size(); ++i) {
         if (!at(i).visitWeak(vm))
             return false;
+    }
+    if (Vector<WriteBarrier<JSCell>>* weakReferences = m_weakReferences.get()) {
+        for (WriteBarrier<JSCell>& weakReference : *weakReferences) {
+            if (!Heap::isMarked(weakReference.get()))
+                return false;
+        }
     }
     return true;
 }
@@ -1084,13 +1127,17 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerate(
         state.failAndRepatch.append(binarySwitch.fallThrough());
     }
 
-    state.failAndIgnore.link(&jit);
-
-    // Make sure that the inline cache optimization code knows that we are taking slow path because
-    // of something that isn't patchable. "seen" being false means that we bypass patching. This is
-    // pretty gross but it means that we don't need to have two slow path entrypoints - one for
-    // patching and one for normal slow stuff.
-    jit.store8(CCallHelpers::TrustedImm32(false), &stubInfo.seen);
+    if (!state.failAndIgnore.empty()) {
+        state.failAndIgnore.link(&jit);
+        
+        // Make sure that the inline cache optimization code knows that we are taking slow path because
+        // of something that isn't patchable. The slow path will decrement "countdown" and will only
+        // patch things if the countdown reaches zero. We increment the slow path count here to ensure
+        // that the slow path does not try to patch.
+        jit.load8(&stubInfo.countdown, state.scratchGPR);
+        jit.add32(CCallHelpers::TrustedImm32(1), state.scratchGPR);
+        jit.store8(state.scratchGPR, &stubInfo.countdown);
+    }
 
     CCallHelpers::JumpList failure;
     if (allocator.didReuseRegisters()) {
@@ -1118,6 +1165,9 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerate(
     
     for (auto callback : state.callbacks)
         callback(linkBuffer);
+
+    if (verbose)
+        dataLog(*codeBlock, " ", stubInfo.codeOrigin, ": Generating polymorphic access stub for ", listDump(cases), "\n");
     
     MacroAssemblerCodeRef code = FINALIZE_CODE_FOR(
         codeBlock, linkBuffer,
@@ -1129,6 +1179,8 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerate(
     
     m_stubRoutine = createJITStubRoutine(code, vm, codeBlock->ownerExecutable(), doesCalls);
     m_watchpoints = WTF::move(state.watchpoints);
+    if (!state.weakReferences.isEmpty())
+        m_weakReferences = std::make_unique<Vector<WriteBarrier<JSCell>>>(WTF::move(state.weakReferences));
     if (verbose)
         dataLog("Returning: ", code.code(), "\n");
     return code.code();

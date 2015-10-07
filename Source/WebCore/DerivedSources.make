@@ -176,6 +176,7 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/Modules/speech/SpeechSynthesisEvent.idl \
     $(WebCore)/Modules/speech/SpeechSynthesisUtterance.idl \
     $(WebCore)/Modules/speech/SpeechSynthesisVoice.idl \
+    $(WebCore)/Modules/streams/ByteLengthQueuingStrategy.idl \
     $(WebCore)/Modules/streams/CountQueuingStrategy.idl \
     $(WebCore)/Modules/streams/ReadableStream.idl \
     $(WebCore)/Modules/streams/ReadableStreamController.idl \
@@ -289,7 +290,6 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/dom/EntityReference.idl \
     $(WebCore)/dom/ErrorEvent.idl \
     $(WebCore)/dom/Event.idl \
-    $(WebCore)/dom/EventException.idl \
     $(WebCore)/dom/EventListener.idl \
     $(WebCore)/dom/EventTarget.idl \
     $(WebCore)/dom/FocusEvent.idl \
@@ -414,6 +414,7 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/html/HTMLTableSectionElement.idl \
     $(WebCore)/html/HTMLTemplateElement.idl \
     $(WebCore)/html/HTMLTextAreaElement.idl \
+    $(WebCore)/html/HTMLTimeElement.idl \
     $(WebCore)/html/HTMLTitleElement.idl \
     $(WebCore)/html/HTMLTrackElement.idl \
     $(WebCore)/html/HTMLUListElement.idl \
@@ -793,6 +794,7 @@ all : \
     $(WORKERGLOBALSCOPE_CONSTRUCTORS_FILE) \
     $(JS_DOM_HEADERS) \
     $(WEB_DOM_HEADERS) \
+    $(WEBCORE_JS_BUILTINS) \
     \
     CSSGrammar.cpp \
     CSSPropertyNames.cpp \
@@ -1140,6 +1142,8 @@ mathmlMakeNames.intermediate : dom/make_names.pl bindings/scripts/Hasher.pm bind
 
 # --------
 
+# Internal Settings
+
 InternalSettingsGenerated.idl InternalSettingsGenerated.cpp InternalSettingsGenerated.h SettingsMacros.h : MakeSettings.intermediate
 .INTERMEDIATE : MakeSettings.intermediate
 MakeSettings.intermediate : page/make_settings.pl page/Settings.in
@@ -1247,6 +1251,22 @@ WebReplayInputs.h : $(INPUT_GENERATOR_SPECIFICATIONS) $(INPUT_GENERATOR_SCRIPTS)
 
 -include $(JS_DOM_HEADERS:.h=.dep)
 
+# WebCore JS Builtins
+
+WEBCORE_JS_BUILTINS = \
+    $(WebCore)/Modules/streams/ByteLengthQueuingStrategy.js \
+    $(WebCore)/Modules/streams/CountQueuingStrategy.js \
+    $(WebCore)/Modules/streams/ReadableStream.js \
+    $(WebCore)/Modules/streams/ReadableStreamController.js \
+    $(WebCore)/Modules/streams/ReadableStreamInternals.js \
+    $(WebCore)/Modules/streams/ReadableStreamReader.js \
+#
+
+all : $(WEBCORE_JS_BUILTINS:%.js=%Builtins.cpp)
+
+%Builtins.cpp: %.js
+	$(PYTHON) $(WebCore)/generate-js-builtins --input $< --generate_js_builtins_path $(GenerateJSBuiltinsScripts)
+
 # ------------------------
 
 # Mac-specific rules
@@ -1297,6 +1317,6 @@ ifeq ($(OS),Windows_NT)
 all : WebCoreHeaderDetection.h
 
 WebCoreHeaderDetection.h : $(WebCore)/AVFoundationSupport.py DerivedSources.make
-	$(PYTHON) $(WebCore)/AVFoundationSupport.py > $@
+	$(PYTHON) $(WebCore)/AVFoundationSupport.py $(WEBKIT_LIBRARIES) > $@
 
 endif # Windows_NT

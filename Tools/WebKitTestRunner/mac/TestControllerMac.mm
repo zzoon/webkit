@@ -29,6 +29,7 @@
 #import "PlatformWebView.h"
 #import "PoseAsClass.h"
 #import "TestInvocation.h"
+#import "TestRunnerWKWebView.h"
 #import "WebKitTestRunnerPasteboard.h"
 #import <WebKit/WKContextPrivate.h>
 #import <WebKit/WKPageGroup.h>
@@ -39,6 +40,7 @@
 #import <WebKit/WKWebView.h>
 #import <WebKit/WKWebViewConfiguration.h>
 #import <WebKit/WKWebViewConfigurationPrivate.h>
+#import <WebKit/WKWebViewPrivate.h>
 #import <WebKit/_WKUserContentExtensionStore.h>
 #import <WebKit/_WKUserContentExtensionStorePrivate.h>
 #import <mach-o/dyld.h>
@@ -77,11 +79,6 @@ void TestController::initializeTestPluginDirectory()
     m_testPluginDirectory.adopt(WKStringCreateWithCFString((CFStringRef)[[NSBundle mainBundle] bundlePath]));
 }
 
-static bool shouldUseThreadedScrolling(const TestInvocation& test)
-{
-    return test.urlContains("tiled-drawing/");
-}
-
 void TestController::platformResetPreferencesToConsistentValues()
 {
 }
@@ -95,9 +92,9 @@ void TestController::platformResetStateToConsistentValues()
     }
 }
 
-void TestController::updatePlatformSpecificTestOptionsForTest(TestOptions& options, const TestInvocation& test) const
+void TestController::updatePlatformSpecificTestOptionsForTest(TestOptions& options, const std::string&) const
 {
-    options.useThreadedScrolling = shouldUseThreadedScrolling(test);
+    options.useThreadedScrolling = true;
     options.useRemoteLayerTree = shouldUseRemoteLayerTree();
     options.shouldShowWebView = shouldShowWebView();
 }
@@ -126,6 +123,11 @@ void TestController::platformConfigureViewForTest(const TestInvocation& test)
         doneCompiling = true;
     }];
     platformRunUntil(doneCompiling, 0);
+
+    // This is for http/tests/contentextensions/disable-blocker.html
+    if (!test.urlContains("disable-blocker"))
+        return;
+    mainWebView()->platformView()._userContentExtensionsEnabled = false;
 #endif
 }
 

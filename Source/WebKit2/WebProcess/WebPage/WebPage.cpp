@@ -1004,6 +1004,8 @@ void WebPage::close()
     // The WebPage can be destroyed by this call.
     WebProcess::singleton().removeWebPage(m_pageID);
 
+    WebProcess::singleton().updateActivePages();
+
     if (isRunningModal)
         RunLoop::main().stop();
 }
@@ -1127,7 +1129,11 @@ void WebPage::navigateToPDFLinkWithSimulatedClick(const String& url, IntPoint do
         return;
 
     const int singleClick = 1;
-    RefPtr<MouseEvent> mouseEvent = MouseEvent::create(eventNames().clickEvent, true, true, currentTime(), nullptr, singleClick, screenPoint.x(), screenPoint.y(), documentPoint.x(), documentPoint.y(), false, false, false, false, 0, nullptr, 0, nullptr);
+    RefPtr<MouseEvent> mouseEvent = MouseEvent::create(eventNames().clickEvent, true, true, currentTime(), nullptr, singleClick, screenPoint.x(), screenPoint.y(), documentPoint.x(), documentPoint.y(),
+#if ENABLE(POINTER_LOCK)
+        0, 0,
+#endif
+        false, false, false, false, 0, nullptr, 0, nullptr);
 
     mainFrame->loader().urlSelected(mainFrameDocument->completeURL(url), emptyString(), mouseEvent.get(), LockHistory::No, LockBackForwardList::No, ShouldSendReferrer::MaybeSendReferrer, ShouldOpenExternalURLsPolicy::ShouldNotAllow);
 }
@@ -1711,10 +1717,18 @@ PassRefPtr<WebImage> WebPage::scaledSnapshotWithOptions(const IntRect& rect, dou
 {
     IntRect snapshotRect = rect;
     IntSize bitmapSize = snapshotRect.size();
-    double scaleFactor = additionalScaleFactor;
-    if (!(options & SnapshotOptionsExcludeDeviceScaleFactor))
-        scaleFactor *= corePage()->deviceScaleFactor();
-    bitmapSize.scale(scaleFactor);
+    if (options & SnapshotOptionsPrinting) {
+        ASSERT(additionalScaleFactor == 1);
+        Frame* coreFrame = m_mainFrame->coreFrame();
+        if (!coreFrame)
+            return nullptr;
+        bitmapSize.setHeight(PrintContext::numberOfPages(*coreFrame, bitmapSize) * (bitmapSize.height() + 1) - 1);
+    } else {
+        double scaleFactor = additionalScaleFactor;
+        if (!(options & SnapshotOptionsExcludeDeviceScaleFactor))
+            scaleFactor *= corePage()->deviceScaleFactor();
+        bitmapSize.scale(scaleFactor);
+    }
 
     return snapshotAtSize(rect, bitmapSize, options);
 }
@@ -1739,6 +1753,11 @@ PassRefPtr<WebImage> WebPage::snapshotAtSize(const IntRect& rect, const IntSize&
         return nullptr;
 
     auto graphicsContext = snapshot->bitmap()->createGraphicsContext();
+
+    if (options & SnapshotOptionsPrinting) {
+        PrintContext::spoolAllPagesWithBoundaries(*coreFrame, *graphicsContext, snapshotRect.size());
+        return snapshot.release();
+    }
 
     Color documentBackgroundColor = frameView->documentBackgroundColor();
     Color backgroundColor = (coreFrame->settings().backgroundShouldExtendBeyondPage() && documentBackgroundColor.isValid()) ? documentBackgroundColor : frameView->baseBackgroundColor();
@@ -3306,9 +3325,9 @@ void WebPage::didReceiveNotificationPermissionDecision(uint64_t notificationID, 
 }
 
 #if ENABLE(MEDIA_STREAM)
-void WebPage::didReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed, const String& deviceUIDVideo, const String& deviceUIDAudio)
+void WebPage::didReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed, const String& audioDeviceUID, const String& videoDeviceUID)
 {
-    m_userMediaPermissionRequestManager.didReceiveUserMediaPermissionDecision(userMediaID, allowed, deviceUIDVideo, deviceUIDAudio);
+    m_userMediaPermissionRequestManager.didReceiveUserMediaPermissionDecision(userMediaID, allowed, audioDeviceUID, videoDeviceUID);
 }
 #endif
 
@@ -4573,6 +4592,7 @@ void WebPage::didCommitLoad(WebFrame* frame)
 #if PLATFORM(IOS)
     frame->setFirstLayerTreeTransactionIDAfterDidCommitLoad(downcast<RemoteLayerTreeDrawingArea>(*m_drawingArea).nextTransactionID());
     cancelPotentialTapInFrame(*frame);
+    resetAssistedNodeForFrame(frame);
 #endif
 
     if (!frame->isMainFrame())
@@ -4877,9 +4897,13 @@ Ref<DocumentLoader> WebPage::createDocumentLoader(Frame& frame, const ResourceRe
 {
     Ref<WebDocumentLoader> documentLoader = WebDocumentLoader::create(request, substituteData);
 
-    if (m_pendingNavigationID && frame.isMainFrame()) {
-        documentLoader->setNavigationID(m_pendingNavigationID);
-        m_pendingNavigationID = 0;
+    if (frame.isMainFrame()) {
+        if (m_pendingNavigationID) {
+            documentLoader->setNavigationID(m_pendingNavigationID);
+            m_pendingNavigationID = 0;
+        }
+        if (frame.page())
+            documentLoader->setUserContentExtensionsEnabled(frame.page()->userContentExtensionsEnabled());
     }
 
     return WTF::move(documentLoader);
@@ -5017,6 +5041,21 @@ void WebPage::removeAllUserContent()
         return;
 
     m_userContentController->userContentController().removeAllUserContent();
+}
+
+void WebPage::dispatchDidLayout(WebCore::LayoutMilestones milestones)
+{
+    RefPtr<API::Object> userData;
+    injectedBundleLoaderClient().didLayout(this, milestones, userData);
+
+    // Clients should not set userData for this message, and it won't be passed through.
+    ASSERT(!userData);
+
+    // The drawing area might want to defer dispatch of didLayout to the UI process.
+    if (m_drawingArea && m_drawingArea->dispatchDidLayout(milestones))
+        return;
+
+    send(Messages::WebPageProxy::DidLayout(milestones));
 }
 
 } // namespace WebKit

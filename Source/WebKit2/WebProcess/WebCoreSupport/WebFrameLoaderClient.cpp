@@ -140,9 +140,6 @@ void WebFrameLoaderClient::detachedFromParent2()
     if (!webPage)
         return;
 
-#if PLATFORM(IOS)
-    webPage->resetAssistedNodeForFrame(m_frame);
-#endif
     RefPtr<API::Object> userData;
 
     // Notify the bundle client.
@@ -604,8 +601,7 @@ void WebFrameLoaderClient::dispatchDidLayout(LayoutMilestones milestones)
     }
 
     // Send this after DidFirstLayout-specific calls since some clients expect to get those messages first.
-    webPage->injectedBundleLoaderClient().didLayout(webPage, milestones, userData);
-    webPage->send(Messages::WebPageProxy::DidLayout(milestones, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
+    webPage->dispatchDidLayout(milestones);
 
     if (milestones & DidFirstVisuallyNonEmptyLayout) {
         if (m_frame->isMainFrame() && !m_didCompletePageTransition && !webPage->corePage()->settings().suppressesIncrementalRendering()) {
@@ -1107,6 +1103,11 @@ ResourceError WebFrameLoaderClient::blockedError(const ResourceRequest& request)
     return WebKit::blockedError(request);
 }
 
+ResourceError WebFrameLoaderClient::blockedByContentBlockerError(const ResourceRequest& request)
+{
+    return WebKit::blockedByContentBlockerError(request);
+}
+
 ResourceError WebFrameLoaderClient::cannotShowURLError(const ResourceRequest& request)
 {
     return WebKit::cannotShowURLError(request);
@@ -1219,7 +1220,7 @@ void WebFrameLoaderClient::restoreViewState()
 
     // FIXME: This should not be necessary. WebCore should be correctly invalidating
     // the view on restores from the back/forward cache.
-    if (m_frame == m_frame->page()->mainWebFrame())
+    if (m_frame->page() && m_frame == m_frame->page()->mainWebFrame())
         m_frame->page()->drawingArea()->setNeedsDisplay();
 #endif
 }
@@ -1538,9 +1539,9 @@ ObjectContentType WebFrameLoaderClient::objectContentType(const URL& url, const 
     bool plugInSupportsMIMEType = false;
     if (WebPage* webPage = m_frame->page()) {
         const PluginData& pluginData = webPage->corePage()->pluginData();
-        if (pluginData.supportsWebVisibleMimeType(mimeType, PluginData::AllPlugins) && webFrame()->coreFrame()->loader().subframeLoader().allowPlugins())
+        if (pluginData.supportsMimeType(mimeType, PluginData::AllPlugins) && webFrame()->coreFrame()->loader().subframeLoader().allowPlugins())
             plugInSupportsMIMEType = true;
-        else if (pluginData.supportsWebVisibleMimeType(mimeType, PluginData::OnlyApplicationPlugins))
+        else if (pluginData.supportsMimeType(mimeType, PluginData::OnlyApplicationPlugins))
             plugInSupportsMIMEType = true;
     }
     
@@ -1715,10 +1716,5 @@ void WebFrameLoaderClient::didRequestAutocomplete(PassRefPtr<WebCore::FormState>
 {
 }
 #endif
-
-void WebFrameLoaderClient::prefetchDNS(const String& hostname)
-{
-    WebProcess::singleton().prefetchDNS(hostname);
-}
 
 } // namespace WebKit

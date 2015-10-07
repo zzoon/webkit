@@ -49,6 +49,7 @@
 #include "Element.h"
 #include "EventHandler.h"
 #include "ExceptionCode.h"
+#include "ExtensionStyleSheets.h"
 #include "File.h"
 #include "FontCache.h"
 #include "FormController.h"
@@ -112,6 +113,7 @@
 #include "TextIterator.h"
 #include "TreeScope.h"
 #include "TypeConversions.h"
+#include "UserMediaController.h"
 #include "ViewportArguments.h"
 #include "WebConsoleAgent.h"
 #include "WorkerThread.h"
@@ -279,34 +281,46 @@ bool InspectorStubFrontend::sendMessageToFrontend(const String& message)
     return InspectorClient::doDispatchMessageOnFrontendPage(frontendPage(), message);
 }
 
-static bool markerTypesFrom(const String& markerType, DocumentMarker::MarkerTypes& result)
+static bool markerTypeFrom(const String& markerType, DocumentMarker::MarkerType& result)
 {
-    if (markerType.isEmpty() || equalIgnoringCase(markerType, "all"))
-        result = DocumentMarker::AllMarkers();
-    else if (equalIgnoringCase(markerType, "Spelling"))
-        result =  DocumentMarker::Spelling;
+    if (equalIgnoringCase(markerType, "Spelling"))
+        result = DocumentMarker::Spelling;
     else if (equalIgnoringCase(markerType, "Grammar"))
-        result =  DocumentMarker::Grammar;
+        result = DocumentMarker::Grammar;
     else if (equalIgnoringCase(markerType, "TextMatch"))
-        result =  DocumentMarker::TextMatch;
+        result = DocumentMarker::TextMatch;
     else if (equalIgnoringCase(markerType, "Replacement"))
-        result =  DocumentMarker::Replacement;
+        result = DocumentMarker::Replacement;
     else if (equalIgnoringCase(markerType, "CorrectionIndicator"))
-        result =  DocumentMarker::CorrectionIndicator;
+        result = DocumentMarker::CorrectionIndicator;
     else if (equalIgnoringCase(markerType, "RejectedCorrection"))
-        result =  DocumentMarker::RejectedCorrection;
+        result = DocumentMarker::RejectedCorrection;
     else if (equalIgnoringCase(markerType, "Autocorrected"))
-        result =  DocumentMarker::Autocorrected;
+        result = DocumentMarker::Autocorrected;
     else if (equalIgnoringCase(markerType, "SpellCheckingExemption"))
-        result =  DocumentMarker::SpellCheckingExemption;
+        result = DocumentMarker::SpellCheckingExemption;
     else if (equalIgnoringCase(markerType, "DeletedAutocorrection"))
-        result =  DocumentMarker::DeletedAutocorrection;
+        result = DocumentMarker::DeletedAutocorrection;
     else if (equalIgnoringCase(markerType, "DictationAlternatives"))
-        result =  DocumentMarker::DictationAlternatives;
+        result = DocumentMarker::DictationAlternatives;
 #if ENABLE(TELEPHONE_NUMBER_DETECTION)
     else if (equalIgnoringCase(markerType, "TelephoneNumber"))
-        result =  DocumentMarker::TelephoneNumber;
+        result = DocumentMarker::TelephoneNumber;
 #endif
+    else
+        return false;
+    
+    return true;
+}
+
+static bool markerTypesFrom(const String& markerType, DocumentMarker::MarkerTypes& result)
+{
+    DocumentMarker::MarkerType singularResult;
+
+    if (markerType.isEmpty() || equalIgnoringCase(markerType, "all"))
+        result = DocumentMarker::AllMarkers();
+    else if (markerTypeFrom(markerType, singularResult))
+        result = singularResult;
     else
         return false;
 
@@ -315,9 +329,9 @@ static bool markerTypesFrom(const String& markerType, DocumentMarker::MarkerType
 
 const char* Internals::internalsId = "internals";
 
-PassRefPtr<Internals> Internals::create(Document* document)
+Ref<Internals> Internals::create(Document* document)
 {
-    return adoptRef(new Internals(document));
+    return adoptRef(*new Internals(document));
 }
 
 Internals::~Internals()
@@ -385,7 +399,6 @@ Internals::Internals(Document* document)
 #if ENABLE(MEDIA_STREAM)
     MockRealtimeMediaSourceCenter::registerMockRealtimeMediaSourceCenter();
     enableMockRTCPeerConnectionHandler();
-    WebCore::provideUserMediaTo(document->page(), new UserMediaClientMock());
 #endif
 }
 
@@ -736,11 +749,11 @@ bool Internals::hasPausedImageAnimations(Element* element, ExceptionCode& ec)
     return element->renderer() && element->renderer()->hasPausedImageAnimations();
 }
 
-PassRefPtr<CSSComputedStyleDeclaration> Internals::computedStyleIncludingVisitedInfo(Node* node, ExceptionCode& ec) const
+RefPtr<CSSComputedStyleDeclaration> Internals::computedStyleIncludingVisitedInfo(Node* node, ExceptionCode& ec) const
 {
     if (!node) {
         ec = INVALID_ACCESS_ERR;
-        return 0;
+        return nullptr;
     }
 
     bool allowVisitedStyle = true;
@@ -1026,7 +1039,7 @@ RenderedDocumentMarker* Internals::markerAt(Node* node, const String& markerType
     return markers[index];
 }
 
-PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
+RefPtr<Range> Internals::markerRangeForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
 {
     RenderedDocumentMarker* marker = markerAt(node, markerType, index, ec);
     if (!marker)
@@ -1040,6 +1053,33 @@ String Internals::markerDescriptionForNode(Node* node, const String& markerType,
     if (!marker)
         return String();
     return marker->description();
+}
+
+String Internals::dumpMarkerRects(const String& markerTypeString, ExceptionCode& ec)
+{
+    DocumentMarker::MarkerType markerType;
+    if (!markerTypeFrom(markerTypeString, markerType)) {
+        ec = SYNTAX_ERR;
+        return String();
+    }
+
+    contextDocument()->markers().updateRectsForInvalidatedMarkersOfType(markerType);
+    auto rects = contextDocument()->markers().renderedRectsForMarkers(markerType);
+
+    StringBuilder rectString;
+    rectString.appendLiteral("marker rects: ");
+    for (const auto& rect : rects) {
+        rectString.append('(');
+        rectString.appendNumber(rect.x());
+        rectString.appendLiteral(", ");
+        rectString.appendNumber(rect.y());
+        rectString.appendLiteral(", ");
+        rectString.appendNumber(rect.width());
+        rectString.appendLiteral(", ");
+        rectString.appendNumber(rect.height());
+        rectString.appendLiteral(") ");
+    }
+    return rectString.toString();
 }
 
 void Internals::addTextMatchMarker(const Range* range, bool isActive)
@@ -1232,11 +1272,11 @@ void Internals::paintControlTints(ExceptionCode& ec)
     frameView->paintControlTints();
 }
 
-PassRefPtr<Range> Internals::rangeFromLocationAndLength(Element* scope, int rangeLocation, int rangeLength, ExceptionCode& ec)
+RefPtr<Range> Internals::rangeFromLocationAndLength(Element* scope, int rangeLocation, int rangeLength, ExceptionCode& ec)
 {
     if (!scope) {
         ec = INVALID_ACCESS_ERR;
-        return 0;
+        return nullptr;
     }
 
     return TextIterator::rangeFromLocationAndLength(scope, rangeLocation, rangeLength);
@@ -1278,11 +1318,11 @@ String Internals::rangeAsText(const Range* range, ExceptionCode& ec)
     return range->text();
 }
 
-PassRefPtr<Range> Internals::subrange(Range* range, int rangeLocation, int rangeLength, ExceptionCode& ec)
+RefPtr<Range> Internals::subrange(Range* range, int rangeLocation, int rangeLength, ExceptionCode& ec)
 {
     if (!range) {
         ec = INVALID_ACCESS_ERR;
-        return 0;
+        return nullptr;
     }
 
     return TextIterator::subrange(range, rangeLocation, rangeLength);
@@ -1404,19 +1444,19 @@ unsigned Internals::touchEventHandlerCount(ExceptionCode& ec)
 // contextDocument(), with the exception of a few tests that pass a
 // different document, and could just make the call through another Internals
 // instance instead.
-PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, int centerY, unsigned topPadding, unsigned rightPadding,
+RefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, int centerY, unsigned topPadding, unsigned rightPadding,
     unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, bool allowChildFrameContent, ExceptionCode& ec) const
 {
     if (!document || !document->frame() || !document->frame()->view()) {
         ec = INVALID_ACCESS_ERR;
-        return 0;
+        return nullptr;
     }
 
     Frame* frame = document->frame();
     FrameView* frameView = document->view();
     RenderView* renderView = document->renderView();
     if (!renderView)
-        return 0;
+        return nullptr;
 
     document->updateLayoutIgnorePendingStylesheets();
 
@@ -1435,7 +1475,7 @@ PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, i
 
     // When ignoreClipping is false, this method returns null for coordinates outside of the viewport.
     if (!request.ignoreClipping() && !frameView->visibleContentRect().intersects(HitTestLocation::rectForPoint(point, topPadding, rightPadding, bottomPadding, leftPadding)))
-        return 0;
+        return nullptr;
 
     Vector<Ref<Node>> matches;
 
@@ -1938,7 +1978,7 @@ void Internals::insertAuthorCSS(const String& css, ExceptionCode& ec) const
     auto parsedSheet = StyleSheetContents::create(*document);
     parsedSheet.get().setIsUserStyleSheet(false);
     parsedSheet.get().parseString(css);
-    document->styleSheetCollection().addAuthorSheet(WTF::move(parsedSheet));
+    document->extensionStyleSheets().addAuthorStyleSheetForTesting(WTF::move(parsedSheet));
 }
 
 void Internals::insertUserCSS(const String& css, ExceptionCode& ec) const
@@ -1952,7 +1992,7 @@ void Internals::insertUserCSS(const String& css, ExceptionCode& ec) const
     auto parsedSheet = StyleSheetContents::create(*document);
     parsedSheet.get().setIsUserStyleSheet(true);
     parsedSheet.get().parseString(css);
-    document->styleSheetCollection().addUserSheet(WTF::move(parsedSheet));
+    document->extensionStyleSheets().addUserStyleSheet(WTF::move(parsedSheet));
 }
 
 String Internals::counterValue(Element* element)
@@ -1989,7 +2029,7 @@ int Internals::numberOfPages(float pageWidth, float pageHeight)
     if (!frame())
         return -1;
 
-    return PrintContext::numberOfPages(frame(), FloatSize(pageWidth, pageHeight));
+    return PrintContext::numberOfPages(*frame(), FloatSize(pageWidth, pageHeight));
 }
 
 String Internals::pageProperty(String propertyName, int pageNumber, ExceptionCode& ec) const
@@ -2149,17 +2189,17 @@ void Internals::removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(const 
     SchemeRegistry::removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(scheme);
 }
 
-PassRefPtr<MallocStatistics> Internals::mallocStatistics() const
+Ref<MallocStatistics> Internals::mallocStatistics() const
 {
     return MallocStatistics::create();
 }
 
-PassRefPtr<TypeConversions> Internals::typeConversions() const
+Ref<TypeConversions> Internals::typeConversions() const
 {
     return TypeConversions::create();
 }
 
-PassRefPtr<MemoryInfo> Internals::memoryInfo() const
+Ref<MemoryInfo> Internals::memoryInfo() const
 {
     return MemoryInfo::create();
 }
@@ -2382,13 +2422,13 @@ String Internals::getCurrentCursorInfo(ExceptionCode& ec)
 #endif
 }
 
-PassRefPtr<ArrayBuffer> Internals::serializeObject(PassRefPtr<SerializedScriptValue> value) const
+RefPtr<ArrayBuffer> Internals::serializeObject(PassRefPtr<SerializedScriptValue> value) const
 {
     Vector<uint8_t> bytes = value->data();
     return ArrayBuffer::create(bytes.data(), bytes.size());
 }
 
-PassRefPtr<SerializedScriptValue> Internals::deserializeBuffer(PassRefPtr<ArrayBuffer> buffer) const
+RefPtr<SerializedScriptValue> Internals::deserializeBuffer(PassRefPtr<ArrayBuffer> buffer) const
 {
     Vector<uint8_t> bytes;
     bytes.append(static_cast<const uint8_t*>(buffer->data()), buffer->byteLength());
@@ -2572,11 +2612,11 @@ void Internals::setCaptionDisplayMode(const String& mode, ExceptionCode& ec)
 }
 
 #if ENABLE(VIDEO)
-PassRefPtr<TimeRanges> Internals::createTimeRanges(Float32Array* startTimes, Float32Array* endTimes)
+Ref<TimeRanges> Internals::createTimeRanges(Float32Array* startTimes, Float32Array* endTimes)
 {
     ASSERT(startTimes && endTimes);
     ASSERT(startTimes->length() == endTimes->length());
-    RefPtr<TimeRanges> ranges = TimeRanges::create();
+    Ref<TimeRanges> ranges = TimeRanges::create();
 
     unsigned count = std::min(startTimes->length(), endTimes->length());
     for (unsigned i = 0; i < count; ++i)
@@ -2662,9 +2702,22 @@ void Internals::setShouldGenerateTimestamps(SourceBuffer* buffer, bool flag)
 #endif
 
 #if ENABLE(VIDEO)
-void Internals::beginMediaSessionInterruption()
+void Internals::beginMediaSessionInterruption(const String& interruptionString, ExceptionCode& ec)
 {
-    PlatformMediaSessionManager::sharedManager().beginInterruption(PlatformMediaSession::SystemInterruption);
+    PlatformMediaSession::InterruptionType interruption = PlatformMediaSession::SystemInterruption;
+
+    if (equalIgnoringCase(interruptionString, "System"))
+        interruption = PlatformMediaSession::SystemInterruption;
+    else if (equalIgnoringCase(interruptionString, "SystemSleep"))
+        interruption = PlatformMediaSession::SystemSleep;
+    else if (equalIgnoringCase(interruptionString, "EnteringBackground"))
+        interruption = PlatformMediaSession::EnteringBackground;
+    else {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    PlatformMediaSessionManager::sharedManager().beginInterruption(interruption);
 }
 
 void Internals::endMediaSessionInterruption(const String& flagsString)
@@ -2677,9 +2730,9 @@ void Internals::endMediaSessionInterruption(const String& flagsString)
     PlatformMediaSessionManager::sharedManager().endInterruption(flags);
 }
 
-void Internals::applicationWillEnterForeground() const
+void Internals::applicationDidEnterForeground() const
 {
-    PlatformMediaSessionManager::sharedManager().applicationWillEnterForeground();
+    PlatformMediaSessionManager::sharedManager().applicationDidEnterForeground();
 }
 
 void Internals::applicationWillEnterBackground() const

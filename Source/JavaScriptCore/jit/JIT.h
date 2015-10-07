@@ -63,12 +63,12 @@ namespace JSC {
     class MarkedAllocator;
     class Register;
     class StructureChain;
+    class StructureStubInfo;
 
     struct Instruction;
     struct OperandTypes;
     struct SimpleJumpTable;
     struct StringJumpTable;
-    struct StructureStubInfo;
 
     struct CallRecord {
         MacroAssembler::Call from;
@@ -323,7 +323,7 @@ namespace JSC {
 
         enum CompileOpStrictEqType { OpStrictEq, OpNStrictEq };
         void compileOpStrictEq(Instruction* instruction, CompileOpStrictEqType type);
-        bool isOperandConstantImmediateDouble(int src);
+        bool isOperandConstantDouble(int src);
         
         void emitLoadDouble(int index, FPRegisterID value);
         void emitLoadInt32ToDouble(int index, FPRegisterID value);
@@ -400,8 +400,11 @@ namespace JSC {
 
         enum FinalObjectMode { MayBeFinal, KnownNotFinal };
 
+        void emitGetVirtualRegister(int src, JSValueRegs dst);
+        void emitPutVirtualRegister(int dst, JSValueRegs src);
+
 #if USE(JSVALUE32_64)
-        bool getOperandConstantImmediateInt(int op1, int op2, int& op, int32_t& constant);
+        bool getOperandConstantInt(int op1, int op2, int& op, int32_t& constant);
 
         void emitLoadTag(int index, RegisterID tag);
         void emitLoadPayload(int index, RegisterID payload);
@@ -422,10 +425,6 @@ namespace JSC {
         void emitJumpSlowCaseIfNotJSCell(int virtualRegisterIndex, RegisterID tag);
 
         void compileGetByIdHotPath(const Identifier*);
-        void compileGetDirectOffset(RegisterID base, RegisterID resultTag, RegisterID resultPayload, PropertyOffset cachedOffset);
-        void compileGetDirectOffset(JSObject* base, RegisterID resultTag, RegisterID resultPayload, PropertyOffset cachedOffset);
-        void compileGetDirectOffset(RegisterID base, RegisterID resultTag, RegisterID resultPayload, RegisterID offset, FinalObjectMode = MayBeFinal);
-        void compilePutDirectOffset(RegisterID base, RegisterID valueTag, RegisterID valuePayload, PropertyOffset cachedOffset);
 
         // Arithmetic opcode helpers
         void emitAdd32Constant(int dst, int op, int32_t constant, ResultType opType);
@@ -448,24 +447,22 @@ namespace JSC {
             emitPutVirtualRegister(dst, payload);
         }
 
-        int32_t getConstantOperandImmediateInt(int src);
+        int32_t getOperandConstantInt(int src);
 
         Jump emitJumpIfJSCell(RegisterID);
         Jump emitJumpIfBothJSCells(RegisterID, RegisterID, RegisterID);
         void emitJumpSlowCaseIfJSCell(RegisterID);
         void emitJumpSlowCaseIfNotJSCell(RegisterID);
         void emitJumpSlowCaseIfNotJSCell(RegisterID, int VReg);
-        Jump emitJumpIfImmediateInteger(RegisterID);
-        Jump emitJumpIfNotImmediateInteger(RegisterID);
-        Jump emitJumpIfNotImmediateIntegers(RegisterID, RegisterID, RegisterID);
-        PatchableJump emitPatchableJumpIfNotImmediateInteger(RegisterID);
-        void emitJumpSlowCaseIfNotImmediateInteger(RegisterID);
-        void emitJumpSlowCaseIfNotImmediateNumber(RegisterID);
-        void emitJumpSlowCaseIfNotImmediateIntegers(RegisterID, RegisterID, RegisterID);
+        Jump emitJumpIfInt(RegisterID);
+        Jump emitJumpIfNotInt(RegisterID);
+        Jump emitJumpIfNotInt(RegisterID, RegisterID, RegisterID scratch);
+        PatchableJump emitPatchableJumpIfNotInt(RegisterID);
+        void emitJumpSlowCaseIfNotInt(RegisterID);
+        void emitJumpSlowCaseIfNotNumber(RegisterID);
+        void emitJumpSlowCaseIfNotInt(RegisterID, RegisterID, RegisterID scratch);
 
-        void emitFastArithReTagImmediate(RegisterID src, RegisterID dest);
-
-        void emitTagAsBoolImmediate(RegisterID reg);
+        void emitTagBool(RegisterID);
         void compileBinaryArithOp(OpcodeID, int dst, int src1, int src2, OperandTypes opi);
         void compileBinaryArithOpSlowCase(Instruction*, OpcodeID, Vector<SlowCaseEntry>::iterator&, int dst, int src1, int src2, OperandTypes, bool op1HasImmediateIntFastCase, bool op2HasImmediateIntFastCase);
 
@@ -671,7 +668,6 @@ namespace JSC {
         void emitVarInjectionCheck(bool needsVarInjectionChecks);
         void emitResolveClosure(int dst, int scope, bool needsVarInjectionChecks, unsigned depth);
         void emitLoadWithStructureCheck(int scope, Structure** structureSlot);
-        void emitGetGlobalProperty(uintptr_t* operandSlot);
 #if USE(JSVALUE64)
         void emitGetVarFromPointer(JSValue* operand, GPRReg);
         void emitGetVarFromIndirectPointer(JSValue** operand, GPRReg);
@@ -680,7 +676,6 @@ namespace JSC {
         void emitGetVarFromPointer(JSValue* operand, GPRReg tag, GPRReg payload);
 #endif
         void emitGetClosureVar(int scope, uintptr_t operand);
-        void emitPutGlobalProperty(uintptr_t* operandSlot, int value);
         void emitNotifyWrite(WatchpointSet*);
         void emitNotifyWrite(GPRReg pointerToSet);
         void emitPutGlobalVariable(JSValue* operand, int value, WatchpointSet*);
@@ -692,8 +687,8 @@ namespace JSC {
         void emitPutIntToCallFrameHeader(RegisterID from, JSStack::CallFrameHeaderEntry);
 
         JSValue getConstantOperand(int src);
-        bool isOperandConstantImmediateInt(int src);
-        bool isOperandConstantImmediateChar(int src);
+        bool isOperandConstantInt(int src);
+        bool isOperandConstantChar(int src);
 
         Jump getSlowCase(Vector<SlowCaseEntry>::iterator& iter)
         {
@@ -710,6 +705,8 @@ namespace JSC {
             ++iter;
         }
         void linkSlowCaseIfNotJSCell(Vector<SlowCaseEntry>::iterator&, int virtualRegisterIndex);
+        void linkAllSlowCasesForBytecodeOffset(Vector<SlowCaseEntry>& slowCases,
+            Vector<SlowCaseEntry>::iterator&, unsigned bytecodeOffset);
 
         MacroAssembler::Call appendCallWithExceptionCheck(const FunctionPtr&);
 #if OS(WINDOWS) && CPU(X86_64)
@@ -822,6 +819,7 @@ namespace JSC {
         MacroAssembler::Call callOperation(V_JITOperation_EJZ, RegisterID, RegisterID, int32_t);
         MacroAssembler::Call callOperation(V_JITOperation_EJZJ, RegisterID, RegisterID, int32_t, RegisterID, RegisterID);
         MacroAssembler::Call callOperation(V_JITOperation_EZJ, int32_t, RegisterID, RegisterID);
+        MacroAssembler::Call callOperation(J_JITOperation_EJscCJ, int, GPRReg, JSCell*, GPRReg, GPRReg);
 #endif
 
         Jump checkStructure(RegisterID reg, Structure* structure);

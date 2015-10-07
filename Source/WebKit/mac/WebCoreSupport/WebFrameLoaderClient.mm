@@ -886,6 +886,9 @@ static BOOL shouldTryAppLink(WebView *webView, const NavigationAction& action, F
     if (!action.processingUserGesture())
         return NO;
 
+    if (targetFrame && targetFrame->document() && protocolHostAndPortAreEqual(targetFrame->document()->url(), action.url()))
+        return NO;
+
     return YES;
 #else
     return NO;
@@ -1142,6 +1145,11 @@ ResourceError WebFrameLoaderClient::cancelledError(const ResourceRequest& reques
 ResourceError WebFrameLoaderClient::blockedError(const ResourceRequest& request)
 {
     return [NSError _webKitErrorWithDomain:WebKitErrorDomain code:WebKitErrorCannotUseRestrictedPort URL:request.url()];
+}
+
+ResourceError WebFrameLoaderClient::blockedByContentBlockerError(const ResourceRequest& request)
+{
+    RELEASE_ASSERT_NOT_REACHED(); // Content blockers are not enabled in WebKit1.
 }
 
 ResourceError WebFrameLoaderClient::cannotShowURLError(const ResourceRequest& request)

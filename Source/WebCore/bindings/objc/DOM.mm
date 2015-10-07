@@ -311,8 +311,6 @@ Class kitClass(WebCore::Node* impl)
             return [DOMText class];
         case WebCore::Node::CDATA_SECTION_NODE:
             return [DOMCDATASection class];
-        case WebCore::Node::ENTITY_REFERENCE_NODE:
-            return [DOMEntityReference class];
         case WebCore::Node::PROCESSING_INSTRUCTION_NODE:
             return [DOMProcessingInstruction class];
         case WebCore::Node::COMMENT_NODE:
@@ -325,10 +323,6 @@ Class kitClass(WebCore::Node* impl)
             return [DOMDocumentType class];
         case WebCore::Node::DOCUMENT_FRAGMENT_NODE:
             return [DOMDocumentFragment class];
-        case WebCore::Node::XPATH_NAMESPACE_NODE:
-            // FIXME: Create an XPath objective C wrapper
-            // See http://bugs.webkit.org/show_bug.cgi?id=8755
-            return nil;
     }
     ASSERT_NOT_REACHED();
     return nil;

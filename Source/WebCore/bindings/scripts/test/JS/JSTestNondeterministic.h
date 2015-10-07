@@ -27,9 +27,9 @@
 
 namespace WebCore {
 
-class JSTestNondeterministic : public JSDOMWrapper {
+class JSTestNondeterministic : public JSDOMWrapperWithImplementation<TestNondeterministic> {
 public:
-    typedef JSDOMWrapper Base;
+    typedef JSDOMWrapperWithImplementation<TestNondeterministic> Base;
     static JSTestNondeterministic* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestNondeterministic>&& impl)
     {
         JSTestNondeterministic* ptr = new (NotNull, JSC::allocateCell<JSTestNondeterministic>(globalObject->vm().heap)) JSTestNondeterministic(structure, globalObject, WTF::move(impl));
@@ -41,7 +41,6 @@ public:
     static JSC::JSObject* getPrototype(JSC::VM&, JSC::JSGlobalObject*);
     static TestNondeterministic* toWrapped(JSC::JSValue);
     static void destroy(JSC::JSCell*);
-    ~JSTestNondeterministic();
 
     DECLARE_INFO;
 
@@ -51,11 +50,6 @@ public:
     }
 
     static JSC::JSValue getConstructor(JSC::VM&, JSC::JSGlobalObject*);
-    TestNondeterministic& impl() const { return *m_impl; }
-    void releaseImpl() { std::exchange(m_impl, nullptr)->deref(); }
-
-private:
-    TestNondeterministic* m_impl;
 protected:
     JSTestNondeterministic(JSC::Structure*, JSDOMGlobalObject*, Ref<TestNondeterministic>&&);
 
@@ -69,8 +63,8 @@ protected:
 
 class JSTestNondeterministicOwner : public JSC::WeakHandleOwner {
 public:
-    bool isReachableFromOpaqueRoots(JSC::JSCell&, void* context, JSC::SlotVisitor&) override;
-    void finalize(JSC::JSCell*&, void* context) override;
+    virtual bool isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown>, void* context, JSC::SlotVisitor&);
+    virtual void finalize(JSC::Handle<JSC::Unknown>, void* context);
 };
 
 inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestNondeterministic*)

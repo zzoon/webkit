@@ -1,3 +1,1644 @@
+2015-10-06  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Add autocleanups
+        https://bugs.webkit.org/show_bug.cgi?id=149588
+
+        Reviewed by Darin Adler.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/AutocleanupsTest.cpp: Added.
+        (AutocleanupsTest::create):
+        (AutocleanupsTest::testWebProcessAutocleanups):
+        (registerTests):
+        * TestWebKitAPI/Tests/WebKit2Gtk/CMakeLists.txt:
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestAutocleanups.cpp: Added.
+        (testUIProcessAutocleanups):
+        (testWebProcessAutocleanups):
+        (beforeAll):
+        (afterAll):
+
+2015-10-06  Brian Burg  <bburg@apple.com>
+
+        Unreviewed, try to fix the iOS 8 build after r190368.
+
+        On older versions, IOHIDEventCreateForceEvent is not available.
+
+        * WebKitTestRunner/ios/HIDEventGenerator.mm:
+        (-[HIDEventGenerator _createIOHIDEventType:]): Add another guard for force events.
+
+2015-10-06  Keith Miller  <keith_miller@apple.com>
+
+        Add gmalloc option to run-javascriptcore-tests.
+        https://bugs.webkit.org/show_bug.cgi?id=149858
+
+        Reviewed by Geoffrey Garen.
+
+        run-javascriptcore-tests takes a new option --gmalloc with an optional string argument, the path to the gmalloc dylib.
+        If no argument is provided then /usr/lib/libgmalloc.dylib is used by default.
+
+        * Scripts/run-javascriptcore-tests:
+
+2015-10-06  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Post-review cleanup after r190572.
+
+        Unreviewed.
+
+        * TestWebKitAPI/Tests/WebKit2/WKRetainPtr.cpp:
+
+2015-10-06  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build correction.
+
+        * TestWebKitAPI/PlatformWin.cmake: We don't need to link to all of these libraries. Most
+        are soft-linked at runtime.
+
+2015-10-06  Keith Miller  <keith_miller@apple.com>
+
+        Fix run-javascriptcore-tests/run-jsc-stress-tests to work with rootless, add a --quick option and deprecate the Mozilla driver.
+        https://bugs.webkit.org/show_bug.cgi?id=149815
+
+        Reviewed by Filip Pizlo.
+
+        Rootless has an issue where it will strip any environment variables that start with DYLD starting a perl/ruby/python script.
+        Now, run-jsc-stress-tests takes an new argument, --env-vars, that will set the specified environment variables before
+        running tests. Additionally, I added a quick option that only runs default and the NoCJITValidate versions of each test.
+        Finally, I removed the calls to the mozilla jsDriver.pl since the run-jsc-stress-tests runner runs the same test suite
+        so should just use one test runner.
+
+        * Scripts/run-javascriptcore-tests:
+        (runJSCStressTests):
+        (runMozillaTests): Deleted.
+        (defaultJsDriverArgsForMozillaTests): Deleted.
+        * Scripts/run-jsc-stress-tests:
+
+2015-10-06  Mark Salisbury  <mark.salisbury@hp.com>
+
+        [GTK] Make update-webkitgtk-libs work behind firewall
+
+        update-webkitgtk-libs can work behind a firewall with changes to
+        a few packages.  Where outbound git and active FTP connections
+        fail, using http protocol succeeds.  Most packages are
+        already accessed using http.
+
+        https://bugs.webkit.org/show_bug.cgi?id=148941
+
+        Reviewed by Martin Robinson.
+
+        Tools
+        * gtk/jhbuild.modules:
+            Replace git URLs with http.  Remove no longer used ftp repositories.
+            Update argument for libxml2's autogen.sh script (--without-python
+            is ignored; --with-python=no is correct).
+        * jhbuild/jhbuild-wrapper:
+            Instead of connecting to git://git.gnome.org/jhbuild, connect to
+            http://git.gnome.org/browse/jhbuild.
+
+2015-10-06  Daniel Bates  <dbates@webkit.org>
+
+        Enable XSLT when building WebKit for iOS using the public iOS SDK
+        https://bugs.webkit.org/show_bug.cgi?id=149827
+
+        Reviewed by Alexey Proskuryakov.
+
+        Teach script configure-xcode-for-ios-development to copy the OS X XSLT headers to the iPhoneOS
+        and iPhoneSimulator SDKs so as to support building WebKit for iOS with XSLT. A person must
+        run this script before building WebKit for iOS or the build will fail because one or more XSLT
+        headers cannot be found.
+
+        * Scripts/configure-xcode-for-ios-development:
+        (copyMissingXSLTHeadersToSDKIfNeeded): Added.
+
+2015-10-05  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        REGRESSION(189668?): http/tests/notifications/events.html flakily asserts or times out
+        https://bugs.webkit.org/show_bug.cgi?id=149218
+
+        Reviewed by Alexey Proskuryakov.
+
+        Because of r189668, WebKitTestRunner now tears down and recreates its WKNotificationManagerRef
+        when the TestOptions change. Previously, WebNotificationProvider only could handle a single
+        WKNotificationManagerRef. Because the ower of the WKNotificationManagerRef is reference counted,
+        and AppKit internally retains some objects which end up retaining the WKNotificationManagerRef,
+        the old WKNotificationManager may not be destroyed before the new one is created. Therefore,
+        WebNotificationProvider must be updated to appropriately handle multiple
+        WKNotificationManagerRefs in flight at the same time.
+
+        * WebKitTestRunner/WebNotificationProvider.cpp:
+        (WTR::WebNotificationProvider::~WebNotificationProvider):
+        (WTR::WebNotificationProvider::showWebNotification):
+        (WTR::WebNotificationProvider::closeWebNotification):
+        (WTR::WebNotificationProvider::addNotificationManager):
+        (WTR::WebNotificationProvider::removeNotificationManager):
+        (WTR::WebNotificationProvider::simulateWebNotificationClick):
+        (WTR::WebNotificationProvider::reset):
+        * WebKitTestRunner/WebNotificationProvider.h:
+
+2015-10-05  Daniel Bates  <dabates@apple.com>
+
+        Disable Bitcode when building for iOS device
+        https://bugs.webkit.org/show_bug.cgi?id=149818
+
+        Reviewed by Alexey Proskuryakov.
+
+        Xcode 7 generates bitcode for iOS device apps by default. Do not generate bitcode
+        when building for iOS device.
+
+        * Scripts/webkitdirs.pm:
+        (XcodeOptions):
+
+2015-10-05  Daniel Bates  <dabates@apple.com>
+
+        [iOS] Make it possible to build WebKit using iphoneos SDK without a developer certificate installed
+        https://bugs.webkit.org/show_bug.cgi?id=140828
+        <rdar://problem/19520599>
+
+        Reviewed by Alexey Proskuryakov.
+
+        Support building WebKit for iOS device without an iOS Developer certificate installed. Otherwise,
+        we will pass CODE_SIGN_IDENTITY="iPhone Developer: " to Xcode to find a iOS Developer certificate
+        to use. To use a specific installed iOS Developer certificate, explicitly pass CODE_SIGN_IDENTITY
+        to build-webkit.
+
+        * Scripts/webkitdirs.pm:
+        (XcodeOptions): Cleaned up code. When building for iOS device, pass to Xcode CODE_SIGN_IDENTITY="iPhone Developer: "
+        to code sign using the installed iOS development certificate (if it exists - we assume there is only one such certificate).
+        Otherwise, pass CODE_SIGN_IDENTITY="" and CODE_SIGNING_REQUIRED=NO to Xcode to disable code signing.
+        (hasIOSDevelopmentCertificate): Added.
+
+2015-10-05  Daniel Bates  <dabates@apple.com>
+
+        DumpRenderTree built with public iOS SDK crashes under -[WebPreferences(WebPrivate) _setCurrentNetworkLoaderSessionCookieAcceptPolicy:]
+        https://bugs.webkit.org/show_bug.cgi?id=149766
+
+        Reviewed by Alexey Proskuryakov.
+
+        Create network storage testing session on iOS.
+
+        Currently we do not create a network storage testing session on iOS. A network storage testing session always
+        has an associated cookie store. When WebKit is built without USE(CFNETWORK), NetworkStorageSession::defaultStorageSession().cookieStorage()
+        returns nullptr because the caller is expected to interact with NSHTTPCookieStorage instead of querying
+        NetworkStorageSession for the cookie store. When WebKit is built with USE(CFNETWORK) accessing
+        NetworkStorageSession::defaultStorageSession().cookieStorage() returns a valid cookie store (creating one if
+        it does not exist). Instead we should make use of NetworkStorageSession::switchToNewTestingSession() to
+        create a network storage testing session when building DumpRenderTree for iOS so as to ensure a consistent
+        testing environment regardless of whether we built with USE(CFNETWORK). This will also make the behavior of
+        DumpRenderTree on iOS more consistent with the behavior of DumpRenderTree on Mac.
+
+        As a side effect of this change DumpRenderTree no longer crashes in -[WebPreferences(WebPrivate) _setCurrentNetworkLoaderSessionCookieAcceptPolicy:]
+        when WebKit is built without USE(CFNETWORK) because NetworkStorageSession::defaultStorageSession().cookieStorage()
+        returns a non-null pointer to a cookie store.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (prepareConsistentTestingEnvironment):
+
+2015-10-05  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix the iOS 8 build again, where -[UIApplication _enqueueHIDEvent:] is not
+        available.
+
+        * WebKitTestRunner/ios/HIDEventGenerator.mm:
+        (-[HIDEventGenerator _sendMarkerHIDEventWithCompletionBlock:]):
+
+2015-10-05  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Allow WKRetainPtrs to be used as keys in hashing data structures
+        https://bugs.webkit.org/show_bug.cgi?id=149762
+
+        Reviewed by Anders Carlsson.
+
+        * TestWebKitAPI/PlatformGTK.cmake:
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WebKit2/WKRetainPtr.cpp: Added.
+        (TestWebKitAPI::TEST):
+
+2015-10-05  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix the iOS 8 build, where -[UIApplication _enqueueHIDEvent:] is not
+        available, and tidy up the #ifdefs in the UIKitSPI header.
+
+        * WebKitTestRunner/ios/HIDEventGenerator.mm:
+        (-[HIDEventGenerator _sendHIDEvent:]):
+        * WebKitTestRunner/ios/UIKitSPI.h:
+
+2015-10-04  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Remove duplicate entries in WebKitTestRunner_SOURCES
+        https://bugs.webkit.org/show_bug.cgi?id=149792
+
+        Reviewed by Martin Robinson.
+
+        * WebKitTestRunner/PlatformGTK.cmake: Don't list build targets
+        for WebKitTestRunner multiple times.
+
+2015-10-04  Daniel Bates  <dabates@apple.com>
+
+        Fix the Apple Internal iOS build after <http://trac.webkit.org/changeset/190515>
+        (https://bugs.webkit.org/show_bug.cgi?id=149753)
+
+        For now, support calling build-layouttestrelay without --ios-simulator so long
+        as we are building on a Mac.
+
+        * Scripts/build-layouttestrelay:
+
+2015-10-04  Alexey Proskuryakov  <ap@apple.com>
+
+        Support Trac 1.0.x XML timeline link format
+        https://bugs.webkit.org/show_bug.cgi?id=149786
+
+        Reviewed by Lucas Forschler.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/Trac.js:
+        (Trac.prototype._convertCommitInfoElementToObject):
+
+2015-10-04  Alexey Proskuryakov  <ap@apple.com>
+
+        Fix some errors on bot watcher's dashboard
+        https://bugs.webkit.org/show_bug.cgi?id=149789
+
+        Reviewed by Lucas Forschler.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/BuildbotTesterQueueView.js:
+        (BuildbotTesterQueueView.prototype.appendBuilderQueueStatus): We may not get to layout
+        tests step, in which case layoutTestResults.tooManyFailures would raise an exception.
+
+2015-10-04  Alexey Proskuryakov  <ap@apple.com>
+
+        Bot watcher's dashboard builders should turn yellow when svn fails
+        https://bugs.webkit.org/show_bug.cgi?id=149791
+
+        Reviewed by Lucas Forschler.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/BuildbotBuilderQueueView.js:
+        (BuildbotBuilderQueueView.prototype.appendBuilderQueueStatus):
+        (BuildbotBuilderQueueView.prototype.update):
+
+2015-10-02  Daniel Bates  <dabates@apple.com>
+
+        Add iOS 9 Simulator builders and testers to WebKit Bot Watcher's Dashboard
+        https://bugs.webkit.org/show_bug.cgi?id=149769
+
+        Reviewed by Alexey Proskuryakov.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Images/IOS9Simulator.png: Added.
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Images/IOS9Simulator@2x.png: Added.
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/Dashboard.js:
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/WebKitBuildbot.js:
+        (WebKitBuildbot):
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Styles/Main.css:
+        (table.queue-grid tr.platform.ios-simulator-9 img.logo):
+
+2015-10-02  Ryosuke Niwa  <rniwa@webkit.org>
+
+        REGRESSION(r190370): Speedometer spits out an extra console message
+        https://bugs.webkit.org/show_bug.cgi?id=149720
+
+        Unreviewed. Temporarily ignore the console error message.
+
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (PerfTest._filter_output):
+
+2015-10-02  Brent Fulgham  <bfulgham@apple.com>
+
+        Provide "--no-ninja" option to avoid using Ninja
+        https://bugs.webkit.org/show_bug.cgi?id=149757
+
+        Reviewed by Alex Christensen.
+
+        Add a new command line argument understood by webkitdirs.pm so
+        that we can conditionally avoid using Ninja. This is an
+        'opt-out' argument, so no existing Ninja users should be affected.
+        
+        * Scripts/webkitdirs.pm:
+        (canUseNinja): Check for option and block ninja if present.
+
+2015-10-02  Aakash Jain  <aakash_jain@apple.com>
+
+        Flakiness dashboard should support OS X El Capitan
+        https://bugs.webkit.org/show_bug.cgi?id=149648
+
+        Reviewed by Alexey Proskuryakov.
+
+        * TestResultServer/static-dashboards/flakiness_dashboard.js: Fix the broken dashboard for ElCapitan.
+
+2015-10-02  Daniel Bates  <dabates@apple.com>
+
+        Fix run-webkit-tests --ios-simulator after <http://trac.webkit.org/changeset/190515>
+        (https://bugs.webkit.org/show_bug.cgi?id=149753)
+
+        For now, pass --ios-simulator.
+
+        * Scripts/webkitpy/port/ios.py:
+        (IOSSimulatorPort._build_relay):
+
+2015-10-02  Simon Fraser  <simon.fraser@apple.com>
+
+        Remove a "nullable" that breaks the iOS 8 build.
+
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm:
+        (-[TestRunnerWKWebView scrollViewWillBeginZooming:withView:]):
+
+2015-10-02  Daniel Bates  <dabates@apple.com>
+
+        LayoutTestRelay is not built and archived when building for iOS Simulator
+        https://bugs.webkit.org/show_bug.cgi?id=149753
+
+        Reviewed by Alexey Proskuryakov and Andy Estes.
+
+        Towards running layout tests on the iOS Simulator test bots, we need to teach scripts build-webkit
+        and built-product-archive to build the Mac tool LayoutTestRelay and include this tool in the built
+        product archive when building for iOS Simulator, respectively.
+
+        * BuildSlaveSupport/built-product-archive:
+        (main): Pass the full platform name (options.platform) to archiveBuiltProduct() so that it can
+        differentiate between iOS device and iOS Simulator platforms.
+        (webkitBuildDirectoryForConfigurationAndPlatform): Extracted logic to run the script webkit-build-directory
+        from determineWebKitBuildDirectories() into this function so that it can be used by both
+        determineWebKitBuildDirectories() and archiveBuiltProduct().
+        (determineWebKitBuildDirectories): Moved logic to execute the script webkit-build-directory from here to
+        webkitBuildDirectoryForConfigurationAndPlatform().
+        (createZip): Added parameter embedParentDirectoryNameOnDarwin (defaults to False) to specify whether
+        we should call ditto(1) with --keepParent to embed the parent directory name in the zip archive. This
+        argument is only applicable when building on Darwin. We only pass embedParentDirectoryNameOnDarwin=True
+        when making an archive for a Mac or iOS device build. For iOS Simulator builds we archive two directories
+        and we do not want to keep the parent directory because it is a placeholder directory used as a workaround
+        for the limitation that ditto(1) can only accept a single directory to archive on its command line.
+        (archiveBuiltProduct): Modified to take the full platform name as an argument. Added logic for iOS.
+        For iOS device builds we use the same logic as for a Mac build and archive the configuration-specific
+        build directory. For iOS Simulator builds we archive the configuration-specific iOS build directory,
+        LayoutTestRelay and LayoutTestRelay.dSYM (if it exists) from the configuration-specific Mac build.
+        * Scripts/build-layouttestrelay:
+            - Remove unnecessary include of Perl module POSIX.
+            - Only build LayoutTestRelay when building for iOS Simulator (i.e. --ios-simulator is passed).
+        * Scripts/build-webkit:
+            - Invoke script build-layouttestrelay when building for iOS Simulator.
+
+2015-10-02  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed test fix.
+
+        You cannot run 'run-webkit-tests' from the command line because it does not know
+        to append the binary subdirectory (bin32/bin64). We don't see this on our builders
+        because they explicitly set use the 'root' argument to provide the full path to
+        the test binaries.
+
+        * Scripts/webkitpy/port/win.py:
+        (WinPort._build_path): Added.
+
+2015-10-02  Alex Christensen  <achristensen@webkit.org>
+
+        Reloading without content blockers doesn't apply to resource loads after the main frame finishes
+        https://bugs.webkit.org/show_bug.cgi?id=149430
+        rdar://problem/22742222
+
+        Reviewed by Geoffrey Garen.
+
+        * WebKitTestRunner/cocoa/TestControllerCocoa.mm:
+        (WTR::TestController::cocoaResetStateToConsistentValues):
+        * WebKitTestRunner/mac/TestControllerMac.mm:
+        (WTR::TestController::platformConfigureViewForTest):
+        Test what happens when you disable content blockers from the SPI.
+
+2015-10-01  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix for run-api-tests
+
+        * Scripts/run-api-tests:
+        (testToolPaths): Windows run needs to specify the binary path.
+
+2015-10-01  Daniel Bates  <dabates@apple.com>
+
+        Another attempt to fix the Windows builders after <https://trac.webkit.org/changeset/190387>
+        (https://bugs.webkit.org/show_bug.cgi?id=149695)
+
+        Following r190424 we can now rely on webkit-build-directory to return the path to
+        the correct configuration-specific build directory on Windows.
+
+        * BuildSlaveSupport/built-product-archive:
+        (archiveBuiltProduct):
+
+2015-10-01  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed build fix.
+
+        * Scripts/webkitdirs.pm:
+        (setupAppleWinEnv): Use 64-bit build tools if available
+
+2015-10-01  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Fix TestWebKitAPI build under CMake.
+
+        Reviewed by Alex Christensen.
+
+        * TestWebKitAPI/PlatformWin.cmake: Add missing link command
+        for Psapi.lib.
+
+2015-10-01  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Fix behavior of webkit-build-directory script
+        https://bugs.webkit.org/show_bug.cgi?id=149718
+
+        Reviewed by Alex Christensen.
+
+        * Scripts/webkitdirs.pm:
+        (determineConfigurationProductDir): Do not include the binary
+        sub-directory in the configuration product directory output.
+        (jscProductDir): Append correct binary path for Windows build.
+        (setPathForRunningWebKitApp): Include properly binary subdirectories.
+        (runSafari): Update for revised productDir behavior.
+        (runMiniBrowser): Ditto.
+
+2015-10-01  Alexey Proskuryakov  <ap@apple.com>
+
+        Stop building LayoutTestRelay for now. It's a Mac project, but build-webkit tries to
+        use iOS SDK, like with all the others.
+
+        * Scripts/build-webkit:
+
+2015-10-01  Daniel Bates  <dabates@apple.com>
+
+        Attempt to fix the iOS 9 Simulator testers
+
+        Add dependency DumpRenderTree.app to target All of project DumpRenderTree so that we
+        build DumpRenderTree.app, if applicable. Also, teach build-webkit to build project
+        LayoutTestRelay when building for iOS Simulator.
+
+        * DumpRenderTree/DumpRenderTree.xcodeproj/project.pbxproj:
+        * Scripts/build-webkit:
+
+2015-10-01  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Websites with invalid auth header keep loading forever
+        https://bugs.webkit.org/show_bug.cgi?id=149710
+
+        Reviewed by Martin Robinson.
+
+        Add test case to check that we can authenticate sites with an
+        empty realm.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestAuthentication.cpp:
+        (testWebViewAuthenticationEmptyRealm):
+        (serverCallback):
+        (beforeAll):
+
+2015-10-01  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac] Make run-api-tests work with System Integrity Protection
+        https://bugs.webkit.org/show_bug.cgi?id=149711
+        rdar://problem/22928202
+
+        Reviewed by Dan Bernstein.
+
+        * Scripts/run-api-tests:
+        (runTest):
+        (archCommandLineArgumentsForRestrictedEnvironmentVariables):
+
+2015-10-01  Daniel Bates  <dabates@apple.com>
+
+        Attempt to fix the Windows build after <https://trac.webkit.org/changeset/190387>
+        (https://bugs.webkit.org/show_bug.cgi?id=149695)
+
+        For some reason built-product-archive hardcodes the assumption that we build for 32-bit Windows.
+        For now, use the path to the top-level WebKit build directory instead of using the configuration-
+        specific build directory.
+
+        * BuildSlaveSupport/built-product-archive:
+        (archiveBuiltProduct):
+
+2015-10-01  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [EFL] Fix the openwebrtc and gst-plugins-openwebrtc build with clang
+        https://bugs.webkit.org/show_bug.cgi?id=145837
+
+        Reviewed by Philippe Normand.
+
+        * efl/jhbuild.modules:
+        * efl/patches/openwebrtc-clang-warning-fix.patch: Added.
+        * efl/patches/openwebrtc-gst-plugins-clang-warning-fix.patch: Added.
+
+2015-10-01  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Unreviewed. Fix the iOS build after r190407.
+
+        * WebKitTestRunner/ios/IOKitSPI.h:
+
+2015-10-01  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        Implement keyboard event sending for iOS in WebKitTestRunner
+        https://bugs.webkit.org/show_bug.cgi?id=149676
+
+        Reviewed by Simon Fraser.
+
+        Adds support for generating and sending key events in WebKitTestRunner. This is accomplished in a similar
+        way as touch events, using IOHIDEvent machinery. Also adds callbacks to the UIScriptController JS API that
+        allows us to run code when the keyboard is shown or hidden.
+
+        * WebKitTestRunner/UIScriptContext/Bindings/UIScriptController.idl: Adds the typeCharacter JS interface.
+        * WebKitTestRunner/UIScriptContext/UIScriptController.cpp:
+        (WTR::UIScriptController::setDidShowKeyboardCallback):
+        (WTR::UIScriptController::didShowKeyboardCallback):
+        (WTR::UIScriptController::setDidHideKeyboardCallback):
+        (WTR::UIScriptController::didHideKeyboardCallback):
+        (WTR::UIScriptController::typeCharacterUsingHardwareKeyboard):
+        (WTR::UIScriptController::platformSetDidShowKeyboardCallback):
+        (WTR::UIScriptController::platformSetDidHideKeyboardCallback):
+        * WebKitTestRunner/UIScriptContext/UIScriptController.h:
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.h:
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm:
+        (-[TestRunnerWKWebView initWithFrame:configuration:]): Registers the TestRunnerWKWebView to listen to
+                the notifications that the keyboard has been raised or lowered.
+        (-[TestRunnerWKWebView _keyboardDidShow:]):
+        (-[TestRunnerWKWebView _keyboardDidHide:]):
+        * WebKitTestRunner/ios/HIDEventGenerator.h:
+        * WebKitTestRunner/ios/HIDEventGenerator.m:
+        (-[HIDEventGenerator _sendIOHIDKeyboardEvent:usage:isKeyDown:]): Helper to send a HID keyboard event.
+        (shouldWrapWithShiftKeyEventForCharacter): Helper used to generate key events.
+        (hidUsageCodeForCharacter): Ditto.
+        (-[HIDEventGenerator keyDown:completionBlock:]): Synthesizes and sends HIDKeyboardEvents, triggering
+                a keyDown event in WebKit.
+        * WebKitTestRunner/ios/IOKitSPI.h:
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+
+2015-10-01  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed, rolling out r190399.
+
+        Tests are still failing even after r190362
+
+        Reverted changeset:
+
+        "Unreviewed. Unskip GTK+ user media unit tests after r190362."
+        http://trac.webkit.org/changeset/190399
+
+2015-10-01  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [jhbuild] switch to new upstream usrsctp library
+        https://bugs.webkit.org/show_bug.cgi?id=149494
+
+        Reviewed by Philippe Normand.
+
+        * efl/jhbuild.modules:
+        * gtk/jhbuild.modules:
+
+2015-10-01  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Unskip GTK+ user media unit tests after r190362.
+
+        They should pass now.
+
+        * Scripts/run-gtk-tests:
+        (TestRunner):
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        Another attempt to fix the build after <https://trac.webkit.org/changeset/190387>
+        (https://bugs.webkit.org/show_bug.cgi?id=149695)
+
+        * BuildSlaveSupport/built-product-archive:
+        (determineWebKitBuildDirectories): Substitute _configurationBuildDirectory for _buildDirectory.
+        (extractBuiltProduct): Substitute _topLevelBuildDirectory for _buildDirectory.
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        Attempt to fix the build after <https://trac.webkit.org/changeset/190387>
+        (https://bugs.webkit.org/show_bug.cgi?id=149695)
+
+        Actually, we need to pass --configuration to script webkit-build-directory to have
+        it return the path to the configuration-specific build directory.
+
+        * BuildSlaveSupport/built-product-archive:
+        (determineWebKitBuildDirectories):
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        built-product-archive archives incorrect build directory for iOS port
+        https://bugs.webkit.org/show_bug.cgi?id=149695
+
+        Reviewed by Darin Adler.
+
+        Fixes an issue where the script built-product-archive archives a non-existent
+        build directory for the iOS port. Without loss of generality, the script assumes
+        the path to the Release configuration build for iOS is in directory WebKitBuild/Release.
+        But the built products for this configuration are in directory WebKitBuild/Release-iphonesimulator.
+
+        Currently the script built-product-archive calls `webkit-build-directory --top-level ...`
+        to determine the top-level build directory and computes the configuration-specific
+        build directory to be the concatenation of the the top-level build directory and
+        the configuration (e.g. Release). This is incorrect. Instead we should call
+        webkit-build-directory omitting the flag --top-level to compute the path to the
+        configuration-specific build directory.
+
+        * BuildSlaveSupport/built-product-archive: Fix up the style such that we use single quoted literals.
+        (main): Renamed global variable _buildDirectory to _topLevelBuildDirectory to better describe
+        its purpose and added global variable _configurationBuildDirectory to store the path
+        to the configuration-specific build directory. Ensure that we have a non-empty string
+        for both the top-level and configuration-specific build directories.
+        (determineWebKitBuildDirectories): Formerly named determineWebKitBuildDirectory.
+        Compute the configuration-specific build directory and store it in the global variable
+        _configurationBuildDirectory.
+        (archiveBuiltProduct): Modified to use _configurationBuildDirectory.
+        (extractBuiltProduct): Modified to use _configurationBuildDirectory and _topLevelBuildDirectory
+        as needed.
+        (determineWebKitBuildDirectory): Deleted.
+
+2015-09-30  Hunseop Jeong  <hs85.jeong@samsung.com>
+
+        [EFL] css3/device-adapt/* tests failed after r190335.
+        https://bugs.webkit.org/show_bug.cgi?id=149655
+
+        Reviewed by Simon Fraser.
+
+        device-adapt/* tests need the fixedLayout option but useFixedLayout option is
+        overwritten by updatePlatformSpecificViewOptionsForTest after r190335.
+
+        * WebKitTestRunner/efl/TestControllerEfl.cpp:
+        (WTR::shouldUseFixedLayout):
+
+2015-09-30  Dewei Zhu  <dewei_zhu@apple.com>
+
+        Extend JetStream timeout for slow devices.
+
+        Reviewed by Chris Dumez.
+
+        Extend JetStream timeout to 20 minutes.
+
+        * Scripts/webkitpy/benchmark_runner/data/plans/jetstream.plan:
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        Rename iOS builders/testers to include version
+        https://bugs.webkit.org/show_bug.cgi?id=149685
+
+        Reviewed by Simon Fraser.
+
+        Substitute "Apple iOS 9" for "Apple iOS" in the names of iOS builders/testers so as
+        make it clear to a reader the version of iOS these builders/testers are using.
+
+        * BuildSlaveSupport/build.webkit.org-config/config.json:
+        * BuildSlaveSupport/build.webkit.org-config/mastercfg_unittest.py:
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        Add iOS criterion for triggering a build
+        https://bugs.webkit.org/show_bug.cgi?id=149679
+
+        Rubber-stamped by Alexey Proskuryakov.
+
+        First pass at defining criterion for triggering an iOS build.
+
+        * BuildSlaveSupport/build.webkit.org-config/wkbuild.py:
+        (_should_file_trigger_build):
+        * BuildSlaveSupport/build.webkit.org-config/wkbuild_unittest.py:
+        (ShouldBuildTest):
+        (ShouldBuildTest.test_should_build):
+
+2015-09-29  Simon Fraser  <simon.fraser@apple.com>
+
+        [iOS] Allow tests to generate user gestures for UI testing
+        https://bugs.webkit.org/show_bug.cgi?id=149653
+
+        Reviewed by Tim Horton.
+
+        Expose functionality in UIScriptController to allow for testing single- and double-tap,
+        and to listen for completion of scrolling and zooming in the WKWebView.
+        
+        Tap generation is done using synthetic IOHIDEvents, via a new HIDEventGenerator class
+        which hides the complexity of creating these events. Event dispatch is asynchronous.
+        We detect when the last event has been handled by dispatching a vendor-specific event,
+        which is detected via -_handleHIDEvent: in our UIApplication subclass.
+        
+        * WebKitTestRunner/Configurations/WebKitTestRunnerApp.xcconfig: Link with IOKit.
+        * WebKitTestRunner/UIScriptContext/Bindings/UIScriptController.idl: Two new properties
+        for 'will begin zooming' and 'did end zooming' callbacks, and functions to dispatch
+        single and double taps.
+        * WebKitTestRunner/UIScriptContext/UIScriptContext.cpp:
+        (UIScriptContext::registerCallback): Used to store the callbacks for zooming.
+        Unlike the "task" callbacks, these are persistent, but we store them in the same hash map.
+        (UIScriptContext::unregisterCallback):
+        (UIScriptContext::callbackWithID):
+        (UIScriptContext::fireCallback):
+        * WebKitTestRunner/UIScriptContext/UIScriptContext.h:
+        * WebKitTestRunner/UIScriptContext/UIScriptController.cpp:
+        (WTR::UIScriptController::setWillBeginZoomingCallback): Cross-platform code.
+        (WTR::UIScriptController::willBeginZoomingCallback): Ditto.
+        (WTR::UIScriptController::setDidEndZoomingCallback):
+        (WTR::UIScriptController::didEndZoomingCallback):
+        (WTR::UIScriptController::singleTapAtPoint): Non-iOS stub.
+        (WTR::UIScriptController::doubleTapAtPoint): Ditto.
+        (WTR::UIScriptController::platformSetWillBeginZoomingCallback):
+        (WTR::UIScriptController::platformSetDidEndZoomingCallback):
+        * WebKitTestRunner/UIScriptContext/UIScriptController.h:
+        * WebKitTestRunner/WebKitTestRunner.xcodeproj/project.pbxproj:
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.h: Properties for the zooming callbacks.
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm:
+        (-[TestRunnerWKWebView zoomToScale:animated:completionHandler:]): Dispatch the zooming callback.
+        (-[TestRunnerWKWebView scrollViewWillBeginZooming:withView:]): Ditto.
+        (-[TestRunnerWKWebView scrollViewDidEndZooming:withView:atScale:]): Ditto.
+        (-[TestRunnerWKWebView onDidEndZooming:]): Deleted.
+        * WebKitTestRunner/ios/HIDEventGenerator.h: Copied from Tools/WebKitTestRunner/cocoa/TestRunnerWKWebView.h.
+        * WebKitTestRunner/ios/HIDEventGenerator.m: Added.
+        (simpleDragCurve):
+        (calculateNextLocation):
+        (delayBetweenMove):
+        (+[HIDEventGenerator sharedHIDEventGenerator]):
+        (+[HIDEventGenerator nextEventCallbackID]):
+        (-[HIDEventGenerator init]):
+        (-[HIDEventGenerator _createIOHIDEventType:]):
+        (-[HIDEventGenerator _sendHIDEvent:]):
+        (-[HIDEventGenerator _sendMarkerHIDEventWithCompletionBlock:]):
+        (-[HIDEventGenerator _updateTouchPoints:count:]):
+        (-[HIDEventGenerator touchDownAtPoints:touchCount:]):
+        (-[HIDEventGenerator touchDown:touchCount:]):
+        (-[HIDEventGenerator touchDown:]):
+        (-[HIDEventGenerator liftUpAtPoints:touchCount:]):
+        (-[HIDEventGenerator liftUp:touchCount:]):
+        (-[HIDEventGenerator liftUp:]):
+        (-[HIDEventGenerator moveToPoints:touchCount:duration:]):
+        (-[HIDEventGenerator sendTaps:location:withNumberOfTouches:completionBlock:]):
+        (-[HIDEventGenerator tap:completionBlock:]):
+        (-[HIDEventGenerator doubleTap:completionBlock:]):
+        (-[HIDEventGenerator twoFingerTap:completionBlock:]):
+        (-[HIDEventGenerator dragWithStartPoint:endPoint:duration:completionBlock:]):
+        (-[HIDEventGenerator pinchCloseWithStartPoint:endPoint:duration:completionBlock:]):
+        (-[HIDEventGenerator pinchOpenWithStartPoint:endPoint:duration:completionBlock:]):
+        (-[HIDEventGenerator markerEventReceived:]):
+        * WebKitTestRunner/ios/IOKitSPI.h: Added.
+        * WebKitTestRunner/ios/UIKitSPI.h: Copied from Tools/WebKitTestRunner/cocoa/TestRunnerWKWebView.h.
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+        (WTR::globalToContentCoordinates):
+        (WTR::UIScriptController::singleTapAtPoint):
+        (WTR::UIScriptController::doubleTapAtPoint):
+        (WTR::UIScriptController::platformSetWillBeginZoomingCallback):
+        (WTR::UIScriptController::platformSetDidEndZoomingCallback):
+        * WebKitTestRunner/ios/mainIOS.mm:
+        (-[WebKitTestRunnerApp _handleHIDEvent:]):
+
+2015-09-30  Dana Burkart  <dburkart@apple.com>
+
+        git-add-reviewer should trim trailing spaces/newlines
+        https://bugs.webkit.org/show_bug.cgi?id=149513
+
+        Reviewed by Darin Adler.
+
+        * Scripts/git-add-reviewer:
+        (nonInteractive):
+
+2015-09-30  Eric Carlson  <eric.carlson@apple.com>
+
+        REGRESSION(r190262): User media unit test failures after r190262
+        https://bugs.webkit.org/show_bug.cgi?id=149580
+
+        Reviewed by Darin Adler.
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::decidePolicyForUserMediaPermissionRequestIfPossible): Fix parameter
+          order to WKUserMediaPermissionRequestAllow.
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        Add iOS builders and testers
+        https://bugs.webkit.org/show_bug.cgi?id=149549
+
+        Reviewed by Alexey Proskuryakov.
+
+        Adds definitions for 64-bit iOS Simulator release builders and testers and a iOS device
+        builder that builds universal release binaries for armv7, armv7s and arm64 architectures.
+
+        * BuildSlaveSupport/build.webkit.org-config/config.json: Add definitions for builders and testers.
+        * BuildSlaveSupport/build.webkit.org-config/mastercfg_unittest.py: Update unit tests.
+
+2015-09-30  Timothy Hatcher  <timothy@apple.com>
+
+        Give WebKitLauncher the get-task-allow entitlement to allow it to work on El Capitan
+        https://bugs.webkit.org/show_bug.cgi?id=149674
+
+        Reviewed by Lucas Forschler.
+
+        * WebKitLauncher/WebKitLauncher.entitlements: Added.
+        * WebKitLauncher/WebKitLauncher.xcodeproj/project.pbxproj:
+
+2015-09-30  Jason Marcell  <jmarcell@apple.com>
+
+        BuildbotQueueView.prototype._appendPendingRevisionCount should skip repositories that don't
+        have an associated trac instance.
+        https://bugs.webkit.org/show_bug.cgi?id=149673
+
+        Reviewed by Alexey Proskuryakov.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/BuildbotQueueView.js:
+        (BuildbotQueueView.prototype._appendPendingRevisionCount): Skip repositories that don't
+        have an associated trac instance.
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        Prioritize testing latest build request on iOS test bots
+        https://bugs.webkit.org/show_bug.cgi?id=149669
+
+        Reviewed by Darin Adler.
+
+        We should prioritize testing of the latest build request on the iOS test bots
+        as we do for Mac and Windows test bots.
+
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (loadBuilderConfig):
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        Add buildbot category for iOS builders and testers
+        https://bugs.webkit.org/show_bug.cgi?id=149667
+
+        Reviewed by Darin Adler.
+
+        Group iOS builders and testers under category iOS and add dashboard and console hyperlinks
+        for iOS to the build.webkit.org home page.
+
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (loadBuilderConfig):
+        * BuildSlaveSupport/build.webkit.org-config/templates/root.html:
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        Actually fix the Mac builders build after <http://trac.webkit.org/changeset/190219>
+        (https://bugs.webkit.org/show_bug.cgi?id=149539)
+
+        I inadvertently didn't remove the ONLY_ACTIVE_ARCH=NO flag when building on a Mac
+        in <http://trac.webkit.org/changeset/190351>.
+
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (CompileWebKit.start):
+
+2015-09-30  Daniel Bates  <dabates@apple.com>
+
+        Attempt to fix the Mac builders build after <http://trac.webkit.org/changeset/190219>
+        (https://bugs.webkit.org/show_bug.cgi?id=149539)
+
+        {32, 64}-bit Mac builders should not try to build project {Plugin.64, Plugin.32},
+        respectively; only pass ONLY_ACTIVE_ARCH=NO when building for iOS.
+
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (CompileWebKit.start):
+
+2015-09-30  Lucas Forschler  <lforschler@apple.com>
+
+        bot210 was configured for a queue instead of bot126.
+        
+        Unreviewed config.json fix.
+        
+        * BuildSlaveSupport/build.webkit.org-config/config.json:
+
+2015-09-30  Lucas Forschler  <lforschler@apple.com>
+
+        Bring El Capitan buildbot infrastructure online.
+        https://bugs.webkit.org/show_bug.cgi?id=149605
+        
+        Reviewed by Darin Adler.
+
+        * BuildSlaveSupport/build.webkit.org-config/config.json:
+
+2015-09-30  Tomas Popela  <tpopela@redhat.com>
+
+        [GTK] Deprecation warnings in DOMNodeTest
+        https://bugs.webkit.org/show_bug.cgi?id=149663
+
+        After the webkit_dom_document_get_elements_by_tag_name deprecation we
+        need to update the tests to use webkit_dom_document_query_selector_all
+        to avoid compilation warnings.
+
+        Also add a new test for webkit_dom_document_get_elements_by_tag_name_as_html_collection
+        (the suggested replacement for the deprecated function).
+
+        Reviewed by Carlos Garcia Campos.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/DOMNodeTest.cpp:
+        (WebKitDOMNodeTest::testTagNamesNodeList):
+        (WebKitDOMNodeTest::testTagNamesHTMLCollection):
+        (registerTests):
+        (WebKitDOMNodeTest::testTagNames): Deleted.
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestDOMNode.cpp:
+        (prepareDOMForTagNamesTests):
+        (testWebKitDOMNodeTagNamesNodeList):
+        (testWebKitDOMNodeTagNamesHTMLCollection):
+        (beforeAll):
+        (testWebKitDOMNodeTagNames): Deleted.
+
+2015-09-29  Simon Fraser  <simon.fraser@apple.com>
+
+        WebKitTestRunner fails to apply "useFlexibleViewport" when it's specified in a file comment
+        https://bugs.webkit.org/show_bug.cgi?id=149650
+
+        Reviewed by Tim Horton.
+        
+        TestInvocation::invoke() consulted shouldMakeViewportFlexible(), but that only
+        looks at the file path, and not the custom options that come from file comments.
+        
+        Fix by computing TestOptions before making the TestInvocation, and setting them
+        as const TestInvocation data. This meant changing various call sites to take
+        the std::string pathOrURL, rather than the TestInvocation itself.
+        
+        Also initialize TestInvocation with a WKURLRef, rather than a std::string.
+
+        * WebKitTestRunner/CMakeLists.txt:
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::ensureViewSupportsOptionsForTest):
+        (WTR::testPath):
+        (WTR::createTestURL):
+        (WTR::updateTestOptionsFromTestHeader):
+        (WTR::TestController::testOptionsForTest):
+        (WTR::TestController::updateWebViewSizeForTest):
+        (WTR::TestController::updateWindowScaleForTest):
+        (WTR::TestController::runTest):
+        * WebKitTestRunner/TestController.h:
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::TestInvocation):
+        (WTR::TestInvocation::invoke):
+        (WTR::createWKURL): Deleted.
+        (WTR::TestInvocation::shouldMakeViewportFlexible): Deleted.
+        (WTR::TestInvocation::shouldUseFixedLayout): Deleted.
+        * WebKitTestRunner/TestInvocation.h:
+        (WTR::TestInvocation::options):
+        * WebKitTestRunner/TestOptions.cpp: Copied from Tools/WebKitTestRunner/TestOptions.h.
+        (WTR::pathContains):
+        (WTR::shouldMakeViewportFlexible):
+        (WTR::shouldUseFixedLayout):
+        (WTR::isSVGTestPath):
+        (WTR::isHiDPITestPath):
+        (WTR::TestOptions::TestOptions):
+        * WebKitTestRunner/TestOptions.h:
+        * WebKitTestRunner/WebKitTestRunner.xcodeproj/project.pbxproj:
+        * WebKitTestRunner/efl/TestControllerEfl.cpp:
+        (WTR::pathContains):
+        (WTR::shouldUseFixedLayout):
+        (WTR::TestController::updatePlatformSpecificTestOptionsForTest):
+        * WebKitTestRunner/gtk/TestControllerGtk.cpp:
+        (WTR::TestController::updatePlatformSpecificTestOptionsForTest):
+        * WebKitTestRunner/ios/TestControllerIOS.mm:
+        (WTR::TestController::updatePlatformSpecificTestOptionsForTest):
+        * WebKitTestRunner/mac/TestControllerMac.mm:
+        (WTR::TestController::updatePlatformSpecificTestOptionsForTest):
+
+2015-09-29  Aakash Jain  <aakash_jain@apple.com>
+
+        Flakiness dashboard should support OS X El Capitan
+        https://bugs.webkit.org/show_bug.cgi?id=149648
+
+        Reviewed by Alexey Proskuryakov.
+
+        * QueueStatusServer/app.yaml: We do not need to maintain SVN revision here because of 
+        difference between new appscale and old Google App Engine implementation.
+        * TestResultServer/app.yaml: Same.
+        * TestResultServer/static-dashboards/builders.jsonp: Added OSX El Capitan support.
+
+2015-09-29  Daniel Bates  <dabates@apple.com>
+
+        configure-xcode-for-ios-development does not work with Xcode 7
+        https://bugs.webkit.org/show_bug.cgi?id=149640
+
+        Reviewed by Alexey Proskuryakov.
+
+        When Xcode 7 is installed, running configure-xcode-for-ios-development dies with an error
+        because it cannot find the Xcode specification files for iOS simulator and device. These
+        files have moved to a new location in Xcode 7 distribution. Moreover we must add the
+        relevant definitions to the Xcode 7 specification files directly as opposed to creating
+        new specification files with the added definitions (as we did in older versions of Xcode)
+        in order for Xcode 7 to honor these definitions.
+
+        * Scripts/configure-xcode-for-ios-development: Sorted forward declarations.
+        (updateXcodeSpecificationFilesForSDKIfNeeded): Added.
+        (updateXcode7SpecificationFile): Added.
+        (createLegacyXcodeSpecificationFilesForSDKIfNeeded): Formerly named createXcodeSpecificationFilesForSDKIfNeeded.
+        (writeXcodeSpecification): Moved congratulations line to caller so as to write out the
+        appropriate success message.
+        (mergeXcodeSpecificationWithSpecificationAndId): Formerly named createXcodeSpecificationFromSpecificationAndId.
+        (createXcodeSpecificationFilesForSDKIfNeeded): Deleted.
+        (createXcodeSpecificationFromSpecificationAndId): Deleted.
+
+2015-09-29  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Allow 'prepare-ChangeLog' to be used without Cygwin
+        https://bugs.webkit.org/show_bug.cgi?id=149639
+
+        Reviewed by Alex Christensen.
+
+        * Scripts/VCSUtils.pm:
+        (exitStatus): Use 'isWindows()' method.
+        (isSVNVersion16OrNewer): 'eval' is not needed here, and just causes
+        an error. This method could probably just go away.
+        (normalizePath): Leave Windows (or Unix) paths as platform paths, rather than
+        always changing to Unix style. 
+        (unixPath): Added. Needed so Windows can always show a Unix path in the
+        ChangeLog file.
+        (changeLogName): Work around the fact that 'getpwuid' is not available on
+        a pure Windows build of Perl.
+        * Scripts/prepare-ChangeLog:
+        (generateFunctionLists): Normalize path received from 'svn' in case it's a Unix
+        path on Windows.
+        (svnUpdateCommand): Added helper function. Needed because Windows Perl does not
+        support using arrays for 'open' arguments.
+        (resolveChangeLogsPath): Ditto.
+        (resolveConflictedChangeLogs): Use new helper functions.
+        (generateNewChangeLogs): Force Windows to use Unix paths in ChangeLog output.
+        (diffCommand): Use double-quotes for paths, since Windows doesn't understand single
+        quotes. Unix systems are happy either way.
+        (statusCommand): Ditto.
+        * Scripts/webkitdirs.pm:
+        (launcherName): Drive-by fix. WinLauncher was renamed to MiniBrowser some time ago.
+
+2015-09-29  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed 64-bit build fix after switch to CMake.
+
+        * Scripts/webkitdirs.pm:
+        (determineIsWin64FromArchitecture): Added.
+
+2015-09-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        printing does not use minimum page zoom factor
+        https://bugs.webkit.org/show_bug.cgi?id=108507
+
+        Reviewed by Darin Adler.
+
+        WebKitTestRunner always takes the snapshots from the UI process
+        (expect for IOS), so in the case of printing, the layout in the
+        web view is not the expected one. When printing, we need to take
+        the snapshot in the web process and ensure it's rendered with a
+        PrintContext.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.cpp:
+        (WTR::InjectedBundlePage::dump): When dumping pixels, pass
+        kWKSnapshotOptionsPrinting option to
+        WKBundlePageCreateSnapshotWithOptions() when printing.
+
+2015-09-28  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [WTR] Pixel tests generate the snapshots twice in Web and UI processes
+        https://bugs.webkit.org/show_bug.cgi?id=149595
+
+        Reviewed by Tim Horton.
+
+        All ports except IOS implement
+        PlatformWebView::windowSnapshotImage() to generate the snapshot
+        for the pixel tests in the UI process. But we are still generating
+        a snapshot for pixel tests in the Web process too, that is passed
+        to the UI process but ignored.
+        Whether a pixel result is needed or not, is only known by the web
+        process depending on whether the test called dumpAsText with
+        dumpPixels == true or not. Since the pixels are now dump in the UI
+        process, we need to pass that information to the UI process when
+        the test is done. For that we set a PixelResultIsPending bool
+        parameter to the Done message, and we only add the PixelResult
+        when UI process doesn't need to generate the pixels dump.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.cpp:
+        (WTR::InjectedBundle::didReceiveMessageToPage): Set
+        m_pixelResultIsPending to false on reset.
+        (WTR::InjectedBundle::done): Add PixelResultIsPending parameter to the
+        Done message, and set the PixelResult if m_pixelResultIsPending is false.
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.h:
+        (WTR::InjectedBundle::setPixelResult): Set m_pixelResultIsPending to false.
+        (WTR::InjectedBundle::setNeedsPixelResult): Set m_pixelResultIsPending.
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.cpp:
+        (WTR::InjectedBundlePage::dump): Only create a snapshot for IOS
+        port.
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::dumpResults): Use either the pixel result
+        from the web process or generate a pixel result from the web view
+        if need it.
+        (WTR::TestInvocation::didReceiveMessageFromInjectedBundle):
+        * WebKitTestRunner/TestInvocation.h: Add SnapshotResultType enum
+        parameter to dumpPixelsAndCompareWithExpected, since the snapshot
+        is created by the caller now, but the CG implementation needs to
+        know if it's a Web or UI process snapshot.
+        * WebKitTestRunner/cairo/TestInvocationCairo.cpp:
+        (WTR::TestInvocation::dumpPixelsAndCompareWithExpected): Create a
+        cairo surface for the given image.
+        * WebKitTestRunner/cg/TestInvocationCG.cpp:
+        (WTR::TestInvocation::dumpPixelsAndCompareWithExpected): Create a
+        CGContext for the given image.
+
+2015-09-28  Dean Johnson  <dean_johnson@apple.com>
+
+        Fix JS errors on dashboard metrics page
+        https://bugs.webkit.org/show_bug.cgi?id=149608
+
+        Reviewed by Alexey Proskuryakov.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/Main.js: Updated to use Settings.
+        (initPlatformsByFamily): 
+        (updateHiddenPlatforms):
+        (parsePlatformFamily): Deleted.
+        (updateToggleButtons): Deleted.
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/MetricsMain.js:
+        (updateHiddenPlatforms): Added to remove errors.
+        (initPlatformsByFamily): Added to remove errors.
+        (unhiddenQueues): Updated to use Settings.
+        (documentReady): Added logic to add toggle buttons to the settings menu.
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/Settings.js:
+        (Settings.prototype.parsePlatformFamily): Moved duplicate logic from Main.js and
+        MetricsMain.js to Settings.
+        (Settings.prototype.updateToggleButtons): Moved duplicate logic from Main.js and
+        MetricsMain.js to Settings.
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/QueueView.js:
+        (QueueView.prototype._updateHiddenState): Updated to use Settings.
+
+2015-09-28  Aakash Jain  <aakash_jain@apple.com>
+
+        Appscale query fails because of missing index
+        https://bugs.webkit.org/show_bug.cgi?id=149609
+
+        Reviewed by Darin Adler.
+
+        * QueueStatusServer/index.yaml: Added the required index.
+
+2015-09-28  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Fix the 64-bit build after switch to cmake.
+
+        Reviewed by Alex Christensen.
+
+        * Scripts/webkitdirs.pm:
+        (generateBuildSystemFromCMakeProject): Use correct arguments for cmake to
+        run a 64-bit build.
+
+2015-09-28  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Allow Windows to run test-webkitpy without Cygwin
+        https://bugs.webkit.org/show_bug.cgi?id=149602
+
+        Reviewed by Alex Christensen.
+
+        These changes mostly shift from hard-coded paths using UNIX-style
+        separators to Python's "os.path.join" syntax that uses the correct
+        path separator for each platform.
+        
+        * Scripts/webkitpy/common/system/path.py:
+        (cygpath): Don't pass paths through Cygpath on native Windows.
+        * Scripts/webkitpy/port/win.py:
+        (WinPort._path_to_apache): Use os.path.join.
+        (WinPort._ntsd_location): Support 64-bit environment (ProgramW6432 doesn't exist
+        in 64-bit environments).
+        * Scripts/webkitpy/style/checker.py: Use os.path.join.
+        * Scripts/webkitpy/style/checker_unittest.py:
+        (GlobalVariablesTest.test_path_rules_specifier.assertNoCheck): Use os.path.join.
+        (GlobalVariablesTest.test_path_rules_specifier): Ditto.
+        (GlobalVariablesTest): Ditto.
+        (GlobalVariablesTest.test_max_reports_per_category): Ditto.
+        (CheckerDispatcherSkipTest.test_should_skip_with_warning): Ditto.
+        (CheckerDispatcherDispatchTest.test_js_paths): Ditto.
+        (CheckerDispatcherDispatchTest.test_json_paths): Ditto.
+        (CheckerDispatcherDispatchTest.test_python_paths): Ditto.
+        (CheckerDispatcherDispatchTest.test_text_paths): Ditto.
+        (CheckerDispatcherDispatchTest.test_xml_paths): Ditto.
+        (StyleProcessor_CodeCoverageTest._create_carriage_checker_class): Ditto.
+        (StyleProcessor_CodeCoverageTest): Ditto.
+        (StyleProcessor_CodeCoverageTest.test_should_process__skip_without_warning): Ditto.
+        (StyleProcessor_CodeCoverageTest.test_should_process__skip_with_warning): Ditto.
+        (StyleProcessor_CodeCoverageTest.test_should_process__true_result): Ditto.
+        * Scripts/webkitpy/w3c/test_parser_unittest.py: Uses os.path.join rather than
+        manual string concatenation of paths.
+
+2015-09-28  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Add bugzilla addresses of committers to contributors.json
+        https://bugs.webkit.org/show_bug.cgi?id=149520
+
+        Reviewed by Darin Adler.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2015-09-28  Csaba Osztrogonác  <ossy@webkit.org>
+
+        validate-committer-lists -b shouldn't need edituser privileges
+        https://bugs.webkit.org/show_bug.cgi?id=149519
+
+        Reviewed by Darin Adler.
+
+        * Scripts/validate-committer-lists:
+        (CommitterListBugzillaChecker._has_invalid_bugzilla_email):
+        * Scripts/webkitpy/common/net/bugzilla/bugzilla.py:
+        (BugzillaQueries.is_invalid_bugzilla_email):
+        (BugzillaQueries): Deleted.
+        (BugzillaQueries.fetch_logins_matching_substring): Deleted.
+
+2015-09-26  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Gardening: skip media stream tests failing after r190262.
+
+        * Scripts/run-gtk-tests:
+        (TestRunner):
+
+2015-09-25  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac] USE_INTERNAL_SDK is used undefined in tools projects
+        https://bugs.webkit.org/show_bug.cgi?id=149571
+
+        Reviewed by Dan Bernstein.
+
+        Use the same pattern as in Source directory configurations (so, also get rid of AspenFamily.xcconfig). 
+
+        * DumpRenderTree/mac/Configurations/Base.xcconfig:
+        * DumpRenderTree/mac/Configurations/DebugRelease.xcconfig:
+        * LayoutTestRelay/Configurations/Base.xcconfig:
+        * MiniBrowser/Configurations/Base.xcconfig:
+        * MiniBrowser/Configurations/DebugRelease.xcconfig:
+        * TestWebKitAPI/Configurations/Base.xcconfig:
+        * TestWebKitAPI/Configurations/DebugRelease.xcconfig:
+        * WebEditingTester/Configurations/Base.xcconfig:
+        * WebEditingTester/Configurations/DebugRelease.xcconfig:
+        * WebKitTestRunner/Configurations/Base.xcconfig:
+        * WebKitTestRunner/Configurations/DebugRelease.xcconfig:
+        * WebKitTestRunner/iOS.xcconfig: Removed.
+
+2015-09-25  Eric Carlson  <eric.carlson@apple.com>
+
+        Clean up user media request internal API
+        https://bugs.webkit.org/show_bug.cgi?id=149527
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/Tests/WebKit2/UserMedia.cpp:
+        (TestWebKitAPI::decidePolicyForUserMediaPermissionRequestCallBack): Update for API changes.
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::decidePolicyForUserMediaPermissionRequestIfPossible): Ditto.
+
+2015-09-25  Simon Fraser  <simon.fraser@apple.com>
+
+        [iOS WK2] Add viewport tests and fix runUIScript() timing issues
+        https://bugs.webkit.org/show_bug.cgi?id=149577
+
+        Reviewed by Tim Horton.
+        
+        When calling testRunner.runUIScript() from a page load event, the script could run
+        in the UI process before the current remote layer tree transaction had been handled
+        there. This meant that runUIScript() could query state which was about to change.
+        
+        Fix by delaying the execution of the UI script until a layer tree transaction has
+        been handled by the UI process, leveraging the existing DrawingAreaProxy::dispatchAfterEnsuringDrawing().
+
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::didReceiveMessageFromInjectedBundle):
+        (WTR::TestInvocation::runUISideScriptAfterUpdateCallback):
+        * WebKitTestRunner/TestInvocation.h:
+
+2015-09-25  Alexey Proskuryakov  <ap@apple.com>
+
+        [Mac] Media tests start to time out after a few days of bot uptime
+        https://bugs.webkit.org/show_bug.cgi?id=149468
+
+        Reviewed by Darin Adler.
+
+        Delete cache directory in addition to the temporary one. Don't delete /private/tmp/MediaCache,
+        as it's not longer used by tests. Set TMPDIR and DIRHELPER_USER_DIR_SUFFIX to make
+        all temporary and cache files go to a custom location.
+
+        * Scripts/webkitpy/port/base.py:
+        * Scripts/webkitpy/port/driver.py:
+        * Scripts/webkitpy/port/mac.py:
+        * Scripts/webkitpy/port/win.py:
+        (WinPort._driver_tempdir_for_environment): Deleted unused function.
+
+2015-09-25  Dan Bernstein  <mitz@apple.com>
+
+        Removed MiniBrowser.entitlements.
+
+        Rubber-stamped by Anders Carlsson.
+
+        The entitlements weren’t used anyway.
+
+        * MiniBrowser/MiniBrowser.entitlements: Removed.
+        * MiniBrowser/MiniBrowser.xcodeproj/project.pbxproj:
+
+2015-09-24  Daniel Bates  <dabates@apple.com>
+
+        Add WebKitSystemInterface for iOS 9.0
+        https://bugs.webkit.org/show_bug.cgi?id=149550
+
+        Rubber-stamped by Alexey Proskuryakov.
+
+        * Scripts/copy-webkitlibraries-to-product-directory:
+
+2015-09-24  Daniel Bates  <dabates@apple.com>
+
+        Support building for arbitrary architectures
+        https://bugs.webkit.org/show_bug.cgi?id=149539
+
+        Reviewed by Alexey Proskuryakov.
+
+        Teach buildbot to pass the architectures associated with the builder to build-webkit
+        when building on OS X and iOS. As a side effect of this change we now support building
+        universal binaries when multiples architectures are specified.
+
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (CompileWebKit.start):
+
+2015-09-24  Daniel Bates  <dabates@apple.com>
+
+        Fix the build after <http://trac.webkit.org/changeset/190212>
+        (http://trac.webkit.org/changeset/190212)
+
+        I inadvertently did not remove the fullPlatform argument from one of the callers of archiveBuiltProduct().
+
+        * BuildSlaveSupport/built-product-archive:
+        (main):
+
+2015-09-24  Daniel Bates  <dabates@apple.com>
+
+        Support running unit tests on iOS Simulator test bot
+        https://bugs.webkit.org/show_bug.cgi?id=149536
+
+        Reviewed by Alexey Proskuryakov.
+
+        Implements support for running unit tests on a iOS test bot. At the time of writing,
+        the script run-api-tests supports running unit tests on Mac, Windows and iOS Simulator.
+
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (RunUnitTests.start): Append appropriate command line flag when invoking script run-api-tests.
+        (TestFactory.__init__): Add step RunUnitTests when the test bot is for the iOS Simulator platform.
+
+2015-09-24  Daniel Bates  <dabates@apple.com>
+
+        Add support infrastructure for OpenSource iOS builders and testers
+        https://bugs.webkit.org/show_bug.cgi?id=149534
+
+        Reviewed by Darin Adler.
+
+        Towards setting up OpenSource iOS build bots, teach buildbot and its support
+        scripts about iOS.
+
+        * BuildSlaveSupport/build.webkit.org-config/master.cfg:
+        (appendCustomBuildFlags): Require the caller to pass parameter fullPlatform and append
+        --ios-simulator or --device for a builder/tester whose full platform name begins with
+        "ios-simulator" or "ios", respectively.
+        (RunJavaScriptCoreTests.start): Pass the full platform name to appendCustomBuildFlags().
+        * BuildSlaveSupport/built-product-archive:
+        (main): Pass the full platform name to determineWebKitBuildDirectory().
+        (determineWebKitBuildDirectory): Call script webkit-build-directory with the appropriate
+        command line flag when building for iOS.
+        (archiveBuiltProduct): Use the same logic for iOS as we do for Mac. Also, remove unused
+        parameter fullPlatform. This parameter was originally added in r125066 to support the
+        Chromium Android port, which has since been removed from the OpenSource WebKit Project.
+        (extractBuiltProduct): Use the same logic for iOS as we do for Mac.
+        * BuildSlaveSupport/clean-build:
+        (main): Call script webkit-build-directory with the appropriate command line flag when
+        building for iOS.
+        * BuildSlaveSupport/delete-stale-build-files:
+        (main): Use the same logic for iOS as we do for Mac.
+        (webkitBuildDirectory): Call script webkit-build-directory with the appropriate command line
+        flag when building for iOS.
+        * BuildSlaveSupport/test-result-archive:
+        (archiveTestResults): Use the same logic for iOS as we do for Mac.
+
+2015-09-24  Daniel Bates  <dabates@apple.com>
+
+        Remove Chromium-specific changes to script built-product-archive
+        https://bugs.webkit.org/show_bug.cgi?id=149530
+
+        Rubber-stamped by Csaba Osztrogonác.
+
+        Reverts changes made in r113074 and r113067 to support Chromium testers. The
+        Chromium code has long since been removed from the OpenSource WebKit Project.
+
+        * BuildSlaveSupport/built-product-archive:
+        (createZipManually):
+        (createZip):
+        (archiveBuiltProduct):
+
+2015-09-24  Dan Bernstein  <mitz@apple.com>
+
+        Build fix.
+
+        * WebKitTestRunner/Configurations/WebKitTestRunnerApp.xcconfig:
+
+2015-09-24  Mark Lam  <mark.lam@apple.com>
+
+        Unreviewed. Make Lucas Forschler a WebKit reviewer.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2015-09-24  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix GObject DOM API breaks after r190120.
+
+        Bring back code removed in r169931 to handle documentation of
+        deleted classes.
+
+        * gtk/webkitdom.py:
+        (WebKitDOMDocGenerator):
+        (WebKitDOMDocGenerator.write_deleted_classes):
+        (WebKitDOMDocGenerator.generate):
+        (write_deleted_classes):
+        (WebKitDOMDocGeneratorSections._deleted_class):
+        (WebKitDOMDocGeneratorSections._deleted_class.in):
+        (WebKitDOMDocGeneratorSections.write_deleted_classes):
+        (WebKitDOMDocGeneratorSections.write_deleted_classes.with):
+
+2015-09-23  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [Cocoa] [Font Features] Implement font-variant-*
+        https://bugs.webkit.org/show_bug.cgi?id=148413
+
+        Reviewed by Darin Adler.
+
+        Update test font to use "lnum" feature.
+
+        * FontWithFeatures/FontWithFeatures/FontCreator.cpp:
+        (Generator::appendGSUBTable):
+
+2015-09-22  Andy Estes  <aestes@apple.com>
+
+        ContentFiltering.AllowDownloadAfterAddData is very flaky
+        https://bugs.webkit.org/show_bug.cgi?id=148885
+        <rdar://problem/22729563>
+
+        Reviewed by Alexey Proskuryakov.
+
+        The AllowDownload* tests were relying on -_downloadDidStart: being called before -webView:didFinishNavigation:,
+        but there is no guarantee of this. For tests that should allow a download, spin the runloop until
+        -_downloadDidStart: is called. The test will now timeout on failure, but will no longer produce false failures.
+
+        * TestWebKitAPI/Tests/WebKit2Cocoa/ContentFiltering.mm:
+        (downloadTest):
+
+2015-09-22  Alexey Proskuryakov  <ap@apple.com>
+
+        Mavericks: Media tests start to time out after a few days of bot uptime
+        https://bugs.webkit.org/show_bug.cgi?id=149468
+
+        Reviewed by Chris Dumez.
+
+        * Scripts/webkitpy/port/base.py:
+        * Scripts/webkitpy/port/driver.py:
+        * Scripts/webkitpy/port/mac.py:
+
+2015-09-22  Nan Wang  <n_wang@apple.com>
+
+        Unreviewed, add myself to the committers list.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2015-09-21  Simon Fraser  <simon.fraser@apple.com>
+
+        Remove 'nullable' to fix older iOS builds.
+
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm:
+        (-[TestRunnerWKWebView scrollViewDidEndZooming:withView:atScale:]):
+
+2015-09-21  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Show tiled drawing debug overlay on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=149426
+
+        Reviewed by Dean Jackson.
+
+        * MiniBrowser/MiniBrowser.vcxproj/MiniBrowserLib.rc: Add new menu option.
+        * MiniBrowser/MiniBrowser.vcxproj/MiniBrowserLibResource.h: Ditto.
+        * MiniBrowser/win/Common.cpp:
+        (::ToggleMenuItem): Recognize new menu item and toggle the 'showTiledScrollingIndicator'
+        flag if needed.
+        * MiniBrowser/win/MiniBrowser.h: Update to use new IWebPreferencesPrivate3 class.
+
+2015-09-21  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Use command-line argument to launch in regular or High DPI mode.
+        https://bugs.webkit.org/show_bug.cgi?id=149417
+
+        Reviewed by Dean Jackson.
+
+        * MiniBrowser/win/Common.cpp:
+        (parseCommandLine): Ignore the '--highDPI' argument. It's used at the
+        very start of execution, before the MiniBrowser.dll is loaded.
+        * win/DLLLauncher/DLLLauncherMain.cpp:
+        (shouldUseHighDPI): Check for '--highDPI', and use this mode if
+        present. On WinCairo, always use High DPI.
+
+2015-09-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        32-bit Mac build fix attempt after r190065.
+
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm:
+
+2015-09-21  Alexey Proskuryakov  <ap@apple.com>
+
+        [OS X] Update for Xcode 7.0 on Yosemite
+        https://bugs.webkit.org/show_bug.cgi?id=149389
+
+        Reviewed by Dan Bernstein.
+
+        * DumpRenderTree/mac/DumpRenderTreeDraggingInfo.h:
+        * WebKitTestRunner/mac/WebKitTestRunnerDraggingInfo.h:
+        Removed unneeded declarations - conforming to a protocol is sufficient.
+
+        * DumpRenderTree/mac/DumpRenderTreeDraggingInfo.mm:
+        * WebKitTestRunner/mac/WebKitTestRunnerDraggingInfo.mm:
+        Changed the definitions to be compiled whenever the SDK requires it (so we will have
+        dead code compiled in when building for 10.10 with 10.11 SDK, somewhat unfortunately).
+
+2015-09-21  Simon Fraser  <simon.fraser@apple.com>
+
+        Add the ability for tests to run script in the UI process in WebKitTestRunner
+        https://bugs.webkit.org/show_bug.cgi?id=149356
+
+        Reviewed by Tim Horton.
+
+        This change adds testRunner.runUIScript(script, callback), which allows a test
+        to execute script in a JSContext which runs in the UI process. That context
+        has bindings exposed through the UIScriptController interface; currently one test
+        function, and some iOS-specific functions are included. UIScriptController can be
+        async with a callback, and runUIScript() itself is asynchronous. When the UI 
+        script is complete, it calls uiController.uiScriptComplete(result), where 'result'
+        is a string passed back to the web process, and given to the runUIScript()
+        callback function.
+        
+        Thanks to Gyuyoung Kim for help with the Gtk/Efl build.
+
+        * WebKitTestRunner/DerivedSources.make: Build UIScriptController.idl.
+        * WebKitTestRunner/InjectedBundle/Bindings/TestRunner.idl: Add runUIScript().
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.cpp:
+        (WTR::InjectedBundle::didReceiveMessageToPage): When the UI-side script is
+        complete, call back into TestRunner.
+        * WebKitTestRunner/InjectedBundle/TestRunner.cpp:
+        (WTR::nextUIScriptCallbackID):
+        (WTR::TestRunner::runUIScript): Post a message to the injected bundle to run the UI script.
+        (WTR::TestRunner::runUIScriptCallback): When the UI script is done, execute its callback function.
+        * WebKitTestRunner/InjectedBundle/TestRunner.h:
+        * WebKitTestRunner/PlatformWebView.h:
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::updateTestOptionsFromTestHeader):
+        (WTR::TestController::testOptionsForTest): Support "useFlexibleViewport" as a test argument.
+        (WTR::shouldUseFixedLayout): Deleted. Moved to a TestInvocation function.
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::shouldUseFixedLayout):
+        (WTR::TestInvocation::shouldUseThreadedScrolling):
+        (WTR::TestInvocation::didReceiveMessageFromInjectedBundle):
+        (WTR::TestInvocation::didReceiveSynchronousMessageFromInjectedBundle):
+        (WTR::TestInvocation::runUISideScript): Run the UI-side script!
+        (WTR::TestInvocation::uiScriptDidComplete): Send a message back to the injected bundle.
+        * WebKitTestRunner/TestInvocation.h:
+        * WebKitTestRunner/TestOptions.h:
+        * WebKitTestRunner/WebKitTestRunner.xcodeproj/project.pbxproj:
+        * WebKitTestRunner/cocoa/TestControllerCocoa.mm:
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.h: Copied from Tools/WebKitTestRunner/TestOptions.h.
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm: Added.
+        (-[TestRunnerWKWebView dragImage:at:offset:event:pasteboard:source:slideBack:]):
+        (-[TestRunnerWKWebView zoomToScale:animated:completionHandler:]):
+        (-[TestRunnerWKWebView scrollViewDidEndZooming:withView:atScale:]):
+        (-[TestRunnerWKWebView onDidEndZooming:]): Allow a test to hook into the end of zooming.
+        * WebKitTestRunner/ios/PlatformWebViewIOS.mm:
+        (WTR::PlatformWebView::PlatformWebView): Make a TestRunnerWKWebView on iOS.
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm: Added.
+        (WTR::UIScriptController::doAsyncTask):
+        (WTR::UIScriptController::zoomToScale):
+        (WTR::UIScriptController::zoomScale):
+        (WTR::UIScriptController::minimumZoomScale):
+        (WTR::UIScriptController::maximumZoomScale):
+        (WTR::UIScriptController::contentVisibleRect):
+        * WebKitTestRunner/mac/EventSenderProxy.mm:
+        * WebKitTestRunner/mac/PlatformWebViewMac.mm:
+        (-[TestRunnerWKWebView dragImage:at:offset:event:pasteboard:source:slideBack:]): Deleted.
+        * WebKitTestRunner/mac/TestControllerMac.mm:
+        (WTR::TestController::updatePlatformSpecificTestOptionsForTest):
+        (WTR::shouldUseThreadedScrolling): Deleted. Moved to TestInvocation.
+        * WebKitTestRunner/mac/WebKitTestRunnerDraggingInfo.h:
+        * WebKitTestRunner/uiscriptcontext/UIScriptContext.cpp: Added. Owns the JS context in the UI process.
+        (UIScriptContext::UIScriptContext):
+        (UIScriptContext::~UIScriptContext):
+        (UIScriptContext::runUIScript): Entrypoint to running the UI script. If the script didn't do anything
+        asynchronous, call the callback.
+        (UIScriptContext::nextTaskCallbackID):
+        (UIScriptContext::prepareForAsyncTask): Do setup for one async task (i.e. a UIScriptController function
+        that has a callback). Has to store the callbackID of the script, so code called from the completion
+        callback knows which UI script invoked it.
+        (UIScriptContext::asyncTaskComplete): Called when one task is finished.
+        (UIScriptContext::uiScriptComplete):
+        (UIScriptContext::objectFromRect): Make a JS object from a rect.
+        * WebKitTestRunner/uiscriptcontext/UIScriptContext.h: Copied from Tools/WebKitTestRunner/TestOptions.h.
+        (WTR::UIScriptContext::hasOutstandingAsyncTasks):
+        * WebKitTestRunner/uiscriptcontext/UIScriptController.cpp: Copied from Tools/WebKitTestRunner/TestOptions.h.
+        (WTR::UIScriptController::UIScriptController):
+        (WTR::UIScriptController::makeWindowObject):
+        (WTR::UIScriptController::wrapperClass):
+        (WTR::UIScriptController::doAsyncTask):
+        (WTR::UIScriptController::zoomToScale):
+        (WTR::UIScriptController::zoomScale):
+        (WTR::UIScriptController::minimumZoomScale):
+        (WTR::UIScriptController::maximumZoomScale):
+        (WTR::UIScriptController::contentVisibleRect):
+        (WTR::UIScriptController::uiScriptComplete):
+        * WebKitTestRunner/uiscriptcontext/UIScriptController.h: Copied from Tools/WebKitTestRunner/TestOptions.h.
+        (WTR::UIScriptController::create):
+        * WebKitTestRunner/uiscriptcontext/bindings/UIScriptController.idl: Copied from Tools/WebKitTestRunner/TestOptions.h.
+
+2015-09-21  Tim Horton  <timothy_horton@apple.com>
+
+        Turn on threaded scrolling by default in the tests
+        https://bugs.webkit.org/show_bug.cgi?id=149377
+
+        Reviewed by Simon Fraser.
+
+        * WebKitTestRunner/mac/TestControllerMac.mm:
+        (WTR::TestController::updatePlatformSpecificTestOptionsForTest):
+        (WTR::shouldUseThreadedScrolling): Deleted.
+        Turn on threaded scrolling by default.
+
 2015-09-21  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         [GTK] run-gtk-tests doesn't provide feedback about crashing google tests

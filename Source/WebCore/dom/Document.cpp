@@ -31,6 +31,7 @@
 #include "AXObjectCache.h"
 #include "AnimationController.h"
 #include "Attr.h"
+#include "AuthorStyleSheets.h"
 #include "CDATASection.h"
 #include "CSSFontSelector.h"
 #include "CSSStyleDeclaration.h"
@@ -57,6 +58,7 @@
 #include "EntityReference.h"
 #include "EventFactory.h"
 #include "EventHandler.h"
+#include "ExtensionStyleSheets.h"
 #include "FocusController.h"
 #include "FontLoader.h"
 #include "FormController.h"
@@ -94,6 +96,7 @@
 #include "ImageLoader.h"
 #include "InspectorInstrumentation.h"
 #include "JSLazyEventListener.h"
+#include "JSModuleLoader.h"
 #include "Language.h"
 #include "LoaderStrategy.h"
 #include "Logging.h"
@@ -439,7 +442,8 @@ Document::Document(Frame* frame, const URL& url, unsigned documentClasses, unsig
     , m_domTreeVersion(++s_globalTreeVersion)
     , m_listenerTypes(0)
     , m_mutationObserverTypes(0)
-    , m_styleSheetCollection(*this)
+    , m_authorStyleSheets(std::make_unique<AuthorStyleSheets>(*this))
+    , m_extensionStyleSheets(std::make_unique<ExtensionStyleSheets>(*this))
     , m_visitedLinkState(std::make_unique<VisitedLinkState>(*this))
     , m_visuallyOrdered(false)
     , m_readyState(Complete)
@@ -453,7 +457,7 @@ Document::Document(Frame* frame, const URL& url, unsigned documentClasses, unsig
     , m_frameElementsShouldIgnoreScrolling(false)
     , m_updateFocusAppearanceRestoresSelection(false)
     , m_ignoreDestructiveWriteCount(0)
-    , m_markers(std::make_unique<DocumentMarkerController>())
+    , m_markers(std::make_unique<DocumentMarkerController>(*this))
     , m_updateFocusAppearanceTimer(*this, &Document::updateFocusAppearanceTimerFired)
     , m_cssTarget(nullptr)
     , m_processingLoadEvent(false)
@@ -461,6 +465,7 @@ Document::Document(Frame* frame, const URL& url, unsigned documentClasses, unsig
     , m_startTime(std::chrono::steady_clock::now())
     , m_overMinimumLayoutThreshold(false)
     , m_scriptRunner(std::make_unique<ScriptRunner>(*this))
+    , m_moduleLoader(std::make_unique<JSModuleLoader>(*this))
     , m_xmlVersion(ASCIILiteral("1.0"))
     , m_xmlStandalone(StandaloneUnspecified)
     , m_hasXMLDeclaration(false)
@@ -602,6 +607,7 @@ Document::~Document()
         m_domWindow->resetUnlessSuspendedForPageCache();
 
     m_scriptRunner = nullptr;
+    m_moduleLoader = nullptr;
 
     removeAllEventListeners();
 
@@ -624,7 +630,7 @@ Document::~Document()
 
     if (m_elementSheet)
         m_elementSheet->detachFromDocument();
-    m_styleSheetCollection.detachFromDocument();
+    extensionStyleSheets().detachFromDocument();
 
     clearStyleResolver(); // We need to destroy CSSFontSelector before destroying m_cachedResourceLoader.
 
@@ -791,8 +797,8 @@ void Document::setCompatibilityMode(DocumentCompatibilityMode mode)
 
     if (inQuirksMode() != wasInQuirksMode) {
         // All user stylesheets have to reparse using the different mode.
-        m_styleSheetCollection.clearPageUserSheet();
-        m_styleSheetCollection.invalidateInjectedStyleSheetCache();
+        extensionStyleSheets().clearPageUserSheet();
+        extensionStyleSheets().invalidateInjectedStyleSheetCache();
     }
 }
 
@@ -909,17 +915,10 @@ RefPtr<ProcessingInstruction> Document::createProcessingInstruction(const String
     return ProcessingInstruction::create(*this, target, data);
 }
 
-RefPtr<EntityReference> Document::createEntityReference(const String& name, ExceptionCode& ec)
+RefPtr<EntityReference> Document::createEntityReference(const String&, ExceptionCode& ec)
 {
-    if (!isValidName(name)) {
-        ec = INVALID_CHARACTER_ERR;
-        return nullptr;
-    }
-    if (isHTMLDocument()) {
-        ec = NOT_SUPPORTED_ERR;
-        return nullptr;
-    }
-    return EntityReference::create(*this, name);
+    ec = NOT_SUPPORTED_ERR;
+    return nullptr;
 }
 
 Ref<Text> Document::createEditingTextNode(const String& text)
@@ -944,7 +943,6 @@ RefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCode& 
     case ELEMENT_NODE:
     case TEXT_NODE:
     case CDATA_SECTION_NODE:
-    case ENTITY_REFERENCE_NODE:
     case PROCESSING_INSTRUCTION_NODE:
     case COMMENT_NODE:
     case DOCUMENT_FRAGMENT_NODE:
@@ -957,11 +955,8 @@ RefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCode& 
     case DOCUMENT_NODE: // Can't import a document into another document.
     case DOCUMENT_TYPE_NODE: // FIXME: Support cloning a DocumentType node per DOM4.
         break;
-
-    case XPATH_NAMESPACE_NODE:
-        ASSERT_NOT_REACHED(); // These two types of DOM nodes are not implemented.
-        break;
     }
+
     ec = NOT_SUPPORTED_ERR;
     return nullptr;
 }
@@ -974,16 +969,10 @@ RefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionCode& ec)
         return nullptr;
     }
 
-    if (source->isReadOnlyNode()) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
-        return nullptr;
-    }
-
     EventQueueScope scope;
 
     switch (source->nodeType()) {
     case DOCUMENT_NODE:
-    case XPATH_NAMESPACE_NODE:
         ec = NOT_SUPPORTED_ERR;
         return nullptr;
     case ATTRIBUTE_NODE: {                   
@@ -1710,52 +1699,52 @@ Ref<Range> Document::createRange()
     return Range::create(*this);
 }
 
-RefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, bool expandEntityReferences, ExceptionCode& ec)
+RefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, bool, ExceptionCode& ec)
 {
-    if (!root) {
-        ec = TypeError;
-        return nullptr;
-    }
-    return NodeIterator::create(root, whatToShow, WTF::move(filter), expandEntityReferences);
+    return createNodeIterator(root, whatToShow, WTF::move(filter), ec);
 }
 
 RefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, ExceptionCode& ec)
 {
-    return createNodeIterator(root, whatToShow, WTF::move(filter), false, ec);
+    if (!root) {
+        ec = TypeError;
+        return nullptr;
+    }
+    return NodeIterator::create(root, whatToShow, WTF::move(filter));
 }
 
 RefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned long whatToShow, ExceptionCode& ec)
 {
-    return createNodeIterator(root, whatToShow, nullptr, false, ec);
+    return createNodeIterator(root, whatToShow, nullptr, ec);
 }
 
 RefPtr<NodeIterator> Document::createNodeIterator(Node* root, ExceptionCode& ec)
 {
-    return createNodeIterator(root, 0xFFFFFFFF, nullptr, false, ec);
+    return createNodeIterator(root, 0xFFFFFFFF, nullptr, ec);
 }
 
-RefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, bool expandEntityReferences, ExceptionCode& ec)
+RefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, bool, ExceptionCode& ec)
+{
+    return createTreeWalker(root, whatToShow, WTF::move(filter), ec);
+}
+
+RefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, ExceptionCode& ec)
 {
     if (!root) {
         ec = TypeError;
         return nullptr;
     }
-    return TreeWalker::create(root, whatToShow, WTF::move(filter), expandEntityReferences);
-}
-
-RefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, ExceptionCode& ec)
-{
-    return createTreeWalker(root, whatToShow, WTF::move(filter), false, ec);
+    return TreeWalker::create(root, whatToShow, WTF::move(filter));
 }
 
 RefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned long whatToShow, ExceptionCode& ec)
 {
-    return createTreeWalker(root, whatToShow, nullptr, false, ec);
+    return createTreeWalker(root, whatToShow, nullptr, ec);
 }
 
 RefPtr<TreeWalker> Document::createTreeWalker(Node* root, ExceptionCode& ec)
 {
-    return createTreeWalker(root, 0xFFFFFFFF, nullptr, false, ec);
+    return createTreeWalker(root, 0xFFFFFFFF, nullptr, ec);
 }
 
 void Document::scheduleForcedStyleRecalc()
@@ -1823,7 +1812,7 @@ void Document::recalcStyle(Style::Change change)
     // re-attaching our containing iframe, which when asked HTMLFrameElementBase::isURLAllowed
     // hits a null-dereference due to security code always assuming the document has a SecurityOrigin.
 
-    m_styleSheetCollection.flushPendingUpdates();
+    authorStyleSheets().flushPendingUpdates();
 
     frameView.willRecalcStyle();
 
@@ -1831,7 +1820,7 @@ void Document::recalcStyle(Style::Change change)
 
     // FIXME: We never reset this flags.
     if (m_elementSheet && m_elementSheet->contents().usesRemUnits())
-        m_styleSheetCollection.setUsesRemUnit(true);
+        authorStyleSheets().setUsesRemUnit(true);
     // We don't call setUsesStyleBasedEditability here because the whole point of the flag is to avoid style recalc.
     // i.e. updating the flag here would be too late.
 
@@ -1858,10 +1847,6 @@ void Document::recalcStyle(Style::Change change)
         unscheduleStyleRecalc();
 
         m_inStyleRecalc = false;
-
-        // Pseudo element removal and similar may only work with these flags still set. Reset them after the style recalc.
-        if (m_styleResolver)
-            m_styleSheetCollection.resetCSSFeatureFlags();
     }
 
     // If we wanted to call implicitClose() during recalcStyle, do so now that we're finished.
@@ -2126,11 +2111,22 @@ void Document::pageSizeAndMarginsInPixels(int pageIndex, IntSize& pageSize, int&
 
 void Document::createStyleResolver()
 {
-    bool matchAuthorAndUserStyles = true;
-    if (Settings* settings = this->settings())
-        matchAuthorAndUserStyles = settings->authorAndUserStylesEnabled();
-    m_styleResolver = std::make_unique<StyleResolver>(*this, matchAuthorAndUserStyles);
-    m_styleSheetCollection.combineCSSFeatureFlags();
+    m_styleResolver = std::make_unique<StyleResolver>(*this);
+    m_styleResolver->appendAuthorStyleSheets(authorStyleSheets().activeStyleSheets());
+}
+
+StyleResolver& Document::userAgentShadowTreeStyleResolver()
+{
+    if (!m_userAgentShadowTreeStyleResolver) {
+        m_userAgentShadowTreeStyleResolver = std::make_unique<StyleResolver>(*this);
+
+        // FIXME: Filter out shadow pseudo elements we don't want to expose to authors.
+        auto& documentAuthorStyle = *ensureStyleResolver().ruleSets().authorStyle();
+        if (documentAuthorStyle.hasShadowPseudoElementRules())
+            m_userAgentShadowTreeStyleResolver->ruleSets().authorStyle()->copyShadowPseudoElementRulesFrom(documentAuthorStyle);
+    }
+
+    return *m_userAgentShadowTreeStyleResolver;
 }
 
 void Document::fontsNeedUpdate(FontSelector&)
@@ -2154,6 +2150,7 @@ CSSFontSelector& Document::fontSelector()
 void Document::clearStyleResolver()
 {
     m_styleResolver = nullptr;
+    m_userAgentShadowTreeStyleResolver = nullptr;
 
     // FIXME: It would be better if the FontSelector could survive this operation.
     if (m_fontSelector) {
@@ -2665,7 +2662,8 @@ void Document::implicitClose()
 
     dispatchWindowLoadEvent();
     enqueuePageshowEvent(PageshowEventNotPersisted);
-    enqueuePopstateEvent(m_pendingStateObject ? m_pendingStateObject.release() : SerializedScriptValue::nullValue());
+    if (m_pendingStateObject)
+        enqueuePopstateEvent(m_pendingStateObject.release());
     
     if (f)
         f->loader().handledOnloadEvents();
@@ -3090,9 +3088,9 @@ bool Document::usesStyleBasedEditability() const
     ASSERT(!m_renderView || !m_renderView->frameView().isPainting());
     ASSERT(!m_inStyleRecalc);
 
-    auto& collection = document().styleSheetCollection();
-    collection.flushPendingUpdates();
-    return collection.usesStyleBasedEditability();
+    auto& authorSheets = const_cast<AuthorStyleSheets&>(authorStyleSheets());
+    authorSheets.flushPendingUpdates();
+    return authorSheets.usesStyleBasedEditability();
 }
 
 void Document::processHttpEquiv(const String& equiv, const String& content)
@@ -3132,8 +3130,8 @@ void Document::processHttpEquiv(const String& equiv, const String& content)
         // For more info, see the test at:
         // http://www.hixie.ch/tests/evil/css/import/main/preferred.html
         // -dwh
-        m_styleSheetCollection.setSelectedStylesheetSetName(content);
-        m_styleSheetCollection.setPreferredStylesheetSetName(content);
+        authorStyleSheets().setSelectedStylesheetSetName(content);
+        authorStyleSheets().setPreferredStylesheetSetName(content);
         styleResolverChanged(DeferRecalcStyle);
         break;
 
@@ -3357,9 +3355,7 @@ bool Document::childTypeAllowed(NodeType type) const
     case CDATA_SECTION_NODE:
     case DOCUMENT_FRAGMENT_NODE:
     case DOCUMENT_NODE:
-    case ENTITY_REFERENCE_NODE:
     case TEXT_NODE:
-    case XPATH_NAMESPACE_NODE:
         return false;
     case COMMENT_NODE:
     case PROCESSING_INSTRUCTION_NODE:
@@ -3385,9 +3381,7 @@ bool Document::canAcceptChild(const Node& newChild, const Node* refChild, Accept
     case ATTRIBUTE_NODE:
     case CDATA_SECTION_NODE:
     case DOCUMENT_NODE:
-    case ENTITY_REFERENCE_NODE:
     case TEXT_NODE:
-    case XPATH_NAMESPACE_NODE:
         return false;
     case COMMENT_NODE:
     case PROCESSING_INSTRUCTION_NODE:
@@ -3488,17 +3482,17 @@ StyleSheetList& Document::styleSheets()
 
 String Document::preferredStylesheetSet() const
 {
-    return m_styleSheetCollection.preferredStylesheetSetName();
+    return authorStyleSheets().preferredStylesheetSetName();
 }
 
 String Document::selectedStylesheetSet() const
 {
-    return m_styleSheetCollection.selectedStylesheetSetName();
+    return authorStyleSheets().selectedStylesheetSetName();
 }
 
 void Document::setSelectedStylesheetSet(const String& aString)
 {
-    m_styleSheetCollection.setSelectedStylesheetSetName(aString);
+    authorStyleSheets().setSelectedStylesheetSetName(aString);
     styleResolverChanged(DeferRecalcStyle);
 }
 
@@ -3517,7 +3511,7 @@ void Document::scheduleOptimizedStyleSheetUpdate()
 {
     if (m_optimizedStyleSheetUpdateTimer.isActive())
         return;
-    m_styleSheetCollection.setPendingUpdateType(DocumentStyleSheetCollection::OptimizedUpdate);
+    authorStyleSheets().setPendingUpdateType(AuthorStyleSheets::OptimizedUpdate);
     m_optimizedStyleSheetUpdateTimer.startOneShot(0);
 }
 
@@ -3604,10 +3598,10 @@ void Document::styleResolverChanged(StyleResolverUpdateFlag updateFlag)
         printf("Beginning update of style selector at time %lld.\n", elapsedTime().count());
 #endif
 
-    DocumentStyleSheetCollection::UpdateFlag styleSheetUpdate = (updateFlag == RecalcStyleIfNeeded || updateFlag == DeferRecalcStyleIfNeeded)
-        ? DocumentStyleSheetCollection::OptimizedUpdate
-        : DocumentStyleSheetCollection::FullUpdate;
-    bool stylesheetChangeRequiresStyleRecalc = m_styleSheetCollection.updateActiveStyleSheets(styleSheetUpdate);
+    auto styleSheetUpdate = (updateFlag == RecalcStyleIfNeeded || updateFlag == DeferRecalcStyleIfNeeded)
+        ? AuthorStyleSheets::OptimizedUpdate
+        : AuthorStyleSheets::FullUpdate;
+    bool stylesheetChangeRequiresStyleRecalc = authorStyleSheets().updateActiveStyleSheets(styleSheetUpdate);
 
     if (updateFlag == DeferRecalcStyle) {
         scheduleForcedStyleRecalc();
@@ -6502,7 +6496,7 @@ void Document::updateHoverActiveState(const HitTestRequest& request, Element* in
 
 bool Document::haveStylesheetsLoaded() const
 {
-    return !m_styleSheetCollection.hasPendingSheets() || m_ignorePendingStylesheets;
+    return !authorStyleSheets().hasPendingSheets() || m_ignorePendingStylesheets;
 }
 
 Locale& Document::getCachedLocale(const AtomicString& locale)

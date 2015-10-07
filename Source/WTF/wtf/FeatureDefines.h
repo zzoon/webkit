@@ -168,12 +168,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_WEBGL 1
 #endif
 
-/* FIXME: Remove this logic and always enable XSLT once we support XSLT when building against
-the public iOS SDK. We will also need to update the FeatureDefines.xcconfig files. */
-#if !defined(ENABLE_XSLT) && !USE(APPLE_INTERNAL_SDK)
-#define ENABLE_XSLT 0
-#endif
-
 #if !defined(ENABLE_PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
 #define ENABLE_PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC 1
 #endif
@@ -704,7 +698,11 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #endif
 
 #if !defined(ENABLE_STREAMS_API)
+#if PLATFORM(WIN)
+#define ENABLE_STREAMS_API 0
+#else
 #define ENABLE_STREAMS_API 1
+#endif
 #endif
 
 #if !defined(ENABLE_SVG_FONTS)

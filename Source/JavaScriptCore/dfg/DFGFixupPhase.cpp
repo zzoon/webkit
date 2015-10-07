@@ -30,6 +30,7 @@
 
 #include "ArrayPrototype.h"
 #include "DFGGraph.h"
+#include "DFGInferredTypeCheck.h"
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
 #include "DFGPredictionPropagationPhase.h"
@@ -410,6 +411,12 @@ private:
             }
             if (node->op() != CompareEq)
                 break;
+            if (Node::shouldSpeculateSymbol(node->child1().node(), node->child2().node())) {
+                fixEdge<SymbolUse>(node->child1());
+                fixEdge<SymbolUse>(node->child2());
+                node->clearFlags(NodeMustGenerate);
+                break;
+            }
             if (node->child1()->shouldSpeculateStringIdent() && node->child2()->shouldSpeculateStringIdent()) {
                 fixEdge<StringIdentUse>(node->child1());
                 fixEdge<StringIdentUse>(node->child2());
@@ -490,6 +497,11 @@ private:
             if (Node::shouldSpeculateNumber(node->child1().node(), node->child2().node())) {
                 fixEdge<DoubleRepUse>(node->child1());
                 fixEdge<DoubleRepUse>(node->child2());
+                break;
+            }
+            if (Node::shouldSpeculateSymbol(node->child1().node(), node->child2().node())) {
+                fixEdge<SymbolUse>(node->child1());
+                fixEdge<SymbolUse>(node->child2());
                 break;
             }
             if (node->child1()->shouldSpeculateStringIdent() && node->child2()->shouldSpeculateStringIdent()) {
@@ -1092,6 +1104,9 @@ private:
             if (!node->child1()->hasStorageResult())
                 fixEdge<KnownCellUse>(node->child1());
             fixEdge<KnownCellUse>(node->child2());
+            insertInferredTypeCheck(
+                m_insertionSet, m_indexInBlock, node->origin, node->child3().node(),
+                node->storageAccessData().inferredType);
             speculateForBarrier(node->child3());
             break;
         }
@@ -1339,11 +1354,15 @@ private:
         case NotifyWrite:
         case VarInjectionWatchpoint:
         case Call:
+        case TailCallInlinedCaller:
         case Construct:
         case CallVarargs:
+        case TailCallVarargsInlinedCaller:
         case ConstructVarargs:
         case CallForwardVarargs:
         case ConstructForwardVarargs:
+        case TailCallForwardVarargs:
+        case TailCallForwardVarargsInlinedCaller:
         case LoadVarargs:
         case ProfileControlFlow:
         case NewObject:
@@ -1361,6 +1380,8 @@ private:
         case CreateClonedArguments:
         case Jump:
         case Return:
+        case TailCall:
+        case TailCallVarargs:
         case Throw:
         case ThrowReferenceError:
         case CountExecution:

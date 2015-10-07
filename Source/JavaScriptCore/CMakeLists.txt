@@ -192,6 +192,7 @@ set(JavaScriptCore_SOURCES
     dfg/DFGGraphSafepoint.cpp
     dfg/DFGHeapLocation.cpp
     dfg/DFGInPlaceAbstractState.cpp
+    dfg/DFGInferredTypeCheck.cpp
     dfg/DFGInsertionSet.cpp
     dfg/DFGIntegerCheckCombiningPhase.cpp
     dfg/DFGIntegerRangeOptimizationPhase.cpp
@@ -293,11 +294,10 @@ set(JavaScriptCore_SOURCES
     heap/FullGCActivityCallback.cpp
     heap/GCActivityCallback.cpp
     heap/GCLogging.cpp
-    heap/GCThread.cpp
-    heap/GCThreadSharedData.cpp
     heap/HandleSet.cpp
     heap/HandleStack.cpp
     heap/Heap.cpp
+    heap/HeapHelperPool.cpp
     heap/HeapStatistics.cpp
     heap/HeapTimer.cpp
     heap/HeapVerifier.cpp
@@ -500,6 +500,8 @@ set(JavaScriptCore_RUNTIME_SOURCES
     runtime/GetterSetter.cpp
     runtime/Identifier.cpp
     runtime/IndexingType.cpp
+    runtime/InferredType.cpp
+    runtime/InferredTypeTable.cpp
     runtime/InferredValue.cpp
     runtime/InitializeThreading.cpp
     runtime/InspectorInstrumentationObject.cpp
@@ -572,6 +574,7 @@ set(JavaScriptCore_RUNTIME_SOURCES
     runtime/JSTemplateRegistryKey.cpp
     runtime/JSTypedArrayConstructors.cpp
     runtime/JSTypedArrayPrototypes.cpp
+    runtime/JSTypedArrayViewPrototype.cpp
     runtime/JSTypedArrays.cpp
     runtime/JSWeakMap.cpp
     runtime/JSWeakSet.cpp
@@ -901,6 +904,7 @@ if (ENABLE_FTL_JIT)
         ftl/FTLJSCall.cpp
         ftl/FTLJSCallBase.cpp
         ftl/FTLJSCallVarargs.cpp
+        ftl/FTLJSTailCall.cpp
         ftl/FTLLink.cpp
         ftl/FTLLocation.cpp
         ftl/FTLLowerDFGToLLVM.cpp
@@ -946,6 +950,7 @@ set(JavaScriptCore_FORWARDING_HEADERS_DIRECTORIES
     API
     assembler
     bindings
+    builtins
     bytecode
     debugger
     dfg
@@ -1084,6 +1089,7 @@ set(JavaScriptCore_BUILTINS_SOURCES
     ${JAVASCRIPTCORE_DIR}/builtins/ReflectObject.js
     ${JAVASCRIPTCORE_DIR}/builtins/StringConstructor.js
     ${JAVASCRIPTCORE_DIR}/builtins/StringIterator.prototype.js
+    ${JAVASCRIPTCORE_DIR}/builtins/TypedArray.prototype.js
 )
 
 add_custom_command(

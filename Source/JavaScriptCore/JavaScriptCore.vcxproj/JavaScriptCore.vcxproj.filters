@@ -282,9 +282,6 @@
     <ClCompile Include="..\heap\GCThread.cpp">
       <Filter>heap</Filter>
     </ClCompile>
-    <ClCompile Include="..\heap\GCThreadSharedData.cpp">
-      <Filter>heap</Filter>
-    </ClCompile>
     <ClCompile Include="..\heap\HandleSet.cpp">
       <Filter>heap</Filter>
     </ClCompile>
@@ -292,6 +289,9 @@
       <Filter>heap</Filter>
     </ClCompile>
     <ClCompile Include="..\heap\Heap.cpp">
+      <Filter>heap</Filter>
+    </ClCompile>
+    <ClCompile Include="..\heap\HeapHelperPool.cpp">
       <Filter>heap</Filter>
     </ClCompile>
     <ClCompile Include="..\heap\HeapStatistics.cpp">
@@ -1083,6 +1083,9 @@
     <ClCompile Include="..\runtime\JSTypedArrays.cpp">
       <Filter>runtime</Filter>
     </ClCompile>
+    <ClCompile Include="..\runtime\JSTypedArrayViewPrototype.cpp">
+      <Filter>runtime</Filter>
+    </ClCompile>
     <ClCompile Include="..\runtime\DataView.cpp">
       <Filter>runtime</Filter>
     </ClCompile>
@@ -1267,6 +1270,9 @@
       <Filter>dfg</Filter>
     </ClCompile>
     <ClCompile Include="..\dfg\DFGInPlaceAbstractState.cpp">
+      <Filter>dfg</Filter>
+    </ClCompile>
+    <ClCompile Include="..\dfg\DFGInferredTypeCheck.cpp">
       <Filter>dfg</Filter>
     </ClCompile>
     <ClCompile Include="..\dfg\DFGInvalidationPointInjectionPhase.cpp">
@@ -1578,6 +1584,9 @@
     <ClCompile Include="..\ftl\FTLJSCall.cpp">
       <Filter>ftl</Filter>
     </ClCompile>
+    <ClCompile Include="..\ftl\FTLJSTailCall.cpp">
+      <Filter>ftl</Filter>
+    </ClCompile>
     <ClCompile Include="..\ftl\FTLLink.cpp">
       <Filter>ftl</Filter>
     </ClCompile>
@@ -1866,6 +1875,8 @@
     <ClCompile Include="..\runtime\DirectArguments.cpp" />
     <ClCompile Include="..\runtime\DirectArgumentsOffset.cpp" />
     <ClCompile Include="..\runtime\InferredValue.cpp" />
+    <ClCompile Include="..\runtime\InferredType.cpp" />
+    <ClCompile Include="..\runtime\InferredTypeTable.cpp" />
     <ClCompile Include="..\runtime\ScopeOffset.cpp" />
     <ClCompile Include="..\runtime\ScopedArguments.cpp" />
     <ClCompile Include="..\runtime\ScopedArgumentsTable.cpp" />
@@ -2208,6 +2219,9 @@
     <ClInclude Include="..\disassembler\Disassembler.h">
       <Filter>disassembler</Filter>
     </ClInclude>
+    <ClInclude Include="..\heap\CellState.h">
+      <Filter>heap</Filter>
+    </ClInclude>
     <ClInclude Include="..\heap\ConservativeRoots.h">
       <Filter>heap</Filter>
     </ClInclude>
@@ -2265,9 +2279,6 @@
     <ClInclude Include="..\heap\GCThread.h">
       <Filter>heap</Filter>
     </ClInclude>
-    <ClInclude Include="..\heap\GCThreadSharedData.h">
-      <Filter>heap</Filter>
-    </ClInclude>
     <ClInclude Include="..\heap\Handle.h">
       <Filter>heap</Filter>
     </ClInclude>
@@ -2287,6 +2298,9 @@
       <Filter>heap</Filter>
     </ClInclude>
     <ClInclude Include="..\heap\Heap.h">
+      <Filter>heap</Filter>
+    </ClInclude>
+    <ClInclude Include="..\heap\HeapHelperPool.h">
       <Filter>heap</Filter>
     </ClInclude>
     <ClInclude Include="..\heap\HeapInlines.h">
@@ -3168,9 +3182,6 @@
     <ClInclude Include="..\runtime\WeakGCMap.h">
       <Filter>runtime</Filter>
     </ClInclude>
-    <ClInclude Include="..\runtime\WeakRandom.h">
-      <Filter>runtime</Filter>
-    </ClInclude>
     <ClInclude Include="..\runtime\WriteBarrier.h">
       <Filter>runtime</Filter>
     </ClInclude>
@@ -3373,6 +3384,9 @@
     <ClInclude Include="..\runtime\JSGenericTypedArrayViewPrototype.h">
       <Filter>runtime</Filter>
     </ClInclude>
+    <ClInclude Include="..\runtime\JSGenericTypedArrayViewPrototypeFunctions.h">
+      <Filter>runtime</Filter>
+    </ClInclude>
     <ClInclude Include="..\runtime\JSInternalPromise.h">
       <Filter>runtime</Filter>
     </ClInclude>
@@ -3448,6 +3462,9 @@
     <ClInclude Include="..\runtime\JSTypedArrays.h">
       <Filter>runtime</Filter>
     </ClInclude>
+    <ClInclude Include="..\runtime\JSTypedArrayViewPrototype.h">
+      <Filter>runtime</Filter>
+    </ClCompile>
     <ClInclude Include="..\runtime\JSUint16Array.h">
       <Filter>runtime</Filter>
     </ClInclude>
@@ -3676,6 +3693,9 @@
     <ClInclude Include="..\dfg\DFGDesiredIdentifiers.h">
       <Filter>dfg</Filter>
     </ClInclude>
+    <ClInclude Include="..\dfg\DFGDesiredInferredType.h">
+      <Filter>dfg</Filter>
+    </ClInclude>
     <ClInclude Include="..\dfg\DFGDesiredTransitions.h">
       <Filter>dfg</Filter>
     </ClInclude>
@@ -3740,6 +3760,9 @@
       <Filter>dfg</Filter>
     </ClInclude>
     <ClInclude Include="..\dfg\DFGInPlaceAbstractState.h">
+      <Filter>dfg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\dfg\DFGInferredTypeCheck.h">
       <Filter>dfg</Filter>
     </ClInclude>
     <ClInclude Include="..\dfg\DFGInvalidationPointInjectionPhase.h">
@@ -4136,6 +4159,9 @@
     <ClInclude Include="..\ftl\FTLJSCall.h">
       <Filter>ftl</Filter>
     </ClInclude>
+    <ClInclude Include="..\ftl\FTLJSTailCall.h">
+      <Filter>ftl</Filter>
+    </ClInclude>
     <ClInclude Include="..\ftl\FTLLink.h">
       <Filter>ftl</Filter>
     </ClInclude>
@@ -4424,6 +4450,9 @@
     <ClInclude Include="..\dfg\DFGPromotedHeapLocation.h">
       <Filter>dfg</Filter>
     </ClInclude>
+    <ClInclude Include="..\dfg\DFGPropertyTypeKey.h">
+      <Filter>dfg</Filter>
+    </ClInclude>
     <ClInclude Include="..\ftl\FTLExitPropertyValue.h">
       <Filter>ftl</Filter>
     </ClInclude>
@@ -4467,6 +4496,8 @@
     <ClInclude Include="..\runtime\GenericArgumentsInlines.h" />
     <ClInclude Include="..\runtime\GenericOffset.h" />
     <ClInclude Include="..\runtime\InferredValue.h" />
+    <ClInclude Include="..\runtime\InferredType.h" />
+    <ClInclude Include="..\runtime\InferredTypeTable.h" />
     <ClInclude Include="..\runtime\ScopeOffset.h" />
     <ClInclude Include="..\runtime\ScopedArguments.h" />
     <ClInclude Include="..\runtime\ScopedArgumentsTable.h" />

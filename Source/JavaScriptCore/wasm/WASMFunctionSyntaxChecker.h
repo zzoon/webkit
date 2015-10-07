@@ -81,14 +81,14 @@ public:
         return UNUSED;
     }
 
-    int buildImmediateF32(uint32_t)
+    int buildImmediateF32(float)
     {
         m_tempStackTop++;
         updateTempStackHeight();
         return UNUSED;
     }
 
-    int buildImmediateF64(uint32_t)
+    int buildImmediateF64(double)
     {
         m_tempStackTop++;
         updateTempStackHeight();
@@ -119,9 +119,11 @@ public:
         return UNUSED;
     }
 
-    int buildStore(const MemoryAddress&, WASMExpressionType, WASMMemoryType, int)
+    int buildStore(WASMOpKind opKind, const MemoryAddress&, WASMExpressionType, WASMMemoryType, int)
     {
         m_tempStackTop -= 2;
+        if (opKind == WASMOpKind::Expression)
+            m_tempStackTop++;
         return UNUSED;
     }
 
@@ -176,6 +178,18 @@ public:
         return UNUSED;
     }
 
+    int buildMinOrMaxI32(int, int, WASMOpExpressionI32)
+    {
+        m_tempStackTop--;
+        return UNUSED;
+    }
+
+    int buildMinOrMaxF64(int, int, WASMOpExpressionF64)
+    {
+        m_tempStackTop--;
+        return UNUSED;
+    }
+
     int buildCallInternal(uint32_t, int, const WASMSignature& signature, WASMExpressionType returnType)
     {
         size_t argumentCount = signature.arguments.size();
@@ -211,6 +225,11 @@ public:
     }
 
     void appendExpressionList(int&, int) { }
+
+    void discard(int)
+    {
+        m_tempStackTop--;
+    }
 
     void linkTarget(const int&) { }
     void jumpToTarget(const int&) { }

@@ -83,7 +83,7 @@ PutByIdStatus PutByIdStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned
         if (!isValidOffset(offset))
             return PutByIdStatus(NoInformation);
         
-        return PutByIdVariant::replace(structure, offset);
+        return PutByIdVariant::replace(structure, offset, structure->inferredTypeDescriptorFor(uid));
     }
 
     Structure* newStructure = vm.heap.structureIDTable().get(newStructureID);
@@ -103,7 +103,8 @@ PutByIdStatus PutByIdStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned
             return PutByIdStatus(NoInformation);
     }
     
-    return PutByIdVariant::transition(structure, newStructure, conditionSet, offset);
+    return PutByIdVariant::transition(
+        structure, newStructure, conditionSet, offset, newStructure->inferredTypeDescriptorFor(uid));
 }
 
 PutByIdStatus PutByIdStatus::computeFor(CodeBlock* profiledBlock, StubInfoMap& map, unsigned bytecodeIndex, UniquedStringImpl* uid)
@@ -143,18 +144,15 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
     const ConcurrentJITLocker& locker, CodeBlock* profiledBlock, StructureStubInfo* stubInfo,
     UniquedStringImpl* uid, CallLinkStatus::ExitSiteData callExitSiteData)
 {
-    if (!stubInfo)
+    if (!stubInfo || !stubInfo->everConsidered)
         return PutByIdStatus();
     
     if (stubInfo->tookSlowPath)
         return PutByIdStatus(TakesSlowPath);
     
-    if (!stubInfo->seen)
-        return PutByIdStatus();
-    
     switch (stubInfo->cacheType) {
     case CacheType::Unset:
-        // If the JIT saw it but didn't optimize it, then assume that this takes slow path.
+        // This means that we attempted to cache but failed for some reason.
         return PutByIdStatus(TakesSlowPath);
         
     case CacheType::PutByIdReplace: {
@@ -162,7 +160,7 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
             stubInfo->u.byIdSelf.baseObjectStructure->getConcurrently(uid);
         if (isValidOffset(offset)) {
             return PutByIdVariant::replace(
-                stubInfo->u.byIdSelf.baseObjectStructure.get(), offset);
+                stubInfo->u.byIdSelf.baseObjectStructure.get(), offset, InferredType::Top);
         }
         return PutByIdStatus(TakesSlowPath);
     }
@@ -193,7 +191,8 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
                 PropertyOffset offset = structure->getConcurrently(uid);
                 if (!isValidOffset(offset))
                     return PutByIdStatus(slowPathState);
-                variant = PutByIdVariant::replace(structure, offset);
+                variant = PutByIdVariant::replace(
+                    structure, offset, structure->inferredTypeDescriptorFor(uid));
                 break;
             }
                 
@@ -206,7 +205,8 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
                 if (!conditionSet.structuresEnsureValidity())
                     return PutByIdStatus(slowPathState);
                 variant = PutByIdVariant::transition(
-                    access.structure(), access.newStructure(), conditionSet, offset);
+                    access.structure(), access.newStructure(), conditionSet, offset,
+                    access.newStructure()->inferredTypeDescriptorFor(uid));
                 break;
             }
                 
@@ -329,8 +329,10 @@ PutByIdStatus PutByIdStatus::computeFor(JSGlobalObject* globalObject, const Stru
                 // So, better leave this alone and take slow path.
                 return PutByIdStatus(TakesSlowPath);
             }
-            
-            if (!result.appendVariant(PutByIdVariant::replace(structure, offset)))
+
+            PutByIdVariant variant =
+                PutByIdVariant::replace(structure, offset, structure->inferredTypeDescriptorFor(uid));
+            if (!result.appendVariant(variant))
                 return PutByIdStatus(TakesSlowPath);
             continue;
         }
@@ -356,13 +358,16 @@ PutByIdStatus PutByIdStatus::computeFor(JSGlobalObject* globalObject, const Stru
         }
     
         // We only optimize if there is already a structure that the transition is cached to.
-        Structure* transition = Structure::addPropertyTransitionToExistingStructureConcurrently(structure, uid, 0, offset);
+        Structure* transition =
+            Structure::addPropertyTransitionToExistingStructureConcurrently(structure, uid, 0, offset);
         if (!transition)
             return PutByIdStatus(TakesSlowPath);
         ASSERT(isValidOffset(offset));
     
         bool didAppend = result.appendVariant(
-            PutByIdVariant::transition(structure, transition, conditionSet, offset));
+            PutByIdVariant::transition(
+                structure, transition, conditionSet, offset,
+                transition->inferredTypeDescriptorFor(uid)));
         if (!didAppend)
             return PutByIdStatus(TakesSlowPath);
     }

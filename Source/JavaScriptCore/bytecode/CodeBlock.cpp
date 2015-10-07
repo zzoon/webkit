@@ -341,39 +341,37 @@ void CodeBlock::printGetByIdCacheStatus(PrintStream& out, ExecState* exec, int l
         if (stubInfo.resetByGC)
             out.print(" (Reset By GC)");
         
-        if (stubInfo.seen) {
-            out.printf(" jit(");
+        out.printf(" jit(");
             
-            Structure* baseStructure = nullptr;
-            PolymorphicAccess* stub = nullptr;
+        Structure* baseStructure = nullptr;
+        PolymorphicAccess* stub = nullptr;
             
-            switch (stubInfo.cacheType) {
-            case CacheType::GetByIdSelf:
-                out.printf("self");
-                baseStructure = stubInfo.u.byIdSelf.baseObjectStructure.get();
-                break;
-            case CacheType::Stub:
-                out.printf("stub");
-                stub = stubInfo.u.stub;
-                break;
-            case CacheType::Unset:
-                out.printf("unset");
-                break;
-            default:
-                RELEASE_ASSERT_NOT_REACHED();
-                break;
-            }
-            
-            if (baseStructure) {
-                out.printf(", ");
-                dumpStructure(out, "struct", baseStructure, ident);
-            }
-
-            if (stub)
-                out.print(", ", *stub);
-
-            out.printf(")");
+        switch (stubInfo.cacheType) {
+        case CacheType::GetByIdSelf:
+            out.printf("self");
+            baseStructure = stubInfo.u.byIdSelf.baseObjectStructure.get();
+            break;
+        case CacheType::Stub:
+            out.printf("stub");
+            stub = stubInfo.u.stub;
+            break;
+        case CacheType::Unset:
+            out.printf("unset");
+            break;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            break;
         }
+            
+        if (baseStructure) {
+            out.printf(", ");
+            dumpStructure(out, "struct", baseStructure, ident);
+        }
+
+        if (stub)
+            out.print(", ", *stub);
+
+        out.printf(")");
     }
 #else
     UNUSED_PARAM(map);
@@ -413,27 +411,25 @@ void CodeBlock::printPutByIdCacheStatus(PrintStream& out, int location, const St
         if (stubInfo.resetByGC)
             out.print(" (Reset By GC)");
         
-        if (stubInfo.seen) {
-            out.printf(" jit(");
-            
-            switch (stubInfo.cacheType) {
-            case CacheType::PutByIdReplace:
-                out.print("replace, ");
-                dumpStructure(out, "struct", stubInfo.u.byIdSelf.baseObjectStructure.get(), ident);
-                break;
-            case CacheType::Stub: {
-                out.print("stub, ", *stubInfo.u.stub);
-                break;
-            }
-            case CacheType::Unset:
-                out.printf("unset");
-                break;
-            default:
-                RELEASE_ASSERT_NOT_REACHED();
-                break;
-            }
-            out.printf(")");
+        out.printf(" jit(");
+        
+        switch (stubInfo.cacheType) {
+        case CacheType::PutByIdReplace:
+            out.print("replace, ");
+            dumpStructure(out, "struct", stubInfo.u.byIdSelf.baseObjectStructure.get(), ident);
+            break;
+        case CacheType::Stub: {
+            out.print("stub, ", *stubInfo.u.stub);
+            break;
         }
+        case CacheType::Unset:
+            out.printf("unset");
+            break;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            break;
+        }
+        out.printf(")");
     }
 #else
     UNUSED_PARAM(map);
@@ -2249,15 +2245,15 @@ void CodeBlock::visitAggregate(SlotVisitor& visitor)
     if (CodeBlock* otherBlock = specialOSREntryBlockOrNull())
         otherBlock->visitAggregate(visitor);
 
-    visitor.reportExtraMemoryVisited(ownerExecutable(), sizeof(CodeBlock));
+    visitor.reportExtraMemoryVisited(sizeof(CodeBlock));
     if (m_jitCode)
-        visitor.reportExtraMemoryVisited(ownerExecutable(), m_jitCode->size());
+        visitor.reportExtraMemoryVisited(m_jitCode->size());
     if (m_instructions.size()) {
         // Divide by refCount() because m_instructions points to something that is shared
         // by multiple CodeBlocks, and we only want to count it towards the heap size once.
         // Having each CodeBlock report only its proportional share of the size is one way
         // of accomplishing this.
-        visitor.reportExtraMemoryVisited(ownerExecutable(), m_instructions.size() * sizeof(Instruction) / m_instructions.refCount());
+        visitor.reportExtraMemoryVisited(m_instructions.size() * sizeof(Instruction) / m_instructions.refCount());
     }
 
     visitor.append(&m_unlinkedCode);
@@ -3602,6 +3598,30 @@ ArrayProfile* CodeBlock::getOrAddArrayProfile(unsigned bytecodeOffset)
     return addArrayProfile(bytecodeOffset);
 }
 
+#if ENABLE(DFG_JIT)
+Vector<CodeOrigin, 0, UnsafeVectorOverflow>& CodeBlock::codeOrigins()
+{
+    return m_jitCode->dfgCommon()->codeOrigins;
+}
+
+size_t CodeBlock::numberOfDFGIdentifiers() const
+{
+    if (!JITCode::isOptimizingJIT(jitType()))
+        return 0;
+    
+    return m_jitCode->dfgCommon()->dfgIdentifiers.size();
+}
+
+const Identifier& CodeBlock::identifier(int index) const
+{
+    size_t unlinkedIdentifiers = m_unlinkedCode->numberOfIdentifiers();
+    if (static_cast<unsigned>(index) < unlinkedIdentifiers)
+        return m_unlinkedCode->identifier(index);
+    ASSERT(JITCode::isOptimizingJIT(jitType()));
+    return m_jitCode->dfgCommon()->dfgIdentifiers[index - unlinkedIdentifiers];
+}
+#endif // ENABLE(DFG_JIT)
+
 void CodeBlock::updateAllPredictionsAndCountLiveness(unsigned& numberOfLiveNonArgumentValueProfiles, unsigned& numberOfSamplesInProfiles)
 {
     ConcurrentJITLocker locker(m_lock);
@@ -3943,6 +3963,14 @@ RareCaseProfile* CodeBlock::rareCaseProfileForBytecodeOffset(int bytecodeOffset)
     return tryBinarySearch<RareCaseProfile, int>(
         m_rareCaseProfiles, m_rareCaseProfiles.size(), bytecodeOffset,
         getRareCaseProfileBytecodeOffset);
+}
+
+unsigned CodeBlock::rareCaseProfileCountForBytecodeOffset(int bytecodeOffset)
+{
+    RareCaseProfile* profile = rareCaseProfileForBytecodeOffset(bytecodeOffset);
+    if (profile)
+        return profile->m_counter;
+    return 0;
 }
 
 #if ENABLE(JIT)

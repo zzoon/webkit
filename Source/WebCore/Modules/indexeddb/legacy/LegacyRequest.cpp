@@ -31,7 +31,6 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
-#include "EventException.h"
 #include "EventListener.h"
 #include "EventNames.h"
 #include "EventQueue.h"
@@ -77,7 +76,7 @@ LegacyRequest::LegacyRequest(ScriptExecutionContext* context, PassRefPtr<LegacyA
     , m_errorCode(0)
     , m_contextStopped(false)
     , m_transaction(transaction)
-    , m_readyState(PENDING)
+    , m_readyState(IDBRequestReadyState::Pending)
     , m_requestAborted(false)
     , m_source(source)
     , m_taskType(taskType)
@@ -96,18 +95,18 @@ LegacyRequest::~LegacyRequest()
 {
 }
 
-PassRefPtr<IDBAny> LegacyRequest::result(ExceptionCode& ec) const
+RefPtr<IDBAny> LegacyRequest::result(ExceptionCode& ec) const
 {
-    if (m_readyState != DONE) {
+    if (m_readyState != IDBRequestReadyState::Done) {
         ec = IDBDatabaseException::InvalidStateError;
         return 0;
     }
     return m_result;
 }
 
-PassRefPtr<DOMError> LegacyRequest::error(ExceptionCode& ec) const
+RefPtr<DOMError> LegacyRequest::error(ExceptionCode& ec) const
 {
-    if (m_readyState != DONE) {
+    if (m_readyState != IDBRequestReadyState::Done) {
         ec = IDBDatabaseException::InvalidStateError;
         return 0;
     }
@@ -116,30 +115,30 @@ PassRefPtr<DOMError> LegacyRequest::error(ExceptionCode& ec) const
 
 unsigned short LegacyRequest::errorCode(ExceptionCode& ec) const
 {
-    if (m_readyState != DONE) {
+    if (m_readyState != IDBRequestReadyState::Done) {
         ec = IDBDatabaseException::InvalidStateError;
         return 0;
     }
     return m_errorCode;
 }
 
-PassRefPtr<IDBAny> LegacyRequest::source() const
+RefPtr<IDBAny> LegacyRequest::source() const
 {
     return m_source;
 }
 
-PassRefPtr<IDBTransaction> LegacyRequest::transaction() const
+RefPtr<IDBTransaction> LegacyRequest::transaction() const
 {
     return m_transaction;
 }
 
 const String& LegacyRequest::readyState() const
 {
-    ASSERT(m_readyState == PENDING || m_readyState == DONE);
+    ASSERT(m_readyState == IDBRequestReadyState::Pending || m_readyState == IDBRequestReadyState::Done);
     DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, pending, ("pending", AtomicString::ConstructFromLiteral));
     DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, done, ("done", AtomicString::ConstructFromLiteral));
 
-    if (m_readyState == PENDING)
+    if (m_readyState == IDBRequestReadyState::Pending)
         return pending;
 
     return done;
@@ -147,8 +146,8 @@ const String& LegacyRequest::readyState() const
 
 void LegacyRequest::markEarlyDeath()
 {
-    ASSERT(m_readyState == PENDING);
-    m_readyState = EarlyDeath;
+    ASSERT(m_readyState == IDBRequestReadyState::Pending);
+    m_readyState = IDBRequestReadyState::DeprecatedEarlyDeath;
     if (m_transaction)
         m_transaction->unregisterRequest(this);
 }
@@ -158,8 +157,8 @@ void LegacyRequest::abort()
     ASSERT(!m_requestAborted);
     if (m_contextStopped || !scriptExecutionContext())
         return;
-    ASSERT(m_readyState == PENDING || m_readyState == DONE);
-    if (m_readyState == DONE)
+    ASSERT(m_readyState == IDBRequestReadyState::Pending || m_readyState == IDBRequestReadyState::Done);
+    if (m_readyState == IDBRequestReadyState::Done)
         return;
 
     // Enqueued events may be the only reference to this object.
@@ -182,7 +181,7 @@ void LegacyRequest::abort()
 
 void LegacyRequest::setCursorDetails(IndexedDB::CursorType cursorType, IndexedDB::CursorDirection direction)
 {
-    ASSERT(m_readyState == PENDING);
+    ASSERT(m_readyState == IDBRequestReadyState::Pending);
     ASSERT(!m_pendingCursor);
     m_cursorType = cursorType;
     m_cursorDirection = direction;
@@ -190,7 +189,7 @@ void LegacyRequest::setCursorDetails(IndexedDB::CursorType cursorType, IndexedDB
 
 void LegacyRequest::setPendingCursor(PassRefPtr<LegacyCursor> cursor)
 {
-    ASSERT(m_readyState == DONE);
+    ASSERT(m_readyState == IDBRequestReadyState::Done);
     ASSERT(scriptExecutionContext());
     ASSERT(m_transaction);
     ASSERT(!m_pendingCursor);
@@ -198,7 +197,7 @@ void LegacyRequest::setPendingCursor(PassRefPtr<LegacyCursor> cursor)
 
     m_pendingCursor = cursor;
     m_result = nullptr;
-    m_readyState = PENDING;
+    m_readyState = IDBRequestReadyState::Pending;
     m_errorCode = 0;
     m_error = nullptr;
     m_errorMessage = String();
@@ -218,7 +217,7 @@ RefPtr<LegacyCursor> LegacyRequest::getResultCursor()
 
 void LegacyRequest::setResultCursor(PassRefPtr<LegacyCursor> cursor, PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, const Deprecated::ScriptValue& value)
 {
-    ASSERT(m_readyState == PENDING);
+    ASSERT(m_readyState == IDBRequestReadyState::Pending);
     m_cursorKey = key;
     m_cursorPrimaryKey = primaryKey;
     m_cursorValue = value;
@@ -234,7 +233,7 @@ void LegacyRequest::setResultCursor(PassRefPtr<LegacyCursor> cursor, PassRefPtr<
 void LegacyRequest::finishCursor()
 {
     m_cursorFinished = true;
-    if (m_readyState != PENDING)
+    if (m_readyState != IDBRequestReadyState::Pending)
         m_hasPendingActivity = false;
 }
 
@@ -242,10 +241,10 @@ bool LegacyRequest::shouldEnqueueEvent() const
 {
     if (m_contextStopped || !scriptExecutionContext())
         return false;
-    ASSERT(m_readyState == PENDING || m_readyState == DONE);
+    ASSERT(m_readyState == IDBRequestReadyState::Pending || m_readyState == IDBRequestReadyState::Done);
     if (m_requestAborted)
         return false;
-    ASSERT(m_readyState == PENDING);
+    ASSERT(m_readyState == IDBRequestReadyState::Pending);
     ASSERT(!m_errorCode && m_errorMessage.isNull() && !m_error && !m_result);
     return true;
 }
@@ -296,7 +295,7 @@ void LegacyRequest::onSuccess(PassRefPtr<IDBCursorBackend> prpBackend)
     RefPtr<LegacyCursor> cursor;
     switch (m_cursorType) {
     case IndexedDB::CursorType::KeyOnly:
-        cursor = LegacyCursor::create(backend.release(), m_cursorDirection, this, m_source.get(), m_transaction.get());
+        cursor = LegacyCursor::create(backend.get(), m_cursorDirection, this, m_source.get(), m_transaction.get());
         break;
     case IndexedDB::CursorType::KeyAndValue:
         cursor = LegacyCursorWithValue::create(backend.release(), m_cursorDirection, this, m_source.get(), m_transaction.get());
@@ -448,7 +447,7 @@ void LegacyRequest::stop()
 
     m_contextStopped = true;
     m_requestState.clear();
-    if (m_readyState == PENDING)
+    if (m_readyState == IDBRequestReadyState::Pending)
         markEarlyDeath();
 }
 
@@ -470,18 +469,18 @@ EventTargetInterface LegacyRequest::eventTargetInterface() const
 bool LegacyRequest::dispatchEvent(PassRefPtr<Event> event)
 {
     LOG(StorageAPI, "LegacyRequest::dispatchEvent");
-    ASSERT(m_readyState == PENDING);
+    ASSERT(m_readyState == IDBRequestReadyState::Pending);
     ASSERT(!m_contextStopped);
     ASSERT(m_hasPendingActivity);
     ASSERT(m_enqueuedEvents.size());
     ASSERT(scriptExecutionContext());
     ASSERT(event->target() == this);
-    ASSERT_WITH_MESSAGE(m_readyState < DONE, "When dispatching event %s, m_readyState < DONE(%d), was %d", event->type().string().utf8().data(), DONE, m_readyState);
+    ASSERT_WITH_MESSAGE(m_readyState < IDBRequestReadyState::Done, "When dispatching event %s, m_readyState < DONE(%d), was %d", event->type().string().utf8().data(), IDBRequestReadyState::Done, m_readyState);
 
     DOMRequestState::Scope scope(m_requestState);
 
     if (event->type() != eventNames().blockedEvent)
-        m_readyState = DONE;
+        m_readyState = IDBRequestReadyState::Done;
 
     for (size_t i = 0; i < m_enqueuedEvents.size(); ++i) {
         if (m_enqueuedEvents[i].get() == event.get())
@@ -524,7 +523,7 @@ bool LegacyRequest::dispatchEvent(PassRefPtr<Event> event)
     bool dontPreventDefault = IDBEventDispatcher::dispatch(event.get(), targets);
 
     if (m_transaction) {
-        if (m_readyState == DONE)
+        if (m_readyState == IDBRequestReadyState::Done)
             m_transaction->unregisterRequest(this);
 
         // Possibly abort the transaction. This must occur after unregistering (so this request
@@ -542,7 +541,7 @@ bool LegacyRequest::dispatchEvent(PassRefPtr<Event> event)
     if (cursorToNotify)
         cursorToNotify->postSuccessHandlerCallback();
 
-    if (m_readyState == DONE && (!cursorToNotify || m_cursorFinished) && event->type() != eventNames().upgradeneededEvent)
+    if (m_readyState == IDBRequestReadyState::Done && (!cursorToNotify || m_cursorFinished) && event->type() != eventNames().upgradeneededEvent)
         m_hasPendingActivity = false;
 
     return dontPreventDefault;
@@ -560,20 +559,20 @@ void LegacyRequest::transactionDidFinishAndDispatch()
 {
     ASSERT(m_transaction);
     ASSERT(m_transaction->isVersionChange());
-    ASSERT(m_readyState == DONE);
+    ASSERT(m_readyState == IDBRequestReadyState::Done);
     ASSERT(scriptExecutionContext());
     m_transaction = nullptr;
-    m_readyState = PENDING;
+    m_readyState = IDBRequestReadyState::Pending;
 }
 
 void LegacyRequest::enqueueEvent(PassRefPtr<Event> event)
 {
-    ASSERT(m_readyState == PENDING || m_readyState == DONE);
+    ASSERT(m_readyState == IDBRequestReadyState::Pending || m_readyState == IDBRequestReadyState::Done);
 
     if (m_contextStopped || !scriptExecutionContext())
         return;
 
-    ASSERT_WITH_MESSAGE(m_readyState == PENDING || m_didFireUpgradeNeededEvent, "When queueing event %s, m_readyState was %d", event->type().string().utf8().data(), m_readyState);
+    ASSERT_WITH_MESSAGE(m_readyState == IDBRequestReadyState::Pending || m_didFireUpgradeNeededEvent, "When queueing event %s, m_readyState was %d", event->type().string().utf8().data(), m_readyState);
 
     event->setTarget(this);
 

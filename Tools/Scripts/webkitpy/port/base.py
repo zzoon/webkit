@@ -853,6 +853,9 @@ class Port(object):
 
         return clean_env
 
+    def _clear_global_caches_and_temporary_files(self):
+        pass
+
     @staticmethod
     def _append_value_colon_separated(env, name, value):
         assert ":" not in value
@@ -1151,8 +1154,8 @@ class Port(object):
     def _driver_tempdir(self):
         return self._filesystem.mkdtemp(prefix='%s-' % self.driver_name())
 
-    def _driver_tempdir_for_environment(self):
-        return self._driver_tempdir()
+    def remove_cache_directory(self, name):
+        pass
 
     def _path_to_webcore_library(self):
         """Returns the full path to a built copy of WebCore."""

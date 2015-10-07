@@ -28,7 +28,6 @@
 #include "JSEventListener.h"
 #include "JSNode.h"
 #include "Node.h"
-#include "TestEventTarget.h"
 #include "wtf/text/AtomicString.h"
 #include <runtime/Error.h>
 #include <runtime/PropertyNameArray.h>
@@ -77,14 +76,14 @@ private:
 class JSTestEventTargetConstructor : public DOMConstructorObject {
 private:
     JSTestEventTargetConstructor(JSC::Structure*, JSDOMGlobalObject*);
-    void finishCreation(JSC::VM&, JSDOMGlobalObject*);
+    void finishCreation(JSC::VM&, JSDOMGlobalObject&);
 
 public:
     typedef DOMConstructorObject Base;
     static JSTestEventTargetConstructor* create(JSC::VM& vm, JSC::Structure* structure, JSDOMGlobalObject* globalObject)
     {
         JSTestEventTargetConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestEventTargetConstructor>(vm.heap)) JSTestEventTargetConstructor(structure, globalObject);
-        ptr->finishCreation(vm, globalObject);
+        ptr->finishCreation(vm, *globalObject);
         return ptr;
     }
 
@@ -112,15 +111,15 @@ static const HashTable JSTestEventTargetTable = { 1, 1, true, JSTestEventTargetT
 const ClassInfo JSTestEventTargetConstructor::s_info = { "TestEventTargetConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestEventTargetConstructor) };
 
 JSTestEventTargetConstructor::JSTestEventTargetConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
-    : DOMConstructorObject(structure, globalObject)
+    : Base(structure, globalObject)
 {
 }
 
-void JSTestEventTargetConstructor::finishCreation(VM& vm, JSDOMGlobalObject* globalObject)
+void JSTestEventTargetConstructor::finishCreation(VM& vm, JSDOMGlobalObject& globalObject)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(info()));
-    putDirect(vm, vm.propertyNames->prototype, JSTestEventTarget::getPrototype(vm, globalObject), DontDelete | ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->prototype, JSTestEventTarget::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("TestEventTarget"))), ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
@@ -146,8 +145,7 @@ void JSTestEventTargetPrototype::finishCreation(VM& vm)
 const ClassInfo JSTestEventTarget::s_info = { "TestEventTarget", &Base::s_info, &JSTestEventTargetTable, CREATE_METHOD_TABLE(JSTestEventTarget) };
 
 JSTestEventTarget::JSTestEventTarget(Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestEventTarget>&& impl)
-    : JSDOMWrapper(structure, globalObject)
-    , m_impl(&impl.leakRef())
+    : JSDOMWrapperWithImplementation<TestEventTarget>(structure, globalObject, WTF::move(impl))
 {
 }
 
@@ -165,11 +163,6 @@ void JSTestEventTarget::destroy(JSC::JSCell* cell)
 {
     JSTestEventTarget* thisObject = static_cast<JSTestEventTarget*>(cell);
     thisObject->JSTestEventTarget::~JSTestEventTarget();
-}
-
-JSTestEventTarget::~JSTestEventTarget()
-{
-    releaseImpl();
 }
 
 bool JSTestEventTarget::getOwnPropertySlot(JSObject* object, ExecState* state, PropertyName propertyName, PropertySlot& slot)
@@ -233,6 +226,10 @@ void JSTestEventTarget::getOwnPropertyNames(JSObject* object, ExecState* state, 
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     for (unsigned i = 0, count = thisObject->impl().length(); i < count; ++i)
         propertyNames.add(Identifier::from(state, i));
+    if (mode.includeDontEnumProperties()) {
+        for (auto& propertyName : thisObject->impl().supportedPropertyNames())
+            propertyNames.add(Identifier::fromString(state, propertyName));
+    }
     Base::getOwnPropertyNames(thisObject, state, propertyNames, mode);
 }
 
@@ -316,20 +313,20 @@ void JSTestEventTarget::visitChildren(JSCell* cell, SlotVisitor& visitor)
     thisObject->impl().visitJSEventListeners(visitor);
 }
 
-bool JSTestEventTargetOwner::isReachableFromOpaqueRoots(JSC::JSCell& cell, void*, SlotVisitor& visitor)
+bool JSTestEventTargetOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handle, void*, SlotVisitor& visitor)
 {
-    auto& jsTestEventTarget = jsCast<JSTestEventTarget&>(cell);
-    if (jsTestEventTarget.impl().isFiringEventListeners())
+    auto* jsTestEventTarget = jsCast<JSTestEventTarget*>(handle.slot()->asCell());
+    if (jsTestEventTarget->impl().isFiringEventListeners())
         return true;
     UNUSED_PARAM(visitor);
     return false;
 }
 
-void JSTestEventTargetOwner::finalize(JSC::JSCell*& cell, void* context)
+void JSTestEventTargetOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
 {
-    auto& wrapper = jsCast<JSTestEventTarget&>(*cell);
+    auto* jsTestEventTarget = jsCast<JSTestEventTarget*>(handle.slot()->asCell());
     auto& world = *static_cast<DOMWrapperWorld*>(context);
-    uncacheWrapper(world, &wrapper.impl(), &wrapper);
+    uncacheWrapper(world, &jsTestEventTarget->impl(), jsTestEventTarget);
 }
 
 #if ENABLE(BINDING_INTEGRITY)

@@ -34,9 +34,6 @@
 #include "JSAudioTrackCustom.cpp"
 #include "JSAudioTrackListCustom.cpp"
 #include "JSBlobCustom.cpp"
-#if ENABLE(STREAMS_API)
-#include "JSCountQueuingStrategyCustom.cpp"
-#endif
 #include "JSCSSRuleCustom.cpp"
 #include "JSCSSRuleListCustom.cpp"
 #include "JSCSSStyleDeclarationCustom.cpp"
@@ -109,6 +106,7 @@
 #include "JSMessageChannelCustom.cpp"
 #include "JSMessageEventCustom.cpp"
 #include "JSMessagePortCustom.cpp"
+#include "JSModuleLoader.cpp"
 #include "JSMutationCallback.cpp"
 #include "JSMutationObserverCustom.cpp"
 #include "JSNamedNodeMapCustom.cpp"
@@ -119,12 +117,7 @@
 #include "JSNodeOrString.cpp"
 #include "JSPluginElementFunctions.cpp"
 #include "JSPopStateEventCustom.cpp"
-#if ENABLE(STREAMS_API)
-#include "JSReadableStreamControllerCustom.cpp"
-#include "JSReadableStreamCustom.cpp"
-#include "JSReadableStreamReaderCustom.cpp"
-#include "ReadableJSStream.cpp"
-#endif
+#include "JSReadableStreamPrivateConstructors.cpp"
 #include "JSSQLResultSetRowListCustom.cpp"
 #include "JSSQLTransactionCustom.cpp"
 #include "JSSVGLengthCustom.cpp"

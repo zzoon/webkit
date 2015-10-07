@@ -32,7 +32,6 @@
 #include "ContextMenuController.h"
 #include "DatabaseProvider.h"
 #include "DocumentMarkerController.h"
-#include "DocumentStyleSheetCollection.h"
 #include "DragController.h"
 #include "Editor.h"
 #include "EditorClient.h"
@@ -40,6 +39,7 @@
 #include "EventNames.h"
 #include "ExceptionCode.h"
 #include "ExceptionCodePlaceholder.h"
+#include "ExtensionStyleSheets.h"
 #include "FileSystem.h"
 #include "FocusController.h"
 #include "FrameLoader.h"
@@ -50,6 +50,7 @@
 #include "HTMLElement.h"
 #include "HistoryController.h"
 #include "HistoryItem.h"
+#include "IDBConnectionToServer.h"
 #include "InspectorController.h"
 #include "InspectorInstrumentation.h"
 #include "Logging.h"
@@ -111,6 +112,10 @@
 
 #if ENABLE(MEDIA_SESSION)
 #include "MediaSessionManager.h"
+#endif
+
+#if ENABLE(INDEXED_DATABASE)
+#include "InProcessIDBServer.h"
 #endif
 
 namespace WebCore {
@@ -1013,7 +1018,7 @@ void Page::userStyleSheetLocationChanged()
 
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (frame->document())
-            frame->document()->styleSheetCollection().updatePageUserSheet();
+            frame->document()->extensionStyleSheets().updatePageUserSheet();
     }
 }
 
@@ -1631,7 +1636,7 @@ void Page::setUserContentController(UserContentController* userContentController
 
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (Document *document = frame->document()) {
-            document->styleSheetCollection().invalidateInjectedStyleSheetCache();
+            document->extensionStyleSheets().invalidateInjectedStyleSheetCache();
             document->styleResolverChanged(DeferRecalcStyle);
         }
     }
@@ -1755,6 +1760,21 @@ void Page::setAllowsMediaDocumentInlinePlayback(bool flag)
 
     for (auto& document : documents)
         document->allowsMediaDocumentInlinePlaybackChanged();
+}
+#endif
+
+#if ENABLE(INDEXED_DATABASE)
+IDBClient::IDBConnectionToServer& Page::idbConnection()
+{
+    if (!m_idbIDBConnectionToServer) {
+        if (usesEphemeralSession()) {
+            auto inProcessServer = InProcessIDBServer::create();
+            m_idbIDBConnectionToServer = &inProcessServer->connectionToServer();
+        } else
+            m_idbIDBConnectionToServer = &databaseProvider().idbConnectionToServerForSession(m_sessionID);
+    }
+    
+    return *m_idbIDBConnectionToServer;
 }
 #endif
 

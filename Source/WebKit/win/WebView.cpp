@@ -1119,21 +1119,9 @@ void WebView::paint(HDC dc, LPARAM options)
 {
     LOCAL_GDI_COUNTER(0, __FUNCTION__);
 
-    if (isAcceleratedCompositing() && !usesLayeredWindow()) {
-#if USE(CA)
-        m_layerTreeHost->flushPendingLayerChangesNow();
-#elif USE(TEXTURE_MAPPER_GL)
-        m_acceleratedCompositingContext->flushAndRenderLayers();
-#endif
-        // Flushing might have taken us out of compositing mode.
-        if (isAcceleratedCompositing()) {
-#if USE(CA)
-            // FIXME: We need to paint into dc (if provided). <http://webkit.org/b/52578>
-            m_layerTreeHost->paint();
-#endif
-            ::ValidateRect(m_viewWindow, 0);
-            return;
-        }
+    if (paintCompositedContentToHDC(dc)) {
+        ::ValidateRect(m_viewWindow, nullptr);
+        return;
     }
 
     Frame* coreFrame = core(m_mainFrame);
@@ -3711,15 +3699,15 @@ HRESULT WebView::rectsForTextMatches(_COM_Outptr_opt_ IEnumTextMatches** pmatche
     do {
         if (Document* document = frame->document()) {
             IntRect visibleRect = frame->view()->visibleContentRect();
-            Vector<IntRect> frameRects = document->markers().renderedRectsForMarkers(DocumentMarker::TextMatch);
+            Vector<FloatRect> frameRects = document->markers().renderedRectsForMarkers(DocumentMarker::TextMatch);
             IntPoint frameOffset(-frame->view()->scrollOffset().width(), -frame->view()->scrollOffset().height());
             frameOffset = frame->view()->convertToContainingWindow(frameOffset);
 
-            Vector<IntRect>::iterator end = frameRects.end();
-            for (Vector<IntRect>::iterator it = frameRects.begin(); it < end; it++) {
+            Vector<FloatRect>::iterator end = frameRects.end();
+            for (Vector<FloatRect>::iterator it = frameRects.begin(); it < end; it++) {
                 it->intersect(visibleRect);
                 it->move(frameOffset.x(), frameOffset.y());
-                allRects.append(*it);
+                allRects.append(enclosingIntRect(*it));
             }
         }
         frame = incrementFrame(frame, true, false);
@@ -4935,7 +4923,7 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
     settings.setShouldDisplayTextDescriptions(enabled);
 #endif
 
-    COMPtr<IWebPreferencesPrivate2> prefsPrivate(Query, preferences);
+    COMPtr<IWebPreferencesPrivate3> prefsPrivate(Query, preferences);
     if (prefsPrivate) {
         hr = prefsPrivate->localStorageDatabasePath(&str);
         if (FAILED(hr))
@@ -5180,6 +5168,11 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
     if (FAILED(hr))
         return hr;
     settings.setShowRepaintCounter(enabled);
+
+    hr = prefsPrivate->showTiledScrollingIndicator(&enabled);
+    if (FAILED(hr))
+        return hr;
+    settings.setShowTiledScrollingIndicator(!!enabled);
 
 #if ENABLE(WEB_AUDIO)
     settings.setWebAudioEnabled(true);
@@ -6138,6 +6131,28 @@ HRESULT WebView::windowAncestryDidChange()
     return S_OK;
 }
 
+bool WebView::paintCompositedContentToHDC(HDC deviceContext)
+{
+    if (!isAcceleratedCompositing() || usesLayeredWindow())
+        return false;
+
+#if USE(CA)
+    m_layerTreeHost->flushPendingLayerChangesNow();
+#elif USE(TEXTURE_MAPPER_GL)
+    m_acceleratedCompositingContext->flushAndRenderLayers();
+#endif
+
+    // Flushing might have taken us out of compositing mode.
+    if (!isAcceleratedCompositing())
+        return false;
+
+#if USE(CA)
+    m_layerTreeHost->paint(deviceContext);
+#endif
+
+    return true;
+}
+
 HRESULT WebView::paintDocumentRectToContext(RECT rect, _In_ HDC deviceContext)
 {
     if (!deviceContext)
@@ -6145,6 +6160,9 @@ HRESULT WebView::paintDocumentRectToContext(RECT rect, _In_ HDC deviceContext)
 
     if (!m_mainFrame)
         return E_UNEXPECTED;
+
+    if (paintCompositedContentToHDC(deviceContext))
+        return S_OK;
 
     return m_mainFrame->paintDocumentRectToContext(rect, deviceContext);
 }
@@ -6156,6 +6174,9 @@ HRESULT WebView::paintScrollViewRectToContextAtPoint(RECT rect, POINT pt, _In_ H
 
     if (!m_mainFrame)
         return E_UNEXPECTED;
+
+    if (paintCompositedContentToHDC(deviceContext))
+        return S_OK;
 
     return m_mainFrame->paintScrollViewRectToContextAtPoint(rect, pt, deviceContext);
 }
@@ -6817,6 +6838,7 @@ void WebView::setAcceleratedCompositing(bool accelerated)
             m_layerTreeHost->setClient(this);
             ASSERT(m_viewWindow);
             m_layerTreeHost->setWindow(m_viewWindow);
+            m_layerTreeHost->setPage(page());
 
             // FIXME: We could perhaps get better performance by never allowing this layer to
             // become tiled (or choosing a higher-than-normal tiling threshold).

@@ -173,7 +173,11 @@ public:
             for (Node* node : *block) {
                 switch (node->op()) {
                 case CallVarargs:
+                case TailCallVarargs:
+                case TailCallVarargsInlinedCaller:
                 case CallForwardVarargs:
+                case TailCallForwardVarargs:
+                case TailCallForwardVarargsInlinedCaller:
                 case ConstructVarargs:
                 case ConstructForwardVarargs:
                     hasVarargs = true;
@@ -723,11 +727,19 @@ private:
             compileLogicalNot();
             break;
         case Call:
+        case TailCallInlinedCaller:
         case Construct:
             compileCallOrConstruct();
             break;
+        case TailCall:
+            compileTailCall();
+            break;
         case CallVarargs:
         case CallForwardVarargs:
+        case TailCallVarargs:
+        case TailCallVarargsInlinedCaller:
+        case TailCallForwardVarargs:
+        case TailCallForwardVarargsInlinedCaller:
         case ConstructVarargs:
         case ConstructForwardVarargs:
             compileCallOrConstructVarargs();
@@ -2026,21 +2038,57 @@ private:
     
     void compileCheckStructure()
     {
-        LValue cell = lowCell(m_node->child1());
-        
         ExitKind exitKind;
         if (m_node->child1()->hasConstant())
             exitKind = BadConstantCache;
         else
             exitKind = BadCache;
-        
-        LValue structureID = m_out.load32(cell, m_heaps.JSCell_structureID);
-        
-        checkStructure(
-            structureID, jsValueValue(cell), exitKind, m_node->structureSet(),
-            [this] (Structure* structure) {
-                return weakStructureID(structure);
-            });
+
+        switch (m_node->child1().useKind()) {
+        case CellUse:
+        case KnownCellUse: {
+            LValue cell = lowCell(m_node->child1());
+            
+            checkStructure(
+                m_out.load32(cell, m_heaps.JSCell_structureID), jsValueValue(cell),
+                exitKind, m_node->structureSet(),
+                [&] (Structure* structure) {
+                    return weakStructureID(structure);
+                });
+            return;
+        }
+
+        case CellOrOtherUse: {
+            LValue value = lowJSValue(m_node->child1(), ManualOperandSpeculation);
+
+            LBasicBlock cellCase = FTL_NEW_BLOCK(m_out, ("CheckStructure CellOrOtherUse cell case"));
+            LBasicBlock notCellCase = FTL_NEW_BLOCK(m_out, ("CheckStructure CellOrOtherUse not cell case"));
+            LBasicBlock continuation = FTL_NEW_BLOCK(m_out, ("CheckStructure CellOrOtherUse continuation"));
+
+            m_out.branch(
+                isCell(value, provenType(m_node->child1())), unsure(cellCase), unsure(notCellCase));
+
+            LBasicBlock lastNext = m_out.appendTo(cellCase, notCellCase);
+            checkStructure(
+                m_out.load32(value, m_heaps.JSCell_structureID), jsValueValue(value),
+                exitKind, m_node->structureSet(),
+                [&] (Structure* structure) {
+                    return weakStructureID(structure);
+                });
+            m_out.jump(continuation);
+
+            m_out.appendTo(notCellCase, continuation);
+            FTL_TYPE_CHECK(jsValueValue(value), m_node->child1(), SpecCell | SpecOther, isNotOther(value));
+            m_out.jump(continuation);
+
+            m_out.appendTo(continuation, lastNext);
+            return;
+        }
+
+        default:
+            DFG_CRASH(m_graph, m_node, "Bad use kind");
+            return;
+        }
     }
     
     void compileCheckCell()
@@ -4022,6 +4070,8 @@ private:
             m_out.appendTo(blocks[i], i + 1 < data.variants.size() ? blocks[i + 1] : exit);
             
             PutByIdVariant variant = data.variants[i];
+
+            checkInferredType(m_node->child2(), value, variant.requiredType());
             
             LValue storage;
             if (variant.kind() == PutByIdVariant::Replace) {
@@ -4152,6 +4202,7 @@ private:
             || m_node->isBinaryUseKind(DoubleRepUse)
             || m_node->isBinaryUseKind(ObjectUse)
             || m_node->isBinaryUseKind(BooleanUse)
+            || m_node->isBinaryUseKind(SymbolUse)
             || m_node->isBinaryUseKind(StringIdentUse)) {
             compileCompareStrictEq();
             return;
@@ -4242,6 +4293,15 @@ private:
         if (m_node->isBinaryUseKind(BooleanUse)) {
             setBoolean(
                 m_out.equal(lowBoolean(m_node->child1()), lowBoolean(m_node->child2())));
+            return;
+        }
+
+        if (m_node->isBinaryUseKind(SymbolUse)) {
+            LValue left = lowSymbol(m_node->child1());
+            LValue right = lowSymbol(m_node->child2());
+            LValue leftStringImpl = m_out.loadPtr(left, m_heaps.Symbol_privateName);
+            LValue rightStringImpl = m_out.loadPtr(right, m_heaps.Symbol_privateName);
+            setBoolean(m_out.equal(leftStringImpl, rightStringImpl));
             return;
         }
         
@@ -4362,6 +4422,41 @@ private:
         
         setJSValue(call);
     }
+
+    void compileTailCall()
+    {
+        int numArgs = m_node->numChildren() - 1;
+        ExitArgumentList exitArguments;
+        exitArguments.reserveCapacity(numArgs + 6);
+
+        unsigned stackmapID = m_stackmapIDs++;
+        exitArguments.append(lowJSValue(m_graph.varArgChild(m_node, 0)));
+        exitArguments.append(m_tagTypeNumber);
+
+        Vector<ExitValue> callArguments(numArgs);
+
+        bool needsTagTypeNumber { false };
+        for (int i = 0; i < numArgs; ++i) {
+            callArguments[i] =
+                exitValueForTailCall(exitArguments, m_graph.varArgChild(m_node, 1 + i).node());
+            if (callArguments[i].dataFormat() == DataFormatInt32)
+                needsTagTypeNumber = true;
+        }
+
+        JSTailCall tailCall(stackmapID, m_node, WTF::move(callArguments));
+
+        exitArguments.insert(0, m_out.constInt32(needsTagTypeNumber ? 2 : 1));
+        exitArguments.insert(0, constNull(m_out.ref8));
+        exitArguments.insert(0, m_out.constInt32(tailCall.estimatedSize()));
+        exitArguments.insert(0, m_out.constInt64(stackmapID));
+
+        LValue call =
+            m_out.call(m_out.patchpointVoidIntrinsic(), exitArguments);
+        setInstructionCallingConvention(call, LLVMAnyRegCallConv);
+        m_out.unreachable();
+
+        m_ftlState.jsTailCalls.append(tailCall);
+    }
     
     void compileCallOrConstructVarargs()
     {
@@ -4372,10 +4467,14 @@ private:
         
         switch (m_node->op()) {
         case CallVarargs:
+        case TailCallVarargs:
+        case TailCallVarargsInlinedCaller:
         case ConstructVarargs:
             jsArguments = lowJSValue(m_node->child2());
             break;
         case CallForwardVarargs:
+        case TailCallForwardVarargs:
+        case TailCallForwardVarargsInlinedCaller:
         case ConstructForwardVarargs:
             break;
         default:
@@ -4402,8 +4501,16 @@ private:
         setInstructionCallingConvention(call, LLVMCCallConv);
         
         m_ftlState.jsCallVarargses.append(JSCallVarargs(stackmapID, m_node));
-        
-        setJSValue(call);
+
+        switch (m_node->op()) {
+        case TailCallVarargs:
+        case TailCallForwardVarargs:
+            m_out.unreachable();
+            break;
+
+        default:
+            setJSValue(call);
+        }
     }
     
     void compileLoadVarargs()
@@ -5673,6 +5780,135 @@ private:
         
         m_out.appendTo(continuation, lastNext);
         return m_out.phi(m_out.int32, results);
+    }
+
+    void checkInferredType(Edge edge, LValue value, const InferredType::Descriptor& type)
+    {
+        // This cannot use FTL_TYPE_CHECK or typeCheck() because it is called partially, as in a node like:
+        //
+        //     MultiPutByOffset(...)
+        //
+        // may be lowered to:
+        //
+        //     switch (object->structure) {
+        //     case 42:
+        //         checkInferredType(..., type1);
+        //         ...
+        //         break;
+        //     case 43:
+        //         checkInferredType(..., type2);
+        //         ...
+        //         break;
+        //     }
+        //
+        // where type1 and type2 are different. Using typeCheck() would mean that the edge would be
+        // filtered by type1 & type2, instead of type1 | type2.
+        
+        switch (type.kind()) {
+        case InferredType::Bottom:
+            speculate(BadType, jsValueValue(value), edge.node(), m_out.booleanTrue);
+            return;
+
+        case InferredType::Boolean:
+            speculate(BadType, jsValueValue(value), edge.node(), isNotBoolean(value, provenType(edge)));
+            return;
+
+        case InferredType::Other:
+            speculate(BadType, jsValueValue(value), edge.node(), isNotOther(value, provenType(edge)));
+            return;
+
+        case InferredType::Int32:
+            speculate(BadType, jsValueValue(value), edge.node(), isNotInt32(value, provenType(edge)));
+            return;
+
+        case InferredType::Number:
+            speculate(BadType, jsValueValue(value), edge.node(), isNotNumber(value, provenType(edge)));
+            return;
+
+        case InferredType::String:
+            speculate(BadType, jsValueValue(value), edge.node(), isNotCell(value, provenType(edge)));
+            speculate(BadType, jsValueValue(value), edge.node(), isNotString(value, provenType(edge)));
+            return;
+
+        case InferredType::ObjectWithStructure:
+            speculate(BadType, jsValueValue(value), edge.node(), isNotCell(value, provenType(edge)));
+            if (!abstractValue(edge).m_structure.isSubsetOf(StructureSet(type.structure()))) {
+                speculate(
+                    BadType, jsValueValue(value), edge.node(),
+                    m_out.notEqual(
+                        m_out.load32(value, m_heaps.JSCell_structureID),
+                        weakStructureID(type.structure())));
+            }
+            return;
+
+        case InferredType::ObjectWithStructureOrOther: {
+            LBasicBlock cellCase = FTL_NEW_BLOCK(m_out, ("checkInferredType ObjectWithStructureOrOther cell case"));
+            LBasicBlock notCellCase = FTL_NEW_BLOCK(m_out, ("checkInferredType ObjectWithStructureOrOther not cell case"));
+            LBasicBlock continuation = FTL_NEW_BLOCK(m_out, ("checkInferredType ObjectWithStructureOrOther continuation"));
+
+            m_out.branch(isCell(value, provenType(edge)), unsure(cellCase), unsure(notCellCase));
+
+            LBasicBlock lastNext = m_out.appendTo(cellCase, notCellCase);
+
+            if (!abstractValue(edge).m_structure.isSubsetOf(StructureSet(type.structure()))) {
+                speculate(
+                    BadType, jsValueValue(value), edge.node(),
+                    m_out.notEqual(
+                        m_out.load32(value, m_heaps.JSCell_structureID),
+                        weakStructureID(type.structure())));
+            }
+
+            m_out.jump(continuation);
+
+            m_out.appendTo(notCellCase, continuation);
+
+            speculate(
+                BadType, jsValueValue(value), edge.node(),
+                isNotOther(value, provenType(edge) & ~SpecCell));
+
+            m_out.jump(continuation);
+
+            m_out.appendTo(continuation, lastNext);
+            return;
+        }
+
+        case InferredType::Object:
+            speculate(BadType, jsValueValue(value), edge.node(), isNotCell(value, provenType(edge)));
+            speculate(BadType, jsValueValue(value), edge.node(), isNotObject(value, provenType(edge)));
+            return;
+
+        case InferredType::ObjectOrOther: {
+            LBasicBlock cellCase = FTL_NEW_BLOCK(m_out, ("checkInferredType ObjectOrOther cell case"));
+            LBasicBlock notCellCase = FTL_NEW_BLOCK(m_out, ("checkInferredType ObjectOrOther not cell case"));
+            LBasicBlock continuation = FTL_NEW_BLOCK(m_out, ("checkInferredType ObjectOrOther continuation"));
+
+            m_out.branch(isCell(value, provenType(edge)), unsure(cellCase), unsure(notCellCase));
+
+            LBasicBlock lastNext = m_out.appendTo(cellCase, notCellCase);
+
+            speculate(
+                BadType, jsValueValue(value), edge.node(),
+                isNotObject(value, provenType(edge) & SpecCell));
+
+            m_out.jump(continuation);
+
+            m_out.appendTo(notCellCase, continuation);
+
+            speculate(
+                BadType, jsValueValue(value), edge.node(),
+                isNotOther(value, provenType(edge) & ~SpecCell));
+
+            m_out.jump(continuation);
+
+            m_out.appendTo(continuation, lastNext);
+            return;
+        }
+
+        case InferredType::Top:
+            return;
+        }
+
+        DFG_CRASH(m_graph, m_node, "Bad inferred type");
     }
     
     LValue loadProperty(LValue storage, unsigned identifierNumber, PropertyOffset offset)
@@ -7514,6 +7750,9 @@ private:
         case CellUse:
             speculateCell(edge);
             break;
+        case CellOrOtherUse:
+            speculateCellOrOther(edge);
+            break;
         case KnownCellUse:
             ASSERT(!m_interpreter.needsTypeCheck(edge));
             break;
@@ -7592,6 +7831,22 @@ private:
     void speculateCell(Edge edge)
     {
         lowCell(edge);
+    }
+    
+    void speculateCellOrOther(Edge edge)
+    {
+        LValue value = lowJSValue(edge, ManualOperandSpeculation);
+
+        LBasicBlock isNotCell = FTL_NEW_BLOCK(m_out, ("Speculate CellOrOther not cell"));
+        LBasicBlock continuation = FTL_NEW_BLOCK(m_out, ("Speculate CellOrOther continuation"));
+
+        m_out.branch(isCell(value, provenType(edge)), unsure(continuation), unsure(isNotCell));
+
+        LBasicBlock lastNext = m_out.appendTo(isNotCell, continuation);
+        FTL_TYPE_CHECK(jsValueValue(value), edge, SpecCell | SpecOther, isNotOther(value));
+        m_out.jump(continuation);
+
+        m_out.appendTo(continuation, lastNext);
     }
     
     void speculateMachineInt(Edge edge)
@@ -8005,14 +8260,13 @@ private:
         return m_graph.masqueradesAsUndefinedWatchpointIsStillValid(m_node->origin.semantic);
     }
     
-    LValue loadMarkByte(LValue base)
+    LValue loadCellState(LValue base)
     {
-        return m_out.load8(base, m_heaps.JSCell_gcData);
+        return m_out.load8(base, m_heaps.JSCell_cellState);
     }
 
     void emitStoreBarrier(LValue base)
     {
-#if ENABLE(GGC)
         LBasicBlock isMarkedAndNotRemembered = FTL_NEW_BLOCK(m_out, ("Store barrier is marked block"));
         LBasicBlock bufferHasSpace = FTL_NEW_BLOCK(m_out, ("Store barrier buffer has space"));
         LBasicBlock bufferIsFull = FTL_NEW_BLOCK(m_out, ("Store barrier buffer is full"));
@@ -8020,7 +8274,7 @@ private:
 
         // Check the mark byte. 
         m_out.branch(
-            m_out.notZero8(loadMarkByte(base)), usually(continuation), rarely(isMarkedAndNotRemembered));
+            m_out.notZero8(loadCellState(base)), usually(continuation), rarely(isMarkedAndNotRemembered));
 
         // Append to the write barrier buffer.
         LBasicBlock lastNext = m_out.appendTo(isMarkedAndNotRemembered, bufferHasSpace);
@@ -8043,9 +8297,6 @@ private:
         m_out.jump(continuation);
 
         m_out.appendTo(continuation, lastNext);
-#else
-        UNUSED_PARAM(base);
-#endif
     }
 
     template<typename... Args>
@@ -8074,7 +8325,14 @@ private:
     }
     void callPreflight()
     {
-        callPreflight(m_node->origin.semantic);
+        CodeOrigin codeOrigin = m_node->origin.semantic;
+
+        if (m_node->op() == TailCallInlinedCaller
+            || m_node->op() == TailCallVarargsInlinedCaller
+            || m_node->op() == TailCallForwardVarargsInlinedCaller)
+            codeOrigin =*codeOrigin.inlineCallFrame->getCallerSkippingDeadFrames();
+
+        callPreflight(codeOrigin);
     }
     
     void callCheck()
@@ -8127,6 +8385,9 @@ private:
             }
         }
 
+        if (failCondition == m_out.booleanFalse)
+            return;
+
         ASSERT(m_ftlState.jitCode->osrExit.size() == m_ftlState.finalizer->osrExit.size());
         
         m_ftlState.jitCode->osrExit.append(OSRExit(
@@ -8135,8 +8396,13 @@ private:
             availabilityMap().m_locals.numberOfArguments(),
             availabilityMap().m_locals.numberOfLocals()));
         m_ftlState.finalizer->osrExit.append(OSRExitCompilationInfo());
-        
+
         OSRExit& exit = m_ftlState.jitCode->osrExit.last();
+
+        if (failCondition == m_out.booleanTrue) {
+            emitOSRExitCall(exit, lowValue);
+            return;
+        }
 
         LBasicBlock lastNext = nullptr;
         LBasicBlock continuation = nullptr;
@@ -8337,12 +8603,45 @@ private:
         DFG_CRASH(m_graph, m_node, toCString("Cannot find value for node: ", node).data());
         return ExitValue::dead();
     }
-    
+
     ExitValue exitArgument(ExitArgumentList& arguments, DataFormat format, LValue value)
     {
         ExitValue result = ExitValue::exitArgument(ExitArgument(format, arguments.size()));
         arguments.append(value);
         return result;
+    }
+
+    ExitValue exitValueForTailCall(ExitArgumentList& arguments, Node* node)
+    {
+        ASSERT(node->shouldGenerate());
+        ASSERT(node->hasResult());
+
+        switch (node->op()) {
+        case JSConstant:
+        case Int52Constant:
+        case DoubleConstant:
+            return ExitValue::constant(node->asJSValue());
+
+        default:
+            break;
+        }
+
+        LoweredNodeValue value = m_jsValueValues.get(node);
+        if (isValid(value))
+            return exitArgument(arguments, DataFormatJS, value.value());
+
+        value = m_int32Values.get(node);
+        if (isValid(value))
+            return exitArgument(arguments, DataFormatInt32, value.value());
+
+        value = m_booleanValues.get(node);
+        if (isValid(value)) {
+            LValue valueToPass = m_out.zeroExt(value.value(), m_out.int32);
+            return exitArgument(arguments, DataFormatBoolean, valueToPass);
+        }
+
+        // Doubles and Int52 have been converted by ValueRep()
+        DFG_CRASH(m_graph, m_node, toCString("Cannot find value for node: ", node).data());
     }
     
     bool doesKill(Edge edge)

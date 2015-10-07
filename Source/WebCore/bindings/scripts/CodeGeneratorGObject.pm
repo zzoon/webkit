@@ -271,6 +271,10 @@ sub SkipAttribute {
         return 1;
     }
 
+    if ($attribute->signature->extendedAttributes->{"JSBuiltin"}) {
+        return 1;
+    }
+
     return 0;
 }
 
@@ -370,6 +374,10 @@ sub SkipFunction {
     }
 
     if ($function->signature->type eq "Date") {
+        return 1;
+    }
+
+    if ($function->signature->extendedAttributes->{"JSBuiltin"}) {
         return 1;
     }
 

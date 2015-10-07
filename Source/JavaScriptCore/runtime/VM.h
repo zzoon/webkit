@@ -54,7 +54,6 @@
 #include "TypedArrayController.h"
 #include "VMEntryRecord.h"
 #include "Watchpoint.h"
-#include "WeakRandom.h"
 #include <wtf/Bag.h>
 #include <wtf/BumpPointerAllocator.h>
 #include <wtf/DateMath.h>
@@ -67,6 +66,7 @@
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/WTFThreadData.h>
+#include <wtf/WeakRandom.h>
 #include <wtf/text/SymbolRegistry.h>
 #include <wtf/text/WTFString.h>
 #if ENABLE(REGEXP_TRACING)
@@ -302,6 +302,8 @@ public:
     Strong<Structure> propertyTableStructure;
     Strong<Structure> weakMapDataStructure;
     Strong<Structure> inferredValueStructure;
+    Strong<Structure> inferredTypeStructure;
+    Strong<Structure> inferredTypeTableStructure;
     Strong<Structure> functionRareDataStructure;
     Strong<Structure> exceptionStructure;
     Strong<Structure> promiseDeferredStructure;
@@ -535,13 +537,6 @@ public:
     bool isInitializingObject() const; 
     void setInitializingObjectClass(const ClassInfo*);
 #endif
-
-    unsigned m_newStringsSinceLastHashCons;
-
-    static const unsigned s_minNumberOfNewStringsToHashCons = 100;
-
-    bool haveEnoughNewStringsToHashCons() { return m_newStringsSinceLastHashCons > s_minNumberOfNewStringsToHashCons; }
-    void resetNewStringsSinceLastHashCons() { m_newStringsSinceLastHashCons = 0; }
 
     bool currentThreadIsHoldingAPILock() const { return m_apiLock->currentThreadIsHoldingLock(); }
 

@@ -452,6 +452,11 @@ bool PlatformCALayerWin::backingStoreAttached() const
     return true;
 }
 
+bool PlatformCALayerWin::geometryFlipped() const
+{
+    return CACFLayerIsGeometryFlipped(m_layer.get());
+}
+
 void PlatformCALayerWin::setGeometryFlipped(bool value)
 {
     CACFLayerSetGeometryFlipped(m_layer.get(), value);
@@ -787,6 +792,12 @@ static void printLayer(StringBuilder& builder, const PlatformCALayer* layer, int
         builder.append("(masksToBounds true)");
     }
 
+    if (bool geometryFlipped = layer->geometryFlipped()) {
+        builder.append('\n');
+        printIndent(builder, indent + 1);
+        builder.append("(geometryFlipped true)");
+    }
+
     // Print opacity if needed
     float layerOpacity = layer->opacity();
     if (layerOpacity != 1) {
@@ -899,7 +910,7 @@ TiledBacking* PlatformCALayerWin::tiledBacking()
     return reinterpret_cast<WebTiledBackingLayerWin*>(intern(this))->tiledBacking();
 }
 
-void PlatformCALayerWin::drawTextAtPoint(CGContextRef context, CGFloat x, CGFloat y, const char* message, size_t length) const
+void PlatformCALayerWin::drawTextAtPoint(CGContextRef context, CGFloat x, CGFloat y, CGSize scale, CGFloat fontSize, const char* message, size_t length) const
 {
     String text(message, length);
 
@@ -910,7 +921,7 @@ void PlatformCALayerWin::drawTextAtPoint(CGContextRef context, CGFloat x, CGFloa
     SystemParametersInfo(SPI_GETNONCLIENTMETRICS, metrics.cbSize, &metrics, 0);
     desc.setOneFamily(metrics.lfSmCaptionFont.lfFaceName);
 
-    desc.setComputedSize(18);
+    desc.setComputedSize(scale.width * fontSize);
 
     FontCascade font = FontCascade(desc, 0, 0);
     font.update(nullptr);

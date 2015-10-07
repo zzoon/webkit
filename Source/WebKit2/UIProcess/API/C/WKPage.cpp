@@ -1013,12 +1013,12 @@ void WKPageSetPageLoaderClient(WKPageRef pageRef, const WKPageLoaderClientBase* 
             m_client.didFirstVisuallyNonEmptyLayoutForFrame(toAPI(&page), toAPI(&frame), toAPI(userData), m_client.base.clientInfo);
         }
 
-        virtual void didLayout(WebPageProxy& page, LayoutMilestones milestones, API::Object* userData) override
+        virtual void didLayout(WebPageProxy& page, LayoutMilestones milestones) override
         {
             if (!m_client.didLayout)
                 return;
 
-            m_client.didLayout(toAPI(&page), toWKLayoutMilestones(milestones), toAPI(userData), m_client.base.clientInfo);
+            m_client.didLayout(toAPI(&page), toWKLayoutMilestones(milestones), nullptr, m_client.base.clientInfo);
         }
 
         virtual void didRemoveFrameFromHierarchy(WebPageProxy& page, WebFrameProxy& frame, API::Object* userData) override
@@ -1794,14 +1794,6 @@ void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient
             return m_client.runBeforeUnloadConfirmPanel(toAPI(page), toAPI(message.impl()), toAPI(frame), m_client.base.clientInfo);
         }
 
-        virtual void didDraw(WebPageProxy* page) override
-        {
-            if (!m_client.didDraw)
-                return;
-
-            m_client.didDraw(toAPI(page), m_client.base.clientInfo);
-        }
-
         virtual void pageDidScroll(WebPageProxy* page) override
         {
             if (!m_client.pageDidScroll)
@@ -2068,11 +2060,11 @@ void WKPageSetPageNavigationClient(WKPageRef pageRef, const WKPageNavigationClie
             m_client.didSameDocumentNavigation(toAPI(&page), toAPI(navigation), toAPI(navigationType), toAPI(userData), m_client.base.clientInfo);
         }
         
-        virtual void renderingProgressDidChange(WebPageProxy& page, WebCore::LayoutMilestones milestones, API::Object* userData) override
+        virtual void renderingProgressDidChange(WebPageProxy& page, WebCore::LayoutMilestones milestones) override
         {
             if (!m_client.renderingProgressDidChange)
                 return;
-            m_client.renderingProgressDidChange(toAPI(&page), pageRenderingProgressEvents(milestones), toAPI(userData), m_client.base.clientInfo);
+            m_client.renderingProgressDidChange(toAPI(&page), pageRenderingProgressEvents(milestones), nullptr, m_client.base.clientInfo);
         }
         
         virtual bool canAuthenticateAgainstProtectionSpace(WebPageProxy& page, WebProtectionSpace* protectionSpace) override
@@ -2469,6 +2461,12 @@ void WKPageClearWheelEventTestTrigger(WKPageRef pageRef)
     toImpl(pageRef)->clearWheelEventTestTrigger();
 }
 
+void WKPageCallAfterNextPresentationUpdate(WKPageRef pageRef, void* context, WKPagePostPresentationUpdateFunction callback)
+{
+    toImpl(pageRef)->callAfterNextPresentationUpdate([context, callback](WebKit::CallbackBase::Error error) {
+        callback(error != WebKit::CallbackBase::Error::None ? toAPI(API::Error::create().ptr()) : 0, context);
+    });
+}
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
 

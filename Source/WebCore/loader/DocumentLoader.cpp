@@ -35,11 +35,13 @@
 #include "CachedPage.h"
 #include "CachedRawResource.h"
 #include "CachedResourceLoader.h"
+#include "ContentExtensionError.h"
 #include "DOMWindow.h"
 #include "Document.h"
 #include "DocumentParser.h"
 #include "DocumentWriter.h"
 #include "Event.h"
+#include "ExtensionStyleSheets.h"
 #include "FormState.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
@@ -845,13 +847,13 @@ void DocumentLoader::commitData(const char* bytes, size_t length)
     }
 
 #if ENABLE(CONTENT_EXTENSIONS)
-    DocumentStyleSheetCollection& styleSheetCollection = m_frame->document()->styleSheetCollection();
+    auto& extensionStyleSheets = m_frame->document()->extensionStyleSheets();
 
     for (auto& pendingStyleSheet : m_pendingNamedContentExtensionStyleSheets)
-        styleSheetCollection.maybeAddContentExtensionSheet(pendingStyleSheet.key, *pendingStyleSheet.value);
+        extensionStyleSheets.maybeAddContentExtensionSheet(pendingStyleSheet.key, *pendingStyleSheet.value);
     for (auto& pendingSelectorEntry : m_pendingContentExtensionDisplayNoneSelectors) {
         for (const auto& pendingSelector : pendingSelectorEntry.value)
-            styleSheetCollection.addDisplayNoneSelector(pendingSelectorEntry.key, pendingSelector.first, pendingSelector.second);
+            extensionStyleSheets.addDisplayNoneSelector(pendingSelectorEntry.key, pendingSelector.first, pendingSelector.second);
     }
 
     m_pendingNamedContentExtensionStyleSheets.clear();
@@ -1147,11 +1149,10 @@ void DocumentLoader::substituteResourceDeliveryTimerFired()
     SubstituteResourceMap copy;
     copy.swap(m_pendingSubstituteResources);
 
-    SubstituteResourceMap::const_iterator end = copy.end();
-    for (SubstituteResourceMap::const_iterator it = copy.begin(); it != end; ++it) {
-        RefPtr<ResourceLoader> loader = it->key;
-        SubstituteResource* resource = it->value.get();
-        
+    for (auto& entry : copy) {
+        auto& loader = entry.key;
+        SubstituteResource* resource = entry.value.get();
+
         if (resource)
             resource->deliver(*loader);
         else {
@@ -1425,7 +1426,7 @@ void DocumentLoader::startLoadingMainResource()
 
     m_applicationCacheHost->maybeLoadMainResource(m_request, m_substituteData);
 
-    if (m_substituteData.isValid()) {
+    if (m_substituteData.isValid() && m_frame->page()) {
         m_identifierForLoadWithoutResourceLoader = m_frame->page()->progress().createUniqueIdentifier();
         frameLoader()->notifier().assignIdentifierToInitialRequest(m_identifierForLoadWithoutResourceLoader, this, m_request);
         frameLoader()->notifier().dispatchWillSendRequest(this, m_identifierForLoadWithoutResourceLoader, m_request, ResourceResponse());
@@ -1442,6 +1443,16 @@ void DocumentLoader::startLoadingMainResource()
     CachedResourceRequest cachedResourceRequest(request, mainResourceLoadOptions);
     cachedResourceRequest.setInitiator(*this);
     m_mainResource = m_cachedResourceLoader->requestMainResource(cachedResourceRequest);
+
+#if ENABLE(CONTENT_EXTENSIONS)
+    if (m_mainResource && m_mainResource->errorOccurred() && m_frame->page() && m_mainResource->resourceError().domain() == ContentExtensions::WebKitContentBlockerDomain) {
+        m_identifierForLoadWithoutResourceLoader = m_frame->page()->progress().createUniqueIdentifier();
+        frameLoader()->notifier().assignIdentifierToInitialRequest(m_identifierForLoadWithoutResourceLoader, this, request);
+        frameLoader()->notifier().dispatchDidFailLoading(this, m_identifierForLoadWithoutResourceLoader, frameLoader()->blockedByContentBlockerError(m_request));
+        m_mainResource = nullptr;
+    }
+#endif
+
     if (!m_mainResource) {
         setRequest(ResourceRequest());
         // If the load was aborted by clearing m_request, it's possible the ApplicationCacheHost

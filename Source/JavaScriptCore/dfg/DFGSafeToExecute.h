@@ -53,6 +53,7 @@ public:
         case RealNumberUse:
         case BooleanUse:
         case CellUse:
+        case CellOrOtherUse:
         case ObjectUse:
         case FunctionUse:
         case FinalObjectUse:
@@ -126,6 +127,9 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     DFG_NODE_DO_TO_CHILDREN(graph, node, safeToExecuteEdge);
     if (!safeToExecuteEdge.result())
         return false;
+
+    // NOTE: This tends to lie when it comes to effectful nodes, because it knows that they aren't going to
+    // get hoisted anyway.
 
     switch (node->op()) {
     case JSConstant:
@@ -212,8 +216,11 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CompareEq:
     case CompareStrictEq:
     case Call:
+    case TailCallInlinedCaller:
     case Construct:
     case CallVarargs:
+    case TailCallVarargsInlinedCaller:
+    case TailCallForwardVarargsInlinedCaller:
     case ConstructVarargs:
     case LoadVarargs:
     case CallForwardVarargs:
@@ -258,6 +265,9 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case Branch:
     case Switch:
     case Return:
+    case TailCall:
+    case TailCallVarargs:
+    case TailCallForwardVarargs:
     case Throw:
     case ThrowReferenceError:
     case CountExecution:

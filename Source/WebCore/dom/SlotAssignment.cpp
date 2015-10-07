@@ -51,16 +51,22 @@ HTMLSlotElement* SlotAssignment::findAssignedSlot(const Node& node, ShadowRoot& 
     return findFirstSlotElement(*it->value, shadowRoot);
 }
 
-void SlotAssignment::addSlotElementByName(const AtomicString& name, HTMLSlotElement& slotElement)
+void SlotAssignment::addSlotElementByName(const AtomicString& name, HTMLSlotElement& slotElement, ShadowRoot& shadowRoot)
 {
 #ifndef NDEBUG
     ASSERT(!m_slotElementsForConsistencyCheck.contains(&slotElement));
     m_slotElementsForConsistencyCheck.add(&slotElement);
 #endif
 
-    auto addResult = m_slots.add(treatNullAsEmpty(name), std::unique_ptr<SlotInfo>());
+    // FIXME: We should be able to do a targeted reconstruction.
+    shadowRoot.host()->setNeedsStyleRecalc(ReconstructRenderTree);
+
+    const AtomicString& key = treatNullAsEmpty(name);
+    auto addResult = m_slots.add(key, std::unique_ptr<SlotInfo>());
     if (addResult.isNewEntry) {
         addResult.iterator->value = std::make_unique<SlotInfo>(slotElement);
+        if (key == emptyAtom) // Because assignSlots doesn't collect nodes assgined to the default slot as an optimzation.
+            m_slotAssignmentsIsValid = false;
         return;
     }
 
@@ -77,12 +83,15 @@ void SlotAssignment::addSlotElementByName(const AtomicString& name, HTMLSlotElem
     slotInfo.elementCount++;
 }
 
-void SlotAssignment::removeSlotElementByName(const AtomicString& name, HTMLSlotElement& slotElement)
+void SlotAssignment::removeSlotElementByName(const AtomicString& name, HTMLSlotElement& slotElement, ShadowRoot& shadowRoot)
 {
 #ifndef NDEBUG
     ASSERT(m_slotElementsForConsistencyCheck.contains(&slotElement));
     m_slotElementsForConsistencyCheck.remove(&slotElement);
 #endif
+
+    if (auto* host = shadowRoot.host()) // FIXME: We should be able to do a targeted reconstruction.
+        host->setNeedsStyleRecalc(ReconstructRenderTree);
 
     auto it = m_slots.find(treatNullAsEmpty(name));
     RELEASE_ASSERT(it != m_slots.end());
@@ -120,6 +129,20 @@ const Vector<Node*>* SlotAssignment::assignedNodesForSlot(const HTMLSlotElement&
         return nullptr;
 
     return &slotInfo.assignedNodes;
+}
+
+void SlotAssignment::invalidate(ShadowRoot& shadowRoot)
+{
+    // FIXME: We should be able to do a targeted reconstruction.
+    shadowRoot.host()->setNeedsStyleRecalc(ReconstructRenderTree);
+    m_slotAssignmentsIsValid = false;
+}
+
+void SlotAssignment::invalidateDefaultSlot(ShadowRoot& shadowRoot)
+{
+    auto it = m_slots.find(emptyAtom);
+    if (it != m_slots.end() && it->value->elementCount)
+        invalidate(shadowRoot); // FIXME: We should be able to reconstruct only under the default slot.
 }
 
 HTMLSlotElement* SlotAssignment::findFirstSlotElement(SlotInfo& slotInfo, ShadowRoot& shadowRoot)
@@ -175,8 +198,6 @@ void SlotAssignment::assignSlots(ShadowRoot& shadowRoot)
     for (auto& entry : m_slots)
         entry.value->assignedNodes.shrink(0);
 
-    auto defaultSlotEntry = m_slots.find(emptyAtom);
-
     for (Node* child = host->firstChild(); child; child = child->nextSibling()) {
         if (is<Element>(child)) {
             auto& slotName = downcast<Element>(*child).fastGetAttribute(slotAttr);
@@ -186,6 +207,7 @@ void SlotAssignment::assignSlots(ShadowRoot& shadowRoot)
                 continue;
             }
         }
+        auto defaultSlotEntry = m_slots.find(emptyAtom);
         if (defaultSlotEntry != m_slots.end())
             defaultSlotEntry->value->assignedNodes.append(child);
     }

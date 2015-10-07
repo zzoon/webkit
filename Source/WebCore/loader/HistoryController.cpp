@@ -639,13 +639,10 @@ void HistoryController::initializeItem(HistoryItem& item)
     if (originalURL.isEmpty())
         originalURL = blankURL();
     
-    Frame* parentFrame = m_frame.tree().parent();
-    String parent = parentFrame ? parentFrame->tree().uniqueName() : "";
     StringWithDirection title = documentLoader->title();
 
     item.setURL(url);
     item.setTarget(m_frame.tree().uniqueName());
-    item.setParent(parent);
     // FIXME: should store title directionality in history as well.
     item.setTitle(title.string());
     item.setOriginalURLString(originalURL.string());
@@ -779,9 +776,8 @@ bool HistoryController::currentFramesMatchItem(HistoryItem* item) const
     if (childItems.size() != m_frame.tree().childCount())
         return false;
     
-    unsigned size = childItems.size();
-    for (unsigned i = 0; i < size; ++i) {
-        if (!m_frame.tree().child(childItems[i]->target()))
+    for (auto& item : childItems) {
+        if (!m_frame.tree().child(item->target()))
             return false;
     }
     

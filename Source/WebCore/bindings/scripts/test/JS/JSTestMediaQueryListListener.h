@@ -27,9 +27,9 @@
 
 namespace WebCore {
 
-class JSTestMediaQueryListListener : public JSDOMWrapper {
+class JSTestMediaQueryListListener : public JSDOMWrapperWithImplementation<TestMediaQueryListListener> {
 public:
-    typedef JSDOMWrapper Base;
+    typedef JSDOMWrapperWithImplementation<TestMediaQueryListListener> Base;
     static JSTestMediaQueryListListener* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestMediaQueryListListener>&& impl)
     {
         JSTestMediaQueryListListener* ptr = new (NotNull, JSC::allocateCell<JSTestMediaQueryListListener>(globalObject->vm().heap)) JSTestMediaQueryListListener(structure, globalObject, WTF::move(impl));
@@ -41,7 +41,6 @@ public:
     static JSC::JSObject* getPrototype(JSC::VM&, JSC::JSGlobalObject*);
     static TestMediaQueryListListener* toWrapped(JSC::JSValue);
     static void destroy(JSC::JSCell*);
-    ~JSTestMediaQueryListListener();
 
     DECLARE_INFO;
 
@@ -51,11 +50,6 @@ public:
     }
 
     static JSC::JSValue getConstructor(JSC::VM&, JSC::JSGlobalObject*);
-    TestMediaQueryListListener& impl() const { return *m_impl; }
-    void releaseImpl() { std::exchange(m_impl, nullptr)->deref(); }
-
-private:
-    TestMediaQueryListListener* m_impl;
 protected:
     JSTestMediaQueryListListener(JSC::Structure*, JSDOMGlobalObject*, Ref<TestMediaQueryListListener>&&);
 
@@ -69,8 +63,8 @@ protected:
 
 class JSTestMediaQueryListListenerOwner : public JSC::WeakHandleOwner {
 public:
-    bool isReachableFromOpaqueRoots(JSC::JSCell&, void* context, JSC::SlotVisitor&) override;
-    void finalize(JSC::JSCell*&, void* context) override;
+    virtual bool isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown>, void* context, JSC::SlotVisitor&);
+    virtual void finalize(JSC::Handle<JSC::Unknown>, void* context);
 };
 
 inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, TestMediaQueryListListener*)

@@ -28,9 +28,9 @@
 
 namespace WebCore {
 
-class JSattribute : public JSDOMWrapper {
+class JSattribute : public JSDOMWrapperWithImplementation<attribute> {
 public:
-    typedef JSDOMWrapper Base;
+    typedef JSDOMWrapperWithImplementation<attribute> Base;
     static JSattribute* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<attribute>&& impl)
     {
         JSattribute* ptr = new (NotNull, JSC::allocateCell<JSattribute>(globalObject->vm().heap)) JSattribute(structure, globalObject, WTF::move(impl));
@@ -42,7 +42,6 @@ public:
     static JSC::JSObject* getPrototype(JSC::VM&, JSC::JSGlobalObject*);
     static attribute* toWrapped(JSC::JSValue);
     static void destroy(JSC::JSCell*);
-    ~JSattribute();
 
     DECLARE_INFO;
 
@@ -52,11 +51,6 @@ public:
     }
 
     static JSC::JSValue getConstructor(JSC::VM&, JSC::JSGlobalObject*);
-    attribute& impl() const { return *m_impl; }
-    void releaseImpl() { std::exchange(m_impl, nullptr)->deref(); }
-
-private:
-    attribute* m_impl;
 protected:
     JSattribute(JSC::Structure*, JSDOMGlobalObject*, Ref<attribute>&&);
 
@@ -70,8 +64,8 @@ protected:
 
 class JSattributeOwner : public JSC::WeakHandleOwner {
 public:
-    bool isReachableFromOpaqueRoots(JSC::JSCell&, void* context, JSC::SlotVisitor&) override;
-    void finalize(JSC::JSCell*&, void* context) override;
+    virtual bool isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown>, void* context, JSC::SlotVisitor&);
+    virtual void finalize(JSC::Handle<JSC::Unknown>, void* context);
 };
 
 inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, attribute*)

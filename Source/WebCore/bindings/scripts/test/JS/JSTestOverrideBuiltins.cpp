@@ -25,7 +25,6 @@
 #include "JSDOMBinding.h"
 #include "JSNode.h"
 #include "Node.h"
-#include "TestOverrideBuiltins.h"
 #include "wtf/text/AtomicString.h"
 #include <runtime/Error.h>
 #include <wtf/GetPtr.h>
@@ -70,14 +69,14 @@ private:
 class JSTestOverrideBuiltinsConstructor : public DOMConstructorObject {
 private:
     JSTestOverrideBuiltinsConstructor(JSC::Structure*, JSDOMGlobalObject*);
-    void finishCreation(JSC::VM&, JSDOMGlobalObject*);
+    void finishCreation(JSC::VM&, JSDOMGlobalObject&);
 
 public:
     typedef DOMConstructorObject Base;
     static JSTestOverrideBuiltinsConstructor* create(JSC::VM& vm, JSC::Structure* structure, JSDOMGlobalObject* globalObject)
     {
         JSTestOverrideBuiltinsConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestOverrideBuiltinsConstructor>(vm.heap)) JSTestOverrideBuiltinsConstructor(structure, globalObject);
-        ptr->finishCreation(vm, globalObject);
+        ptr->finishCreation(vm, *globalObject);
         return ptr;
     }
 
@@ -105,15 +104,15 @@ static const HashTable JSTestOverrideBuiltinsTable = { 1, 1, true, JSTestOverrid
 const ClassInfo JSTestOverrideBuiltinsConstructor::s_info = { "TestOverrideBuiltinsConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestOverrideBuiltinsConstructor) };
 
 JSTestOverrideBuiltinsConstructor::JSTestOverrideBuiltinsConstructor(Structure* structure, JSDOMGlobalObject* globalObject)
-    : DOMConstructorObject(structure, globalObject)
+    : Base(structure, globalObject)
 {
 }
 
-void JSTestOverrideBuiltinsConstructor::finishCreation(VM& vm, JSDOMGlobalObject* globalObject)
+void JSTestOverrideBuiltinsConstructor::finishCreation(VM& vm, JSDOMGlobalObject& globalObject)
 {
     Base::finishCreation(vm);
     ASSERT(inherits(info()));
-    putDirect(vm, vm.propertyNames->prototype, JSTestOverrideBuiltins::getPrototype(vm, globalObject), DontDelete | ReadOnly | DontEnum);
+    putDirect(vm, vm.propertyNames->prototype, JSTestOverrideBuiltins::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("TestOverrideBuiltins"))), ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
@@ -136,8 +135,7 @@ void JSTestOverrideBuiltinsPrototype::finishCreation(VM& vm)
 const ClassInfo JSTestOverrideBuiltins::s_info = { "TestOverrideBuiltins", &Base::s_info, &JSTestOverrideBuiltinsTable, CREATE_METHOD_TABLE(JSTestOverrideBuiltins) };
 
 JSTestOverrideBuiltins::JSTestOverrideBuiltins(Structure* structure, JSDOMGlobalObject* globalObject, Ref<TestOverrideBuiltins>&& impl)
-    : JSDOMWrapper(structure, globalObject)
-    , m_impl(&impl.leakRef())
+    : JSDOMWrapperWithImplementation<TestOverrideBuiltins>(structure, globalObject, WTF::move(impl))
 {
 }
 
@@ -155,11 +153,6 @@ void JSTestOverrideBuiltins::destroy(JSC::JSCell* cell)
 {
     JSTestOverrideBuiltins* thisObject = static_cast<JSTestOverrideBuiltins*>(cell);
     thisObject->JSTestOverrideBuiltins::~JSTestOverrideBuiltins();
-}
-
-JSTestOverrideBuiltins::~JSTestOverrideBuiltins()
-{
-    releaseImpl();
 }
 
 bool JSTestOverrideBuiltins::getOwnPropertySlot(JSObject* object, ExecState* state, PropertyName propertyName, PropertySlot& slot)
@@ -201,6 +194,17 @@ EncodedJSValue jsTestOverrideBuiltinsConstructor(ExecState* state, JSObject*, En
     return JSValue::encode(JSTestOverrideBuiltins::getConstructor(state->vm(), domObject->globalObject()));
 }
 
+void JSTestOverrideBuiltins::getOwnPropertyNames(JSObject* object, ExecState* state, PropertyNameArray& propertyNames, EnumerationMode mode)
+{
+    auto* thisObject = jsCast<JSTestOverrideBuiltins*>(object);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
+    if (mode.includeDontEnumProperties()) {
+        for (auto& propertyName : thisObject->impl().supportedPropertyNames())
+            propertyNames.add(Identifier::fromString(state, propertyName));
+    }
+    Base::getOwnPropertyNames(thisObject, state, propertyNames, mode);
+}
+
 JSValue JSTestOverrideBuiltins::getConstructor(VM& vm, JSGlobalObject* globalObject)
 {
     return getDOMConstructor<JSTestOverrideBuiltinsConstructor>(vm, jsCast<JSDOMGlobalObject*>(globalObject));
@@ -221,18 +225,18 @@ EncodedJSValue JSC_HOST_CALL jsTestOverrideBuiltinsPrototypeFunctionNamedItem(Ex
     return JSValue::encode(result);
 }
 
-bool JSTestOverrideBuiltinsOwner::isReachableFromOpaqueRoots(JSC::JSCell& cell, void*, SlotVisitor& visitor)
+bool JSTestOverrideBuiltinsOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handle, void*, SlotVisitor& visitor)
 {
-    UNUSED_PARAM(cell);
+    UNUSED_PARAM(handle);
     UNUSED_PARAM(visitor);
     return false;
 }
 
-void JSTestOverrideBuiltinsOwner::finalize(JSC::JSCell*& cell, void* context)
+void JSTestOverrideBuiltinsOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
 {
-    auto& wrapper = jsCast<JSTestOverrideBuiltins&>(*cell);
+    auto* jsTestOverrideBuiltins = jsCast<JSTestOverrideBuiltins*>(handle.slot()->asCell());
     auto& world = *static_cast<DOMWrapperWorld*>(context);
-    uncacheWrapper(world, &wrapper.impl(), &wrapper);
+    uncacheWrapper(world, &jsTestOverrideBuiltins->impl(), jsTestOverrideBuiltins);
 }
 
 #if ENABLE(BINDING_INTEGRITY)

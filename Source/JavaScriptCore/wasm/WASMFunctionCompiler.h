@@ -128,7 +128,7 @@ public:
         m_codeBlock->setCalleeSaveRegisters(RegisterSet::webAssemblyCalleeSaveRegisters());
 
         emitFunctionPrologue();
-        emitPutImmediateToCallFrameHeader(m_codeBlock, JSStack::CodeBlock);
+        emitPutToCallFrameHeader(m_codeBlock, JSStack::CodeBlock);
 
         m_beginLabel = label();
 
@@ -215,7 +215,7 @@ public:
         // FIXME: Implement arity check.
         Label arityCheck = label();
         emitFunctionPrologue();
-        emitPutImmediateToCallFrameHeader(m_codeBlock, JSStack::CodeBlock);
+        emitPutToCallFrameHeader(m_codeBlock, JSStack::CodeBlock);
         jump(m_beginLabel);
 
         if (!m_divideErrorJumpList.empty()) {
@@ -532,7 +532,7 @@ public:
         return UNUSED;
     }
 
-    int buildStore(const MemoryAddress& memoryAddress, WASMExpressionType expressionType, WASMMemoryType memoryType, int)
+    int buildStore(WASMOpKind opKind, const MemoryAddress& memoryAddress, WASMExpressionType expressionType, WASMMemoryType memoryType, int)
     {
         const ArrayBuffer* arrayBuffer = m_module->arrayBuffer()->impl();
         move(TrustedImmPtr(arrayBuffer->data()), GPRInfo::regT0);
@@ -580,6 +580,20 @@ public:
             ASSERT_NOT_REACHED();
         }
         m_tempStackTop -= 2;
+
+        if (opKind == WASMOpKind::Expression) {
+            switch (expressionType) {
+            case WASMExpressionType::I32:
+            case WASMExpressionType::F32:
+                store32(GPRInfo::regT2, temporaryAddress(m_tempStackTop++));
+                break;
+            case WASMExpressionType::F64:
+                storeDouble(FPRInfo::fpRegT0, temporaryAddress(m_tempStackTop++));
+                break;
+            default:
+                ASSERT_NOT_REACHED();
+            }
+        }
         return UNUSED;
     }
 
@@ -996,6 +1010,56 @@ public:
         return UNUSED;
     }
 
+    int buildMinOrMaxI32(int, int, WASMOpExpressionI32 op)
+    {
+        load32(temporaryAddress(m_tempStackTop - 2), GPRInfo::regT0);
+        load32(temporaryAddress(m_tempStackTop - 1), GPRInfo::regT1);
+        RelationalCondition condition;
+        switch (op) {
+        case WASMOpExpressionI32::SMin:
+            condition = LessThanOrEqual;
+            break;
+        case WASMOpExpressionI32::UMin:
+            condition = BelowOrEqual;
+            break;
+        case WASMOpExpressionI32::SMax:
+            condition = GreaterThanOrEqual;
+            break;
+        case WASMOpExpressionI32::UMax:
+            condition = AboveOrEqual;
+            break;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+        }
+        Jump useLeft = branch32(condition, GPRInfo::regT0, GPRInfo::regT1);
+        store32(GPRInfo::regT1, temporaryAddress(m_tempStackTop - 2));
+        useLeft.link(this);
+        m_tempStackTop--;
+        return UNUSED;
+    }
+
+    int buildMinOrMaxF64(int, int, WASMOpExpressionF64 op)
+    {
+        loadDouble(temporaryAddress(m_tempStackTop - 2), FPRInfo::fpRegT0);
+        loadDouble(temporaryAddress(m_tempStackTop - 1), FPRInfo::fpRegT1);
+        DoubleCondition condition;
+        switch (op) {
+        case WASMOpExpressionF64::Min:
+            condition = DoubleLessThanOrEqual;
+            break;
+        case WASMOpExpressionF64::Max:
+            condition = DoubleGreaterThanOrEqual;
+            break;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+        }
+        Jump useLeft = branchDouble(condition, FPRInfo::fpRegT0, FPRInfo::fpRegT1);
+        storeDouble(FPRInfo::fpRegT1, temporaryAddress(m_tempStackTop - 2));
+        useLeft.link(this);
+        m_tempStackTop--;
+        return UNUSED;
+    }
+
     int buildCallInternal(uint32_t functionIndex, int, const WASMSignature& signature, WASMExpressionType returnType)
     {
         boxArgumentsAndAdjustStackPointer(signature.arguments);
@@ -1034,6 +1098,11 @@ public:
     }
 
     void appendExpressionList(int&, int) { }
+
+    void discard(int)
+    {
+        m_tempStackTop--;
+    }
 
     void linkTarget(JumpTarget& target)
     {

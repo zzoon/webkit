@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003-2009, 2013-2014 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003-2009, 2013-2015 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -26,11 +26,11 @@
 #include "CodeBlockSet.h"
 #include "CopyVisitor.h"
 #include "GCIncomingRefCountedSet.h"
-#include "GCThreadSharedData.h"
 #include "HandleSet.h"
 #include "HandleStack.h"
 #include "HeapOperation.h"
 #include "JITStubRoutineSet.h"
+#include "ListableHandler.h"
 #include "MarkedAllocator.h"
 #include "MarkedBlock.h"
 #include "MarkedBlockSet.h"
@@ -38,11 +38,14 @@
 #include "Options.h"
 #include "SlotVisitor.h"
 #include "StructureIDTable.h"
+#include "UnconditionalFinalizer.h"
 #include "WeakHandleOwner.h"
+#include "WeakReferenceHarvester.h"
 #include "WriteBarrierBuffer.h"
 #include "WriteBarrierSupport.h"
 #include <wtf/HashCountedSet.h>
 #include <wtf/HashSet.h>
+#include <wtf/ParallelHelperPool.h>
 
 namespace JSC {
 
@@ -85,7 +88,6 @@ class Heap {
 public:
     friend class JIT;
     friend class DFG::SpeculativeJIT;
-    friend class GCThreadSharedData;
     static Heap* heap(const JSValue); // 0 for immediate values
     static Heap* heap(const JSCell*);
 
@@ -99,9 +101,7 @@ public:
     static bool isMarked(const void*);
     static bool testAndSetMarked(const void*);
     static void setMarked(const void*);
-    static bool isRemembered(const void*);
 
-    JS_EXPORT_PRIVATE void addToRememberedSet(const JSCell*);
     static bool isWriteBarrierEnabled();
     void writeBarrier(const JSCell*);
     void writeBarrier(const JSCell*, JSValue);
@@ -165,7 +165,7 @@ public:
     // call both of these functions: Calling only one may trigger catastropic
     // memory growth.
     void reportExtraMemoryAllocated(size_t);
-    void reportExtraMemoryVisited(JSCell*, size_t);
+    void reportExtraMemoryVisited(CellState cellStateBeforeVisiting, size_t);
 
     // Use this API to report non-GC memory if you can't use the better API above.
     void deprecatedReportExtraMemory(size_t);
@@ -184,7 +184,6 @@ public:
     JS_EXPORT_PRIVATE size_t protectedGlobalObjectCount();
     JS_EXPORT_PRIVATE std::unique_ptr<TypeCountSet> protectedObjectTypeCounts();
     JS_EXPORT_PRIVATE std::unique_ptr<TypeCountSet> objectTypeCounts();
-    void showStatistics();
 
     HashSet<MarkedArgumentBuffer*>& markListSet();
     
@@ -243,6 +242,7 @@ private:
     friend class DeferGCForAWhile;
     friend class GCAwareJITStubRoutine;
     friend class GCLogging;
+    friend class GCThread;
     friend class HandleSet;
     friend class HeapVerifier;
     friend class JITStubRoutine;
@@ -268,8 +268,8 @@ private:
 
     static const size_t minExtraMemory = 256;
     
-    class FinalizerOwner final : public WeakHandleOwner {
-        void finalize(JSCell*&, void* context) override;
+    class FinalizerOwner : public WeakHandleOwner {
+        virtual void finalize(Handle<Unknown>, void* context) override;
     };
 
     JS_EXPORT_PRIVATE bool isValidAllocation(size_t);
@@ -283,6 +283,8 @@ private:
     void flushOldStructureIDTables();
     void flushWriteBarrierBuffer();
     void stopAllocation();
+    
+    void completeAllDFGPlans();
 
     void markRoots(double gcStartTime, void* stackOrigin, void* stackTop, MachineThreads::RegisterState&);
     void gatherStackRoots(ConservativeRoots&, void* stackOrigin, void* stackTop, MachineThreads::RegisterState&);
@@ -302,7 +304,6 @@ private:
     void traceCodeBlocksAndJITStubRoutines();
     void converge();
     void visitWeakHandles(HeapRootVisitor&);
-    void clearRememberedSet(Vector<const JSCell*>&);
     void updateObjectCounts(double gcStartTime);
     void resetVisitors();
 
@@ -319,6 +320,7 @@ private:
     void finalizeUnconditionalFinalizers();
     void clearUnmarkedExecutables();
     void deleteUnmarkedCompiledCode();
+    JS_EXPORT_PRIVATE void addToRememberedSet(const JSCell*);
     void updateAllocationLimits();
     void didFinishCollection(double gcStartTime);
     void resumeCompilerThreads();
@@ -336,6 +338,11 @@ private:
     void incrementDeferralDepth();
     void decrementDeferralDepth();
     void decrementDeferralDepthAndGCIfNeeded();
+
+    size_t threadVisitCount();
+    size_t threadBytesVisited();
+    size_t threadBytesCopied();
+    size_t threadDupStrings();
 
     const HeapType m_heapType;
     const size_t m_ramSize;
@@ -369,9 +376,15 @@ private:
 
     MachineThreads m_machineThreads;
     
-    GCThreadSharedData m_sharedData;
     SlotVisitor m_slotVisitor;
-    CopyVisitor m_copyVisitor;
+
+    // We pool the slot visitors used by parallel marking threads. It's useful to be able to
+    // enumerate over them, and it's useful to have them cache some small amount of memory from
+    // one GC to the next. GC marking threads claim these at the start of marking, and return
+    // them at the end.
+    Vector<std::unique_ptr<SlotVisitor>> m_parallelSlotVisitors;
+    Vector<SlotVisitor*> m_availableParallelSlotVisitors;
+    Lock m_parallelSlotVisitorLock;
 
     HandleSet m_handleSet;
     HandleStack m_handleStack;
@@ -407,6 +420,24 @@ private:
 #endif
 
     HashMap<void*, std::function<void()>> m_weakGCMaps;
+
+    Lock m_markingMutex;
+    Condition m_markingConditionVariable;
+    MarkStackArray m_sharedMarkStack;
+    unsigned m_numberOfActiveParallelMarkers { 0 };
+    unsigned m_numberOfWaitingParallelMarkers { 0 };
+    bool m_parallelMarkersShouldExit { false };
+
+    Lock m_opaqueRootsMutex;
+    HashSet<void*> m_opaqueRoots;
+
+    Vector<CopiedBlock*> m_blocksToCopy;
+    static const size_t s_blockFragmentLength = 32;
+
+    ListableHandler<WeakReferenceHarvester>::List m_weakReferenceHarvesters;
+    ListableHandler<UnconditionalFinalizer>::List m_unconditionalFinalizers;
+
+    ParallelHelperClient m_helperClient;
 };
 
 } // namespace JSC

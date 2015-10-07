@@ -43,7 +43,6 @@
 #include "CodeType.h"
 #include "CompactJITCodeMap.h"
 #include "DFGCommon.h"
-#include "DFGCommonData.h"
 #include "DFGExitProfile.h"
 #include "DeferredCompilationCallback.h"
 #include "EvalCodeCache.h"
@@ -407,14 +406,14 @@ public:
         return &m_rareCaseProfiles.last();
     }
     unsigned numberOfRareCaseProfiles() { return m_rareCaseProfiles.size(); }
-    RareCaseProfile* rareCaseProfile(int index) { return &m_rareCaseProfiles[index]; }
     RareCaseProfile* rareCaseProfileForBytecodeOffset(int bytecodeOffset);
+    unsigned rareCaseProfileCountForBytecodeOffset(int bytecodeOffset);
 
     bool likelyToTakeSlowCase(int bytecodeOffset)
     {
         if (!hasBaselineJITProfiling())
             return false;
-        unsigned value = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+        unsigned value = rareCaseProfileCountForBytecodeOffset(bytecodeOffset);
         return value >= Options::likelyToTakeSlowCaseMinimumCount();
     }
 
@@ -422,7 +421,7 @@ public:
     {
         if (!hasBaselineJITProfiling())
             return false;
-        unsigned value = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+        unsigned value = rareCaseProfileCountForBytecodeOffset(bytecodeOffset);
         return value >= Options::couldTakeSlowCaseMinimumCount();
     }
 
@@ -439,20 +438,19 @@ public:
             m_specialFastCaseProfiles, m_specialFastCaseProfiles.size(), bytecodeOffset,
             getRareCaseProfileBytecodeOffset);
     }
-
-    bool likelyToTakeSpecialFastCase(int bytecodeOffset)
+    unsigned specialFastCaseProfileCountForBytecodeOffset(int bytecodeOffset)
     {
-        if (!hasBaselineJITProfiling())
-            return false;
-        unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
-        return specialFastCaseCount >= Options::likelyToTakeSlowCaseMinimumCount();
+        RareCaseProfile* profile = specialFastCaseProfileForBytecodeOffset(bytecodeOffset);
+        if (!profile)
+            return 0;
+        return profile->m_counter;
     }
 
     bool couldTakeSpecialFastCase(int bytecodeOffset)
     {
         if (!hasBaselineJITProfiling())
             return false;
-        unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+        unsigned specialFastCaseCount = specialFastCaseProfileCountForBytecodeOffset(bytecodeOffset);
         return specialFastCaseCount >= Options::couldTakeSlowCaseMinimumCount();
     }
 
@@ -460,19 +458,9 @@ public:
     {
         if (!hasBaselineJITProfiling())
             return false;
-        unsigned slowCaseCount = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
-        unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
+        unsigned slowCaseCount = rareCaseProfileCountForBytecodeOffset(bytecodeOffset);
+        unsigned specialFastCaseCount = specialFastCaseProfileCountForBytecodeOffset(bytecodeOffset);
         unsigned value = slowCaseCount - specialFastCaseCount;
-        return value >= Options::likelyToTakeSlowCaseMinimumCount();
-    }
-
-    bool likelyToTakeAnySlowCase(int bytecodeOffset)
-    {
-        if (!hasBaselineJITProfiling())
-            return false;
-        unsigned slowCaseCount = rareCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
-        unsigned specialFastCaseCount = specialFastCaseProfileForBytecodeOffset(bytecodeOffset)->m_counter;
-        unsigned value = slowCaseCount + specialFastCaseCount;
         return value >= Options::likelyToTakeSlowCaseMinimumCount();
     }
 
@@ -494,10 +482,7 @@ public:
     bool hasExpressionInfo() { return m_unlinkedCode->hasExpressionInfo(); }
 
 #if ENABLE(DFG_JIT)
-    Vector<CodeOrigin, 0, UnsafeVectorOverflow>& codeOrigins()
-    {
-        return m_jitCode->dfgCommon()->codeOrigins;
-    }
+    Vector<CodeOrigin, 0, UnsafeVectorOverflow>& codeOrigins();
     
     // Having code origins implies that there has been some inlining.
     bool hasCodeOrigins()
@@ -545,22 +530,8 @@ public:
     // Constant Pool
 #if ENABLE(DFG_JIT)
     size_t numberOfIdentifiers() const { return m_unlinkedCode->numberOfIdentifiers() + numberOfDFGIdentifiers(); }
-    size_t numberOfDFGIdentifiers() const
-    {
-        if (!JITCode::isOptimizingJIT(jitType()))
-            return 0;
-
-        return m_jitCode->dfgCommon()->dfgIdentifiers.size();
-    }
-
-    const Identifier& identifier(int index) const
-    {
-        size_t unlinkedIdentifiers = m_unlinkedCode->numberOfIdentifiers();
-        if (static_cast<unsigned>(index) < unlinkedIdentifiers)
-            return m_unlinkedCode->identifier(index);
-        ASSERT(JITCode::isOptimizingJIT(jitType()));
-        return m_jitCode->dfgCommon()->dfgIdentifiers[index - unlinkedIdentifiers];
-    }
+    size_t numberOfDFGIdentifiers() const;
+    const Identifier& identifier(int index) const;
 #else
     size_t numberOfIdentifiers() const { return m_unlinkedCode->numberOfIdentifiers(); }
     const Identifier& identifier(int index) const { return m_unlinkedCode->identifier(index); }
@@ -1274,9 +1245,7 @@ inline void CodeBlockSet::mark(CodeBlock* codeBlock)
     // a barrier when a CodeBlock needs it.
     codeBlock->clearMarks();
 
-#if ENABLE(GGC)
     m_currentlyExecuting.add(codeBlock);
-#endif
 }
 
 template <typename Functor> inline void ScriptExecutable::forEachCodeBlock(Functor&& functor)

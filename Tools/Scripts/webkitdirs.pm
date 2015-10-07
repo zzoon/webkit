@@ -93,6 +93,9 @@ use constant SIMULATOR_DEVICE_STATE_SHUTDOWN => "1";
 use constant SIMULATOR_DEVICE_STATE_BOOTED => "3";
 use constant SIMULATOR_DEVICE_SUFFIX_FOR_WEBKIT_DEVELOPMENT  => "For WebKit Development";
 
+# See table "Certificate types and names" on <https://developer.apple.com/library/ios/documentation/IDEs/Conceptual/AppDistributionGuide/MaintainingCertificates/MaintainingCertificates.html#//apple_ref/doc/uid/TP40012582-CH31-SW41>.
+use constant IOS_DEVELOPMENT_CERTIFICATE_NAME_PREFIX => "iPhone Developer: ";
+
 our @EXPORT_OK;
 
 my $architecture;
@@ -120,6 +123,7 @@ my $isInspectorFrontend;
 my $shouldTargetWebProcess;
 my $shouldUseXPCServiceForWebProcess;
 my $shouldUseGuardMalloc;
+my $shouldNotUseNinja;
 my $xcodeVersion;
 
 # Variables for Win32 support
@@ -559,8 +563,7 @@ sub determineConfigurationProductDir
     determineBaseProductDir();
     determineConfiguration();
     if (isAppleWinWebKit() || isWinCairo()) {
-        my $binDir = isWin64() ? "bin64" : "bin32";
-        $configurationProductDir = File::Spec->catdir($baseProductDir, $configuration, $binDir);
+        $configurationProductDir = File::Spec->catdir($baseProductDir, $configuration);
     } else {
         if (usesPerConfigurationBuildDirectory()) {
             $configurationProductDir = "$baseProductDir";
@@ -615,6 +618,10 @@ sub jscProductDir
 {
     my $productDir = productDir();
     $productDir .= "/bin" if (isEfl() || isGtk());
+    if (isAnyWindows()) {
+        my $binDir = isWin64() ? "bin64" : "bin32";
+        $productDir = File::Spec->catdir($productDir, $binDir);
+    }
 
     return $productDir;
 }
@@ -655,6 +662,11 @@ sub determineGenerateDsym()
     $generateDsym = checkForArgumentAndRemoveFromARGV("--dsym");
 }
 
+sub hasIOSDevelopmentCertificate()
+{
+    return !exitStatus(system("security find-identity -p codesigning | grep '" . IOS_DEVELOPMENT_CERTIFICATE_NAME_PREFIX . "' > /dev/null 2>&1"));
+}
+
 sub argumentsForXcode()
 {
     my @args = ();
@@ -670,11 +682,25 @@ sub XcodeOptions
     determineASanIsEnabled();
     determineXcodeSDK();
 
-    my @sdkOption = ($xcodeSDK ? "SDKROOT=$xcodeSDK" : ());
-    my @architectureOption = ($architecture ? "ARCHS=$architecture" : ());
-    my @asanOption = ($asanIsEnabled ? ("-xcconfig", sourceDir() . "/Tools/asan/asan.xcconfig", "ASAN_IGNORE=" . sourceDir() . "/Tools/asan/webkit-asan-ignore.txt") : ());
-
-    return ("-UseSanitizedBuildSystemEnvironment=YES", @baseProductDirOption, "-configuration", $configuration, @architectureOption, @sdkOption, @asanOption, argumentsForXcode());
+    my @options;
+    push @options, "-UseSanitizedBuildSystemEnvironment=YES";
+    push @options, ("-configuration", $configuration);
+    push @options, ("-xcconfig", sourceDir() . "/Tools/asan/asan.xcconfig", "ASAN_IGNORE=" . sourceDir() . "/Tools/asan/webkit-asan-ignore.txt") if $asanIsEnabled;
+    push @options, @baseProductDirOption;
+    push @options, "ARCHS=$architecture" if $architecture;
+    push @options, "SDKROOT=$xcodeSDK" if $xcodeSDK;
+    if (willUseIOSDeviceSDKWhenBuilding()) {
+        push @options, "ENABLE_BITCODE=NO";
+        if (hasIOSDevelopmentCertificate()) {
+            # FIXME: May match more than one installed development certificate.
+            push @options, "CODE_SIGN_IDENTITY=" . IOS_DEVELOPMENT_CERTIFICATE_NAME_PREFIX;
+        } else {
+            push @options, "CODE_SIGN_IDENTITY="; # No identity
+            push @options, "CODE_SIGNING_REQUIRED=NO";
+        }
+    }
+    push @options, argumentsForXcode();
+    return @options;
 }
 
 sub XcodeOptionString
@@ -1032,6 +1058,13 @@ sub determineIsWin64()
     $isWin64 = checkForArgumentAndRemoveFromARGV("--64-bit");
 }
 
+sub determineIsWin64FromArchitecture($)
+{
+    my $arch = shift;
+    $isWin64 = ($arch eq "x86_64");
+    return $isWin64;
+}
+
 sub isCygwin()
 {
     return ($^O eq "cygwin") || 0;
@@ -1377,7 +1410,7 @@ sub launcherName()
     } elsif (isAppleMacWebKit()) {
         return "Safari";
     } elsif (isAppleWinWebKit()) {
-        return "WinLauncher";
+        return "MiniBrowser";
     }
 }
 
@@ -1515,6 +1548,8 @@ sub setupAppleWinEnv()
         $variablesToSet{WEBKIT_LIBRARIES} = windowsLibrariesDir() unless $ENV{WEBKIT_LIBRARIES};
         $variablesToSet{WEBKIT_OUTPUTDIR} = windowsOutputDir() unless $ENV{WEBKIT_OUTPUTDIR};
         $variablesToSet{MSBUILDDISABLENODEREUSE} = "1" unless $ENV{MSBUILDDISABLENODEREUSE};
+        $variablesToSet{_IsNativeEnvironment} = "true" unless $ENV{_IsNativeEnvironment};
+        $variablesToSet{PreferredToolArchitecture} = "x64" unless $ENV{PreferredToolArchitecture};
 
         foreach my $variable (keys %variablesToSet) {
             print "Setting the Environment Variable '" . $variable . "' to '" . $variablesToSet{$variable} . "'\n\n";
@@ -1797,6 +1832,14 @@ sub removeCMakeCache(@)
 
 sub canUseNinja(@)
 {
+    if (!defined($shouldNotUseNinja)) {
+        $shouldNotUseNinja = checkForArgumentAndRemoveFromARGV("--no-ninja");
+    }
+
+    if ($shouldNotUseNinja) {
+        return 0;
+    }
+
     # Test both ninja and ninja-build. Fedora uses ninja-build and has patched CMake to also call ninja-build.
     return commandExists("ninja") || commandExists("ninja-build");
 }
@@ -1850,6 +1893,8 @@ sub generateBuildSystemFromCMakeProject
         } else {
             push @args, "Ninja";
         }
+    } elsif (isAnyWindows() && isWin64()) {
+        push @args, '-G "Visual Studio 14 2015 Win64"';
     }
 
     # GTK+ has a production mode, but build-webkit should always use developer mode.
@@ -1986,12 +2031,16 @@ sub setPathForRunningWebKitApp
 {
     my ($env) = @_;
 
-    if (isAppleWinWebKit()) {
-        $env->{PATH} = join(':', productDir(), appleApplicationSupportPath(), $env->{PATH} || "");
-    } elsif (isWinCairo()) {
-        my $winCairoBin = sourceDir() . "/WebKitLibraries/win/" . (isWin64() ? "bin64/" : "bin32/");
-        my $gstreamerBin = isWin64() ? $ENV{"GSTREAMER_1_0_ROOT_X86_64"} . "bin" : $ENV{"GSTREAMER_1_0_ROOT_X86"} . "bin";
-        $env->{PATH} = join(':', productDir(), $winCairoBin, $gstreamerBin, $env->{PATH} || "");
+    if (isAnyWindows()) {
+        my $binDir = isWin64() ? "bin64" : "bin32";
+        my $productBinaryDir = File::Spec->catdir(productDir(), $binDir);
+        if (isAppleWinWebKit()) {
+            $env->{PATH} = join(':', $productBinaryDir, appleApplicationSupportPath(), $env->{PATH} || "");
+        } elsif (isWinCairo()) {
+            my $winCairoBin = sourceDir() . "/WebKitLibraries/win/" . (isWin64() ? "bin64/" : "bin32/");
+            my $gstreamerBin = isWin64() ? $ENV{"GSTREAMER_1_0_ROOT_X86_64"} . "bin" : $ENV{"GSTREAMER_1_0_ROOT_X86"} . "bin";
+            $env->{PATH} = join(':', $productBinaryDir, $winCairoBin, $gstreamerBin, $env->{PATH} || "");
+        }
     }
 }
 
@@ -2392,7 +2441,8 @@ sub runSafari
     if (isAppleWinWebKit()) {
         my $result;
         my $productDir = productDir();
-        my $webKitLauncherPath = File::Spec->catfile(productDir(), "WinLauncher.exe");
+        my $binDir = isWin64() ? "bin64" : "bin32";
+        my $webKitLauncherPath = File::Spec->catfile(productDir(), $binDir, "MiniBrowser.exe");
         return system { $webKitLauncherPath } $webKitLauncherPath, @ARGV;
     }
 
@@ -2403,6 +2453,12 @@ sub runMiniBrowser
 {
     if (isAppleMacWebKit()) {
         return runMacWebKitApp(File::Spec->catfile(productDir(), "MiniBrowser.app", "Contents", "MacOS", "MiniBrowser"));
+    } elsif (isAppleWinWebKit()) {
+        my $result;
+        my $productDir = productDir();
+        my $binDir = isWin64() ? "bin64" : "bin32";
+        my $webKitLauncherPath = File::Spec->catfile(productDir(), $binDir, "MiniBrowser.exe");
+        return system { $webKitLauncherPath } $webKitLauncherPath, @ARGV;
     }
 
     return 1;

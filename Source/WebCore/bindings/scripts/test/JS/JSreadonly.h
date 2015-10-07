@@ -27,9 +27,9 @@
 
 namespace WebCore {
 
-class JSreadonly : public JSDOMWrapper {
+class JSreadonly : public JSDOMWrapperWithImplementation<readonly> {
 public:
-    typedef JSDOMWrapper Base;
+    typedef JSDOMWrapperWithImplementation<readonly> Base;
     static JSreadonly* create(JSC::Structure* structure, JSDOMGlobalObject* globalObject, Ref<readonly>&& impl)
     {
         JSreadonly* ptr = new (NotNull, JSC::allocateCell<JSreadonly>(globalObject->vm().heap)) JSreadonly(structure, globalObject, WTF::move(impl));
@@ -41,7 +41,6 @@ public:
     static JSC::JSObject* getPrototype(JSC::VM&, JSC::JSGlobalObject*);
     static readonly* toWrapped(JSC::JSValue);
     static void destroy(JSC::JSCell*);
-    ~JSreadonly();
 
     DECLARE_INFO;
 
@@ -51,11 +50,6 @@ public:
     }
 
     static JSC::JSValue getConstructor(JSC::VM&, JSC::JSGlobalObject*);
-    readonly& impl() const { return *m_impl; }
-    void releaseImpl() { std::exchange(m_impl, nullptr)->deref(); }
-
-private:
-    readonly* m_impl;
 protected:
     JSreadonly(JSC::Structure*, JSDOMGlobalObject*, Ref<readonly>&&);
 
@@ -69,8 +63,8 @@ protected:
 
 class JSreadonlyOwner : public JSC::WeakHandleOwner {
 public:
-    bool isReachableFromOpaqueRoots(JSC::JSCell&, void* context, JSC::SlotVisitor&) override;
-    void finalize(JSC::JSCell*&, void* context) override;
+    virtual bool isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown>, void* context, JSC::SlotVisitor&);
+    virtual void finalize(JSC::Handle<JSC::Unknown>, void* context);
 };
 
 inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld&, readonly*)

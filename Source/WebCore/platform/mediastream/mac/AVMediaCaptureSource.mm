@@ -130,6 +130,7 @@ AVMediaCaptureSource::AVMediaCaptureSource(AVCaptureDeviceType* device, const At
     , m_isRunning(false)
 {
     setName(device.localizedName);
+    setPersistentID(device.uniqueID);
     m_currentStates.setSourceType(type == RealtimeMediaSource::Video ? RealtimeMediaSourceStates::Camera : RealtimeMediaSourceStates::Microphone);
 }
 
@@ -207,6 +208,12 @@ void AVMediaCaptureSource::scheduleDeferredTask(std::function<void ()> function)
 
         function();
     });
+}
+
+AudioSourceProvider* AVMediaCaptureSource::audioSourceProvider()
+{
+    ASSERT_NOT_REACHED();
+    return nullptr;
 }
 
 } // namespace WebCore

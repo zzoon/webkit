@@ -70,7 +70,7 @@ private:
 
     virtual void attachViewOverlayGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*) override;
 
-#if USE(TEXTURE_MAPPER_GL) && PLATFORM(GTK)
+#if USE(TEXTURE_MAPPER) && PLATFORM(GTK)
     virtual void setNativeSurfaceHandleForCompositing(uint64_t) override;
 #endif
 
@@ -131,6 +131,8 @@ private:
     // won't paint until painting has resumed again.
     bool m_isPaintingSuspended;
     bool m_alwaysUseCompositing;
+
+    bool m_forceRepaintAfterBackingStoreStateUpdate { false };
 
     RunLoop::Timer<DrawingAreaImpl> m_displayTimer;
     RunLoop::Timer<DrawingAreaImpl> m_exitCompositingTimer;
