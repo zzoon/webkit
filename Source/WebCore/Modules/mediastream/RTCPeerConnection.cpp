@@ -372,8 +372,7 @@ void RTCPeerConnection::updateIceGatheringState(IceGatheringState newState)
     scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
         m_iceGatheringState = newState;
 
-        // FIXME: add icegatheringstatechange to event names
-        dispatchEvent(Event::create(eventNames().statechangeEvent, false, false));
+        dispatchEvent(Event::create(eventNames().icegatheringstatechangeEvent, false, false));
     });
 }
 

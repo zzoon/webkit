@@ -97,6 +97,7 @@
     attribute EventHandler onsignalingstatechange;
     attribute EventHandler ontrack;
     attribute EventHandler oniceconnectionstatechange;
+    attribute EventHandler onicegatheringstatechange;
     attribute EventHandler ondatachannel;
 
     // EventTarget interface
