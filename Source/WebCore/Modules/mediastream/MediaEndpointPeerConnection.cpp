@@ -232,6 +232,12 @@ void MediaEndpointPeerConnection::queuedCreateOffer(RTCOfferOptions& options, Se
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
+    if (m_client->internalSignalingState() == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        completeQueuedOperation();
+        return;
+    }
+
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = internalLocalDescription() ?
         internalLocalDescription()->configuration()->clone() : MediaEndpointConfiguration::create();
 
@@ -304,6 +310,19 @@ void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, Sessio
 void MediaEndpointPeerConnection::queuedCreateAnswer(RTCAnswerOptions&, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
+
+    if (m_client->internalSignalingState() == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        completeQueuedOperation();
+        return;
+    }
+
+    if (!remoteDescription()) {
+        // FIXME: Error type?
+        promise.reject(DOMError::create("InvalidStateError (no remote description)"));
+        completeQueuedOperation();
+        return;
+    }
 
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = internalLocalDescription() ?
         internalLocalDescription()->configuration()->clone() : MediaEndpointConfiguration::create();
@@ -396,8 +415,11 @@ static bool allSendersRepresented(const RtpSenderVector& senders, const MediaDes
 
 void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, VoidPromise& promise)
 {
-    if (m_client->internalSignalingState() == SignalingState::Closed)
+    if (m_client->internalSignalingState() == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        completeQueuedOperation();
         return;
+    }
 
     SessionDescription::Type descriptionType = parseDescriptionType(description->type());
 
@@ -558,8 +580,11 @@ void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* de
 
 void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* description, VoidPromise& promise)
 {
-    if (m_client->internalSignalingState() == SignalingState::Closed)
+    if (m_client->internalSignalingState() == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        completeQueuedOperation();
         return;
+    }
 
     SessionDescription::Type descriptionType = parseDescriptionType(description->type());
 
@@ -676,6 +701,12 @@ void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate,
 
 void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, PeerConnection::VoidPromise& promise)
 {
+    if (m_client->internalSignalingState() == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        completeQueuedOperation();
+        return;
+    }
+
     if (!remoteDescription()) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidStateError (no remote description)"));

@@ -172,11 +172,6 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
 
 void RTCPeerConnection::createOffer(const Dictionary& offerOptions, SessionDescriptionPromise&& promise)
 {
-    if (m_signalingState == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        return;
-    }
-
     ExceptionCode ec = 0;
     RefPtr<RTCOfferOptions> options = RTCOfferOptions::create(offerOptions, ec);
     if (ec) {
@@ -190,21 +185,10 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, SessionDescr
 
 void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, SessionDescriptionPromise&& promise)
 {
-    if (m_signalingState == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        return;
-    }
-
     ExceptionCode ec = 0;
     RefPtr<RTCAnswerOptions> options = RTCAnswerOptions::create(answerOptions, ec);
     if (ec) {
         promise.reject(DOMError::create("Invalid createAnswer argument"));
-        return;
-    }
-
-    if (!remoteDescription()) {
-        // FIXME: Error type?
-        promise.reject(DOMError::create("InvalidStateError (no remote description)"));
         return;
     }
 
@@ -213,11 +197,6 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, SessionDes
 
 void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, PeerConnection::VoidPromise&& promise)
 {
-    if (m_signalingState == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        return;
-    }
-
     m_backend->setLocalDescription(description, WTF::move(promise));
 }
 
@@ -238,11 +217,6 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::pendingLocalDescription() const
 
 void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description, PeerConnection::VoidPromise&& promise)
 {
-    if (m_signalingState == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        return;
-    }
-
     m_backend->setRemoteDescription(description, WTF::move(promise));
 }
 
@@ -263,11 +237,6 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::pendingRemoteDescription() cons
 
 void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidPromise&& promise)
 {
-    if (m_signalingState == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        return;
-    }
-
     m_backend->addIceCandidate(rtcCandidate, WTF::move(promise));
 }
 
