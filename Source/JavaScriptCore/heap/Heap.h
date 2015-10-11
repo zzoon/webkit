@@ -31,6 +31,7 @@
 #include "HeapOperation.h"
 #include "JITStubRoutineSet.h"
 #include "ListableHandler.h"
+#include "MachineStackMarker.h"
 #include "MarkedAllocator.h"
 #include "MarkedBlock.h"
 #include "MarkedBlockSet.h"
@@ -73,6 +74,7 @@ class WeakGCHandlePool;
 class SlotVisitor;
 
 namespace DFG {
+class SpeculativeJIT;
 class Worklist;
 }
 
@@ -102,7 +104,6 @@ public:
     static bool testAndSetMarked(const void*);
     static void setMarked(const void*);
 
-    static bool isWriteBarrierEnabled();
     void writeBarrier(const JSCell*);
     void writeBarrier(const JSCell*, JSValue);
     void writeBarrier(const JSCell*, JSCell*);
@@ -226,8 +227,6 @@ public:
         template<typename T> void releaseSoon(RetainPtr<T>&&);
 #endif
 
-    void removeCodeBlock(CodeBlock* cb) { m_codeBlocks.remove(cb); }
-
     static bool isZombified(JSCell* cell) { return *(void**)cell == zombifiedBits; }
 
     void registerWeakGCMap(void* weakGCMap, std::function<void()> pruningCallback);
@@ -252,7 +251,6 @@ private:
     friend class MarkedBlock;
     friend class CopiedSpace;
     friend class CopyVisitor;
-    friend class RecursiveAllocationScope;
     friend class SlotVisitor;
     friend class SuperRegion;
     friend class IncrementalSweeper;
@@ -313,7 +311,7 @@ private:
     void snapshotMarkedSpace();
     void deleteSourceProviderCaches();
     void notifyIncrementalSweeper();
-    void rememberCurrentlyExecutingCodeBlocks();
+    void writeBarrierCurrentlyExecutingCodeBlocks();
     void resetAllocators();
     void copyBackingStores();
     void harvestWeakReferences();

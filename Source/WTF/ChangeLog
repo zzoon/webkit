@@ -1,3 +1,43 @@
+2015-10-10  Dan Bernstein  <mitz@apple.com>
+
+        [iOS] Remove unnecessary iOS version checks
+        https://bugs.webkit.org/show_bug.cgi?id=150002
+
+        Reviewed by Alexey Proskuryakov.
+
+        * wtf/Platform.h:
+
+2015-10-10  Dan Bernstein  <mitz@apple.com>
+
+        [iOS] Remove project support for iOS 8
+        https://bugs.webkit.org/show_bug.cgi?id=149993
+
+        Reviewed by Alexey Proskuryakov.
+
+        * Configurations/Base.xcconfig:
+        * Configurations/WTF.xcconfig:
+        * Configurations/mbmalloc.xcconfig:
+
+2015-10-08  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Clean up Marked classes
+        https://bugs.webkit.org/show_bug.cgi?id=149853
+
+        Reviewed by Darin Adler.
+
+        * wtf/PageBlock.h:
+        Remove duplicate using statement.
+
+2015-10-08  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Remove PageReservation.h clang fixme that has been fixed for a while
+        https://bugs.webkit.org/show_bug.cgi?id=149908
+
+        Reviewed by Csaba Osztrogonác.
+
+        * wtf/PageReservation.h:
+        (WTF::PageReservation::operator bool): Deleted.
+
 2015-10-06  Daniel Bates  <dbates@webkit.org>
 
         Enable XSLT when building WebKit for iOS using the public iOS SDK

@@ -1,3 +1,701 @@
+2015-10-10  Andreas Kling  <akling@apple.com>
+
+        Reduce pointless malloc traffic in CodeBlock construction.
+        <https://webkit.org/b/149999>
+
+        Reviewed by Antti Koivisto.
+
+        Create the RefCountedArray<Instruction> for CodeBlock's m_instructions directly
+        instead of first creating a Vector<Instruction> and then creating a RefCountedArray
+        from that. None of the Vector functionality is needed here anyway.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::finishCreation):
+        (JSC::CodeBlock::insertBasicBlockBoundariesForControlFlowProfiler):
+        * bytecode/CodeBlock.h:
+
+2015-10-10  Dan Bernstein  <mitz@apple.com>
+
+        [iOS] Remove unnecessary iOS version checks
+        https://bugs.webkit.org/show_bug.cgi?id=150002
+
+        Reviewed by Alexey Proskuryakov.
+
+        * llvm/library/LLVMExports.cpp:
+        (initializeAndGetJSCLLVMAPI):
+
+2015-10-10  Dan Bernstein  <mitz@apple.com>
+
+        [iOS] Remove project support for iOS 8
+        https://bugs.webkit.org/show_bug.cgi?id=149993
+
+        Reviewed by Alexey Proskuryakov.
+
+        * Configurations/Base.xcconfig:
+        * Configurations/JSC.xcconfig:
+        * Configurations/JavaScriptCore.xcconfig:
+        * Configurations/LLVMForJSC.xcconfig:
+        * Configurations/ToolExecutable.xcconfig:
+
+2015-10-09  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Modernize and cleanup an NSNumber constant
+        https://bugs.webkit.org/show_bug.cgi?id=149962
+
+        Reviewed by Andreas Kling.
+
+        * API/JSVirtualMachine.mm:
+        (-[JSVirtualMachine addExternalRememberedObject:]):
+
+2015-10-09  Joseph Pecoraro  <pecoraro@apple.com>
+
+        No need to keep setting needsVisit flag in SmallStrings
+        https://bugs.webkit.org/show_bug.cgi?id=149961
+
+        Reviewed by Andreas Kling.
+
+        SmallStrings are all initialized at once privately before the VM
+        enables Garbage Collection. There is no need to keep updating
+        this flag, as it couldn't have changed.
+
+        * runtime/SmallStrings.cpp:
+        (JSC::SmallStrings::createEmptyString):
+        (JSC::SmallStrings::createSingleCharacterString):
+        (JSC::SmallStrings::initialize):
+        * runtime/SmallStrings.h:
+
+2015-10-09  Geoffrey Garen  <ggaren@apple.com>
+
+        Unreviewed, rolling back in r190694
+        https://bugs.webkit.org/show_bug.cgi?id=149727
+
+        This time for double sure?
+
+        The cause of the crash was an incorrect write barrier.
+
+        OSR exit was barriering the baseline codeblock for the top of the stack
+        twice, missing the baseline codeblock for the bottom of the stack.
+
+        Restored changesets:
+
+        "CodeBlock should be a GC object"
+        https://bugs.webkit.org/show_bug.cgi?id=149727
+        http://trac.webkit.org/changeset/r190694
+
+2015-10-09  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Remove unused RecursiveAllocationScope
+        https://bugs.webkit.org/show_bug.cgi?id=149967
+
+        Reviewed by Csaba Osztrogonác.
+
+        RecursiveAllocationScope has been unused since r163691.
+
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * heap/Heap.cpp:
+        * heap/Heap.h:
+        * heap/RecursiveAllocationScope.h: Removed.
+        * runtime/VM.h:
+
+2015-10-09  Geoffrey Garen  <ggaren@apple.com>
+
+        Unreviewed, rolling out r190694
+        https://bugs.webkit.org/show_bug.cgi?id=148560
+
+        Crashes seen on PLT bots and facebook.com.
+
+        Reverted changesets:
+
+        "CodeBlock should be a GC object"
+        https://bugs.webkit.org/show_bug.cgi?id=149727
+        http://trac.webkit.org/changeset/190694
+
+2015-10-09  Xabier Rodriguez Calvar  <calvaris@igalia.com> and Youenn Fablet  <youenn.fablet@crf.canon.fr>
+
+        Automate WebCore JS builtins generation and build system
+        https://bugs.webkit.org/show_bug.cgi?id=149751
+
+        Reviewed by Darin Adler.
+
+        * generate-js-builtins: updating the part related to WebCore JS binding.
+
+2015-10-08  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG SSA should remove unreachable code
+        https://bugs.webkit.org/show_bug.cgi?id=149931
+
+        Reviewed by Geoffrey Garen.
+
+        Rolled back in with a call to m_state.reset(), which fixes the debug asserts.
+
+        * dfg/DFGConstantFoldingPhase.cpp:
+        (JSC::DFG::ConstantFoldingPhase::run): Remove unreachable code.
+        * dfg/DFGObjectAllocationSinkingPhase.cpp: Deal with the CFG changing.
+        * dfg/DFGPutStackSinkingPhase.cpp: Deal with the CFG changing.
+
+2015-10-08  Daniel Bates  <dabates@apple.com>
+
+        Add LLVM binaries for iOS 9 device
+        https://bugs.webkit.org/show_bug.cgi?id=149913
+
+        Reviewed by Filip Pizlo.
+
+        Look for locally built/binary dropped LLVM headers and libraries when building for iOS device
+        in WebKitBuild/usr/local.
+
+        Currently Mac and iOS look for the locally built/binary dropped LLVM in different directories:
+        WebKitBuild/usr/local and /usr/local/LLVMForJavaScriptCore, respectively. This difference is
+        due to dependencies with the Apple internal build system. We should look to resolve the
+        Apple internal dependencies and standardize on one location for both platforms.
+
+        * Configurations/Base.xcconfig:
+
+2015-10-08  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r190749.
+        https://bugs.webkit.org/show_bug.cgi?id=149938
+
+        Caused 50+ layout test failures
+        https://build.webkit.org/results/Apple%20El%20Capitan%20Debug%20WK1%20(Tests)/r190749%20(213)/results.html
+        (Requested by litherum1 on #webkit).
+
+        Reverted changeset:
+
+        "DFG SSA should remove unreachable code"
+        https://bugs.webkit.org/show_bug.cgi?id=149931
+        http://trac.webkit.org/changeset/190749
+
+2015-10-08  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG SSA should remove unreachable code
+        https://bugs.webkit.org/show_bug.cgi?id=149931
+
+        Reviewed by Geoffrey Garen.
+
+        * dfg/DFGConstantFoldingPhase.cpp:
+        (JSC::DFG::ConstantFoldingPhase::run): Remove unreachable code.
+        * dfg/DFGObjectAllocationSinkingPhase.cpp: Deal with the CFG changing.
+        * dfg/DFGPutStackSinkingPhase.cpp: Deal with the CFG changing.
+
+2015-10-08  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Unreviewed build fix. Missing forward declaration.
+
+        * heap/Heap.h:
+
+2015-10-08  Saam barati  <sbarati@apple.com>
+
+        Unreviewed Cloop build fix after bug: https://bugs.webkit.org/show_bug.cgi?id=149601
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::newExceptionHandlingCallSiteIndex):
+        * jit/JITCode.cpp:
+        (JSC::NativeJITCode::addressForCall):
+        (JSC::JITCode::liveRegistersToPreserveAtExceptionHandlingCallSite):
+        * jit/JITCode.h:
+
+2015-10-08  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Clean up Marked classes
+        https://bugs.webkit.org/show_bug.cgi?id=149853
+
+        Reviewed by Darin Adler.
+
+        * heap/Heap.h:
+        Move include here where it is really needed.
+
+        * heap/HeapStatistics.cpp:
+        * heap/HeapStatistics.h:
+        Simplify includes.
+
+        * heap/MarkedAllocator.h:
+        Add missing copyright header.
+
+        * heap/MarkedBlock.cpp:
+        * heap/MarkedBlock.h:
+        (JSC::MarkedBlock::needsSweeping):
+        Remove unused constants. Add some static asserts. Add some `const` ness.
+
+        * heap/MarkedSpace.h:
+        (JSC::MarkedSpace::isIterating):
+        Update comments to better reflect actual values.
+        Remove unimplemented method (moved to Heap).
+
+        * heap/MarkedSpace.cpp:
+        (JSC::Free::Free):
+        (JSC::Free::operator()):
+        (JSC::Free::returnValue): Deleted.
+        (JSC::FreeOrShrink::FreeOrShrink):
+        (JSC::FreeOrShrink::operator()):
+        (JSC::MarkedSpace::~MarkedSpace):
+        (JSC::MarkedSpace::shrink):
+        Replace conditional Functor that was not using return value
+        with simplified targeted VoidFunctors.
+
+        (JSC::Shrink::operator()): Deleted.
+        Remove unused functor.
+
+        * heap/WeakBlock.cpp:
+        * heap/WeakBlock.h:
+        * runtime/Options.cpp:
+        Remove dead code.
+
+2015-10-08  Saam barati  <sbarati@apple.com>
+
+        We should be able to inline getter/setter calls inside an inline cache even when the SpillRegistersMode is NeedsToSpill
+        https://bugs.webkit.org/show_bug.cgi?id=149601
+
+        Reviewed by Filip Pizlo.
+
+        Before, if we had a PolymorphicAccess with and a StructureStubInfo
+        with a NeedToSpill spillMode, we wouldn't generate getter/setter
+        calls. This patch changes it such that we will generate the
+        getter/setter call and do the necessary register spilling/filling
+        around the getter/setter call to preserve any "usedRegisters".
+
+        This has an interesting story with how it relates to exception handling 
+        inside the DFG. Because the GetById variants are considered a throwing call 
+        site, we must make sure that we properly restore the registers spilled to the stack 
+        in case of an exception being thrown inside the getter/setter call. We do 
+        this by having the inline cache register itself as a new exception handling 
+        call site. When the inline cache "catches" the exception (i.e, genericUnwind 
+        will jump to this code), it will restore the registers it spilled that are 
+        live inside the original catch handler, and then jump to the original catch 
+        handler. We make sure to only generate this makeshift catch handler when we 
+        actually need to do any cleanup. If we determine that we don't need to restore 
+        any registers, we don't bother generating this makeshift catch handler.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::~CodeBlock):
+        (JSC::CodeBlock::handlerForIndex):
+        (JSC::CodeBlock::newExceptionHandlingCallSiteIndex):
+        (JSC::CodeBlock::removeExceptionHandlerForCallSite):
+        (JSC::CodeBlock::lineNumberForBytecodeOffset):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::appendExceptionHandler):
+        * bytecode/PolymorphicAccess.cpp:
+        (JSC::AccessGenerationState::AccessGenerationState):
+        (JSC::AccessGenerationState::restoreScratch):
+        (JSC::AccessGenerationState::succeed):
+        (JSC::AccessGenerationState::calculateLiveRegistersForCallAndExceptionHandling):
+        (JSC::AccessGenerationState::preserveLiveRegistersToStackForCall):
+        (JSC::AccessGenerationState::restoreLiveRegistersFromStackForCall):
+        (JSC::AccessGenerationState::restoreLiveRegistersFromStackForCallWithThrownException):
+        (JSC::AccessGenerationState::liveRegistersForCall):
+        (JSC::AccessGenerationState::callSiteIndexForExceptionHandlingOrOriginal):
+        (JSC::AccessGenerationState::callSiteIndexForExceptionHandling):
+        (JSC::AccessGenerationState::originalExceptionHandler):
+        (JSC::AccessGenerationState::numberOfStackBytesUsedForRegisterPreservation):
+        (JSC::AccessGenerationState::needsToRestoreRegistersIfException):
+        (JSC::AccessGenerationState::originalCallSiteIndex):
+        (JSC::AccessGenerationState::liveRegistersToPreserveAtExceptionHandlingCallSite):
+        (JSC::AccessCase::AccessCase):
+        (JSC::AccessCase::generate):
+        (JSC::PolymorphicAccess::regenerateWithCases):
+        (JSC::PolymorphicAccess::regenerate):
+        (JSC::PolymorphicAccess::aboutToDie):
+        * bytecode/PolymorphicAccess.h:
+        (JSC::AccessCase::doesCalls):
+        (JSC::AccessCase::isGetter):
+        (JSC::AccessCase::callLinkInfo):
+        * bytecode/StructureStubInfo.cpp:
+        (JSC::StructureStubInfo::deref):
+        (JSC::StructureStubInfo::aboutToDie):
+        (JSC::StructureStubInfo::addAccessCase):
+        * bytecode/StructureStubInfo.h:
+        * bytecode/ValueRecovery.h:
+        (JSC::ValueRecovery::isInJSValueRegs):
+        (JSC::ValueRecovery::fpr):
+        * dfg/DFGCommonData.cpp:
+        (JSC::DFG::CommonData::addCodeOrigin):
+        (JSC::DFG::CommonData::addCodeOriginUnconditionally):
+        (JSC::DFG::CommonData::lastCallSite):
+        (JSC::DFG::CommonData::removeCallSiteIndex):
+        (JSC::DFG::CommonData::shrinkToFit):
+        * dfg/DFGCommonData.h:
+        * dfg/DFGJITCode.cpp:
+        (JSC::DFG::JITCode::reconstruct):
+        (JSC::DFG::JITCode::liveRegistersToPreserveAtExceptionHandlingCallSite):
+        (JSC::DFG::JITCode::checkIfOptimizationThresholdReached):
+        * dfg/DFGJITCode.h:
+        (JSC::DFG::JITCode::osrEntryBlock):
+        (JSC::DFG::JITCode::setOSREntryBlock):
+        * dfg/DFGJITCompiler.cpp:
+        (JSC::DFG::JITCompiler::appendExceptionHandlingOSRExit):
+        * dfg/DFGOSRExit.cpp:
+        (JSC::DFG::OSRExit::OSRExit):
+        * dfg/DFGOSRExit.h:
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileIn):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::cachedGetById):
+        (JSC::DFG::SpeculativeJIT::cachedPutById):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::cachedGetById):
+        (JSC::DFG::SpeculativeJIT::cachedPutById):
+        * ftl/FTLCompile.cpp:
+        (JSC::FTL::mmAllocateDataSection):
+        * ftl/FTLJITCode.cpp:
+        (JSC::FTL::JITCode::validateReferences):
+        (JSC::FTL::JITCode::liveRegistersToPreserveAtExceptionHandlingCallSite):
+        * ftl/FTLJITCode.h:
+        (JSC::FTL::JITCode::handles):
+        (JSC::FTL::JITCode::dataSections):
+        * jit/GCAwareJITStubRoutine.cpp:
+        (JSC::GCAwareJITStubRoutine::GCAwareJITStubRoutine):
+        (JSC::GCAwareJITStubRoutine::~GCAwareJITStubRoutine):
+        (JSC::GCAwareJITStubRoutine::observeZeroRefCount):
+        (JSC::MarkingGCAwareJITStubRoutineWithOneObject::markRequiredObjectsInternal):
+        (JSC::GCAwareJITStubRoutineWithExceptionHandler::GCAwareJITStubRoutineWithExceptionHandler):
+        (JSC::GCAwareJITStubRoutineWithExceptionHandler::aboutToDie):
+        (JSC::GCAwareJITStubRoutineWithExceptionHandler::~GCAwareJITStubRoutineWithExceptionHandler):
+        (JSC::createJITStubRoutine):
+        * jit/GCAwareJITStubRoutine.h:
+        * jit/JITCode.cpp:
+        (JSC::NativeJITCode::addressForCall):
+        (JSC::JITCode::liveRegistersToPreserveAtExceptionHandlingCallSite):
+        * jit/JITCode.h:
+        * jit/JITInlineCacheGenerator.cpp:
+        (JSC::JITByIdGenerator::JITByIdGenerator):
+        (JSC::JITGetByIdGenerator::JITGetByIdGenerator):
+        (JSC::JITPutByIdGenerator::JITPutByIdGenerator):
+        * jit/JITInlineCacheGenerator.h:
+        (JSC::JITByIdGenerator::reportSlowPathCall):
+        * jit/JITPropertyAccess.cpp:
+        (JSC::JIT::emitGetByValWithCachedId):
+        (JSC::JIT::emitPutByValWithCachedId):
+        (JSC::JIT::emit_op_get_by_id):
+        (JSC::JIT::emit_op_put_by_id):
+        * jit/JITPropertyAccess32_64.cpp:
+        (JSC::JIT::emitGetByValWithCachedId):
+        (JSC::JIT::emitPutByValWithCachedId):
+        (JSC::JIT::emit_op_get_by_id):
+        (JSC::JIT::emit_op_put_by_id):
+        * jit/JITStubRoutine.h:
+        (JSC::JITStubRoutine::createSelfManagedRoutine):
+        (JSC::JITStubRoutine::aboutToDie):
+        * jit/RegisterSet.cpp:
+        (JSC::RegisterSet::webAssemblyCalleeSaveRegisters):
+        (JSC::RegisterSet::registersToNotSaveForCall):
+        (JSC::RegisterSet::allGPRs):
+        * jit/RegisterSet.h:
+        (JSC::RegisterSet::set):
+        (JSC::RegisterSet::clear):
+        * jit/ScratchRegisterAllocator.cpp:
+        (JSC::ScratchRegisterAllocator::allocateScratchGPR):
+        (JSC::ScratchRegisterAllocator::allocateScratchFPR):
+        (JSC::ScratchRegisterAllocator::preserveReusedRegistersByPushing):
+        (JSC::ScratchRegisterAllocator::restoreReusedRegistersByPopping):
+        (JSC::ScratchRegisterAllocator::usedRegistersForCall):
+        (JSC::ScratchRegisterAllocator::preserveUsedRegistersToScratchBufferForCall):
+        (JSC::ScratchRegisterAllocator::restoreUsedRegistersFromScratchBufferForCall):
+        (JSC::ScratchRegisterAllocator::preserveRegistersToStackForCall):
+        (JSC::ScratchRegisterAllocator::restoreRegistersFromStackForCall):
+        * jit/ScratchRegisterAllocator.h:
+        (JSC::ScratchRegisterAllocator::numberOfReusedRegisters):
+        (JSC::ScratchRegisterAllocator::usedRegisters):
+        * jsc.cpp:
+        (WTF::CustomGetter::CustomGetter):
+        (WTF::CustomGetter::createStructure):
+        (WTF::CustomGetter::create):
+        (WTF::CustomGetter::getOwnPropertySlot):
+        (WTF::CustomGetter::customGetter):
+        (WTF::Element::handleOwner):
+        (GlobalObject::finishCreation):
+        (functionCreateImpureGetter):
+        (functionCreateCustomGetterObject):
+        (functionSetImpureGetterDelegate):
+        * tests/stress/try-catch-custom-getter-as-get-by-id.js: Added.
+        (assert):
+        (bar):
+        (foo):
+        * tests/stress/try-catch-getter-as-get-by-id-register-restoration.js: Added.
+        (assert):
+        (o1.get f):
+        (bar):
+        (foo):
+        * tests/stress/try-catch-getter-as-get-by-id.js: Added.
+        (assert):
+        (o1.get f):
+        (bar):
+        (foo):
+        * tests/stress/try-catch-setter-as-put-by-id.js: Added.
+        (assert):
+        (o1.set f):
+        (bar):
+        (foo):
+        * tests/stress/try-catch-stub-routine-replaced.js: Added.
+        (assert):
+        (arr):
+        (hello):
+        (foo):
+        (objChain.get f):
+        (fakeOut.get f):
+        (o.get f):
+
+2015-10-08  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r190716.
+        https://bugs.webkit.org/show_bug.cgi?id=149924
+
+        broke mac build from time to time (Requested by youenn on
+        #webkit).
+
+        Reverted changeset:
+
+        "Automate WebCore JS builtins generation and build system"
+        https://bugs.webkit.org/show_bug.cgi?id=149751
+        http://trac.webkit.org/changeset/190716
+
+2015-10-08  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Fix the WASM build on Linux
+        https://bugs.webkit.org/show_bug.cgi?id=149919
+
+        Reviewed by Mark Lam.
+
+        * inspector/ScriptCallStackFactory.cpp:
+        * wasm/JSWASMModule.cpp:
+        * wasm/WASMFunctionCompiler.h:
+        (JSC::sizeOfMemoryType):
+        * wasm/WASMFunctionLLVMIRGenerator.h:
+
+2015-10-08  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Unreviewed CLOOP buildfix after r190718.
+
+        * jit/Repatch.h:
+        (JSC::resetGetByID): Deleted.
+        (JSC::resetPutByID): Deleted.
+        (JSC::resetIn): Deleted.
+
+2015-10-08  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Remove references to removed class RepatchBuffer
+        https://bugs.webkit.org/show_bug.cgi?id=149909
+
+        Reviewed by Csaba Osztrogonác.
+
+        * assembler/AbstractMacroAssembler.h:
+        * assembler/MacroAssemblerARM.h:
+        * assembler/MacroAssemblerARM64.h:
+        * assembler/MacroAssemblerARMv7.h:
+        * assembler/MacroAssemblerMIPS.h:
+        * assembler/MacroAssemblerSH4.h:
+        * assembler/MacroAssemblerX86.h:
+        * assembler/MacroAssemblerX86_64.h:
+        * jit/JITStubRoutine.h:
+        * jit/Repatch.h:
+
+2015-10-08  Xabier Rodriguez Calvar  <calvaris@igalia.com> and Youenn Fablet  <youenn.fablet@crf.canon.fr>
+
+        Automate WebCore JS builtins generation and build system
+        https://bugs.webkit.org/show_bug.cgi?id=149751
+
+        Reviewed by Darin Adler.
+
+        * generate-js-builtins: updating the part related to WebCore JS binding.
+
+2015-10-07  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Clean up Copied classes
+        https://bugs.webkit.org/show_bug.cgi?id=149863
+
+        Reviewed by Saam Barati.
+
+        * heap/CopiedAllocator.h:
+        (JSC::CopiedAllocator::isValid):
+        * heap/CopiedBlock.h:
+        * heap/CopiedBlockInlines.h:
+        * heap/CopiedSpace.cpp:
+        * heap/CopiedSpace.h:
+        (JSC::CopiedSpace::isInCopyPhase):
+        (JSC::CopiedSpace::shouldDoCopyPhase):
+        * heap/CopiedSpaceInlines.h:
+        * heap/CopyToken.h:
+        * heap/CopyVisitor.cpp:
+        * heap/CopyVisitor.h:
+        * heap/CopyVisitorInlines.h:
+        * heap/CopyWorkList.h:
+        * heap/HandleBlock.h:
+        * heap/HandleSet.h:
+        * heap/HeapHelperPool.cpp:
+        * heap/HeapHelperPool.h:
+
+2015-10-07  Mark Lam  <mark.lam@apple.com>
+
+        [Follow up 2] Disable tail calls because it is breaking some sites.
+        https://bugs.webkit.org/show_bug.cgi?id=149900
+
+        Rubber stamped by Saam Barati.
+
+        Also need to surpress JSC tail call tests.
+
+        * tests/es6.yaml:
+        * tests/stress/dfg-tail-calls.js:
+        (nonInlinedTailCall.callee):
+        * tests/stress/mutual-tail-call-no-stack-overflow.js:
+        (shouldThrow):
+        * tests/stress/tail-call-in-inline-cache.js:
+        (tail):
+        * tests/stress/tail-call-no-stack-overflow.js:
+        (shouldThrow):
+        * tests/stress/tail-call-recognize.js:
+        (callerMustBeRun):
+        * tests/stress/tail-call-varargs-no-stack-overflow.js:
+        (shouldThrow):
+
+2015-10-07  Geoffrey Garen  <ggaren@apple.com>
+
+        Unreviewed, rolling back in r190450
+        https://bugs.webkit.org/show_bug.cgi?id=149727
+
+        This time for sure?
+
+        The cause of the leak was an invalidated compilation.
+
+        There was vestigial manual memory management code that eagerly removed
+        a CodeBlock from the set of CodeBlocks if compilation was invalidated.
+        That's not cool since we rely on the set of CodeBlocks when we run
+        destructors.
+
+        The fix is to remove the vestigial code.
+
+        I ran the leaks, correctness, and performance tests locally and did not
+        see any problems.
+
+        Restored changesets:
+
+        "CodeBlock should be a GC object"
+        https://bugs.webkit.org/show_bug.cgi?id=149727
+        http://trac.webkit.org/changeset/190450
+
+2015-10-07  Mark Lam  <mark.lam@apple.com>
+
+        Disable tail calls because it is breaking some sites.
+        https://bugs.webkit.org/show_bug.cgi?id=149900
+
+        Reviewed by Saam Barati.
+
+        This is until we fix whatever the breakage is.
+
+        * runtime/Options.h:
+
+2015-10-07  Sukolsak Sakshuwong  <sukolsak@gmail.com>
+
+        Add an LLVM IR generator for WebAssembly
+        https://bugs.webkit.org/show_bug.cgi?id=149486
+
+        Reviewed by Mark Lam.
+
+        This patch adds initial support for an LLVM IR generator in WebAssembly
+        (polyfill-prototype-1 format). All the methods will be implemented in
+        subsequent patches.
+
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * wasm/WASMFunctionLLVMIRGenerator.h: Added.
+        (JSC::WASMFunctionLLVMIRGenerator::MemoryAddress::MemoryAddress):
+        (JSC::WASMFunctionLLVMIRGenerator::startFunction):
+        (JSC::WASMFunctionLLVMIRGenerator::endFunction):
+        (JSC::WASMFunctionLLVMIRGenerator::buildSetLocal):
+        (JSC::WASMFunctionLLVMIRGenerator::buildSetGlobal):
+        (JSC::WASMFunctionLLVMIRGenerator::buildReturn):
+        (JSC::WASMFunctionLLVMIRGenerator::buildImmediateI32):
+        (JSC::WASMFunctionLLVMIRGenerator::buildImmediateF32):
+        (JSC::WASMFunctionLLVMIRGenerator::buildImmediateF64):
+        (JSC::WASMFunctionLLVMIRGenerator::buildGetLocal):
+        (JSC::WASMFunctionLLVMIRGenerator::buildGetGlobal):
+        (JSC::WASMFunctionLLVMIRGenerator::buildConvertType):
+        (JSC::WASMFunctionLLVMIRGenerator::buildLoad):
+        (JSC::WASMFunctionLLVMIRGenerator::buildStore):
+        (JSC::WASMFunctionLLVMIRGenerator::buildUnaryI32):
+        (JSC::WASMFunctionLLVMIRGenerator::buildUnaryF32):
+        (JSC::WASMFunctionLLVMIRGenerator::buildUnaryF64):
+        (JSC::WASMFunctionLLVMIRGenerator::buildBinaryI32):
+        (JSC::WASMFunctionLLVMIRGenerator::buildBinaryF32):
+        (JSC::WASMFunctionLLVMIRGenerator::buildBinaryF64):
+        (JSC::WASMFunctionLLVMIRGenerator::buildRelationalI32):
+        (JSC::WASMFunctionLLVMIRGenerator::buildRelationalF32):
+        (JSC::WASMFunctionLLVMIRGenerator::buildRelationalF64):
+        (JSC::WASMFunctionLLVMIRGenerator::buildMinOrMaxI32):
+        (JSC::WASMFunctionLLVMIRGenerator::buildMinOrMaxF64):
+        (JSC::WASMFunctionLLVMIRGenerator::buildCallInternal):
+        (JSC::WASMFunctionLLVMIRGenerator::buildCallIndirect):
+        (JSC::WASMFunctionLLVMIRGenerator::buildCallImport):
+        (JSC::WASMFunctionLLVMIRGenerator::appendExpressionList):
+        (JSC::WASMFunctionLLVMIRGenerator::discard):
+        (JSC::WASMFunctionLLVMIRGenerator::linkTarget):
+        (JSC::WASMFunctionLLVMIRGenerator::jumpToTarget):
+        (JSC::WASMFunctionLLVMIRGenerator::jumpToTargetIf):
+        (JSC::WASMFunctionLLVMIRGenerator::startLoop):
+        (JSC::WASMFunctionLLVMIRGenerator::endLoop):
+        (JSC::WASMFunctionLLVMIRGenerator::startSwitch):
+        (JSC::WASMFunctionLLVMIRGenerator::endSwitch):
+        (JSC::WASMFunctionLLVMIRGenerator::startLabel):
+        (JSC::WASMFunctionLLVMIRGenerator::endLabel):
+        (JSC::WASMFunctionLLVMIRGenerator::breakTarget):
+        (JSC::WASMFunctionLLVMIRGenerator::continueTarget):
+        (JSC::WASMFunctionLLVMIRGenerator::breakLabelTarget):
+        (JSC::WASMFunctionLLVMIRGenerator::continueLabelTarget):
+        (JSC::WASMFunctionLLVMIRGenerator::buildSwitch):
+        * wasm/WASMFunctionParser.cpp:
+
+2015-10-07  Filip Pizlo  <fpizlo@apple.com>
+
+        Get rid of LLInt inline/out-of-line storage helpers, they are unused
+        https://bugs.webkit.org/show_bug.cgi?id=149892
+
+        Reviewed by Mark Lam.
+
+        Just killing dead code.
+
+        * llint/LowLevelInterpreter.asm:
+
+2015-10-07  Filip Pizlo  <fpizlo@apple.com>
+
+        Don't setOutOfBounds in JIT code for PutByVal, since the C++ slow path already does it
+        https://bugs.webkit.org/show_bug.cgi?id=149885
+
+        Reviewed by Geoffrey Garen.
+
+        This simplifies the slow path code, which will make it easier to put read barriers on all of
+        the butterflies.
+
+        * jit/JITOperations.cpp:
+        (JSC::getByVal):
+        * jit/JITPropertyAccess.cpp:
+        (JSC::JIT::emitSlow_op_put_by_val):
+
+2015-10-07  Filip Pizlo  <fpizlo@apple.com>
+
+        Get rid of JIT::compilePutDirectOffset
+        https://bugs.webkit.org/show_bug.cgi?id=149884
+
+        Reviewed by Andreas Kling.
+
+        I'm finding more dead code.
+
+        * jit/JIT.h:
+        * jit/JITPropertyAccess.cpp:
+        (JSC::JIT::emitSlow_op_put_by_id):
+        (JSC::JIT::emitVarInjectionCheck):
+        (JSC::JIT::compilePutDirectOffset): Deleted.
+
+2015-10-07  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Heap::isWriteBarrierEnabled is unused
+        https://bugs.webkit.org/show_bug.cgi?id=149881
+
+        Reviewed by Geoffrey Garen.
+
+        * heap/Heap.h:
+        * heap/HeapInlines.h:
+        (JSC::Heap::isWriteBarrierEnabled): Deleted.
+
 2015-10-07  Filip Pizlo  <fpizlo@apple.com>
 
         JIT::emitGetGlobalProperty/emitPutGlobalProperty are only called from one place

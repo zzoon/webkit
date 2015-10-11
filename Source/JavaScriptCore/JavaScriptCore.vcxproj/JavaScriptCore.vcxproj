@@ -1375,7 +1375,6 @@
     <ClInclude Include="..\heap\MarkedBlockSet.h" />
     <ClInclude Include="..\heap\MarkedSpace.h" />
     <ClInclude Include="..\heap\MarkStack.h" />
-    <ClInclude Include="..\heap\RecursiveAllocationScope.h" />
     <ClInclude Include="..\heap\SlotVisitor.h" />
     <ClInclude Include="..\heap\SlotVisitorInlines.h" />
     <ClInclude Include="..\heap\Strong.h" />
@@ -1830,6 +1829,7 @@
     <ClInclude Include="..\wasm\WASMConstants.h" />
     <ClInclude Include="..\wasm\WASMFormat.h" />
     <ClInclude Include="..\wasm\WASMFunctionCompiler.h" />
+    <ClInclude Include="..\wasm\WASMFunctionLLVMIRGenerator.h" />
     <ClInclude Include="..\wasm\WASMFunctionParser.h" />
     <ClInclude Include="..\wasm\WASMFunctionSyntaxChecker.h" />
     <ClInclude Include="..\wasm\WASMModuleParser.h" />

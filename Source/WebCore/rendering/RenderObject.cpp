@@ -882,10 +882,8 @@ void RenderObject::repaintUsingContainer(const RenderLayerModelObject* repaintCo
     if (r.isEmpty())
         return;
 
-    if (!repaintContainer) {
-        view().repaintViewRectangle(r);
-        return;
-    }
+    if (!repaintContainer)
+        repaintContainer = &view();
 
     if (is<RenderFlowThread>(*repaintContainer)) {
         downcast<RenderFlowThread>(*repaintContainer).repaintRectangleInRegions(r);
@@ -897,17 +895,21 @@ void RenderObject::repaintUsingContainer(const RenderLayerModelObject* repaintCo
         return;
     }
 
-    RenderView& v = view();
     if (repaintContainer->isRenderView()) {
-        ASSERT(repaintContainer == &v);
-        bool viewHasCompositedLayer = v.isComposited();
-        if (!viewHasCompositedLayer || v.layer()->backing()->paintsIntoWindow()) {
-            v.repaintViewRectangle(viewHasCompositedLayer && v.layer()->transform() ? LayoutRect(v.layer()->transform()->mapRect(snapRectToDevicePixels(r, document().deviceScaleFactor()))) : r);
+        RenderView& view = this->view();
+        ASSERT(repaintContainer == &view);
+        bool viewHasCompositedLayer = view.isComposited();
+        if (!viewHasCompositedLayer || view.layer()->backing()->paintsIntoWindow()) {
+            LayoutRect rect = r;
+            if (viewHasCompositedLayer && view.layer()->transform())
+                rect = LayoutRect(view.layer()->transform()->mapRect(snapRectToDevicePixels(rect, document().deviceScaleFactor())));
+            view.repaintViewRectangle(rect);
             return;
         }
     }
     
-    if (v.usesCompositing()) {
+
+    if (view().usesCompositing()) {
         ASSERT(repaintContainer->isComposited());
         repaintContainer->layer()->setBackingNeedsRepaintInRect(r, shouldClipToLayer ? GraphicsLayer::ClipToLayer : GraphicsLayer::DoNotClipToLayer);
     }
@@ -924,7 +926,7 @@ void RenderObject::repaint() const
         return;
 
     RenderLayerModelObject* repaintContainer = containerForRepaint();
-    repaintUsingContainer(repaintContainer ? repaintContainer : &view, clippedOverflowRectForRepaint(repaintContainer));
+    repaintUsingContainer(repaintContainer, clippedOverflowRectForRepaint(repaintContainer));
 }
 
 void RenderObject::repaintRectangle(const LayoutRect& r, bool shouldClipToLayer) const
@@ -943,8 +945,7 @@ void RenderObject::repaintRectangle(const LayoutRect& r, bool shouldClipToLayer)
     dirtyRect.move(view.layoutDelta());
 
     RenderLayerModelObject* repaintContainer = containerForRepaint();
-    computeRectForRepaint(repaintContainer, dirtyRect);
-    repaintUsingContainer(repaintContainer ? repaintContainer : &view, dirtyRect, shouldClipToLayer);
+    repaintUsingContainer(repaintContainer, computeRectForRepaint(dirtyRect, repaintContainer), shouldClipToLayer);
 }
 
 void RenderObject::repaintSlowRepaintObject() const
@@ -965,7 +966,7 @@ void RenderObject::repaintSlowRepaintObject() const
     IntRect repaintRect;
     // If this is the root background, we need to check if there is an extended background rect. If
     // there is, then we should not allow painting to clip to the layer size.
-    if (isRoot() || isBody()) {
+    if (isDocumentElementRenderer() || isBody()) {
         shouldClipToLayer = !view.frameView().hasExtendedBackgroundRectForPainting();
         repaintRect = snappedIntRect(view.backgroundRect());
     } else
@@ -997,25 +998,28 @@ LayoutRect RenderObject::clippedOverflowRectForRepaint(const RenderLayerModelObj
     return LayoutRect();
 }
 
-void RenderObject::computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
+LayoutRect RenderObject::computeRectForRepaint(const LayoutRect& rect, const RenderLayerModelObject* repaintContainer, bool fixed) const
 {
     if (repaintContainer == this)
-        return;
+        return rect;
 
-    if (auto* parent = this->parent()) {
-        if (parent->hasOverflowClip()) {
-            downcast<RenderBox>(*parent).applyCachedClipAndScrollOffsetForRepaint(rect);
-            if (rect.isEmpty())
-                return;
-        }
+    auto* parent = this->parent();
+    if (!parent)
+        return rect;
 
-        parent->computeRectForRepaint(repaintContainer, rect, fixed);
+    LayoutRect adjustedRect = rect;
+    if (parent->hasOverflowClip()) {
+        downcast<RenderBox>(*parent).applyCachedClipAndScrollOffsetForRepaint(adjustedRect);
+        if (adjustedRect.isEmpty())
+            return adjustedRect;
     }
+    return parent->computeRectForRepaint(adjustedRect, repaintContainer, fixed);
 }
 
-void RenderObject::computeFloatRectForRepaint(const RenderLayerModelObject*, FloatRect&, bool) const
+FloatRect RenderObject::computeFloatRectForRepaint(const FloatRect&, const RenderLayerModelObject*, bool) const
 {
     ASSERT_NOT_REACHED();
+    return FloatRect();
 }
 
 #if ENABLE(TREE_DEBUGGING)
@@ -1911,7 +1915,7 @@ RenderBoxModelObject* RenderObject::offsetParent() const
     // A is the root element.
     // A is the HTML body element.
     // The computed value of the position property for element A is fixed.
-    if (isRoot() || isBody() || (isOutOfFlowPositioned() && style().position() == FixedPosition))
+    if (isDocumentElementRenderer() || isBody() || (isOutOfFlowPositioned() && style().position() == FixedPosition))
         return nullptr;
 
     // If A is an area HTML element which has a map HTML element somewhere in the ancestor

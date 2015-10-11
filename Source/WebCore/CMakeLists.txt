@@ -1507,6 +1507,7 @@ set(WebCore_SOURCES
     dom/SecurityOriginPolicy.cpp
     dom/SelectorQuery.cpp
     dom/ShadowRoot.cpp
+    dom/SlotAssignment.cpp
     dom/SpaceSplitString.cpp
     dom/StaticNodeList.cpp
     dom/StringCallback.cpp
@@ -1707,6 +1708,7 @@ set(WebCore_SOURCES
     html/HTMLQuoteElement.cpp
     html/HTMLScriptElement.cpp
     html/HTMLSelectElement.cpp
+    html/HTMLSlotElement.cpp
     html/HTMLSourceElement.cpp
     html/HTMLSpanElement.cpp
     html/HTMLStyleElement.cpp
@@ -1848,9 +1850,7 @@ set(WebCore_SOURCES
     html/parser/XSSAuditorDelegate.cpp
 
     html/shadow/AutoFillButtonElement.cpp
-    html/shadow/ContentDistributor.cpp
     html/shadow/DetailsMarkerControl.cpp
-    html/shadow/InsertionPoint.cpp
     html/shadow/MediaControlElementTypes.cpp
     html/shadow/MediaControlElements.cpp
     html/shadow/MediaControls.cpp
@@ -3591,7 +3591,7 @@ foreach (_builtinjs ${WEBCORE_JS_BUILTINS})
     get_filename_component(_name ${_builtinjs} NAME_WE)
     add_custom_command(
         OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/${_name}BuiltinsWrapper.h ${DERIVED_SOURCES_WEBCORE_DIR}/${_name}Builtins.h ${DERIVED_SOURCES_WEBCORE_DIR}/${_name}Builtins.cpp
-        MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/generate-js-builtins
+        MAIN_DEPENDENCY ${WEBCORE_DIR}/generate-js-builtins
         DEPENDS ${WebCore_GENERATE_JS_BUILTINS_SCRIPTS_DIR}/generate-js-builtins
         DEPENDS ${_builtinjs}
         COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate-js-builtins --input ${_builtinjs} --output_dir ${DERIVED_SOURCES_WEBCORE_DIR} --generate_js_builtins_path ${WebCore_GENERATE_JS_BUILTINS_SCRIPTS_DIR}

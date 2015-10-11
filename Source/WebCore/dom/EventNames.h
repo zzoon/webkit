@@ -115,6 +115,7 @@ namespace WebCore {
     macro(hashchange) \
     macro(icecandidate) \
     macro(iceconnectionstatechange) \
+    macro(icegatheringstatechange) \
     macro(inactive) \
     macro(input) \
     macro(invalid) \
