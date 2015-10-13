@@ -1,3 +1,126 @@
+2015-10-13  Alexey Proskuryakov  <ap@apple.com>
+
+        Mac Debug and 32-bit queues should be separate
+        https://bugs.webkit.org/show_bug.cgi?id=150092
+
+        Reviewed by Lucas Forschler.
+
+        * QueueStatusServer/config/queues.py:
+        * QueueStatusServer/model/queues.py:
+        (Queue._capitalize_after_dash):
+        (Queue._caplitalize_after_dash): Deleted.
+        * Scripts/webkitpy/common/config/ews.json:
+
+2015-10-13  Sergio Villar Senin  <svillar@igalia.com>
+
+        [GTK] Fix build for ENABLE_TOUCH_EVENTS=OFF
+        https://bugs.webkit.org/show_bug.cgi?id=150085
+
+        Reviewed by Carlos Garcia Campos.
+
+        * WebKitTestRunner/gtk/EventSenderProxyGtk.cpp:
+
+2015-10-13  Sebastian Dröge  <sebastian@centricular.com>
+
+        Unreviewed, add myself to the committers list.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2015-10-12  Alexey Proskuryakov  <ap@apple.com>
+
+        Update bot watcher's dashboard to reflect that EWS is on iOS 9 now
+        https://bugs.webkit.org/show_bug.cgi?id=149983
+
+        Reviewed by Dan Bates.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/BubbleQueueServer.js:
+        (BubbleQueueServer):
+        * BuildSlaveSupport/build.webkit.org-config/public_html/dashboard/Scripts/Dashboard.js:
+
+2015-10-12  Alexey Proskuryakov  <ap@apple.com>
+
+        Fix webkitpy tests after r190922.
+
+        * Scripts/webkitpy/common/config/ews.json:
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        * Scripts/webkitpy/tool/commands/earlywarningsystem_unittest.py:
+
+2015-10-12  Alexey Proskuryakov  <ap@apple.com>
+
+        Add a Mac debug EWS queue
+        https://bugs.webkit.org/show_bug.cgi?id=150069
+
+        Reviewed by Geoffrey Garen.
+
+        * QueueStatusServer/config/queues.py:
+        * Scripts/webkitpy/common/config/ews.json:
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        (AbstractEarlyWarningSystem):
+        (AbstractEarlyWarningSystem.archive_last_test_results):
+        (AbstractEarlyWarningSystem.build_style):
+        (AbstractEarlyWarningSystem.refetch_patch):
+        (AbstractEarlyWarningSystem.load_ews_classes):
+
+2015-10-12  Mario Sanchez Prada  <mario@endlessm.com>
+
+        [GTK] Update jhbuild's version of harfbuzz
+        https://bugs.webkit.org/show_bug.cgi?id=149749
+
+        Reviewed by Martin Robinson.
+
+        Update harfbuzz to 0.9.35, following the lead of Debian Stable.
+
+        * gtk/jhbuild.modules: Updated details for harfbuzz.
+
+2015-10-12  Mario Sanchez Prada  <mario@endlessm.com>
+
+        [GTK] Media tests crashing with gst-plugins-bad 1.4.4 and cpp 5.2
+        https://bugs.webkit.org/show_bug.cgi?id=150026
+
+        Reviewed by Philippe Normand.
+
+        Backport upstream patch from gst-plugins-bad so that the right version
+        of FAAD2 can be found with newer versions of cpp, so that gst-plugins-bad
+        gets compiled properly, avoiding crashes on runtime while running tests.
+
+        * gtk/patches/gst-plugins-bad-fix-faad2-version-check.patch: Added.
+        * gtk/jhbuild.modules: Referenced the newly added patch for gst-plugins-bad.
+
+2015-10-11  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Test font-variant-* and font-feature-settings with mocked preinstalled fonts
+        https://bugs.webkit.org/show_bug.cgi?id=149777
+
+        Reviewed by Simon Fraser.
+
+        Include FontWithFeatures in DumpRenderTree and WebKitTestRunner. Add it
+        to the list of tests to preinstall at startup time.
+
+        Also, update the generation of the 'name' table in the FontWithFeatures font.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (allowedFontFamilySet):
+        (activateTestingFonts):
+        (activateFontsIOS):
+        * FontWithFeatures/FontWithFeatures/FontCreator.cpp:
+        (Generator::generate):
+        (Generator::appendCFFTable):
+        (Generator::appendNameSubtable):
+        (Generator::appendNAMETable):
+        * FontWithFeatures/FontWithFeatures/main.cpp:
+        (main):
+        * WebKitTestRunner/InjectedBundle/cocoa/ActivateFontsCocoa.mm:
+        (WTR::allowedFontFamilySet):
+        (WTR::activateFonts):
+        * WebKitTestRunner/mac/TestControllerMac.mm:
+        (WTR::allowedFontFamilySet):
+
+2015-10-11  Jinyoung Hur  <hur.ims@navercorp.com>
+
+        Unreviewed. Add Jinyoung Hur as a committer. 
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
 2015-10-10  Dan Bernstein  <mitz@apple.com>
 
         [iOS] Remove unnecessary iOS version checks

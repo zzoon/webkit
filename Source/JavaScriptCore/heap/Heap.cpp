@@ -38,22 +38,20 @@
 #include "HeapVerifier.h"
 #include "IncrementalSweeper.h"
 #include "Interpreter.h"
+#include "JSCInlines.h"
 #include "JSGlobalObject.h"
 #include "JSLock.h"
-#include "JSONObject.h"
-#include "JSCInlines.h"
 #include "JSVirtualMachineInternal.h"
-#include "RegExpCache.h"
 #include "Tracing.h"
 #include "TypeProfilerLog.h"
 #include "UnlinkedCodeBlock.h"
 #include "VM.h"
 #include "WeakSetInlines.h"
 #include <algorithm>
-#include <wtf/RAMSize.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/ParallelVectorIterator.h>
 #include <wtf/ProcessID.h>
+#include <wtf/RAMSize.h>
 
 using namespace std;
 using namespace JSC;
@@ -851,7 +849,7 @@ void Heap::visitWeakHandles(HeapRootVisitor& visitor)
 
 void Heap::updateObjectCounts(double gcStartTime)
 {
-    GCCOUNTER(VisitedValueCount, m_slotVisitor.visitCount());
+    GCCOUNTER(VisitedValueCount, m_slotVisitor.visitCount() + threadVisitCount());
 
     if (Options::logGC() == GCLogging::Verbose) {
         size_t visitCount = m_slotVisitor.visitCount();
@@ -1000,6 +998,12 @@ void Heap::addToRememberedSet(const JSCell* cell)
     // same.
     cell->setCellState(CellState::OldGrey);
     m_slotVisitor.appendToMarkStack(const_cast<JSCell*>(cell));
+}
+
+void* Heap::copyBarrier(const JSCell*, void*& pointer)
+{
+    // Do nothing for now.
+    return pointer;
 }
 
 void Heap::collectAndSweep(HeapOperation collectionType)

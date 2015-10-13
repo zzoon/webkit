@@ -1,3 +1,115 @@
+2015-10-13  Chris Dumez  <cdumez@apple.com>
+
+        Avoid useless copies in range-loops that are using 'auto'
+        https://bugs.webkit.org/show_bug.cgi?id=150091
+
+        Reviewed by Sam Weinig.
+
+        Avoid useless copies in range-loops that are using 'auto'. Also use
+        'auto*' instead of 'auto' when range values are pointers for clarity.
+
+        * UIProcess/VisitedLinkStore.cpp:
+        (WebKit::VisitedLinkStore::pendingVisitedLinksTimerFired):
+        (WebKit::VisitedLinkStore::resizeTable):
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::WebProcessProxy::releaseRemainingIconsForPageURLs):
+        * UIProcess/WebsiteData/WebsiteDataStore.cpp:
+        (WebKit::WebsiteDataStore::fetchData):
+        (WebKit::WebsiteDataStore::removeData):
+        (WebKit::WebsiteDataStore::plugins):
+
+2015-10-13  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        Add debug settings for using giant tiles (4096x4096)
+        https://bugs.webkit.org/show_bug.cgi?id=149977
+        <rdar://problem/23017093>
+
+        Reviewed by Tim Horton.
+
+        * Shared/WebPreferencesDefinitions.h:
+        * UIProcess/API/C/WKPreferences.cpp:
+        (WKPreferencesSetUseGiantTiles):
+        (WKPreferencesGetUseGiantTiles):
+        * UIProcess/API/C/WKPreferencesRefPrivate.h:
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::updatePreferences):
+
+2015-10-13  Brent Fulgham  <bfulgham@apple.com>
+
+        [iOS] Avoid crash due to invalid screen bounds
+        https://bugs.webkit.org/show_bug.cgi?id=150048
+        <rdar://problem/22112664>
+
+        Reviewed by Jer Noble.
+
+        Check for an invalid bounds, and reset it to a known state before
+        attempting to use it.
+
+        * WebProcess/ios/WebVideoFullscreenManager.mm:
+        (WebKit::WebVideoFullscreenManager::setVideoLayerFrameFenced):
+
+2015-10-13  Sergio Villar Senin  <svillar@igalia.com>
+
+        [GTK] Fix build for ENABLE_TOUCH_EVENTS=OFF
+        https://bugs.webkit.org/show_bug.cgi?id=150085
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Shared/gtk/NativeWebTouchEventGtk.cpp:
+        * Shared/gtk/WebEventFactory.cpp:
+        * Shared/gtk/WebEventFactory.h:
+        * UIProcess/API/gtk/PageClientImpl.cpp:
+        * UIProcess/API/gtk/PageClientImpl.h:
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (webkit_web_view_base_class_init):
+
+2015-10-13  Chris Dumez  <cdumez@apple.com>
+
+        Avoid useless copying of Key::HashType in loops in NetworkCache::Storage::synchronize()
+        https://bugs.webkit.org/show_bug.cgi?id=150061
+
+        Reviewed by Carlos Garcia Campos.
+
+        Avoid useless copying of Key::HashType in loops in NetworkCache::Storage::synchronize().
+        Key::HashType is currently a SHA1::Digest, which is a std::array<uint8_t, 20>.
+
+        * NetworkProcess/cache/NetworkCacheStorage.cpp:
+        (WebKit::NetworkCache::Storage::synchronize):
+
+2015-10-12  Philip Chimento  <philip.chimento@gmail.com>
+
+        [GTK] OSX linker doesn't understand --whole-archive
+        https://bugs.webkit.org/show_bug.cgi?id=144557
+
+        Reviewed by Martin Robinson.
+
+        * PlatformGTK.cmake: Link with extra libraries on Darwin, since
+        we don't have the --whole-archive linker option.
+
+2015-10-09  Anders Carlsson  <andersca@apple.com>
+
+        Don't allow plug-ins to override image types for <embed> elements
+        https://bugs.webkit.org/show_bug.cgi?id=149979
+
+        Reviewed by Tim Horton.
+
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::objectContentType):
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.h:
+
+2015-10-12  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Bump Version/X in user agent
+        https://bugs.webkit.org/show_bug.cgi?id=150013
+
+        Reviewed by Csaba Osztrogonác.
+
+        EFL port needs to ensure maximum compatibility with existing web sites.
+        Thus version number needs to be bumped from 5.0 to 8.0 as GTK port.
+
+        * UIProcess/efl/WebPageProxyEfl.cpp:
+        (WebKit::WebPageProxy::standardUserAgent):
+
 2015-10-10  Dan Bernstein  <mitz@apple.com>
 
         [iOS] Remove unnecessary iOS version checks

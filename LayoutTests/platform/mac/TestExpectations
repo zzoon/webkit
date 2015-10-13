@@ -258,12 +258,9 @@ compositing/rtl/rtl-iframe-relative.html [ Skip ]
 # ENABLE(DRAGGABLE_REGION) is disabled
 fast/css/draggable-region-parser.html
 
-# Font feature settings is not implemented.
-css3/font-feature-settings-rendering.html
-
-webkit.org/b/149246 [ Mavericks ] css3/font-feature-settings-rendering-2.html
-webkit.org/b/149246 [ Mavericks ] css3/font-variant-all-webfont.html
-webkit.org/b/149246 [ Mavericks ] css3/font-variant-parsing.html
+# Font features are not implemented on Mavericks.
+webkit.org/b/149246 [ Mavericks ] css3/font-feature-settings-rendering.html [ ImageOnlyFailure ]
+webkit.org/b/149246 [ Mavericks ] css3/font-variant-all.html [ ImageOnlyFailure ]
 
 # This feature is disabled on Mavericks.
 [ Mavericks ] http/tests/navigation/page-cache-pending-image-load.html [ Skip ]
@@ -1339,6 +1336,12 @@ webkit.org/b/149441 fast/shadow-dom/css-scoping-shadow-slot-display-override.htm
 
 # Marking test as flaky in El Capitan
 webkit.org/b/149819 [ Debug ElCapitan+ ] compositing/video/video-poster.html [ Pass Crash ]
+
+# Marking as flaky again, patch did not work
+webkit.org/b/149218 http/tests/notifications/events.html [ Pass Crash ]
+
+# Flaky on Mac
+webkit.org/b/148435 storage/domstorage/events/basic-body-attribute.html [ Pass Failure ]
 
 # Imported Blink tests which have not been investigated.
 imported/blink/compositing/video/video-controls-layer-creation-squashing.html [ Pass ImageOnlyFailure ]
