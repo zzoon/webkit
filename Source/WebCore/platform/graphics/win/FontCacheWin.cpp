@@ -604,4 +604,8 @@ std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDe
     return result;
 }
 
+void FontCache::platformPurgeInactiveFontData()
+{
+}
+
 }
