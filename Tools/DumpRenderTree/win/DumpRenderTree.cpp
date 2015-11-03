@@ -1234,6 +1234,7 @@ IWebView* createWebViewAndOffscreenWindow(HWND* webViewWindow)
 
     viewPrivate->setShouldApplyMacFontAscentHack(TRUE);
     viewPrivate->setAlwaysUsesComplexTextCodePath(forceComplexText);
+    viewPrivate->setCustomBackingScaleFactor(1.0);
 
     _bstr_t pluginPath = _bstr_t(exePath().data()) + TestPluginDir;
     if (FAILED(viewPrivate->addAdditionalPluginDirectory(pluginPath.GetBSTR())))
@@ -1296,13 +1297,6 @@ RetainPtr<CFURLCacheRef> sharedCFURLCache()
     return nullptr;
 }
 #endif
-
-static LONG WINAPI exceptionFilter(EXCEPTION_POINTERS*)
-{
-    fputs("#CRASHED\n", stderr);
-    fflush(stderr);
-    return EXCEPTION_CONTINUE_SEARCH;
-}
 
 static Vector<const char*> initializeGlobalsFromCommandLineOptions(int argc, const char* argv[])
 {
@@ -1413,8 +1407,6 @@ int main(int argc, const char* argv[])
     // testing/debugging, as it causes the post-mortem debugger not to be invoked. We reset the
     // error mode here to work around Cygwin's behavior. See <http://webkit.org/b/55222>.
     ::SetErrorMode(0);
-
-    ::SetUnhandledExceptionFilter(exceptionFilter);
 
     leakChecking = false;
 

@@ -247,22 +247,22 @@ void TestRunner::setDatabaseQuota(uint64_t quota)
 
 void TestRunner::clearAllApplicationCaches()
 {
-    WKBundleClearApplicationCache(InjectedBundle::singleton().bundle());
+    WKBundlePageClearApplicationCache(InjectedBundle::singleton().page()->page());
 }
 
 void TestRunner::clearApplicationCacheForOrigin(JSStringRef origin)
 {
-    WKBundleClearApplicationCacheForOrigin(InjectedBundle::singleton().bundle(), toWK(origin).get());
+    WKBundlePageClearApplicationCacheForOrigin(InjectedBundle::singleton().page()->page(), toWK(origin).get());
 }
 
 void TestRunner::setAppCacheMaximumSize(uint64_t size)
 {
-    WKBundleSetAppCacheMaximumSize(InjectedBundle::singleton().bundle(), size);
+    WKBundlePageSetAppCacheMaximumSize(InjectedBundle::singleton().page()->page(), size);
 }
 
 long long TestRunner::applicationCacheDiskUsageForOrigin(JSStringRef origin)
 {
-    return WKBundleGetAppCacheUsageForOrigin(InjectedBundle::singleton().bundle(), toWK(origin).get());
+    return WKBundlePageGetAppCacheUsageForOrigin(InjectedBundle::singleton().page()->page(), toWK(origin).get());
 }
 
 void TestRunner::disallowIncreaseForApplicationCacheQuota()
@@ -287,10 +287,11 @@ static inline JSValueRef stringArrayToJS(JSContextRef context, WKArrayRef string
 
 JSValueRef TestRunner::originsWithApplicationCache()
 {
-    auto& injectedBundle = InjectedBundle::singleton();
-    WKRetainPtr<WKArrayRef> origins(AdoptWK, WKBundleCopyOriginsWithApplicationCache(injectedBundle.bundle()));
+    WKBundlePageRef page = InjectedBundle::singleton().page()->page();
 
-    WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(injectedBundle.page()->page());
+    WKRetainPtr<WKArrayRef> origins(AdoptWK, WKBundlePageCopyOriginsWithApplicationCache(page));
+
+    WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(page);
     JSContextRef context = WKBundleFrameGetJavaScriptContext(mainFrame);
 
     return stringArrayToJS(context, origins.get());
@@ -858,6 +859,13 @@ void TestRunner::setBlockAllPlugins(bool shouldBlock)
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetBlockAllPlugins"));
     WKRetainPtr<WKBooleanRef> messageBody(AdoptWK, WKBooleanCreate(shouldBlock));
     WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), messageName.get(), messageBody.get());
+}
+
+JSValueRef TestRunner::failNextNewCodeBlock()
+{
+    WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(InjectedBundle::singleton().page()->page());
+    JSContextRef context = WKBundleFrameGetJavaScriptContext(mainFrame);
+    return JSC::failNextNewCodeBlock(context);
 }
 
 JSValueRef TestRunner::numberOfDFGCompiles(JSValueRef theFunction)

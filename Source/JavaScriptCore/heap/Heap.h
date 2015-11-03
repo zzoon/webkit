@@ -28,6 +28,7 @@
 #include "GCIncomingRefCountedSet.h"
 #include "HandleSet.h"
 #include "HandleStack.h"
+#include "HeapObserver.h"
 #include "HeapOperation.h"
 #include "JITStubRoutineSet.h"
 #include "ListableHandler.h"
@@ -50,28 +51,24 @@
 
 namespace JSC {
 
-class CopiedSpace;
 class CodeBlock;
-class ExecutableBase;
+class CopiedSpace;
 class EdenGCActivityCallback;
+class ExecutableBase;
 class FullGCActivityCallback;
 class GCActivityCallback;
 class GCAwareJITStubRoutine;
-class GlobalCodeBlock;
 class Heap;
 class HeapRootVisitor;
 class HeapVerifier;
 class IncrementalSweeper;
 class JITStubRoutine;
 class JSCell;
-class VM;
 class JSStack;
 class JSValue;
-class LiveObjectIterator;
 class LLIntOffsetsExtractor;
 class MarkedArgumentBuffer;
-class WeakGCHandlePool;
-class SlotVisitor;
+class VM;
 
 namespace DFG {
 class SpeculativeJIT;
@@ -134,6 +131,9 @@ public:
     JS_EXPORT_PRIVATE IncrementalSweeper* sweeper();
     JS_EXPORT_PRIVATE void setIncrementalSweeper(std::unique_ptr<IncrementalSweeper>);
 
+    void addObserver(HeapObserver* observer) { m_observers.append(observer); }
+    void removeObserver(HeapObserver* observer) { m_observers.removeFirst(observer); }
+
     // true if collection is in progress
     bool isCollecting();
     HeapOperation operationInProgress() { return m_operationInProgress; }
@@ -178,7 +178,7 @@ public:
     JS_EXPORT_PRIVATE void protect(JSValue);
     JS_EXPORT_PRIVATE bool unprotect(JSValue); // True when the protect count drops to 0.
     
-    size_t extraMemorySize(); // Non-GC memory referenced by GC objects.
+    JS_EXPORT_PRIVATE size_t extraMemorySize(); // Non-GC memory referenced by GC objects.
     JS_EXPORT_PRIVATE size_t size();
     JS_EXPORT_PRIVATE size_t capacity();
     JS_EXPORT_PRIVATE size_t objectCount();
@@ -221,7 +221,7 @@ public:
     
     void addReference(JSCell*, ArrayBuffer*);
     
-    bool isDeferred() const { return !!m_deferralDepth || Options::disableGC(); }
+    bool isDeferred() const { return !!m_deferralDepth || !Options::useGC(); }
 
     StructureIDTable& structureIDTable() { return m_structureIDTable; }
 
@@ -235,6 +235,13 @@ public:
     void unregisterWeakGCMap(void* weakGCMap);
 
     void addLogicallyEmptyWeakBlock(WeakBlock*);
+
+#if ENABLE(RESOURCE_USAGE_OVERLAY)
+    size_t blockBytesAllocated() const { return m_blockBytesAllocated; }
+#endif
+
+    void didAllocateBlock(size_t capacity);
+    void didFreeBlock(size_t capacity);
 
 private:
     friend class CodeBlock;
@@ -330,7 +337,6 @@ private:
     bool sweepNextLogicallyEmptyWeakBlock();
 
     bool shouldDoFullCollection(HeapOperation requestedCollectionType) const;
-    size_t sizeAfterCollect();
 
     JSStack& stack();
     
@@ -357,7 +363,9 @@ private:
     size_t m_maxHeapSize;
     bool m_shouldDoFullCollection;
     size_t m_totalBytesVisited;
+    size_t m_totalBytesVisitedThisCycle;
     size_t m_totalBytesCopied;
+    size_t m_totalBytesCopiedThisCycle;
     
     HeapOperation m_operationInProgress;
     StructureIDTable m_structureIDTable;
@@ -407,7 +415,9 @@ private:
     RefPtr<GCActivityCallback> m_edenActivityCallback;
     std::unique_ptr<IncrementalSweeper> m_sweeper;
     Vector<MarkedBlock*> m_blockSnapshot;
-    
+
+    Vector<HeapObserver*> m_observers;
+
     unsigned m_deferralDepth;
     Vector<DFG::Worklist*> m_suspendedCompilerWorklists;
 
@@ -436,6 +446,10 @@ private:
     ListableHandler<UnconditionalFinalizer>::List m_unconditionalFinalizers;
 
     ParallelHelperClient m_helperClient;
+
+#if ENABLE(RESOURCE_USAGE_OVERLAY)
+    size_t m_blockBytesAllocated { 0 };
+#endif
 };
 
 } // namespace JSC

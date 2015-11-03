@@ -66,8 +66,6 @@ public:
     static Ref<HTMLInputElement> create(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
     virtual ~HTMLInputElement();
 
-    virtual HTMLInputElement* toInputElement() override final { return this; }
-
     WEBCORE_EXPORT virtual bool shouldAutocomplete() const override final;
 
     // For ValidityState
@@ -282,10 +280,8 @@ public:
 
     void cacheSelectionInResponseToSetValue(int caretOffset) { cacheSelection(caretOffset, caretOffset, SelectionHasNoDirection); }
 
-#if ENABLE(INPUT_TYPE_COLOR)
-    // For test purposes.
-    WEBCORE_EXPORT void selectColorInColorChooser(const Color&);
-#endif
+    Color valueAsColor() const; // Returns transparent color if not type=color.
+    WEBCORE_EXPORT void selectColor(const Color&); // Does nothing if not type=color. Simulates user selection of color; intended for testing.
 
     String defaultToolTip() const;
 
@@ -345,7 +341,7 @@ private:
     virtual bool isMouseFocusable() const override final;
     virtual bool isEnumeratable() const override final;
     virtual bool supportLabels() const override final;
-    virtual void updateFocusAppearance(bool restorePreviousSelection) override final;
+    virtual void updateFocusAppearance(SelectionRestorationMode, SelectionRevealMode) override final;
     virtual bool shouldUseInputMethod() override final;
 
     virtual bool isTextFormControl() const override final { return isTextField(); }

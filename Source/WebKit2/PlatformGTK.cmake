@@ -35,6 +35,7 @@ list(APPEND WebKit2_SOURCES
     NetworkProcess/soup/NetworkProcessSoup.cpp
     NetworkProcess/soup/RemoteNetworkingContextSoup.cpp
 
+    Platform/IPC/glib/GSocketMonitor.cpp
     Platform/IPC/unix/AttachmentUnix.cpp
     Platform/IPC/unix/ConnectionUnix.cpp
 
@@ -63,7 +64,6 @@ list(APPEND WebKit2_SOURCES
     Shared/cairo/ShareableBitmapCairo.cpp
 
     Shared/gtk/ArgumentCodersGtk.cpp
-    Shared/gtk/NativeContextMenuItemGtk.cpp
     Shared/gtk/NativeWebKeyboardEventGtk.cpp
     Shared/gtk/NativeWebMouseEventGtk.cpp
     Shared/gtk/NativeWebTouchEventGtk.cpp
@@ -90,6 +90,7 @@ list(APPEND WebKit2_SOURCES
     UIProcess/BackingStore.cpp
     UIProcess/DefaultUndoController.cpp
     UIProcess/DrawingAreaProxyImpl.cpp
+    UIProcess/LegacySessionStateCodingNone.cpp
 
     UIProcess/API/C/cairo/WKIconDatabaseCairo.cpp
 
@@ -289,6 +290,8 @@ list(APPEND WebKit2_SOURCES
     UIProcess/Plugins/unix/PluginProcessProxyUnix.cpp
 
     UIProcess/Storage/StorageManager.cpp
+
+    UIProcess/WebsiteData/unix/WebsiteDataStoreUnix.cpp
 
     UIProcess/cairo/BackingStoreCairo.cpp
 
@@ -490,6 +493,7 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/DatabaseProcess/unix"
     "${WEBKIT2_DIR}/NetworkProcess/gtk"
     "${WEBKIT2_DIR}/NetworkProcess/unix"
+    "${WEBKIT2_DIR}/Platform/IPC/glib"
     "${WEBKIT2_DIR}/Shared/API/c/gtk"
     "${WEBKIT2_DIR}/Shared/Network/CustomProtocols/soup"
     "${WEBKIT2_DIR}/Shared/Downloads/soup"
@@ -708,6 +712,7 @@ if (ENABLE_PLUGIN_PROCESS_GTK2)
         Platform/IPC/MessageSender.cpp
         Platform/IPC/StringReference.cpp
 
+        Platform/IPC/glib/GSocketMonitor.cpp
         Platform/IPC/unix/AttachmentUnix.cpp
         Platform/IPC/unix/ConnectionUnix.cpp
 
@@ -973,8 +978,10 @@ add_custom_command(
         ${GObjectDOMBindings_GIR_HEADERS}
         ${WebKit2WebExtension_INSTALLED_HEADERS}
         ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitContextMenu.h
+        ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitContextMenu.cpp
         ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitContextMenuActions.h
         ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitContextMenuItem.h
+        ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitContextMenuItem.cpp
         ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitHitTestResult.h
         ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitURIRequest.h
         ${WEBKIT2_DIR}/UIProcess/API/gtk/WebKitURIResponse.h

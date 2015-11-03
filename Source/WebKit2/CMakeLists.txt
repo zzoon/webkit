@@ -148,6 +148,7 @@ set(WebKit2_INCLUDE_DIRECTORIES
     "${DERIVED_SOURCES_WEBKIT2_DIR}/include"
     "${CMAKE_BINARY_DIR}"
     "${CMAKE_SOURCE_DIR}/Source"
+    "${CMAKE_SOURCE_DIR}/WebKitLibraries"
 )
 
 set(WebKit2_SYSTEM_INCLUDE_DIRECTORIES "")
@@ -335,7 +336,6 @@ set(WebKit2_SOURCES
     UIProcess/FrameLoadState.cpp
     UIProcess/GeolocationPermissionRequestManagerProxy.cpp
     UIProcess/GeolocationPermissionRequestProxy.cpp
-    UIProcess/LegacySessionStateCodingNone.cpp
     UIProcess/PageLoadState.cpp
     UIProcess/ProcessAssertion.cpp
     UIProcess/ProcessThrottler.cpp
@@ -359,7 +359,6 @@ set(WebKit2_SOURCES
     UIProcess/WebDatabaseManagerProxy.cpp
     UIProcess/WebDatabaseManagerProxyClient.cpp
     UIProcess/WebEditCommandProxy.cpp
-    UIProcess/WebFindClient.cpp
     UIProcess/WebFormClient.cpp
     UIProcess/WebFormSubmissionListenerProxy.cpp
     UIProcess/WebFrameListenerProxy.cpp
@@ -494,8 +493,6 @@ set(WebKit2_SOURCES
 
     UIProcess/WebsiteData/WebsiteDataRecord.cpp
     UIProcess/WebsiteData/WebsiteDataStore.cpp
-
-    UIProcess/WebsiteData/unix/WebsiteDataStoreUnix.cpp
 
     WebProcess/WebConnectionToUIProcess.cpp
     WebProcess/WebProcess.cpp
@@ -842,7 +839,11 @@ endif ()
 POPULATE_LIBRARY_VERSION(WEBKIT2)
 set_target_properties(WebKit2 PROPERTIES VERSION ${WEBKIT2_VERSION} SOVERSION ${WEBKIT2_VERSION_MAJOR})
 
-install(TARGETS WebKit2 WebProcess
+if (APPLE)
+    WEBKIT_FRAMEWORK(WebKit2)
+else ()
+    install(TARGETS WebKit2 WebProcess
         LIBRARY DESTINATION "${LIB_INSTALL_DIR}"
         RUNTIME DESTINATION "${LIBEXEC_INSTALL_DIR}"
-)
+    )
+endif ()

@@ -55,7 +55,6 @@
 #include "ImageBuffer.h"
 #include "InspectorClient.h"
 #include "InspectorDOMAgent.h"
-#include "InspectorInstrumentation.h"
 #include "InspectorOverlay.h"
 #include "InspectorTimelineAgent.h"
 #include "InstrumentingAgents.h"
@@ -73,6 +72,7 @@
 #include <inspector/IdentifiersFactory.h>
 #include <inspector/InspectorValues.h>
 #include <wtf/ListHashSet.h>
+#include <wtf/Stopwatch.h>
 #include <wtf/text/Base64.h>
 #include <wtf/text/StringBuilder.h>
 #include <yarr/RegularExpression.h>

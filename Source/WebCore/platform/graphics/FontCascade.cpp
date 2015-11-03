@@ -29,6 +29,7 @@
 #include "FontCache.h"
 #include "GlyphBuffer.h"
 #include "LayoutRect.h"
+#include "SurrogatePairAwareTextIterator.h"
 #include "TextRun.h"
 #include "WidthIterator.h"
 #include <wtf/MainThread.h>
@@ -92,8 +93,6 @@ static bool useBackslashAsYenSignForFamily(const AtomicString& family)
 
 FontCascade::CodePath FontCascade::s_codePath = Auto;
 
-TypesettingFeatures FontCascade::s_defaultTypesettingFeatures = 0;
-
 // ============================================================================================
 // FontCascade Implementation (Cross-Platform Portion)
 // ============================================================================================
@@ -103,7 +102,8 @@ FontCascade::FontCascade()
     , m_letterSpacing(0)
     , m_wordSpacing(0)
     , m_useBackslashAsYenSymbol(false)
-    , m_typesettingFeatures(0)
+    , m_enableKerning(false)
+    , m_requiresShaping(false)
 {
 }
 
@@ -113,7 +113,8 @@ FontCascade::FontCascade(const FontCascadeDescription& fd, float letterSpacing, 
     , m_letterSpacing(letterSpacing)
     , m_wordSpacing(wordSpacing)
     , m_useBackslashAsYenSymbol(useBackslashAsYenSignForFamily(fd.firstFamily()))
-    , m_typesettingFeatures(computeTypesettingFeatures())
+    , m_enableKerning(computeEnableKerning())
+    , m_requiresShaping(computeRequiresShaping())
 {
 }
 
@@ -124,7 +125,8 @@ FontCascade::FontCascade(const FontPlatformData& fontData, FontSmoothingMode fon
     , m_letterSpacing(0)
     , m_wordSpacing(0)
     , m_useBackslashAsYenSymbol(false)
-    , m_typesettingFeatures(computeTypesettingFeatures())
+    , m_enableKerning(computeEnableKerning())
+    , m_requiresShaping(computeRequiresShaping())
 {
     m_fontDescription.setFontSmoothing(fontSmoothingMode);
 #if PLATFORM(IOS)
@@ -142,7 +144,8 @@ FontCascade::FontCascade(const FontCascade& other)
     , m_letterSpacing(other.m_letterSpacing)
     , m_wordSpacing(other.m_wordSpacing)
     , m_useBackslashAsYenSymbol(other.m_useBackslashAsYenSymbol)
-    , m_typesettingFeatures(computeTypesettingFeatures())
+    , m_enableKerning(computeEnableKerning())
+    , m_requiresShaping(computeRequiresShaping())
 {
 }
 
@@ -153,7 +156,8 @@ FontCascade& FontCascade::operator=(const FontCascade& other)
     m_letterSpacing = other.m_letterSpacing;
     m_wordSpacing = other.m_wordSpacing;
     m_useBackslashAsYenSymbol = other.m_useBackslashAsYenSymbol;
-    m_typesettingFeatures = other.m_typesettingFeatures;
+    m_enableKerning = other.m_enableKerning;
+    m_requiresShaping = other.m_requiresShaping;
     return *this;
 }
 
@@ -298,7 +302,8 @@ void FontCascade::update(RefPtr<FontSelector>&& fontSelector) const
 {
     m_fonts = retrieveOrAddCachedFonts(m_fontDescription, WTF::move(fontSelector));
     m_useBackslashAsYenSymbol = useBackslashAsYenSignForFamily(firstFamily());
-    m_typesettingFeatures = computeTypesettingFeatures();
+    m_enableKerning = computeEnableKerning();
+    m_requiresShaping = computeRequiresShaping();
 }
 
 float FontCascade::drawText(GraphicsContext& context, const TextRun& run, const FloatPoint& point, int from, int to, CustomFontNotReadyAction customFontNotReadyAction) const
@@ -313,7 +318,7 @@ float FontCascade::drawText(GraphicsContext& context, const TextRun& run, const 
 
     CodePath codePathToUse = codePath(run);
     // FIXME: Use the fast code path once it handles partial runs with kerning and ligatures. See http://webkit.org/b/100050
-    if (codePathToUse != Complex && typesettingFeatures() && (from || static_cast<unsigned>(to) != run.length()) && !isDrawnWithSVGFont(run))
+    if (codePathToUse != Complex && (enableKerning() || requiresShaping()) && (from || static_cast<unsigned>(to) != run.length()) && !isDrawnWithSVGFont(run))
         codePathToUse = Complex;
 
     if (codePathToUse != Complex)
@@ -332,7 +337,7 @@ void FontCascade::drawEmphasisMarks(GraphicsContext& context, const TextRun& run
 
     CodePath codePathToUse = codePath(run);
     // FIXME: Use the fast code path once it handles partial runs with kerning and ligatures. See http://webkit.org/b/100050
-    if (codePathToUse != Complex && typesettingFeatures() && (from || static_cast<unsigned>(to) != run.length()) && !isDrawnWithSVGFont(run))
+    if (codePathToUse != Complex && (enableKerning() || requiresShaping()) && (from || static_cast<unsigned>(to) != run.length()) && !isDrawnWithSVGFont(run))
         codePathToUse = Complex;
 
     if (codePathToUse != Complex)
@@ -353,9 +358,8 @@ float FontCascade::width(const TextRun& run, HashSet<const Font*>* fallbackFonts
             glyphOverflow = 0;
     }
 
-    bool hasKerningOrLigatures = typesettingFeatures() & (Kerning | Ligatures);
     bool hasWordSpacingOrLetterSpacing = wordSpacing() || letterSpacing();
-    float* cacheEntry = m_fonts->widthCache().add(run, std::numeric_limits<float>::quiet_NaN(), hasKerningOrLigatures, hasWordSpacingOrLetterSpacing, glyphOverflow);
+    float* cacheEntry = m_fonts->widthCache().add(run, std::numeric_limits<float>::quiet_NaN(), enableKerning() || requiresShaping(), hasWordSpacingOrLetterSpacing, glyphOverflow);
     if (cacheEntry && !std::isnan(*cacheEntry))
         return *cacheEntry;
 
@@ -505,7 +509,7 @@ void FontCascade::adjustSelectionRectForText(const TextRun& run, LayoutRect& sel
 
     CodePath codePathToUse = codePath(run);
     // FIXME: Use the fast code path once it handles partial runs with kerning and ligatures. See http://webkit.org/b/100050
-    if (codePathToUse != Complex && typesettingFeatures() && (from || static_cast<unsigned>(to) != run.length()) && !isDrawnWithSVGFont(run))
+    if (codePathToUse != Complex && (enableKerning() || requiresShaping()) && (from || static_cast<unsigned>(to) != run.length()) && !isDrawnWithSVGFont(run))
         codePathToUse = Complex;
 
     if (codePathToUse != Complex)
@@ -517,7 +521,7 @@ void FontCascade::adjustSelectionRectForText(const TextRun& run, LayoutRect& sel
 int FontCascade::offsetForPosition(const TextRun& run, float x, bool includePartialGlyphs) const
 {
     // FIXME: Use the fast code path once it handles partial runs with kerning and ligatures. See http://webkit.org/b/100050
-    if (codePath(run) != Complex && (!typesettingFeatures() || isDrawnWithSVGFont(run)))
+    if (codePath(run) != Complex && (!(enableKerning() || requiresShaping()) || isDrawnWithSVGFont(run)))
         return offsetForPositionForSimpleText(run, x, includePartialGlyphs);
 
     return offsetForPositionForComplexText(run, x, includePartialGlyphs);
@@ -580,16 +584,6 @@ FontCascade::CodePath FontCascade::codePath()
     return s_codePath;
 }
 
-void FontCascade::setDefaultTypesettingFeatures(TypesettingFeatures typesettingFeatures)
-{
-    s_defaultTypesettingFeatures = typesettingFeatures;
-}
-
-TypesettingFeatures FontCascade::defaultTypesettingFeatures()
-{
-    return s_defaultTypesettingFeatures;
-}
-
 FontCascade::CodePath FontCascade::codePath(const TextRun& run) const
 {
     if (s_codePath != Auto)
@@ -600,12 +594,12 @@ FontCascade::CodePath FontCascade::codePath(const TextRun& run) const
         return Simple;
 #endif
 
-    // FIXME: This shouldn't be necessary because Font::applyTransforms() should perform all necessary shaping.
+    // Because Font::applyTransforms() doesn't know which features to enable/disable it the simple code path can’t properly handle feature or variant settings.
     if (m_fontDescription.featureSettings().size() > 0 || !m_fontDescription.variantSettings().isAllNormal())
         return Complex;
 
 #if !PLATFORM(COCOA)
-    if (run.length() > 1 && typesettingFeatures())
+    if (run.length() > 1 && (enableKerning() || requiresShaping()))
         return Complex;
 #endif
 
@@ -1204,38 +1198,31 @@ GlyphToPathTranslator::GlyphUnderlineType computeUnderlineType(const TextRun& te
 
 // FIXME: This function may not work if the emphasis mark uses a complex script, but none of the
 // standard emphasis marks do so.
-bool FontCascade::getEmphasisMarkGlyphData(const AtomicString& mark, GlyphData& glyphData) const
+Optional<GlyphData> FontCascade::getEmphasisMarkGlyphData(const AtomicString& mark) const
 {
     if (mark.isEmpty())
-        return false;
+        return Nullopt;
 
-    UChar32 character = mark[0];
+    UChar32 character;
+    if (!mark.is8Bit()) {
+        SurrogatePairAwareTextIterator iterator(mark.characters16(), 0, mark.length(), mark.length());
+        unsigned clusterLength;
+        if (!iterator.consume(character, clusterLength))
+            return Nullopt;
+    } else
+        character = mark[0];
 
-    if (U16_IS_SURROGATE(character)) {
-        if (!U16_IS_SURROGATE_LEAD(character))
-            return false;
-
-        if (mark.length() < 2)
-            return false;
-
-        UChar low = mark[1];
-        if (!U16_IS_TRAIL(low))
-            return false;
-
-        character = U16_GET_SUPPLEMENTARY(character, low);
-    }
-
-    glyphData = glyphDataForCharacter(character, false, EmphasisMarkVariant);
-    return true;
+    Optional<GlyphData> glyphData(glyphDataForCharacter(character, false, EmphasisMarkVariant));
+    return glyphData.value().isValid() ? glyphData : Nullopt;
 }
 
 int FontCascade::emphasisMarkAscent(const AtomicString& mark) const
 {
-    GlyphData markGlyphData;
-    if (!getEmphasisMarkGlyphData(mark, markGlyphData))
+    Optional<GlyphData> markGlyphData = getEmphasisMarkGlyphData(mark);
+    if (!markGlyphData)
         return 0;
 
-    const Font* markFontData = markGlyphData.font;
+    const Font* markFontData = markGlyphData.value().font;
     ASSERT(markFontData);
     if (!markFontData)
         return 0;
@@ -1245,11 +1232,11 @@ int FontCascade::emphasisMarkAscent(const AtomicString& mark) const
 
 int FontCascade::emphasisMarkDescent(const AtomicString& mark) const
 {
-    GlyphData markGlyphData;
-    if (!getEmphasisMarkGlyphData(mark, markGlyphData))
+    Optional<GlyphData> markGlyphData = getEmphasisMarkGlyphData(mark);
+    if (!markGlyphData)
         return 0;
 
-    const Font* markFontData = markGlyphData.font;
+    const Font* markFontData = markGlyphData.value().font;
     ASSERT(markFontData);
     if (!markFontData)
         return 0;
@@ -1259,11 +1246,11 @@ int FontCascade::emphasisMarkDescent(const AtomicString& mark) const
 
 int FontCascade::emphasisMarkHeight(const AtomicString& mark) const
 {
-    GlyphData markGlyphData;
-    if (!getEmphasisMarkGlyphData(mark, markGlyphData))
+    Optional<GlyphData> markGlyphData = getEmphasisMarkGlyphData(mark);
+    if (!markGlyphData)
         return 0;
 
-    const Font* markFontData = markGlyphData.font;
+    const Font* markFontData = markGlyphData.value().font;
     ASSERT(markFontData);
     if (!markFontData)
         return 0;
@@ -1396,16 +1383,16 @@ inline static float offsetToMiddleOfGlyphAtIndex(const GlyphBuffer& glyphBuffer,
 
 void FontCascade::drawEmphasisMarks(GraphicsContext& context, const TextRun& run, const GlyphBuffer& glyphBuffer, const AtomicString& mark, const FloatPoint& point) const
 {
-    GlyphData markGlyphData;
-    if (!getEmphasisMarkGlyphData(mark, markGlyphData))
+    Optional<GlyphData> markGlyphData = getEmphasisMarkGlyphData(mark);
+    if (!markGlyphData)
         return;
 
-    const Font* markFontData = markGlyphData.font;
+    const Font* markFontData = markGlyphData.value().font;
     ASSERT(markFontData);
     if (!markFontData)
         return;
 
-    Glyph markGlyph = markGlyphData.glyph;
+    Glyph markGlyph = markGlyphData.value().glyph;
     Glyph spaceGlyph = markFontData->spaceGlyph();
 
     float middleOfLastGlyph = offsetToMiddleOfGlyphAtIndex(glyphBuffer, 0);
@@ -1427,7 +1414,7 @@ float FontCascade::floatWidthForSimpleText(const TextRun& run, HashSet<const Fon
 {
     WidthIterator it(this, run, fallbackFonts, glyphOverflow);
     GlyphBuffer glyphBuffer;
-    it.advance(run.length(), (typesettingFeatures() & (Kerning | Ligatures)) ? &glyphBuffer : 0);
+    it.advance(run.length(), (enableKerning() || requiresShaping()) ? &glyphBuffer : nullptr);
 
     if (glyphOverflow) {
         glyphOverflow->top = std::max<int>(glyphOverflow->top, ceilf(-it.minGlyphBoundingBoxY()) - (glyphOverflow->computeBounds ? 0 : fontMetrics().ascent()));

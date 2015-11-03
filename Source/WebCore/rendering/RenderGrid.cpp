@@ -473,9 +473,12 @@ void RenderGrid::computeUsedBreadthOfGridTracks(GridTrackSizingDirection directi
     for (auto trackIndex : flexibleSizedTracksIndex) {
         const GridTrackSize& trackSize = gridTrackSize(direction, trackIndex);
         GridTrack& track = tracks[trackIndex];
-        LayoutUnit baseSize = std::max<LayoutUnit>(track.baseSize(), flexFraction * trackSize.maxTrackBreadth().flex());
-        track.setBaseSize(baseSize);
-        availableLogicalSpace -= baseSize;
+        LayoutUnit oldBaseSize = track.baseSize();
+        LayoutUnit baseSize = std::max<LayoutUnit>(oldBaseSize, flexFraction * trackSize.maxTrackBreadth().flex());
+        if (LayoutUnit increment = baseSize - oldBaseSize) {
+            track.setBaseSize(baseSize);
+            availableLogicalSpace -= increment;
+        }
     }
 }
 
@@ -587,7 +590,7 @@ LayoutUnit RenderGrid::logicalContentHeightForChild(RenderBox& child, Vector<Gri
 {
     Optional<LayoutUnit> oldOverrideContainingBlockContentLogicalWidth = child.hasOverrideContainingBlockLogicalWidth() ? child.overrideContainingBlockContentLogicalWidth() : LayoutUnit();
     LayoutUnit overrideContainingBlockContentLogicalWidth = gridAreaBreadthForChild(child, ForColumns, columnTracks);
-    if (child.hasRelativeLogicalHeight() || !oldOverrideContainingBlockContentLogicalWidth || oldOverrideContainingBlockContentLogicalWidth.value() != overrideContainingBlockContentLogicalWidth)
+    if (child.hasOverrideLogicalContentHeight() || child.hasRelativeLogicalHeight() || !oldOverrideContainingBlockContentLogicalWidth || oldOverrideContainingBlockContentLogicalWidth.value() != overrideContainingBlockContentLogicalWidth)
         child.setNeedsLayout(MarkOnlyThis);
 
     // We need to clear the stretched height to properly compute logical height during layout.
@@ -599,6 +602,7 @@ LayoutUnit RenderGrid::logicalContentHeightForChild(RenderBox& child, Vector<Gri
     // what we are interested in here. Thus we need to set the override logical height to Nullopt (no possible resolution).
     if (child.hasRelativeLogicalHeight())
         child.setOverrideContainingBlockContentLogicalHeight(Nullopt);
+
     child.layoutIfNeeded();
     return child.logicalHeight() + child.marginLogicalHeight();
 }

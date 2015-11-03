@@ -8,6 +8,8 @@ set(JavaScriptCore_INCLUDE_DIRECTORIES
     "${JAVASCRIPTCORE_DIR}/API"
     "${JAVASCRIPTCORE_DIR}/ForwardingHeaders"
     "${JAVASCRIPTCORE_DIR}/assembler"
+    "${JAVASCRIPTCORE_DIR}/b3"
+    "${JAVASCRIPTCORE_DIR}/b3/air"
     "${JAVASCRIPTCORE_DIR}/bindings"
     "${JAVASCRIPTCORE_DIR}/builtins"
     "${JAVASCRIPTCORE_DIR}/bytecode"
@@ -65,6 +67,61 @@ set(JavaScriptCore_SOURCES
     assembler/MacroAssemblerARMv7.cpp
     assembler/MacroAssemblerPrinter.cpp
     assembler/MacroAssemblerX86Common.cpp
+
+    b3/air/AirAllocateStack.cpp
+    b3/air/AirArg.cpp
+    b3/air/AirBasicBlock.cpp
+    b3/air/AirCCallSpecial.cpp
+    b3/air/AirCode.cpp
+    b3/air/AirGenerate.cpp
+    b3/air/AirGenerated.cpp
+    b3/air/AirHandleCalleeSaves.cpp
+    b3/air/AirInsertionSet.cpp
+    b3/air/AirInst.cpp
+    b3/air/AirPhaseScope.cpp
+    b3/air/AirRegisterPriority.cpp
+    b3/air/AirSpecial.cpp
+    b3/air/AirSpillEverything.cpp
+    b3/air/AirStackSlot.cpp
+    b3/air/AirTmp.cpp
+    b3/air/AirValidate.cpp
+
+    b3/B3ArgumentRegValue.cpp
+    b3/B3BasicBlock.cpp
+    b3/B3CheckSpecial.cpp
+    b3/B3CheckValue.cpp
+    b3/B3Common.cpp
+    b3/B3Commutativity.cpp
+    b3/B3Const32Value.cpp
+    b3/B3Const64Value.cpp
+    b3/B3ConstDoubleValue.cpp
+    b3/B3ControlValue.cpp
+    b3/B3Effects.cpp
+    b3/B3FrequencyClass.cpp
+    b3/B3Generate.cpp
+    b3/B3HeapRange.cpp
+    b3/B3InsertionSet.cpp
+    b3/B3LowerToAir.cpp
+    b3/B3MemoryValue.cpp
+    b3/B3Opcode.cpp
+    b3/B3Origin.cpp
+    b3/B3PatchpointSpecial.cpp
+    b3/B3PatchpointValue.cpp
+    b3/B3PhaseScope.cpp
+    b3/B3Procedure.cpp
+    b3/B3ReduceStrength.cpp
+    b3/B3Stackmap.cpp
+    b3/B3StackmapSpecial.cpp
+    b3/B3StackSlotKind.cpp
+    b3/B3StackSlotValue.cpp
+    b3/B3SwitchCase.cpp
+    b3/B3SwitchValue.cpp
+    b3/B3Type.cpp
+    b3/B3UpsilonValue.cpp
+    b3/B3UseCounts.cpp
+    b3/B3Validate.cpp
+    b3/B3Value.cpp
+    b3/B3ValueRep.cpp
 
     bindings/ScriptFunctionCall.cpp
     bindings/ScriptObject.cpp
@@ -150,7 +207,6 @@ set(JavaScriptCore_SOURCES
     dfg/DFGBasicBlock.cpp
     dfg/DFGBlockInsertionSet.cpp
     dfg/DFGBlockSet.cpp
-    dfg/DFGBlockWorklist.cpp
     dfg/DFGByteCodeParser.cpp
     dfg/DFGCFAPhase.cpp
     dfg/DFGCFGSimplificationPhase.cpp
@@ -177,7 +233,6 @@ set(JavaScriptCore_SOURCES
     dfg/DFGDesiredWeakReferences.cpp
     dfg/DFGDisassembler.cpp
     dfg/DFGDoesGC.cpp
-    dfg/DFGDominators.cpp
     dfg/DFGDriver.cpp
     dfg/DFGEdge.cpp
     dfg/DFGEpoch.cpp
@@ -214,7 +269,6 @@ set(JavaScriptCore_SOURCES
     dfg/DFGMinifiedNode.cpp
     dfg/DFGMovHintRemovalPhase.cpp
     dfg/DFGMultiGetByOffsetData.cpp
-    dfg/DFGNaiveDominators.cpp
     dfg/DFGNaturalLoops.cpp
     dfg/DFGNode.cpp
     dfg/DFGNodeFlags.cpp
@@ -288,6 +342,7 @@ set(JavaScriptCore_SOURCES
 
     heap/CodeBlockSet.cpp
     heap/ConservativeRoots.cpp
+    heap/CopiedBlock.cpp
     heap/CopiedSpace.cpp
     heap/CopyVisitor.cpp
     heap/DeferGC.cpp
@@ -348,6 +403,7 @@ set(JavaScriptCore_SOURCES
     inspector/agents/InspectorAgent.cpp
     inspector/agents/InspectorConsoleAgent.cpp
     inspector/agents/InspectorDebuggerAgent.cpp
+    inspector/agents/InspectorHeapAgent.cpp
     inspector/agents/InspectorRuntimeAgent.cpp
     inspector/agents/JSGlobalObjectConsoleAgent.cpp
     inspector/agents/JSGlobalObjectDebuggerAgent.cpp
@@ -372,7 +428,9 @@ set(JavaScriptCore_SOURCES
     jit/ExecutableAllocatorFixedVMPool.cpp
     jit/GCAwareJITStubRoutine.cpp
     jit/HostCallReturnValue.cpp
+    jit/IntrinsicEmitter.cpp
     jit/JIT.cpp
+    jit/JITAddGenerator.cpp
     jit/JITArithmetic.cpp
     jit/JITArithmetic32_64.cpp
     jit/JITCall.cpp
@@ -387,7 +445,7 @@ set(JavaScriptCore_SOURCES
     jit/JITPropertyAccess.cpp
     jit/JITPropertyAccess32_64.cpp
     jit/JITStubRoutine.cpp
-    jit/JITStubs.cpp
+    jit/JITSubGenerator.cpp
     jit/JITThunks.cpp
     jit/JITToDFGDeferredCompilationCallback.cpp
     jit/PolymorphicCallStubRoutine.cpp
@@ -575,6 +633,7 @@ set(JavaScriptCore_RUNTIME_SOURCES
     runtime/JSTemplateRegistryKey.cpp
     runtime/JSTypedArrayConstructors.cpp
     runtime/JSTypedArrayPrototypes.cpp
+    runtime/JSTypedArrayViewConstructor.cpp
     runtime/JSTypedArrayViewPrototype.cpp
     runtime/JSTypedArrays.cpp
     runtime/JSWeakMap.cpp
@@ -664,14 +723,11 @@ list(APPEND JavaScriptCore_SOURCES
     ${JavaScriptCore_RUNTIME_SOURCES}
 )
 
-set(JavaScriptCore_LUT_FILES
-    runtime/ArrayConstructor.cpp
-    runtime/ArrayIteratorPrototype.cpp
+set(JavaScriptCore_NATIVE_OBJECT_LUT_SOURCES
     runtime/BooleanPrototype.cpp
     runtime/DateConstructor.cpp
     runtime/DatePrototype.cpp
     runtime/ErrorPrototype.cpp
-    runtime/InspectorInstrumentationObject.cpp
     runtime/IntlCollatorConstructor.cpp
     runtime/IntlCollatorPrototype.cpp
     runtime/IntlDateTimeFormatConstructor.cpp
@@ -679,28 +735,68 @@ set(JavaScriptCore_LUT_FILES
     runtime/IntlNumberFormatConstructor.cpp
     runtime/IntlNumberFormatPrototype.cpp
     runtime/JSDataViewPrototype.cpp
+    runtime/JSONObject.cpp
+    runtime/NumberConstructor.cpp
+    runtime/NumberPrototype.cpp
+    runtime/RegExpConstructor.cpp
+    runtime/RegExpPrototype.cpp
+    runtime/SymbolConstructor.cpp
+    runtime/SymbolPrototype.cpp
+)
+
+# If an object's implementation contains at least one builtin, then it must
+# be added to this section so it is generated with builtin-specific includes.
+
+set(JavaScriptCore_BUILTIN_OBJECT_LUT_SOURCES
+    runtime/ArrayConstructor.cpp
+    runtime/ArrayIteratorPrototype.cpp
+    runtime/InspectorInstrumentationObject.cpp
     runtime/JSGlobalObject.cpp
     runtime/JSInternalPromiseConstructor.cpp
-    runtime/JSONObject.cpp
     runtime/JSPromiseConstructor.cpp
     runtime/JSPromisePrototype.cpp
     runtime/ModuleLoaderObject.cpp
-    runtime/NumberConstructor.cpp
-    runtime/NumberPrototype.cpp
     runtime/ObjectConstructor.cpp
     runtime/ReflectObject.cpp
-    runtime/RegExpConstructor.cpp
-    runtime/RegExpPrototype.cpp
     runtime/StringConstructor.cpp
     runtime/StringIteratorPrototype.cpp
-    runtime/SymbolConstructor.cpp
-    runtime/SymbolPrototype.cpp
 )
 
 set(JavaScriptCore_LIBRARIES
     WTF${DEBUG_SUFFIX}
     ${ICU_I18N_LIBRARIES}
 )
+
+set(JavaScriptCore_SCRIPTS_SOURCES_DIR "${JAVASCRIPTCORE_DIR}/Scripts")
+
+# Globbing relies on the fact that generator-specific file names are prefixed with their directory.
+# Top-level scripts should have a file extension, since they are invoked during the build.
+
+set(JavaScriptCore_SCRIPTS_SOURCES_PATHS
+    ${JavaScriptCore_SCRIPTS_SOURCES_DIR}/*.pl
+    ${JavaScriptCore_SCRIPTS_SOURCES_DIR}/*.py
+    ${JavaScriptCore_SCRIPTS_SOURCES_DIR}/builtins/builtins*.py
+)
+
+# Force JavaScriptCore to run scripts from the same staging path as WebCore.
+set(JavaScriptCore_SCRIPTS_DIR "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/Scripts")
+
+file(MAKE_DIRECTORY ${JavaScriptCore_SCRIPTS_DIR})
+
+# The directory flattening performed below mirrors what the Mac port does with private headers.
+
+file(GLOB JavaScriptCore_SCRIPTS_SOURCES ${JavaScriptCore_SCRIPTS_SOURCES_PATHS})
+
+foreach (_file ${JavaScriptCore_SCRIPTS_SOURCES})
+    get_filename_component(_script "${_file}" NAME)
+    add_custom_command(
+        OUTPUT ${JavaScriptCore_SCRIPTS_DIR}/${_script}
+        MAIN_DEPENDENCY ${_file}
+        WORKING_DIRECTORY ${DERIVED_SOURCES_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_file} ${JavaScriptCore_SCRIPTS_DIR}/${_script}
+        VERBATIM)
+    list(APPEND JavaScriptCore_SCRIPTS ${JavaScriptCore_SCRIPTS_DIR}/${_script})
+endforeach ()
 
 if (USE_UDIS86)
     set(UDIS_GEN_DEP
@@ -867,7 +963,7 @@ if (ENABLE_FTL_JIT)
 
     WEBKIT_WRAP_SOURCELIST(${llvmForJSC_SOURCES})
     add_library(llvmForJSC SHARED ${llvmForJSC_SOURCES} ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/WebKitLLVMLibraryToken.h)
-    target_link_libraries(llvmForJSC ${LLVM_STATIC_LIBRARIES} "pthread" "dl" -Wl,--version-script=${JAVASCRIPTCORE_DIR}/llvm/library/libllvmForJSC.version)
+    target_link_libraries(llvmForJSC ${LLVM_STATIC_LIBRARIES} ${LLVM_SYSTEM_LIBRARIES} -Wl,--version-script=${JAVASCRIPTCORE_DIR}/llvm/library/libllvmForJSC.version)
 
     # Added extra items for JavaScriptCore
     list(APPEND JavaScriptCore_SYSTEM_INCLUDE_DIRECTORIES
@@ -933,18 +1029,29 @@ if (ENABLE_FTL_JIT)
 endif ()
 
 set(HASH_LUT_GENERATOR ${CMAKE_CURRENT_SOURCE_DIR}/create_hash_table)
+set(LUT_GENERATOR_FLAGS "")
 macro(GENERATE_HASH_LUT _input _output)
     add_custom_command(
         OUTPUT ${_output}
-        DEPENDS ${HASH_LUT_GENERATOR} ${_input} ${CMAKE_CURRENT_SOURCE_DIR}/generate-js-builtins
-        COMMAND ${PERL_EXECUTABLE} ${HASH_LUT_GENERATOR} ${_input} -i > ${_output}
+        MAIN_DEPENDENCY ${HASH_LUT_GENERATOR}
+        DEPENDS ${_input}
+        COMMAND ${PERL_EXECUTABLE} ${HASH_LUT_GENERATOR} ${LUT_GENERATOR_FLAGS} ${_input} > ${_output}
         VERBATIM)
     list(APPEND JavaScriptCore_HEADERS ${_output})
+    ADD_SOURCE_DEPENDENCIES(${_input} ${_output})
 endmacro()
 
 # GENERATOR 1-A: LUT creator
-foreach (_file ${JavaScriptCore_LUT_FILES})
+
+foreach (_file ${JavaScriptCore_NATIVE_OBJECT_LUT_SOURCES})
     get_filename_component(_name ${_file} NAME_WE)
+    set(LUT_GENERATOR_FLAGS -i)
+    GENERATE_HASH_LUT(${CMAKE_CURRENT_SOURCE_DIR}/${_file} ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/${_name}.lut.h)
+endforeach ()
+
+foreach (_file ${JavaScriptCore_BUILTIN_OBJECT_LUT_SOURCES})
+    get_filename_component(_name ${_file} NAME_WE)
+    set(LUT_GENERATOR_FLAGS -i -b)
     GENERATE_HASH_LUT(${CMAKE_CURRENT_SOURCE_DIR}/${_file} ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/${_name}.lut.h)
 endforeach ()
 
@@ -976,6 +1083,7 @@ set(JavaScriptCore_FORWARDING_HEADERS_DIRECTORIES
 )
 
 # GENERATOR 1-B: particular LUT creator (for 1 file only)
+set(LUT_GENERATOR_FLAGS )
 GENERATE_HASH_LUT(${CMAKE_CURRENT_SOURCE_DIR}/parser/Keywords.table ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/Lexer.lut.h)
 
 #GENERATOR: "RegExpJitTables.h": tables used by Yarr
@@ -1028,6 +1136,7 @@ set(JavaScriptCore_INSPECTOR_DOMAINS
     ${JAVASCRIPTCORE_DIR}/inspector/protocol/Database.json
     ${JAVASCRIPTCORE_DIR}/inspector/protocol/Debugger.json
     ${JAVASCRIPTCORE_DIR}/inspector/protocol/GenericTypes.json
+    ${JAVASCRIPTCORE_DIR}/inspector/protocol/Heap.json
     ${JAVASCRIPTCORE_DIR}/inspector/protocol/Inspector.json
     ${JAVASCRIPTCORE_DIR}/inspector/protocol/LayerTree.json
     ${JAVASCRIPTCORE_DIR}/inspector/protocol/Network.json
@@ -1052,9 +1161,9 @@ endif ()
 
 add_custom_command(
     OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/CombinedDomains.json
-    MAIN_DEPENDENCY ${JavaScriptCore_INSPECTOR_SCRIPTS_DIR}/generate-combined-inspector-json.py
+    MAIN_DEPENDENCY ${JavaScriptCore_SCRIPTS_DIR}/generate-combined-inspector-json.py
     DEPENDS ${JavaScriptCore_INSPECTOR_DOMAINS}
-    COMMAND ${PYTHON_EXECUTABLE} ${JavaScriptCore_INSPECTOR_SCRIPTS_DIR}/generate-combined-inspector-json.py ${JavaScriptCore_INSPECTOR_DOMAINS} > ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/CombinedDomains.json
+    COMMAND ${PYTHON_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/generate-combined-inspector-json.py ${JavaScriptCore_INSPECTOR_DOMAINS} > ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/CombinedDomains.json
     VERBATIM)
 
 # Inspector Backend Dispatchers, Frontend Dispatchers, Type Builders
@@ -1074,6 +1183,20 @@ add_custom_command(
     VERBATIM)
 
 # JSCBuiltins
+
+set(BUILTINS_GENERATOR_SCRIPTS
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_generator.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_model.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_templates.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_combined_header.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_combined_implementation.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_separate_header.py
+    ${JavaScriptCore_SCRIPTS_DIR}/builtins_generate_separate_implementation.py
+    ${JavaScriptCore_SCRIPTS_DIR}/generate-js-builtins.py
+    ${JavaScriptCore_SCRIPTS_DIR}/lazywriter.py
+)
+
 set(JavaScriptCore_BUILTINS_SOURCES
     ${JAVASCRIPTCORE_DIR}/builtins/ArrayConstructor.js
     ${JAVASCRIPTCORE_DIR}/builtins/ArrayIterator.prototype.js
@@ -1092,14 +1215,46 @@ set(JavaScriptCore_BUILTINS_SOURCES
     ${JAVASCRIPTCORE_DIR}/builtins/StringConstructor.js
     ${JAVASCRIPTCORE_DIR}/builtins/StringIterator.prototype.js
     ${JAVASCRIPTCORE_DIR}/builtins/TypedArray.prototype.js
+    ${JAVASCRIPTCORE_DIR}/builtins/TypedArrayConstructor.js
 )
 
 add_custom_command(
-   OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/JSCBuiltins.cpp ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/JSCBuiltins.h
-   MAIN_DEPENDENCY ${CMAKE_CURRENT_SOURCE_DIR}/generate-js-builtins
-   DEPENDS ${JavaScriptCore_BUILTINS_SOURCES}
-   COMMAND ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/generate-js-builtins --input-directory ${CMAKE_CURRENT_SOURCE_DIR}/builtins --output ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/JSCBuiltins.cpp
-   VERBATIM)
+    OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/B3AddressMatcher.h
+    MAIN_DEPENDENCY ${JAVASCRIPTCORE_DIR}/b3/B3AddressMatcher.patterns
+    DEPENDS ${JAVASCRIPTCORE_DIR}/b3/generate_pattern_matcher.rb
+    COMMAND ${RUBY_EXECUTABLE} ${JAVASCRIPTCORE_DIR}/b3/generate_pattern_matcher.rb ${JAVASCRIPTCORE_DIR}/b3/B3AddressMatcher.patterns VERBATIM
+    WORKING_DIRECTORY ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}
+)
+
+add_custom_command(
+    OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/B3LoweringMatcher.h
+    MAIN_DEPENDENCY ${JAVASCRIPTCORE_DIR}/b3/B3LoweringMatcher.patterns
+    DEPENDS ${JAVASCRIPTCORE_DIR}/b3/generate_pattern_matcher.rb
+    COMMAND ${RUBY_EXECUTABLE} ${JAVASCRIPTCORE_DIR}/b3/generate_pattern_matcher.rb ${JAVASCRIPTCORE_DIR}/b3/B3LoweringMatcher.patterns VERBATIM
+    WORKING_DIRECTORY ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}
+)
+
+add_custom_command(
+    OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/AirOpcode.h ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/AirOpcodeGenerated.h
+    MAIN_DEPENDENCY ${JAVASCRIPTCORE_DIR}/b3/air/AirOpcode.opcodes
+    DEPENDS ${JAVASCRIPTCORE_DIR}/b3/air/opcode_generator.rb
+    COMMAND ${RUBY_EXECUTABLE} ${JAVASCRIPTCORE_DIR}/b3/air/opcode_generator.rb ${JAVASCRIPTCORE_DIR}/b3/air/AirOpcode.opcodes VERBATIM
+    WORKING_DIRECTORY ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}
+)
+
+list(APPEND JavaScriptCore_SOURCES
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/AirOpcode.h
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/AirOpcodeGenerated.h
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/B3AddressMatcher.h
+    ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/B3LoweringMatcher.h
+)
+
+add_custom_command(
+    OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/JSCBuiltins.cpp ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/JSCBuiltins.h
+    MAIN_DEPENDENCY ${JavaScriptCore_SCRIPTS_DIR}/generate-js-builtins.py
+    DEPENDS ${JavaScriptCore_BUILTINS_SOURCES} ${BUILTINS_GENERATOR_SCRIPTS}
+    COMMAND ${PYTHON_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/generate-js-builtins.py --framework JavaScriptCore --output-directory ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR} --combined ${JavaScriptCore_BUILTINS_SOURCES}
+    VERBATIM)
 
 list(APPEND JavaScriptCore_SOURCES
     ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/inspector/InspectorBackendDispatchers.cpp
@@ -1118,10 +1273,10 @@ list(APPEND JavaScriptCore_HEADERS
 add_custom_command(
     OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.h ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js
     MAIN_DEPENDENCY ${JAVASCRIPTCORE_DIR}/inspector/InjectedScriptSource.js
-    DEPENDS ${JavaScriptCore_INSPECTOR_SCRIPTS_DIR}/xxd.pl ${JavaScriptCore_INSPECTOR_SCRIPTS_DIR}/jsmin.py
-    COMMAND echo "//# sourceURL=__WebInspectorInjectedScript__" > ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js
-    COMMAND ${PYTHON_EXECUTABLE} ${JavaScriptCore_INSPECTOR_SCRIPTS_DIR}/jsmin.py < ${JAVASCRIPTCORE_DIR}/inspector/InjectedScriptSource.js >> ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js
-    COMMAND ${PERL_EXECUTABLE} ${JavaScriptCore_INSPECTOR_SCRIPTS_DIR}/xxd.pl InjectedScriptSource_js ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.h
+    DEPENDS ${JavaScriptCore_SCRIPTS_DIR}/xxd.pl ${JavaScriptCore_SCRIPTS_DIR}/jsmin.py
+    COMMAND ${CMAKE_COMMAND} -E echo "//# sourceURL=__WebInspectorInjectedScript__" > ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js
+    COMMAND ${PYTHON_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/jsmin.py < ${JAVASCRIPTCORE_DIR}/inspector/InjectedScriptSource.js >> ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js
+    COMMAND ${PERL_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/xxd.pl InjectedScriptSource_js ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.min.js ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.h
     VERBATIM)
 
 list(APPEND JavaScriptCore_HEADERS ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InjectedScriptSource.h)
@@ -1202,4 +1357,9 @@ if (ENABLE_FTL_JIT)
     add_dependencies(JavaScriptCore llvmForJSC)
 endif ()
 
+# Force staging of shared scripts, even if they aren't directly used to build JavaScriptCore.
 
+add_custom_target(stageSharedScripts DEPENDS ${JavaScriptCore_SCRIPTS})
+add_dependencies(JavaScriptCore stageSharedScripts)
+
+WEBKIT_FRAMEWORK(JavaScriptCore)

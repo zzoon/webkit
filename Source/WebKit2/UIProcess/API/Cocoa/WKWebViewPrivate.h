@@ -58,6 +58,7 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 @protocol _WKDiagnosticLoggingDelegate;
 @protocol _WKFindDelegate;
 @protocol _WKFormDelegate;
+@protocol _WKInputDelegate;
 
 @interface WKWebView (WKPrivate)
 
@@ -72,6 +73,7 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 @property (nonatomic, readonly) NSURL *_unreachableURL;
 
 - (void)_loadAlternateHTMLString:(NSString *)string baseURL:(NSURL *)baseURL forUnreachableURL:(NSURL *)unreachableURL;
+- (WKNavigation *)_loadData:(NSData *)data MIMEType:(NSString *)MIMEType characterEncodingName:(NSString *)characterEncodingName baseURL:(NSURL *)baseURL userData:(id)userData WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 @property (nonatomic, readonly) NSArray *_certificateChain WK_DEPRECATED(10_10, 10_11, 8_0, 9_0, "use -certificateChain");
 @property (nonatomic, readonly) NSURL *_committedURL;
@@ -132,9 +134,6 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 // FIXME: This can be removed once WKNavigation's response property is implemented.
 @property (nonatomic, readonly) NSString *_suggestedFilenameForDisplayedPDF;
 
-// The viewport meta tag width is negative if the value is not defined.
-@property (nonatomic, readonly) CGFloat _viewportMetaTagWidth;
-
 @property (nonatomic, readonly) _WKWebViewPrintFormatter *_webViewPrintFormatter;
 
 - (void)_beginInteractiveObscuredInsetsChange;
@@ -185,7 +184,12 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 // Clients that want to maintain default behavior can return nil. To disable the immediate action entirely, return NSNull. And to
 // do something custom, return an object that conforms to the NSImmediateActionAnimationController protocol.
 - (id)_immediateActionAnimationControllerForHitTestResult:(_WKHitTestResult *)hitTestResult withType:(_WKImmediateActionType)type userData:(id<NSSecureCoding>)userData;
+
+@property (nonatomic, setter=_setMinimumLayoutWidth:) CGFloat _minimumLayoutWidth WK_AVAILABLE(WK_MAC_TBA, NA);
+
 #endif
+
+- (WKNavigation *)_reloadWithoutContentBlockers WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 - (void)_killWebContentProcessAndResetState;
 
@@ -211,7 +215,8 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 - (void)_countStringMatches:(NSString *)string options:(_WKFindOptions)options maxCount:(NSUInteger)maxCount;
 - (void)_hideFindUI;
 
-@property (nonatomic, weak, setter=_setFormDelegate:) id <_WKFormDelegate> _formDelegate;
+@property (nonatomic, weak, setter=_setFormDelegate:) id <_WKFormDelegate> _formDelegate WK_DEPRECATED(10_10, WK_MAC_TBA, 8_0, WK_IOS_TBA, "use _inputDelegate");
+@property (nonatomic, weak, setter=_setInputDelegate:) id <_WKInputDelegate> _inputDelegate WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 @property (nonatomic, readonly, getter=_isDisplayingStandaloneImageDocument) BOOL _displayingStandaloneImageDocument;
 @property (nonatomic, readonly, getter=_isDisplayingStandaloneMediaDocument) BOOL _displayingStandaloneMediaDocument;
@@ -222,6 +227,8 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 - (void)_saveBackForwardSnapshotForItem:(WKBackForwardListItem *)item WK_AVAILABLE(10_11, 9_0);
 
 @property (nonatomic, getter=_allowsMediaDocumentInlinePlayback, setter=_setAllowsMediaDocumentInlinePlayback:) BOOL _allowsMediaDocumentInlinePlayback;
+
+@property (nonatomic, readonly) BOOL _webProcessIsResponsive WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 @end
 

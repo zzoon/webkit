@@ -3,6 +3,9 @@
 //
 inherit
 initial
+unset
+revert
+
 //
 // CSS_PROP_OUTLINE_STYLE
 // CSS_PROP_BORDER_TOP_STYLE
@@ -1032,6 +1035,7 @@ sideways
 sideways-right
 upright
 vertical-right
+mixed
 
 // -webkit-line-box-contain
 font
@@ -1169,3 +1173,8 @@ style
 // will-change
 scroll-position
 contents
+
+#if defined(ENABLE_TOUCH_EVENTS) && ENABLE_TOUCH_EVENTS
+// touch-action
+manipulation
+#endif

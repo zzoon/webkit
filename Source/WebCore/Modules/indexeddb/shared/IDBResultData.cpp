@@ -39,16 +39,26 @@ IDBResultData::IDBResultData(const IDBResourceIdentifier& requestIdentifier)
 {
 }
 
+IDBResultData::IDBResultData(IDBResultType type, const IDBResourceIdentifier& requestIdentifier)
+    : m_type(type)
+    , m_requestIdentifier(requestIdentifier)
+{
+}
+
 IDBResultData::IDBResultData(const IDBResultData& other)
     : m_type(other.m_type)
     , m_requestIdentifier(other.m_requestIdentifier)
     , m_error(other.m_error)
     , m_databaseConnectionIdentifier(other.m_databaseConnectionIdentifier)
+    , m_resultInteger(other.m_resultInteger)
+    , m_resultData(other.m_resultData)
 {
     if (other.m_databaseInfo)
         m_databaseInfo = std::make_unique<IDBDatabaseInfo>(*other.m_databaseInfo);
     if (other.m_transactionInfo)
         m_transactionInfo = std::make_unique<IDBTransactionInfo>(*other.m_transactionInfo);
+    if (other.m_resultKey)
+        m_resultKey = std::make_unique<IDBKeyData>(*other.m_resultKey);
 }
 
 IDBResultData IDBResultData::error(const IDBResourceIdentifier& requestIdentifier, const IDBError& error)
@@ -77,6 +87,47 @@ IDBResultData IDBResultData::openDatabaseUpgradeNeeded(const IDBResourceIdentifi
     result.m_databaseInfo = std::make_unique<IDBDatabaseInfo>(transaction.databaseConnection().database().info());
     result.m_transactionInfo = std::make_unique<IDBTransactionInfo>(transaction.info());
     return WTF::move(result);
+}
+
+IDBResultData IDBResultData::createObjectStoreSuccess(const IDBResourceIdentifier& requestIdentifier)
+{
+    return { IDBResultType::CreateObjectStoreSuccess, requestIdentifier };
+}
+
+IDBResultData IDBResultData::deleteObjectStoreSuccess(const IDBResourceIdentifier& requestIdentifier)
+{
+    return { IDBResultType::DeleteObjectStoreSuccess, requestIdentifier };
+}
+
+IDBResultData IDBResultData::clearObjectStoreSuccess(const IDBResourceIdentifier& requestIdentifier)
+{
+    return { IDBResultType::ClearObjectStoreSuccess, requestIdentifier };
+}
+
+IDBResultData IDBResultData::putOrAddSuccess(const IDBResourceIdentifier& requestIdentifier, const IDBKeyData& resultKey)
+{
+    IDBResultData result(IDBResultType::PutOrAddSuccess, requestIdentifier);
+    result.m_resultKey = std::make_unique<IDBKeyData>(resultKey);
+    return result;
+}
+
+IDBResultData IDBResultData::getRecordSuccess(const IDBResourceIdentifier& requestIdentifier, const ThreadSafeDataBuffer& valueData)
+{
+    IDBResultData result(IDBResultType::GetRecordSuccess, requestIdentifier);
+    result.m_resultData = valueData;
+    return result;
+}
+
+IDBResultData IDBResultData::getCountSuccess(const IDBResourceIdentifier& requestIdentifier, uint64_t count)
+{
+    IDBResultData result(IDBResultType::GetRecordSuccess, requestIdentifier);
+    result.m_resultInteger = count;
+    return result;
+}
+
+IDBResultData IDBResultData::deleteRecordSuccess(const IDBResourceIdentifier& requestIdentifier)
+{
+    return { IDBResultType::DeleteRecordSuccess, requestIdentifier };
 }
 
 const IDBDatabaseInfo& IDBResultData::databaseInfo() const

@@ -152,7 +152,7 @@ public:
     bool mayCauseRepaintInsideViewport(const IntRect* visibleRect = nullptr) const;
 
     // Returns true if this renderer requires a new stacking context.
-    bool createsGroup() const { return isTransparent() || hasMask() || hasFilter() || hasBackdropFilter() || hasBlendMode(); }
+    bool createsGroup() const { return isTransparent() || hasMask() || hasClipPath() || hasFilter() || hasBackdropFilter() || hasBlendMode(); }
 
     bool isTransparent() const { return style().opacity() < 1.0f; }
     float opacity() const { return style().opacity(); }
@@ -210,6 +210,8 @@ public:
     
     const RenderElement* enclosingRendererWithTextDecoration(TextDecoration, bool firstLine) const;
     void drawLineForBoxSide(GraphicsContext&, const FloatRect&, BoxSide, Color, EBorderStyle, float adjacentWidth1, float adjacentWidth2, bool antialias = false) const;
+
+    bool childRequiresTable(const RenderObject& child) const;
 
 protected:
     enum BaseTypeFlags {

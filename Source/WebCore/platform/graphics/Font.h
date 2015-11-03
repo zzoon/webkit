@@ -35,7 +35,6 @@
 #if ENABLE(OPENTYPE_VERTICAL)
 #include "OpenTypeVerticalData.h"
 #endif
-#include "TypesettingFeatures.h"
 #include <wtf/TypeCasts.h>
 #include <wtf/text/StringHash.h>
 
@@ -101,12 +100,12 @@ public:
     const OpenTypeVerticalData* verticalData() const { return m_verticalData.get(); }
 #endif
 
-    PassRefPtr<Font> smallCapsFont(const FontDescription&) const;
-    PassRefPtr<Font> emphasisMarkFont(const FontDescription&) const;
-    PassRefPtr<Font> brokenIdeographFont() const;
-    PassRefPtr<Font> nonSyntheticItalicFont() const;
+    const Font* smallCapsFont(const FontDescription&) const;
+    const Font* emphasisMarkFont(const FontDescription&) const;
+    const Font& brokenIdeographFont() const;
+    const Font& nonSyntheticItalicFont() const;
 
-    PassRefPtr<Font> variantFont(const FontDescription& description, FontVariant variant) const
+    const Font* variantFont(const FontDescription& description, FontVariant variant) const
     {
         switch (variant) {
         case SmallCapsVariant:
@@ -114,7 +113,7 @@ public:
         case EmphasisMarkVariant:
             return emphasisMarkFont(description);
         case BrokenIdeographVariant:
-            return brokenIdeographFont();
+            return &brokenIdeographFont();
         case AutoVariant:
         case NormalVariant:
             break;
@@ -123,8 +122,8 @@ public:
         return const_cast<Font*>(this);
     }
 
-    PassRefPtr<Font> verticalRightOrientationFont() const;
-    PassRefPtr<Font> uprightOrientationFont() const;
+    const Font& verticalRightOrientationFont() const;
+    const Font& uprightOrientationFont() const;
 
     bool hasVerticalGlyphs() const { return m_hasVerticalGlyphs; }
     bool isTextOrientationFallback() const { return m_isTextOrientationFallback; }
@@ -193,7 +192,7 @@ public:
     bool shouldNotBeUsedForArabic() const { return m_shouldNotBeUsedForArabic; };
 #endif
 #if PLATFORM(COCOA)
-    CFDictionaryRef getCFStringAttributes(TypesettingFeatures, FontOrientation) const;
+    CFDictionaryRef getCFStringAttributes(bool enableKerning, FontOrientation) const;
     bool hasCustomTracking() const { return isSystemFont(); }
 #endif
 
@@ -201,7 +200,7 @@ public:
     bool canRenderCombiningCharacterSequence(const UChar*, size_t) const;
 #endif
 
-    bool applyTransforms(GlyphBufferGlyph*, GlyphBufferAdvance*, size_t glyphCount, TypesettingFeatures) const;
+    bool applyTransforms(GlyphBufferGlyph*, GlyphBufferAdvance*, size_t glyphCount, bool enableKerning, bool requiresShaping) const;
 
 #if PLATFORM(COCOA) || PLATFORM(WIN)
     bool isSystemFont() const { return m_isSystemFont; }
@@ -229,8 +228,8 @@ private:
 
     void initCharWidths();
 
-    PassRefPtr<Font> createScaledFont(const FontDescription&, float scaleFactor) const;
-    PassRefPtr<Font> platformCreateScaledFont(const FontDescription&, float scaleFactor) const;
+    RefPtr<Font> createScaledFont(const FontDescription&, float scaleFactor) const;
+    RefPtr<Font> platformCreateScaledFont(const FontDescription&, float scaleFactor) const;
 
     void removeFromSystemFallbackCache();
 

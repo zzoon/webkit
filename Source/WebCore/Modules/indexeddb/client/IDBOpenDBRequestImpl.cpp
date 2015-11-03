@@ -55,13 +55,11 @@ IDBOpenDBRequest::IDBOpenDBRequest(IDBConnectionToServer& connection, ScriptExec
     , m_databaseIdentifier(databaseIdentifier)
     , m_version(version)
 {
-    suspendIfNeeded();
 }
 
 IDBOpenDBRequest::~IDBOpenDBRequest()
 {
 }
-
 
 void IDBOpenDBRequest::onError(const IDBResultData& data)
 {
@@ -69,9 +67,18 @@ void IDBOpenDBRequest::onError(const IDBResultData& data)
     enqueueEvent(Event::create(eventNames().errorEvent, true, true));
 }
 
-void IDBOpenDBRequest::onSuccess(const IDBResultData&)
+void IDBOpenDBRequest::onSuccess(const IDBResultData& resultData)
 {
-    // FIXME: Implement
+    LOG(IndexedDB, "IDBOpenDBRequest::onSuccess()");
+
+    if (!scriptExecutionContext())
+        return;
+
+    Ref<IDBDatabase> database = IDBDatabase::create(*scriptExecutionContext(), connection(), resultData);
+    m_result = IDBAny::create(WTF::move(database));
+    m_readyState = IDBRequestReadyState::Done;
+
+    enqueueEvent(Event::create(eventNames().successEvent, false, false));
 }
 
 void IDBOpenDBRequest::onUpgradeNeeded(const IDBResultData& resultData)
@@ -84,11 +91,12 @@ void IDBOpenDBRequest::onUpgradeNeeded(const IDBResultData& resultData)
     uint64_t oldVersion = database->info().version();
     uint64_t newVersion = transaction->info().newVersion();
 
-    LOG(IndexedDB, "IDBOpenDBRequest::onUpgradeNeeded() - current version is %llu, new is %llu", static_cast<unsigned long long>(oldVersion), static_cast<unsigned long long>(newVersion));
+    LOG(IndexedDB, "IDBOpenDBRequest::onUpgradeNeeded() - current version is %" PRIu64 ", new is %" PRIu64, oldVersion, newVersion);
 
     m_result = IDBAny::create(WTF::move(database));
     m_readyState = IDBRequestReadyState::Done;
     m_transaction = adoptRef(&transaction.leakRef());
+    m_transaction->addRequest(*this);
 
     enqueueEvent(IDBVersionChangeEvent::create(oldVersion, newVersion, eventNames().upgradeneededEvent));
 }
@@ -107,6 +115,8 @@ void IDBOpenDBRequest::requestCompleted(const IDBResultData& data)
     case IDBResultType::OpenDatabaseUpgradeNeeded:
         onUpgradeNeeded(data);
         break;
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
     }
 }
 

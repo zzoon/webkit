@@ -406,6 +406,11 @@ ALWAYS_INLINE MacroAssembler::Call JIT::callOperationWithCallFrameRollbackOnExce
     return appendCallWithCallFrameRollbackOnException(operation);
 }
 
+ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_ECIZC operation, RegisterID regOp1, UniquedStringImpl* identOp2, int32_t op3, RegisterID regOp4)
+{
+    setupArgumentsWithExecState(regOp1, TrustedImmPtr(identOp2), TrustedImm32(op3), regOp4);
+    return appendCallWithExceptionCheck(operation);
+}
 
 #if USE(JSVALUE64)
 ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(Z_JITOperation_EJZZ operation, GPRReg arg1, int32_t arg2, int32_t arg3)
@@ -541,19 +546,13 @@ ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_EJ operatio
     return appendCallWithExceptionCheck(operation);
 }
 
-ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_EJIdZJ operation, RegisterID regOp1, const Identifier* identOp2, int32_t op3, RegisterID regOp4)
-{
-    setupArgumentsWithExecState(regOp1, TrustedImmPtr(identOp2), TrustedImm32(op3), regOp4);
-    return appendCallWithExceptionCheck(operation);
-}
-
-ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_EJIdZJJ operation, RegisterID regOp1, const Identifier* identOp2, int32_t op3, RegisterID regOp4, RegisterID regOp5)
+ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_ECIZJJ operation, RegisterID regOp1, UniquedStringImpl* identOp2, int32_t op3, RegisterID regOp4, RegisterID regOp5)
 {
     setupArgumentsWithExecState(regOp1, TrustedImmPtr(identOp2), TrustedImm32(op3), regOp4, regOp5);
     return appendCallWithExceptionCheck(operation);
 }
 
-ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_EJJZJ operation, RegisterID regOp1, RegisterID regOp2, int32_t op3, RegisterID regOp4)
+ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_ECJZC operation, RegisterID regOp1, RegisterID regOp2, int32_t op3, RegisterID regOp4)
 {
     setupArgumentsWithExecState(regOp1, regOp2, TrustedImm32(op3), regOp4);
     return appendCallWithExceptionCheck(operation);
@@ -675,13 +674,7 @@ ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(S_JITOperation_EJJ operati
     return appendCallWithExceptionCheck(operation);
 }
 
-ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_ECIZC operation, RegisterID regOp1, const Identifier* identOp2, int32_t op3, RegisterID regOp4)
-{
-    setupArgumentsWithExecState(regOp1, TrustedImmPtr(identOp2), TrustedImm32(op3), regOp4);
-    return appendCallWithExceptionCheck(operation);
-}
-
-ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_ECIZCC operation, RegisterID regOp1, const Identifier* identOp2, int32_t op3, RegisterID regOp4, RegisterID regOp5)
+ALWAYS_INLINE MacroAssembler::Call JIT::callOperation(V_JITOperation_ECIZCC operation, RegisterID regOp1, UniquedStringImpl* identOp2, int32_t op3, RegisterID regOp4, RegisterID regOp5)
 {
     setupArgumentsWithExecState(regOp1, TrustedImmPtr(identOp2), TrustedImm32(op3), regOp4, regOp5);
     return appendCallWithExceptionCheck(operation);
@@ -887,8 +880,12 @@ ALWAYS_INLINE bool JIT::isOperandConstantChar(int src)
 template<typename StructureType>
 inline void JIT::emitAllocateJSObject(RegisterID allocator, StructureType structure, RegisterID result, RegisterID scratch)
 {
-    loadPtr(Address(allocator, MarkedAllocator::offsetOfFreeListHead()), result);
-    addSlowCase(branchTestPtr(Zero, result));
+    if (Options::forceGCSlowPaths())
+        addSlowCase(jump());
+    else {
+        loadPtr(Address(allocator, MarkedAllocator::offsetOfFreeListHead()), result);
+        addSlowCase(branchTestPtr(Zero, result));
+    }
 
     // remove the object from the free list
     loadPtr(Address(result), scratch);
@@ -976,6 +973,11 @@ inline JITArrayMode JIT::chooseArrayMode(ArrayProfile* profile)
     if (arrayProfileSaw(arrayModes, ArrayStorageShape))
         return JITArrayStorage;
     return JITContiguous;
+}
+
+ALWAYS_INLINE int32_t JIT::getOperandConstantInt(int src)
+{
+    return getConstantOperand(src).asInt32();
 }
 
 #if USE(JSVALUE32_64)
@@ -1193,11 +1195,6 @@ ALWAYS_INLINE void JIT::emitGetVirtualRegisters(int src1, RegisterID dst1, int s
 ALWAYS_INLINE void JIT::emitGetVirtualRegisters(VirtualRegister src1, RegisterID dst1, VirtualRegister src2, RegisterID dst2)
 {
     emitGetVirtualRegisters(src1.offset(), dst1, src2.offset(), dst2);
-}
-
-ALWAYS_INLINE int32_t JIT::getOperandConstantInt(int src)
-{
-    return getConstantOperand(src).asInt32();
 }
 
 ALWAYS_INLINE bool JIT::isOperandConstantInt(int src)

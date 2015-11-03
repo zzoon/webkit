@@ -28,13 +28,27 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include "IDBDatabaseInfo.h"
+#include "IDBError.h"
+#include "IDBObjectStoreImpl.h"
 #include "IDBTransaction.h"
 #include "IDBTransactionInfo.h"
+#include "IndexedDB.h"
+#include "Timer.h"
+#include <wtf/Deque.h>
+#include <wtf/HashMap.h>
 
 namespace WebCore {
+
+class IDBObjectStoreInfo;
+class IDBResultData;
+
+struct IDBKeyRangeData;
+
 namespace IDBClient {
 
 class IDBDatabase;
+class TransactionOperation;
 
 class IDBTransaction : public WebCore::IDBTransaction {
 public:
@@ -44,25 +58,137 @@ public:
 
     // IDBTransaction IDL
     virtual const String& mode() const override final;
-    virtual WebCore::IDBDatabase* db() const override final;
+    virtual WebCore::IDBDatabase* db() override final;
     virtual RefPtr<DOMError> error() const override final;
-    virtual RefPtr<IDBObjectStore> objectStore(const String& name, ExceptionCode&) override final;
+    virtual RefPtr<WebCore::IDBObjectStore> objectStore(const String& name, ExceptionCode&) override final;
     virtual void abort(ExceptionCode&) override final;
 
     virtual EventTargetInterface eventTargetInterface() const override final { return IDBTransactionEventTargetInterfaceType; }
     virtual ScriptExecutionContext* scriptExecutionContext() const override final { return ActiveDOMObject::scriptExecutionContext(); }
     virtual void refEventTarget() override final { ref(); }
     virtual void derefEventTarget() override final { deref(); }
+    using EventTarget::dispatchEvent;
+    virtual bool dispatchEvent(PassRefPtr<Event>) override final;
 
     virtual const char* activeDOMObjectName() const override final;
     virtual bool canSuspendForPageCache() const override final;
+    virtual bool hasPendingActivity() const override final;
 
     const IDBTransactionInfo info() const { return m_info; }
+    IDBDatabase& database() { return m_database.get(); }
+    const IDBDatabase& database() const { return m_database.get(); }
+    IDBDatabaseInfo* originalDatabaseInfo() const { return m_originalDatabaseInfo.get(); }
+
+    void didStart(const IDBError&);
+    void didAbort(const IDBError&);
+    void didCommit(const IDBError&);
+
+    bool isVersionChange() const { return m_info.mode() == IndexedDB::TransactionMode::VersionChange; }
+    bool isReadOnly() const { return m_info.mode() == IndexedDB::TransactionMode::ReadOnly; }
+    bool isActive() const;
+
+    Ref<IDBObjectStore> createObjectStore(const IDBObjectStoreInfo&);
+
+    Ref<IDBRequest> requestPutOrAdd(ScriptExecutionContext&, IDBObjectStore&, IDBKey*, SerializedScriptValue&, IndexedDB::ObjectStoreOverwriteMode);
+    Ref<IDBRequest> requestGetRecord(ScriptExecutionContext&, IDBObjectStore&, const IDBKeyRangeData&);
+    Ref<IDBRequest> requestDeleteRecord(ScriptExecutionContext&, IDBObjectStore&, const IDBKeyRangeData&);
+    Ref<IDBRequest> requestClearObjectStore(ScriptExecutionContext&, IDBObjectStore&);
+    Ref<IDBRequest> requestCount(ScriptExecutionContext&, IDBObjectStore&, const IDBKeyRangeData&);
+
+    void deleteObjectStore(const String& objectStoreName);
+
+    void addRequest(IDBRequest&);
+    void removeRequest(IDBRequest&);
+
+    IDBConnectionToServer& serverConnection();
+
+    void activate();
+    void deactivate();
+
+    void operationDidComplete(TransactionOperation&);
 
 private:
     IDBTransaction(IDBDatabase&, const IDBTransactionInfo&);
 
+    bool isFinishedOrFinishing() const;
+
+    void commit();
+
+    void finishAbortOrCommit();
+
+    void scheduleOperation(RefPtr<TransactionOperation>&&);
+    void operationTimerFired();
+
+    void fireOnComplete();
+    void fireOnAbort();
+    void enqueueEvent(Ref<Event>);
+
+    void commitOnServer(TransactionOperation&);
+    void abortOnServer(TransactionOperation&);
+
+    void createObjectStoreOnServer(TransactionOperation&, const IDBObjectStoreInfo&);
+    void didCreateObjectStoreOnServer(const IDBResultData&);
+
+    void clearObjectStoreOnServer(TransactionOperation&, const uint64_t& objectStoreIdentifier);
+    void didClearObjectStoreOnServer(IDBRequest&, const IDBResultData&);
+
+    void putOrAddOnServer(TransactionOperation&, RefPtr<IDBKey>, RefPtr<SerializedScriptValue>, const IndexedDB::ObjectStoreOverwriteMode&);
+    void didPutOrAddOnServer(IDBRequest&, const IDBResultData&);
+
+    void getRecordOnServer(TransactionOperation&, const IDBKeyRangeData&);
+    void didGetRecordOnServer(IDBRequest&, const IDBResultData&);
+
+    void getCountOnServer(TransactionOperation&, const IDBKeyRangeData&);
+    void didGetCountOnServer(IDBRequest&, const IDBResultData&);
+
+    void deleteRecordOnServer(TransactionOperation&, const IDBKeyRangeData&);
+    void didDeleteRecordOnServer(IDBRequest&, const IDBResultData&);
+
+    void deleteObjectStoreOnServer(TransactionOperation&, const String& objectStoreName);
+    void didDeleteObjectStoreOnServer(const IDBResultData&);
+
+    void establishOnServer();
+
+    void scheduleOperationTimer();
+
+    Ref<IDBDatabase> m_database;
     IDBTransactionInfo m_info;
+    std::unique_ptr<IDBDatabaseInfo> m_originalDatabaseInfo;
+
+    IndexedDB::TransactionState m_state { IndexedDB::TransactionState::Inactive };
+    bool m_startedOnServer { false };
+
+    IDBError m_idbError;
+
+    Timer m_operationTimer;
+    std::unique_ptr<Timer> m_activationTimer;
+
+    Deque<RefPtr<TransactionOperation>> m_transactionOperationQueue;
+    HashMap<IDBResourceIdentifier, RefPtr<TransactionOperation>> m_transactionOperationMap;
+
+    HashMap<String, RefPtr<IDBObjectStore>> m_referencedObjectStores;
+
+    HashSet<RefPtr<IDBRequest>> m_openRequests;
+};
+
+class TransactionActivator {
+    WTF_MAKE_NONCOPYABLE(TransactionActivator);
+public:
+    TransactionActivator(IDBTransaction* transaction)
+        : m_transaction(transaction)
+    {
+        if (m_transaction)
+            m_transaction->activate();
+    }
+
+    ~TransactionActivator()
+    {
+        if (m_transaction)
+            m_transaction->deactivate();
+    }
+
+private:
+    IDBTransaction* m_transaction;
 };
 
 } // namespace IDBClient

@@ -123,11 +123,6 @@ void TestController::platformConfigureViewForTest(const TestInvocation& test)
         doneCompiling = true;
     }];
     platformRunUntil(doneCompiling, 0);
-
-    // This is for http/tests/contentextensions/disable-blocker.html
-    if (!test.urlContains("disable-blocker"))
-        return;
-    mainWebView()->platformView()._userContentExtensionsEnabled = false;
 #endif
 }
 
@@ -282,7 +277,7 @@ static WKRetainPtr<WKArrayRef> generateWhitelist()
     }
 
     for (NSString *hiddenFontFamily in systemHiddenFontFamilySet())
-        WKArrayAppendItem(result, WKStringCreateWithUTF8CString([hiddenFontFamily UTF8String]));
+        WKArrayAppendItem(result, adoptWK(WKStringCreateWithUTF8CString([hiddenFontFamily UTF8String])).get());
 
     return adoptWK(result);
 }

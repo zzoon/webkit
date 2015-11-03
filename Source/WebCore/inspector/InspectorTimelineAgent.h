@@ -39,9 +39,7 @@
 #include <inspector/InspectorFrontendDispatchers.h>
 #include <inspector/InspectorValues.h>
 #include <inspector/ScriptDebugListener.h>
-#include <wtf/Stopwatch.h>
 #include <wtf/Vector.h>
-#include <wtf/WeakPtr.h>
 
 namespace JSC {
 class Profile;
@@ -53,13 +51,8 @@ class Event;
 class FloatQuad;
 class Frame;
 class InspectorPageAgent;
-class IntRect;
-class URL;
-class Page;
 class PageScriptDebugServer;
 class RenderObject;
-class ResourceRequest;
-class ResourceResponse;
 class RunLoopObserver;
 
 typedef String ErrorString;
@@ -73,7 +66,6 @@ enum class TimelineRecordType {
     Paint,
     Composite,
     RenderingFrame,
-    ScrollLayer,
 
     ParseHTML,
 
@@ -83,15 +75,9 @@ enum class TimelineRecordType {
 
     EvaluateScript,
 
-    MarkLoad,
-    MarkDOMContent,
-
     TimeStamp,
     Time,
     TimeEnd,
-
-    XHRReadyStateChange,
-    XHRLoad,
 
     FunctionCall,
     ProbeSample,
@@ -100,11 +86,6 @@ enum class TimelineRecordType {
     RequestAnimationFrame,
     CancelAnimationFrame,
     FireAnimationFrame,
-
-    WebSocketCreate,
-    WebSocketSendHandshakeRequest,
-    WebSocketReceiveHandshakeResponse,
-    WebSocketDestroy
 };
 
 class InspectorTimelineAgent final
@@ -142,8 +123,6 @@ public:
     void didFireTimer();
     void willCallFunction(const String& scriptName, int scriptLine, Frame*);
     void didCallFunction(Frame*);
-    void willDispatchXHRReadyStateChangeEvent(const String&, int, Frame*);
-    void didDispatchXHRReadyStateChangeEvent();
     void willDispatchEvent(const Event&, Frame*);
     void didDispatchEvent();
     void willEvaluateScript(const String&, int, Frame&);
@@ -151,10 +130,6 @@ public:
     void didInvalidateLayout(Frame&);
     void willLayout(Frame&);
     void didLayout(RenderObject*);
-    void willScroll(Frame&);
-    void didScroll();
-    void willDispatchXHRLoadEvent(const String&, Frame*);
-    void didDispatchXHRLoadEvent();
     void willComposite(Frame&);
     void didComposite();
     void willPaint(Frame&);
@@ -165,20 +140,12 @@ public:
     void willWriteHTML(unsigned startLine, Frame*);
     void didWriteHTML(unsigned endLine);
     void didTimeStamp(Frame&, const String&);
-    void didMarkDOMContentEvent(Frame&);
-    void didMarkLoadEvent(Frame&);
     void didRequestAnimationFrame(int callbackId, Frame*);
     void didCancelAnimationFrame(int callbackId, Frame*);
     void willFireAnimationFrame(int callbackId, Frame*);
     void didFireAnimationFrame();
     void time(Frame&, const String&);
     void timeEnd(Frame&, const String&);
-#if ENABLE(WEB_SOCKETS)
-    void didCreateWebSocket(unsigned long identifier, const URL&, const String& protocol, Frame*);
-    void willSendWebSocketHandshakeRequest(unsigned long identifier, Frame*);
-    void didReceiveWebSocketHandshakeResponse(unsigned long identifier, Frame*);
-    void didDestroyWebSocket(unsigned long identifier, Frame*);
-#endif
 
 protected:
     // ScriptDebugListener

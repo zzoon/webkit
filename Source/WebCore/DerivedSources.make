@@ -181,6 +181,7 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/Modules/streams/ReadableStream.idl \
     $(WebCore)/Modules/streams/ReadableStreamController.idl \
     $(WebCore)/Modules/streams/ReadableStreamReader.idl \
+    $(WebCore)/Modules/streams/WritableStream.idl \
     $(WebCore)/Modules/webaudio/AudioBuffer.idl \
     $(WebCore)/Modules/webaudio/AudioBufferCallback.idl \
     $(WebCore)/Modules/webaudio/AudioBufferSourceNode.idl \
@@ -409,7 +410,9 @@ NON_SVG_BINDING_IDLS = \
     $(WebCore)/html/HTMLTableCaptionElement.idl \
     $(WebCore)/html/HTMLTableCellElement.idl \
     $(WebCore)/html/HTMLTableColElement.idl \
+    $(WebCore)/html/HTMLTableDataCellElement.idl \
     $(WebCore)/html/HTMLTableElement.idl \
+    $(WebCore)/html/HTMLTableHeaderCellElement.idl \
     $(WebCore)/html/HTMLTableRowElement.idl \
     $(WebCore)/html/HTMLTableSectionElement.idl \
     $(WebCore)/html/HTMLTemplateElement.idl \
@@ -744,19 +747,23 @@ PLATFORM_FEATURE_DEFINES = Configurations/FeatureDefines.xcconfig
 endif
 endif
 
-ifeq ($(WTF_PLATFORM_IOS), 1)
 ADDITIONAL_BINDING_IDLS =
+ifeq ($(findstring ENABLE_MAC_GESTURE_EVENTS,$(FEATURE_DEFINES)), ENABLE_MAC_GESTURE_EVENTS)
+ADDITIONAL_BINDING_IDLS += GestureEvent.idl
+endif
 
+ifeq ($(findstring ENABLE_IOS_GESTURE_EVENTS,$(FEATURE_DEFINES)), ENABLE_IOS_GESTURE_EVENTS)
+ADDITIONAL_BINDING_IDLS += GestureEvent.idl
+endif
+
+ifeq ($(WTF_PLATFORM_IOS), 1)
 ifeq ($(findstring ENABLE_IOS_TOUCH_EVENTS,$(FEATURE_DEFINES)), ENABLE_IOS_TOUCH_EVENTS)
 ADDITIONAL_BINDING_IDLS += \
     Touch.idl \
     TouchEvent.idl \
     TouchList.idl
 endif
-
-ifeq ($(findstring ENABLE_IOS_GESTURE_EVENTS,$(FEATURE_DEFINES)), ENABLE_IOS_GESTURE_EVENTS)
-ADDITIONAL_BINDING_IDLS += GestureEvent.idl
-endif
+endif # IOS
 
 NON_SVG_BINDING_IDLS += $(ADDITIONAL_BINDING_IDLS)
 
@@ -766,8 +773,6 @@ vpath %.idl $(BUILT_PRODUCTS_DIR)/usr/local/include $(SDKROOT)/usr/local/include
 
 $(ADDITIONAL_BINDING_IDLS) : % : WebKitAdditions/%
 	cp $< .
-
-endif
 
 endif # MACOS
 
@@ -794,7 +799,6 @@ all : \
     $(WORKERGLOBALSCOPE_CONSTRUCTORS_FILE) \
     $(JS_DOM_HEADERS) \
     $(WEB_DOM_HEADERS) \
-    $(WEBCORE_JS_BUILTINS) \
     \
     CSSGrammar.cpp \
     CSSPropertyNames.cpp \
@@ -898,8 +902,8 @@ SelectorPseudoElementTypeMap.cpp : $(WebCore)/css/makeSelectorPseudoElementsMap.
 all : XMLViewerCSS.h
 
 XMLViewerCSS.h : xml/XMLViewer.css
-	$(PYTHON) $(InspectorScripts)/cssmin.py <"$(WebCore)/xml/XMLViewer.css" > ./XMLViewer.min.css
-	$(PERL) $(InspectorScripts)/xxd.pl XMLViewer_css ./XMLViewer.min.css XMLViewerCSS.h
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/cssmin.py <"$(WebCore)/xml/XMLViewer.css" > ./XMLViewer.min.css
+	$(PERL) $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl XMLViewer_css ./XMLViewer.min.css XMLViewerCSS.h
 	$(DELETE) XMLViewer.min.css
 
 # --------
@@ -909,8 +913,8 @@ XMLViewerCSS.h : xml/XMLViewer.css
 all : XMLViewerJS.h
 
 XMLViewerJS.h : xml/XMLViewer.js
-	$(PYTHON) $(InspectorScripts)/jsmin.py <"$(WebCore)/xml/XMLViewer.js" > ./XMLViewer.min.js
-	$(PERL) $(InspectorScripts)/xxd.pl XMLViewer_js ./XMLViewer.min.js XMLViewerJS.h
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py <"$(WebCore)/xml/XMLViewer.js" > ./XMLViewer.min.js
+	$(PERL) $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl XMLViewer_js ./XMLViewer.min.js XMLViewerJS.h
 	$(DELETE) XMLViewer.min.js
 
 # --------
@@ -1004,7 +1008,7 @@ ifdef USER_AGENT_SCRIPTS
 all : UserAgentScripts.h
 
 UserAgentScripts.h : Scripts/make-js-file-arrays.py $(USER_AGENT_SCRIPTS)
-	PYTHONPATH=$(InspectorScripts) $(PYTHON) $< $@ UserAgentScriptsData.cpp $(USER_AGENT_SCRIPTS)
+	PYTHONPATH=$(JavaScriptCore_SCRIPTS_DIR) $(PYTHON) $< $@ UserAgentScriptsData.cpp $(USER_AGENT_SCRIPTS)
 endif
 
 # --------
@@ -1220,52 +1224,76 @@ JS%.h : %.idl $(JS_BINDINGS_SCRIPTS) $(IDL_ATTRIBUTES_FILE) $(WINDOW_CONSTRUCTOR
 all : InspectorOverlayPage.h
 
 InspectorOverlayPage.h : InspectorOverlayPage.html InspectorOverlayPage.css InspectorOverlayPage.js
-	$(PYTHON) $(InspectorScripts)/inline-and-minify-stylesheets-and-scripts.py $(WebCore)/inspector/InspectorOverlayPage.html ./InspectorOverlayPage.combined.html
-	$(PERL) $(InspectorScripts)/xxd.pl InspectorOverlayPage_html ./InspectorOverlayPage.combined.html InspectorOverlayPage.h
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/inline-and-minify-stylesheets-and-scripts.py $(WebCore)/inspector/InspectorOverlayPage.html ./InspectorOverlayPage.combined.html
+	$(PERL) $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl InspectorOverlayPage_html ./InspectorOverlayPage.combined.html InspectorOverlayPage.h
 	$(DELETE) InspectorOverlayPage.combined.html
 
 all : CommandLineAPIModuleSource.h
 
 CommandLineAPIModuleSource.h : CommandLineAPIModuleSource.js
 	echo "//# sourceURL=__WebInspectorCommandLineAPIModuleSource__" > ./CommandLineAPIModuleSource.min.js
-	$(PYTHON) $(InspectorScripts)/jsmin.py <$(WebCore)/inspector/CommandLineAPIModuleSource.js >> ./CommandLineAPIModuleSource.min.js
-	$(PERL) $(InspectorScripts)/xxd.pl CommandLineAPIModuleSource_js ./CommandLineAPIModuleSource.min.js CommandLineAPIModuleSource.h
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py <$(WebCore)/inspector/CommandLineAPIModuleSource.js >> ./CommandLineAPIModuleSource.min.js
+	$(PERL) $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl CommandLineAPIModuleSource_js ./CommandLineAPIModuleSource.min.js CommandLineAPIModuleSource.h
 	$(DELETE) CommandLineAPIModuleSource.min.js
 
 # Web Replay inputs generator
 
 INPUT_GENERATOR_SCRIPTS = \
-    $(WebReplayScripts)/CodeGeneratorReplayInputs.py \
-    $(WebReplayScripts)/CodeGeneratorReplayInputsTemplates.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/CodeGeneratorReplayInputs.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/CodeGeneratorReplayInputsTemplates.py \
 #
 
 INPUT_GENERATOR_SPECIFICATIONS = \
 	$(WebCore)/replay/WebInputs.json \
-	$(WebReplayScripts)/JSInputs.json \
+	$(JavaScriptCore_SCRIPTS_DIR)/JSInputs.json \
 #
 
 all : WebReplayInputs.h
 
 WebReplayInputs.h : $(INPUT_GENERATOR_SPECIFICATIONS) $(INPUT_GENERATOR_SCRIPTS)
-	$(PYTHON) $(WebReplayScripts)/CodeGeneratorReplayInputs.py --outputDir . --framework WebCore $(INPUT_GENERATOR_SPECIFICATIONS)
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/CodeGeneratorReplayInputs.py --outputDir . --framework WebCore $(INPUT_GENERATOR_SPECIFICATIONS)
 
 -include $(JS_DOM_HEADERS:.h=.dep)
 
 # WebCore JS Builtins
 
-WEBCORE_JS_BUILTINS = \
+WebCore_BUILTINS_SOURCES = \
+    $(WebCore)/Modules/mediastream/MediaDevices.js \
     $(WebCore)/Modules/streams/ByteLengthQueuingStrategy.js \
     $(WebCore)/Modules/streams/CountQueuingStrategy.js \
     $(WebCore)/Modules/streams/ReadableStream.js \
     $(WebCore)/Modules/streams/ReadableStreamController.js \
     $(WebCore)/Modules/streams/ReadableStreamInternals.js \
     $(WebCore)/Modules/streams/ReadableStreamReader.js \
+    $(WebCore)/Modules/streams/StreamInternals.js \
+    $(WebCore)/Modules/streams/WritableStream.js \
+    $(WebCore)/Modules/streams/WritableStreamInternals.js \
 #
 
-all : $(WEBCORE_JS_BUILTINS:%.js=%Builtins.cpp)
+BUILTINS_GENERATOR_SCRIPTS = \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins_generator.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins_model.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins_templates.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins_generate_combined_header.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins_generate_combined_implementation.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins_generate_separate_header.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins_generate_separate_implementation.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/generate-js-builtins.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/lazywriter.py \
+#
 
-%Builtins.cpp: %.js
-	$(PYTHON) $(WebCore)/generate-js-builtins --input $< --generate_js_builtins_path $(GenerateJSBuiltinsScripts)
+# Adding/removing scripts should trigger regeneration, but changing which builtins are
+# generated should not affect other builtins when not passing '--combined' to the generator.
+
+.PHONY: force
+WebCore_BUILTINS_DEPENDENCIES_LIST : $(JavaScriptCore_SCRIPTS_DIR)/UpdateContents.py force
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/UpdateContents.py '$(BUILTINS_GENERATOR_SCRIPTS)' $@
+
+%Builtins.h: %.js $(BUILTINS_GENERATOR_SCRIPTS) WebCore_BUILTINS_DEPENDENCIES_LIST
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/generate-js-builtins.py --output-directory . --framework WebCore $<
+
+all : $(notdir $(WebCore_BUILTINS_SOURCES:%.js=%Builtins.h))
 
 # ------------------------
 

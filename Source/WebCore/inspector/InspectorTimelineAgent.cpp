@@ -35,24 +35,16 @@
 
 #include "Event.h"
 #include "Frame.h"
-#include "FrameView.h"
-#include "InspectorInstrumentation.h"
 #include "InspectorPageAgent.h"
 #include "InstrumentingAgents.h"
-#include "IntRect.h"
 #include "JSDOMWindow.h"
-#include "MainFrame.h"
 #include "PageScriptDebugServer.h"
-#include "RenderElement.h"
 #include "RenderView.h"
-#include "ResourceRequest.h"
-#include "ResourceResponse.h"
 #include "ScriptState.h"
 #include "TimelineRecordFactory.h"
-#include <inspector/IdentifiersFactory.h>
 #include <inspector/ScriptBreakpoint.h>
 #include <profiler/LegacyProfiler.h>
-#include <wtf/CurrentTime.h>
+#include <wtf/Stopwatch.h>
 
 #if PLATFORM(IOS)
 #include "RuntimeApplicationChecksIOS.h"
@@ -341,20 +333,7 @@ void InspectorTimelineAgent::didInvalidateLayout(Frame& frame)
 
 void InspectorTimelineAgent::willLayout(Frame& frame)
 {
-    auto* root = frame.view()->layoutRoot();
-    bool partialLayout = !!root;
-
-    if (!partialLayout)
-        root = frame.contentRenderer();
-
-    unsigned dirtyObjects = 0;
-    unsigned totalObjects = 0;
-    for (RenderObject* o = root; o; o = o->nextInPreOrder(root)) {
-        ++totalObjects;
-        if (o->needsLayout())
-            ++dirtyObjects;
-    }
-    pushCurrentRecord(TimelineRecordFactory::createLayoutData(dirtyObjects, totalObjects, partialLayout), TimelineRecordType::Layout, true, &frame);
+    pushCurrentRecord(InspectorObject::create(), TimelineRecordType::Layout, true, &frame);
 }
 
 void InspectorTimelineAgent::didLayout(RenderObject* root)
@@ -416,16 +395,6 @@ void InspectorTimelineAgent::didPaint(RenderObject* renderer, const LayoutRect& 
     didCompleteCurrentRecord(TimelineRecordType::Paint);
 }
 
-void InspectorTimelineAgent::willScroll(Frame& frame)
-{
-    pushCurrentRecord(InspectorObject::create(), TimelineRecordType::ScrollLayer, false, &frame);
-}
-
-void InspectorTimelineAgent::didScroll()
-{
-    didCompleteCurrentRecord(TimelineRecordType::ScrollLayer);
-}
-
 void InspectorTimelineAgent::willWriteHTML(unsigned startLine, Frame* frame)
 {
     pushCurrentRecord(TimelineRecordFactory::createParseHTMLData(startLine), TimelineRecordType::ParseHTML, true, frame);
@@ -458,26 +427,6 @@ void InspectorTimelineAgent::willFireTimer(int timerId, Frame* frame)
 void InspectorTimelineAgent::didFireTimer()
 {
     didCompleteCurrentRecord(TimelineRecordType::TimerFire);
-}
-
-void InspectorTimelineAgent::willDispatchXHRReadyStateChangeEvent(const String& url, int readyState, Frame* frame)
-{
-    pushCurrentRecord(TimelineRecordFactory::createXHRReadyStateChangeData(url, readyState), TimelineRecordType::XHRReadyStateChange, false, frame);
-}
-
-void InspectorTimelineAgent::didDispatchXHRReadyStateChangeEvent()
-{
-    didCompleteCurrentRecord(TimelineRecordType::XHRReadyStateChange);
-}
-
-void InspectorTimelineAgent::willDispatchXHRLoadEvent(const String& url, Frame* frame)
-{
-    pushCurrentRecord(TimelineRecordFactory::createXHRLoadData(url), TimelineRecordType::XHRLoad, true, frame);
-}
-
-void InspectorTimelineAgent::didDispatchXHRLoadEvent()
-{
-    didCompleteCurrentRecord(TimelineRecordType::XHRLoad);
 }
 
 void InspectorTimelineAgent::willEvaluateScript(const String& url, int lineNumber, Frame& frame)
@@ -527,16 +476,6 @@ void InspectorTimelineAgent::timeEnd(Frame& frame, const String& message)
     appendRecord(TimelineRecordFactory::createTimeStampData(message), TimelineRecordType::TimeEnd, true, &frame);
 }
 
-void InspectorTimelineAgent::didMarkDOMContentEvent(Frame& frame)
-{
-    appendRecord(TimelineRecordFactory::createMarkData(frame.isMainFrame()), TimelineRecordType::MarkDOMContent, false, &frame);
-}
-
-void InspectorTimelineAgent::didMarkLoadEvent(Frame& frame)
-{
-    appendRecord(TimelineRecordFactory::createMarkData(frame.isMainFrame()), TimelineRecordType::MarkLoad, false, &frame);
-}
-
 void InspectorTimelineAgent::didCommitLoad()
 {
     clearRecordStack();
@@ -561,28 +500,6 @@ void InspectorTimelineAgent::didFireAnimationFrame()
 {
     didCompleteCurrentRecord(TimelineRecordType::FireAnimationFrame);
 }
-
-#if ENABLE(WEB_SOCKETS)
-void InspectorTimelineAgent::didCreateWebSocket(unsigned long identifier, const URL& url, const String& protocol, Frame* frame)
-{
-    appendRecord(TimelineRecordFactory::createWebSocketCreateData(identifier, url, protocol), TimelineRecordType::WebSocketCreate, true, frame);
-}
-
-void InspectorTimelineAgent::willSendWebSocketHandshakeRequest(unsigned long identifier, Frame* frame)
-{
-    appendRecord(TimelineRecordFactory::createGenericWebSocketData(identifier), TimelineRecordType::WebSocketSendHandshakeRequest, true, frame);
-}
-
-void InspectorTimelineAgent::didReceiveWebSocketHandshakeResponse(unsigned long identifier, Frame* frame)
-{
-    appendRecord(TimelineRecordFactory::createGenericWebSocketData(identifier), TimelineRecordType::WebSocketReceiveHandshakeResponse, false, frame);
-}
-
-void InspectorTimelineAgent::didDestroyWebSocket(unsigned long identifier, Frame* frame)
-{
-    appendRecord(TimelineRecordFactory::createGenericWebSocketData(identifier), TimelineRecordType::WebSocketDestroy, true, frame);
-}
-#endif // ENABLE(WEB_SOCKETS)
 
 // ScriptDebugListener
 
@@ -613,8 +530,6 @@ static Inspector::Protocol::Timeline::EventType toProtocol(TimelineRecordType ty
         return Inspector::Protocol::Timeline::EventType::Composite;
     case TimelineRecordType::RenderingFrame:
         return Inspector::Protocol::Timeline::EventType::RenderingFrame;
-    case TimelineRecordType::ScrollLayer:
-        return Inspector::Protocol::Timeline::EventType::ScrollLayer;
 
     case TimelineRecordType::ParseHTML:
         return Inspector::Protocol::Timeline::EventType::ParseHTML;
@@ -629,22 +544,12 @@ static Inspector::Protocol::Timeline::EventType toProtocol(TimelineRecordType ty
     case TimelineRecordType::EvaluateScript:
         return Inspector::Protocol::Timeline::EventType::EvaluateScript;
 
-    case TimelineRecordType::MarkLoad:
-        return Inspector::Protocol::Timeline::EventType::MarkLoad;
-    case TimelineRecordType::MarkDOMContent:
-        return Inspector::Protocol::Timeline::EventType::MarkDOMContent;
-
     case TimelineRecordType::TimeStamp:
         return Inspector::Protocol::Timeline::EventType::TimeStamp;
     case TimelineRecordType::Time:
         return Inspector::Protocol::Timeline::EventType::Time;
     case TimelineRecordType::TimeEnd:
         return Inspector::Protocol::Timeline::EventType::TimeEnd;
-
-    case TimelineRecordType::XHRReadyStateChange:
-        return Inspector::Protocol::Timeline::EventType::XHRReadyStateChange;
-    case TimelineRecordType::XHRLoad:
-        return Inspector::Protocol::Timeline::EventType::XHRLoad;
 
     case TimelineRecordType::FunctionCall:
         return Inspector::Protocol::Timeline::EventType::FunctionCall;
@@ -659,15 +564,6 @@ static Inspector::Protocol::Timeline::EventType toProtocol(TimelineRecordType ty
         return Inspector::Protocol::Timeline::EventType::CancelAnimationFrame;
     case TimelineRecordType::FireAnimationFrame:
         return Inspector::Protocol::Timeline::EventType::FireAnimationFrame;
-
-    case TimelineRecordType::WebSocketCreate:
-        return Inspector::Protocol::Timeline::EventType::WebSocketCreate;
-    case TimelineRecordType::WebSocketSendHandshakeRequest:
-        return Inspector::Protocol::Timeline::EventType::WebSocketSendHandshakeRequest;
-    case TimelineRecordType::WebSocketReceiveHandshakeResponse:
-        return Inspector::Protocol::Timeline::EventType::WebSocketReceiveHandshakeResponse;
-    case TimelineRecordType::WebSocketDestroy:
-        return Inspector::Protocol::Timeline::EventType::WebSocketDestroy;
     }
 
     return Inspector::Protocol::Timeline::EventType::TimeStamp;
@@ -717,6 +613,11 @@ void InspectorTimelineAgent::didCompleteCurrentRecord(TimelineRecordType type)
         TimelineRecordEntry entry = m_recordStack.last();
         m_recordStack.removeLast();
         ASSERT_UNUSED(type, entry.type == type);
+
+        // Don't send RenderingFrame records that have no children to reduce noise.
+        if (entry.type == TimelineRecordType::RenderingFrame && !entry.children->length())
+            return;
+
         didCompleteRecordEntry(entry);
     }
 }

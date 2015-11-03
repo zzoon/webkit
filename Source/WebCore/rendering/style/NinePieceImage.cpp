@@ -28,6 +28,7 @@
 #include "LengthFunctions.h"
 #include "RenderStyle.h"
 #include <wtf/NeverDestroyed.h>
+#include <wtf/PointerComparison.h>
 
 namespace WebCore {
 
@@ -205,6 +206,9 @@ void NinePieceImage::paint(GraphicsContext& graphicsContext, RenderElement* rend
     Vector<FloatSize> tileScales = computeTileScales(destinationRects, sourceRects, horizontalRule(), verticalRule());
 
     RefPtr<Image> image = styleImage->image(renderer, source);
+    if (!image)
+        return;
+
     ColorSpace colorSpace = style.colorSpace();
 
     for (ImagePiece piece = MinPiece; piece < MaxPiece; ++piece) {
@@ -212,13 +216,13 @@ void NinePieceImage::paint(GraphicsContext& graphicsContext, RenderElement* rend
             continue;
 
         if (isCornerPiece(piece)) {
-            graphicsContext.drawImage(image.get(), colorSpace, destinationRects[piece], sourceRects[piece], op);
+            graphicsContext.drawImage(*image, colorSpace, destinationRects[piece], sourceRects[piece], op);
             continue;
         }
 
         Image::TileRule hRule = isHorizontalPiece(piece) ? static_cast<Image::TileRule>(horizontalRule()) : Image::StretchTile;
         Image::TileRule vRule = isVerticalPiece(piece) ? static_cast<Image::TileRule>(verticalRule()) : Image::StretchTile;
-        graphicsContext.drawTiledImage(image.get(), colorSpace, destinationRects[piece], sourceRects[piece], tileScales[piece], hRule, vRule, op);
+        graphicsContext.drawTiledImage(*image, colorSpace, destinationRects[piece], sourceRects[piece], tileScales[piece], hRule, vRule, op);
     }
 }
 
@@ -252,7 +256,7 @@ Ref<NinePieceImageData> NinePieceImageData::copy() const
 
 bool NinePieceImageData::operator==(const NinePieceImageData& other) const
 {
-    return StyleImage::imagesEquivalent(image.get(), other.image.get())
+    return arePointingToEqualData(image, other.image)
         && imageSlices == other.imageSlices
         && fill == other.fill
         && borderSlices == other.borderSlices

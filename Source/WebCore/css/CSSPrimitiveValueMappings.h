@@ -3331,16 +3331,16 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextOrientation e)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (e) {
-    case TextOrientationSideways:
+    case TextOrientation::Sideways:
         m_value.valueID = CSSValueSideways;
         break;
-    case TextOrientationSidewaysRight:
+    case TextOrientation::SidewaysRight:
         m_value.valueID = CSSValueSidewaysRight;
         break;
-    case TextOrientationVerticalRight:
-        m_value.valueID = CSSValueVerticalRight;
+    case TextOrientation::Mixed:
+        m_value.valueID = CSSValueMixed;
         break;
-    case TextOrientationUpright:
+    case TextOrientation::Upright:
         m_value.valueID = CSSValueUpright;
         break;
     }
@@ -3352,19 +3352,21 @@ template<> inline CSSPrimitiveValue::operator TextOrientation() const
 
     switch (m_value.valueID) {
     case CSSValueSideways:
-        return TextOrientationSideways;
+        return TextOrientation::Sideways;
     case CSSValueSidewaysRight:
-        return TextOrientationSidewaysRight;
+        return TextOrientation::SidewaysRight;
     case CSSValueVerticalRight:
-        return TextOrientationVerticalRight;
+        return TextOrientation::Mixed;
+    case CSSValueMixed:
+        return TextOrientation::Mixed;
     case CSSValueUpright:
-        return TextOrientationUpright;
+        return TextOrientation::Upright;
     default:
         break;
     }
 
     ASSERT_NOT_REACHED();
-    return TextOrientationVerticalRight;
+    return TextOrientation::Mixed;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EPointerEvents e)
@@ -3438,18 +3440,18 @@ template<> inline CSSPrimitiveValue::operator EPointerEvents() const
     return PE_ALL;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontCascadeDescription::Kerning kerning)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(Kerning kerning)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_VALUE_ID;
     switch (kerning) {
-    case FontCascadeDescription::AutoKerning:
+    case Kerning::Auto:
         m_value.valueID = CSSValueAuto;
         return;
-    case FontCascadeDescription::NormalKerning:
+    case Kerning::Normal:
         m_value.valueID = CSSValueNormal;
         return;
-    case FontCascadeDescription::NoneKerning:
+    case Kerning::NoShift:
         m_value.valueID = CSSValueNone;
         return;
     }
@@ -3458,23 +3460,23 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(FontCascadeDescription::K
     m_value.valueID = CSSValueAuto;
 }
 
-template<> inline CSSPrimitiveValue::operator FontCascadeDescription::Kerning() const
+template<> inline CSSPrimitiveValue::operator Kerning() const
 {
     ASSERT(isValueID());
 
     switch (m_value.valueID) {
     case CSSValueAuto:
-        return FontCascadeDescription::AutoKerning;
+        return Kerning::Auto;
     case CSSValueNormal:
-        return FontCascadeDescription::NormalKerning;
+        return Kerning::Normal;
     case CSSValueNone:
-        return FontCascadeDescription::NoneKerning;
+        return Kerning::NoShift;
     default:
         break;
     }
 
     ASSERT_NOT_REACHED();
-    return FontCascadeDescription::AutoKerning;
+    return Kerning::Auto;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ObjectFit fit)
@@ -5251,6 +5253,37 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextZoom textZoom)
     ASSERT_NOT_REACHED();
     m_value.valueID = CSSValueNormal;
 }
+
+#if ENABLE(TOUCH_EVENTS)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TouchAction touchAction)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_VALUE_ID;
+    switch (touchAction) {
+    case TouchAction::Auto:
+        m_value.valueID = CSSValueAuto;
+        break;
+    case TouchAction::Manipulation:
+        m_value.valueID = CSSValueManipulation;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator TouchAction() const
+{
+    ASSERT(isValueID());
+    switch (m_value.valueID) {
+    case CSSValueAuto:
+        return TouchAction::Auto;
+    case CSSValueManipulation:
+        return TouchAction::Manipulation;
+    default:
+        break;
+    }
+    ASSERT_NOT_REACHED();
+    return TouchAction::Auto;
+}
+#endif
 
 #if ENABLE(CSS_SCROLL_SNAP)
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ScrollSnapType e)

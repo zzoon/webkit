@@ -146,8 +146,8 @@ void reifyInlinedCallFrames(CCallHelpers& jit, const OSRExitBase& exit)
     for (codeOrigin = &exit.m_codeOrigin; codeOrigin && codeOrigin->inlineCallFrame; codeOrigin = codeOrigin->inlineCallFrame->getCallerSkippingDeadFrames()) {
         InlineCallFrame* inlineCallFrame = codeOrigin->inlineCallFrame;
         CodeBlock* baselineCodeBlock = jit.baselineCodeBlockFor(*codeOrigin);
-        CodeOrigin* trueCaller = inlineCallFrame->getCallerSkippingDeadFrames();
-        void* trueReturnPC = nullptr;
+        InlineCallFrame::Kind trueCallerCallKind;
+        CodeOrigin* trueCaller = inlineCallFrame->getCallerSkippingDeadFrames(&trueCallerCallKind);
         GPRReg callerFrameGPR = GPRInfo::callFrameRegister;
 
         if (!trueCaller) {
@@ -161,7 +161,7 @@ void reifyInlinedCallFrames(CCallHelpers& jit, const OSRExitBase& exit)
             unsigned callBytecodeIndex = trueCaller->bytecodeIndex;
             void* jumpTarget = nullptr;
 
-            switch (inlineCallFrame->kind) {
+            switch (trueCallerCallKind) {
             case InlineCallFrame::Call:
             case InlineCallFrame::Construct:
             case InlineCallFrame::CallVarargs:
@@ -182,22 +182,14 @@ void reifyInlinedCallFrames(CCallHelpers& jit, const OSRExitBase& exit)
                     baselineCodeBlockForCaller->findStubInfo(CodeOrigin(callBytecodeIndex));
                 RELEASE_ASSERT(stubInfo);
 
-                switch (inlineCallFrame->kind) {
-                case InlineCallFrame::GetterCall:
-                    jumpTarget = jit.vm()->getCTIStub(baselineGetterReturnThunkGenerator).code().executableAddress();
-                    break;
-                case InlineCallFrame::SetterCall:
-                    jumpTarget = jit.vm()->getCTIStub(baselineSetterReturnThunkGenerator).code().executableAddress();
-                    break;
-                default:
-                    RELEASE_ASSERT_NOT_REACHED();
-                    break;
-                }
-
-                trueReturnPC = stubInfo->callReturnLocation.labelAtOffset(
+                jumpTarget = stubInfo->callReturnLocation.labelAtOffset(
                     stubInfo->patch.deltaCallToDone).executableAddress();
                 break;
-            } }
+            }
+
+            default:
+                RELEASE_ASSERT_NOT_REACHED();
+            }
 
             if (trueCaller->inlineCallFrame) {
                 jit.addPtr(
@@ -210,11 +202,17 @@ void reifyInlinedCallFrames(CCallHelpers& jit, const OSRExitBase& exit)
             jit.storePtr(AssemblyHelpers::TrustedImmPtr(jumpTarget), AssemblyHelpers::addressForByteOffset(inlineCallFrame->returnPCOffset()));
         }
 
-        if (trueReturnPC)
-            jit.storePtr(AssemblyHelpers::TrustedImmPtr(trueReturnPC), AssemblyHelpers::addressFor(inlineCallFrame->stackOffset + virtualRegisterForArgument(inlineCallFrame->arguments.size()).offset()));
-                         
         jit.storePtr(AssemblyHelpers::TrustedImmPtr(baselineCodeBlock), AssemblyHelpers::addressFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::CodeBlock)));
-        jit.emitSaveCalleeSavesFor(baselineCodeBlock, static_cast<VirtualRegister>(inlineCallFrame->stackOffset));
+
+        // Restore the inline call frame's callee save registers.
+        // If this inlined frame is a tail call that will return back to the original caller, we need to
+        // copy the prior contents of the tag registers already saved for the outer frame to this frame.
+        jit.emitSaveOrCopyCalleeSavesFor(
+            baselineCodeBlock,
+            static_cast<VirtualRegister>(inlineCallFrame->stackOffset),
+            trueCaller ? AssemblyHelpers::UseExistingTagRegisterContents : AssemblyHelpers::CopySavedTagRegistersFromBaseFrame,
+            GPRInfo::regT2);
+
         if (!inlineCallFrame->isVarargs())
             jit.store32(AssemblyHelpers::TrustedImm32(inlineCallFrame->arguments.size()), AssemblyHelpers::payloadFor((VirtualRegister)(inlineCallFrame->stackOffset + JSStack::ArgumentCount)));
 #if USE(JSVALUE64)
@@ -266,30 +264,29 @@ static void osrWriteBarrier(CCallHelpers& jit, GPRReg owner, GPRReg scratch)
     ownerIsRememberedOrInEden.link(&jit);
 }
 
-static void osrWriteBarrier(CCallHelpers& jit, const OSRExitBase& exit)
-{
-    HashSet<CodeBlock*> codeBlocksToWriteBarrier;
-
-    // Note that the value profiling CodeBlock and the baseline CodeBlock might
-    // not be equal. In "f() { a(); b(); }", if both 'a' and 'b' are inlined,
-    // we might exit to 'b' due to a bad value loaded from 'a'.
-    codeBlocksToWriteBarrier.add(jit.baselineCodeBlockFor(exit.m_codeOriginForExitProfile));
-
-    codeBlocksToWriteBarrier.add(jit.codeBlock()->baselineAlternative());
-
-    for (InlineCallFrame* inlineCallFrame = exit.m_codeOrigin.inlineCallFrame; inlineCallFrame; inlineCallFrame = inlineCallFrame->directCaller.inlineCallFrame)
-        codeBlocksToWriteBarrier.add(inlineCallFrame->baselineCodeBlock.get());
-
-    for (CodeBlock* codeBlock : codeBlocksToWriteBarrier) {
-        jit.move(
-            AssemblyHelpers::TrustedImmPtr(codeBlock), GPRInfo::argumentGPR1);
-        osrWriteBarrier(jit, GPRInfo::argumentGPR1, GPRInfo::nonArgGPR0);
-    }
-}
-
 void adjustAndJumpToTarget(CCallHelpers& jit, const OSRExitBase& exit, bool isExitingToOpCatch)
 {
-    osrWriteBarrier(jit, exit);
+    jit.move(
+        AssemblyHelpers::TrustedImmPtr(
+            jit.codeBlock()->baselineAlternative()), GPRInfo::argumentGPR1);
+    osrWriteBarrier(jit, GPRInfo::argumentGPR1, GPRInfo::nonArgGPR0);
+
+    // We barrier all inlined frames -- and not just the current inline stack --
+    // because we don't know which inlined function owns the value profile that
+    // we'll update when we exit. In the case of "f() { a(); b(); }", if both
+    // a and b are inlined, we might exit inside b due to a bad value loaded
+    // from a.
+    // FIXME: MethodOfGettingAValueProfile should remember which CodeBlock owns
+    // the value profile.
+    InlineCallFrameSet* inlineCallFrames = jit.codeBlock()->jitCode()->dfgCommon()->inlineCallFrames.get();
+    if (inlineCallFrames) {
+        for (InlineCallFrame* inlineCallFrame : *inlineCallFrames) {
+            jit.move(
+                AssemblyHelpers::TrustedImmPtr(
+                    inlineCallFrame->baselineCodeBlock.get()), GPRInfo::argumentGPR1);
+            osrWriteBarrier(jit, GPRInfo::argumentGPR1, GPRInfo::nonArgGPR0);
+        }
+    }
 
     if (exit.m_codeOrigin.inlineCallFrame)
         jit.addPtr(AssemblyHelpers::TrustedImm32(exit.m_codeOrigin.inlineCallFrame->stackOffset * sizeof(EncodedJSValue)), GPRInfo::callFrameRegister);

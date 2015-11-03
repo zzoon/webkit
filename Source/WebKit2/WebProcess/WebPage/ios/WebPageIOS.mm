@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 
 #if PLATFORM(IOS)
 
+#import "AccessibilityIOS.h"
 #import "AssistedNodeInformation.h"
 #import "DataReference.h"
 #import "DrawingArea.h"
@@ -45,12 +46,10 @@
 #import "WebFrame.h"
 #import "WebImage.h"
 #import "WebKitSystemInterface.h"
-#import "WebKitSystemInterfaceIOS.h"
 #import "WebPageProxyMessages.h"
 #import "WebProcess.h"
 #import <CoreText/CTFont.h>
 #import <WebCore/Chrome.h>
-#import <WebCore/DNS.h>
 #import <WebCore/DiagnosticLoggingClient.h>
 #import <WebCore/DiagnosticLoggingKeys.h>
 #import <WebCore/Element.h>
@@ -59,6 +58,7 @@
 #import <WebCore/FloatQuad.h>
 #import <WebCore/FocusController.h>
 #import <WebCore/Frame.h>
+#import <WebCore/FrameLoaderClient.h>
 #import <WebCore/FrameView.h>
 #import <WebCore/GeometryUtilities.h>
 #import <WebCore/HTMLElementTypeHelpers.h>
@@ -119,9 +119,7 @@ void WebPage::platformInitializeAccessibility()
     m_mockAccessibilityElement = adoptNS([[WKAccessibilityWebPageObject alloc] init]);
     [m_mockAccessibilityElement setWebPage:this];
     
-    RetainPtr<CFUUIDRef> uuid = adoptCF(CFUUIDCreate(kCFAllocatorDefault));
-    NSData *remoteToken = WKAXRemoteToken(uuid.get());
-    
+    NSData *remoteToken = newAccessibilityRemoteToken([NSUUID UUID]);
     IPC::DataReference dataToken = IPC::DataReference(reinterpret_cast<const uint8_t*>([remoteToken bytes]), [remoteToken length]);
     send(Messages::WebPageProxy::RegisterWebProcessAccessibilityToken(dataToken));
 }
@@ -233,13 +231,8 @@ void WebPage::viewportPropertiesDidChange(const ViewportArguments& viewportArgum
     if (m_viewportConfiguration.viewportArguments() == viewportArguments)
         return;
 
-    float oldWidth = m_viewportConfiguration.viewportArguments().width;
-
     m_viewportConfiguration.setViewportArguments(viewportArguments);
     viewportConfigurationChanged();
-
-    if (oldWidth != viewportArguments.width)
-        send(Messages::WebPageProxy::ViewportMetaTagWidthDidChange(viewportArguments.width));
 }
 
 void WebPage::didReceiveMobileDocType(bool isMobileDoctype)
@@ -628,8 +621,10 @@ void WebPage::sendTapHighlightForNodeIfNecessary(uint64_t requestID, Node* node)
     if (!node)
         return;
 
-    if (is<Element>(*node))
-        prefetchDNS(downcast<Element>(*node).absoluteLinkURL().host());
+    if (is<Element>(*node)) {
+        ASSERT(m_page);
+        m_page->mainFrame().loader().client().prefetchDNS(downcast<Element>(*node).absoluteLinkURL().host());
+    }
 
     Vector<FloatQuad> quads;
     if (RenderObject *renderer = node->renderer()) {
@@ -662,6 +657,10 @@ void WebPage::potentialTapAtPosition(uint64_t requestID, const WebCore::FloatPoi
 {
     m_potentialTapNode = m_page->mainFrame().nodeRespondingToClickEvents(position, m_potentialTapLocation);
     sendTapHighlightForNodeIfNecessary(requestID, m_potentialTapNode.get());
+#if ENABLE(TOUCH_EVENTS)
+    if (m_potentialTapNode && !m_potentialTapNode->allowsDoubleTapGesture())
+        send(Messages::WebPageProxy::DisableDoubleTapGesturesDuringTapIfNecessary(requestID));
+#endif
 }
 
 void WebPage::commitPotentialTap(uint64_t lastLayerTreeTransactionId)
@@ -2218,7 +2217,7 @@ void WebPage::getPositionInformation(const IntPoint& point, InteractionInformati
                                 FloatSize bitmapSize = scaledSize.width() < image->size().width() ? scaledSize : image->size();
                                 if (RefPtr<ShareableBitmap> sharedBitmap = ShareableBitmap::createShareable(IntSize(bitmapSize), ShareableBitmap::SupportsAlpha)) {
                                     auto graphicsContext = sharedBitmap->createGraphicsContext();
-                                    graphicsContext->drawImage(image, ColorSpaceDeviceRGB, FloatRect(0, 0, bitmapSize.width(), bitmapSize.height()));
+                                    graphicsContext->drawImage(*image, ColorSpaceDeviceRGB, FloatRect(0, 0, bitmapSize.width(), bitmapSize.height()));
                                     info.image = sharedBitmap;
                                 }
                             }

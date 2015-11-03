@@ -105,6 +105,7 @@ GCAwareJITStubRoutineWithExceptionHandler::GCAwareJITStubRoutineWithExceptionHan
     , m_exceptionHandlerCallSiteIndex(exceptionHandlerCallSiteIndex)
 {
     RELEASE_ASSERT(m_codeBlockWithExceptionHandler);
+    ASSERT(!!m_codeBlockWithExceptionHandler->handlerForIndex(exceptionHandlerCallSiteIndex.bits()));
 }
 
 void GCAwareJITStubRoutineWithExceptionHandler::aboutToDie()
@@ -112,14 +113,17 @@ void GCAwareJITStubRoutineWithExceptionHandler::aboutToDie()
     m_codeBlockWithExceptionHandler = nullptr;
 }
 
-GCAwareJITStubRoutineWithExceptionHandler::~GCAwareJITStubRoutineWithExceptionHandler()
+void GCAwareJITStubRoutineWithExceptionHandler::observeZeroRefCount()
 {
     if (m_codeBlockWithExceptionHandler) {
         m_codeBlockWithExceptionHandler->jitCode()->dfgCommon()->removeCallSiteIndex(m_exceptionHandlerCallSiteIndex);
         m_codeBlockWithExceptionHandler->removeExceptionHandlerForCallSite(m_exceptionHandlerCallSiteIndex);
+        m_codeBlockWithExceptionHandler = nullptr;
     }
+
+    Base::observeZeroRefCount();
 }
-    
+
 
 PassRefPtr<JITStubRoutine> createJITStubRoutine(
     const MacroAssemblerCodeRef& code,

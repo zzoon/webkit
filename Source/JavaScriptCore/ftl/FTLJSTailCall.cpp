@@ -77,6 +77,8 @@ ValueRecovery recoveryFor(const ExitValue& value, StackMaps::Record& record, Sta
             // Oh LLVM, you crazy...
             RELEASE_ASSERT(location.dwarfReg().reg() == Reg(MacroAssembler::framePointerRegister));
             RELEASE_ASSERT(!(location.offset() % sizeof(void*)));
+            // DataFormatInt32 and DataFormatBoolean should be already be boxed.
+            RELEASE_ASSERT(format != DataFormatInt32 && format != DataFormatBoolean);
             return ValueRecovery::displacedInJSStack(VirtualRegister { static_cast<int>(location.offset() / sizeof(void*)) }, format);
 
         case Location::Constant:
@@ -179,7 +181,7 @@ uint32_t sizeFor(DataFormat format)
 } // anonymous namespace
 
 JSTailCall::JSTailCall(unsigned stackmapID, Node* node, Vector<ExitValue> arguments)
-    : JSCallBase(CallLinkInfo::TailCall, node->origin.semantic)
+    : JSCallBase(CallLinkInfo::TailCall, node->origin.semantic, node->origin.semantic)
     , m_stackmapID(stackmapID)
     , m_arguments { WTF::move(arguments) }
     , m_instructionOffset(0)
@@ -318,7 +320,7 @@ void JSTailCall::emit(JITCode& jitCode, CCallHelpers& jit)
 
     jit.abortWithReason(JITDidReturnFromTailCall);
 
-    m_callLinkInfo->setUpCall(m_type, m_origin, calleeGPR);
+    m_callLinkInfo->setUpCall(m_type, m_semanticeOrigin, calleeGPR);
 }
 
 } } // namespace JSC::FTL

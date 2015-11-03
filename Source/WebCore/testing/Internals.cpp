@@ -66,11 +66,11 @@
 #include "HTMLVideoElement.h"
 #include "HistoryController.h"
 #include "HistoryItem.h"
+#include "HitTestResult.h"
 #include "IconController.h"
 #include "InspectorClient.h"
 #include "InspectorController.h"
 #include "InspectorFrontendClientLocal.h"
-#include "InspectorInstrumentation.h"
 #include "InspectorOverlay.h"
 #include "InstrumentingAgents.h"
 #include "IntRect.h"
@@ -114,7 +114,6 @@
 #include "TypeConversions.h"
 #include "UserMediaController.h"
 #include "ViewportArguments.h"
-#include "WebConsoleAgent.h"
 #include "WorkerThread.h"
 #include "XMLHttpRequest.h"
 #include <JavaScriptCore/Profile.h>
@@ -385,6 +384,8 @@ void Internals::resetToConsistentState(Page* page)
 #if ENABLE(CONTENT_FILTERING)
     MockContentFilterSettings::reset();
 #endif
+
+    page->setShowAllPlugins(false);
 }
 
 Internals::Internals(Document* document)
@@ -885,17 +886,13 @@ String Internals::visiblePlaceholder(Element* element)
     return String();
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
 void Internals::selectColorInColorChooser(Element* element, const String& colorValue)
 {
-    if (!is<HTMLInputElement>(*element))
+    if (!is<HTMLInputElement>(element))
         return;
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement)
-        return;
-    inputElement->selectColorInColorChooser(Color(colorValue));
+    auto& inputElement = downcast<HTMLInputElement>(*element);
+    inputElement.selectColor(Color(colorValue));
 }
-#endif
 
 Vector<String> Internals::formControlStateOfPreviousHistoryItem(ExceptionCode& ec)
 {
@@ -1188,8 +1185,8 @@ bool Internals::wasLastChangeUserEdit(Element* textField, ExceptionCode& ec)
         return false;
     }
 
-    if (HTMLInputElement* inputElement = textField->toInputElement())
-        return inputElement->lastChangeWasUserEdit();
+    if (is<HTMLInputElement>(*textField))
+        return downcast<HTMLInputElement>(*textField).lastChangeWasUserEdit();
 
     if (is<HTMLTextAreaElement>(*textField))
         return downcast<HTMLTextAreaElement>(*textField).lastChangeWasUserEdit();
@@ -1205,11 +1202,12 @@ bool Internals::elementShouldAutoComplete(Element* element, ExceptionCode& ec)
         return false;
     }
 
-    if (HTMLInputElement* inputElement = element->toInputElement())
-        return inputElement->shouldAutocomplete();
+    if (!is<HTMLInputElement>(*element)) {
+        ec = INVALID_NODE_TYPE_ERR;
+        return false;
+    }
 
-    ec = INVALID_NODE_TYPE_ERR;
-    return false;
+    return downcast<HTMLInputElement>(*element).shouldAutocomplete();
 }
 
 void Internals::setEditingValue(Element* element, const String& value, ExceptionCode& ec)
@@ -1219,33 +1217,42 @@ void Internals::setEditingValue(Element* element, const String& value, Exception
         return;
     }
 
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement) {
+    if (!is<HTMLInputElement>(*element)) {
         ec = INVALID_NODE_TYPE_ERR;
         return;
     }
 
-    inputElement->setEditingValue(value);
+    downcast<HTMLInputElement>(*element).setEditingValue(value);
 }
 
 void Internals::setAutofilled(Element* element, bool enabled, ExceptionCode& ec)
 {
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement) {
+    if (!element) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
-    inputElement->setAutoFilled(enabled);
+
+    if (!is<HTMLInputElement>(*element)) {
+        ec = INVALID_NODE_TYPE_ERR;
+        return;
+    }
+
+    downcast<HTMLInputElement>(*element).setAutoFilled(enabled);
 }
 
 void Internals::setShowAutoFillButton(Element* element, bool show, ExceptionCode& ec)
 {
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement) {
+    if (!element) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
-    inputElement->setShowAutoFillButton(show);
+
+    if (!is<HTMLInputElement>(*element)) {
+        ec = INVALID_NODE_TYPE_ERR;
+        return;
+    }
+
+    downcast<HTMLInputElement>(*element).setShowAutoFillButton(show);
 }
 
 
@@ -1765,27 +1772,6 @@ unsigned Internals::numberOfLiveNodes() const
 unsigned Internals::numberOfLiveDocuments() const
 {
     return Document::allDocuments().size();
-}
-
-Vector<String> Internals::consoleMessageArgumentCounts() const
-{
-    Document* document = contextDocument();
-    if (!document || !document->page())
-        return Vector<String>();
-
-    InstrumentingAgents* instrumentingAgents = InspectorInstrumentation::instrumentingAgentsForPage(document->page());
-    if (!instrumentingAgents)
-        return Vector<String>();
-
-    InspectorConsoleAgent* consoleAgent = instrumentingAgents->webConsoleAgent();
-    if (!consoleAgent)
-        return Vector<String>();
-
-    Vector<unsigned> counts = consoleAgent->consoleMessageArgumentCounts();
-    Vector<String> result(counts.size());
-    for (size_t i = 0; i < counts.size(); i++)
-        result[i] = String::number(counts[i]);
-    return result;
 }
 
 RefPtr<DOMWindow> Internals::openDummyInspectorFrontend(const String& url)
@@ -3147,5 +3133,18 @@ String Internals::userVisibleString(const DOMURL*)
     return String();
 }
 #endif
+
+void Internals::setShowAllPlugins(bool show)
+{
+    Document* document = contextDocument();
+    if (!document)
+        return;
+    
+    Page* page = document->page();
+    if (!page)
+        return;
+
+    page->setShowAllPlugins(show);
+}
 
 }

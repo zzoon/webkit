@@ -28,9 +28,12 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
-#include <wtf/text/WTFString.h>
+#include "IDBObjectStoreInfo.h"
+#include <wtf/HashMap.h>
 
 namespace WebCore {
+
+class IDBKeyPath;
 
 class IDBDatabaseInfo {
 public:
@@ -39,13 +42,29 @@ public:
     IDBDatabaseInfo isolatedCopy() const;
 
     const String& name() const { return m_name; }
+
+    void setVersion(uint64_t version) { m_version = version; }
     uint64_t version() const { return m_version; }
+
+    bool hasObjectStore(const String& name) const;
+    IDBObjectStoreInfo createNewObjectStore(const String& name, const IDBKeyPath&, bool autoIncrement);
+    void addExistingObjectStore(const IDBObjectStoreInfo&);
+    const IDBObjectStoreInfo* infoForExistingObjectStore(uint64_t objectStoreIdentifier) const;
+    const IDBObjectStoreInfo* infoForExistingObjectStore(const String& objectStoreName) const;
+
+    Vector<String> objectStoreNames() const;
+
+    void deleteObjectStore(const String& objectStoreName);
 
 private:
     IDBDatabaseInfo();
 
     String m_name;
     uint64_t m_version { 0 };
+    uint64_t m_maxObjectStoreID { 0 };
+
+    HashMap<uint64_t, IDBObjectStoreInfo> m_objectStoreMap;
+
 };
 
 } // namespace WebCore

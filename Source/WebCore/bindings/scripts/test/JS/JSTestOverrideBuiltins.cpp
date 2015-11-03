@@ -23,6 +23,7 @@
 
 #include "ExceptionCode.h"
 #include "JSDOMBinding.h"
+#include "JSDOMConstructor.h"
 #include "JSNode.h"
 #include "Node.h"
 #include "wtf/text/AtomicString.h"
@@ -66,26 +67,7 @@ private:
     void finishCreation(JSC::VM&);
 };
 
-class JSTestOverrideBuiltinsConstructor : public DOMConstructorObject {
-private:
-    JSTestOverrideBuiltinsConstructor(JSC::Structure*, JSDOMGlobalObject&);
-    void finishCreation(JSC::VM&, JSDOMGlobalObject&);
-
-public:
-    typedef DOMConstructorObject Base;
-    static JSTestOverrideBuiltinsConstructor* create(JSC::VM& vm, JSC::Structure* structure, JSDOMGlobalObject& globalObject)
-    {
-        JSTestOverrideBuiltinsConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestOverrideBuiltinsConstructor>(vm.heap)) JSTestOverrideBuiltinsConstructor(structure, globalObject);
-        ptr->finishCreation(vm, globalObject);
-        return ptr;
-    }
-
-    DECLARE_INFO;
-    static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject& globalObject, JSC::JSValue prototype)
-    {
-        return JSC::Structure::create(vm, &globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), info());
-    }
-};
+typedef JSDOMConstructorNotConstructable<JSTestOverrideBuiltins> JSTestOverrideBuiltinsConstructor;
 
 /* Hash table */
 
@@ -101,21 +83,14 @@ static const HashTableValue JSTestOverrideBuiltinsTableValues[] =
 };
 
 static const HashTable JSTestOverrideBuiltinsTable = { 1, 1, true, JSTestOverrideBuiltinsTableValues, JSTestOverrideBuiltinsTableIndex };
-const ClassInfo JSTestOverrideBuiltinsConstructor::s_info = { "TestOverrideBuiltinsConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestOverrideBuiltinsConstructor) };
-
-JSTestOverrideBuiltinsConstructor::JSTestOverrideBuiltinsConstructor(Structure* structure, JSDOMGlobalObject& globalObject)
-    : Base(structure, globalObject)
+template<> void JSTestOverrideBuiltinsConstructor::initializeProperties(VM& vm, JSDOMGlobalObject& globalObject)
 {
-}
-
-void JSTestOverrideBuiltinsConstructor::finishCreation(VM& vm, JSDOMGlobalObject& globalObject)
-{
-    Base::finishCreation(vm);
-    ASSERT(inherits(info()));
     putDirect(vm, vm.propertyNames->prototype, JSTestOverrideBuiltins::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("TestOverrideBuiltins"))), ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
+
+template<> const ClassInfo JSTestOverrideBuiltinsConstructor::s_info = { "TestOverrideBuiltinsConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestOverrideBuiltinsConstructor) };
 
 /* Hash table for prototype */
 
@@ -135,7 +110,7 @@ void JSTestOverrideBuiltinsPrototype::finishCreation(VM& vm)
 const ClassInfo JSTestOverrideBuiltins::s_info = { "TestOverrideBuiltins", &Base::s_info, &JSTestOverrideBuiltinsTable, CREATE_METHOD_TABLE(JSTestOverrideBuiltins) };
 
 JSTestOverrideBuiltins::JSTestOverrideBuiltins(Structure* structure, JSDOMGlobalObject& globalObject, Ref<TestOverrideBuiltins>&& impl)
-    : JSDOMWrapperWithImplementation<TestOverrideBuiltins>(structure, globalObject, WTF::move(impl))
+    : JSDOMWrapper<TestOverrideBuiltins>(structure, globalObject, WTF::move(impl))
 {
 }
 
@@ -199,7 +174,7 @@ void JSTestOverrideBuiltins::getOwnPropertyNames(JSObject* object, ExecState* st
     auto* thisObject = jsCast<JSTestOverrideBuiltins*>(object);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     if (mode.includeDontEnumProperties()) {
-        for (auto& propertyName : thisObject->impl().supportedPropertyNames())
+        for (auto& propertyName : thisObject->wrapped().supportedPropertyNames())
             propertyNames.add(Identifier::fromString(state, propertyName));
     }
     Base::getOwnPropertyNames(thisObject, state, propertyNames, mode);
@@ -217,7 +192,7 @@ EncodedJSValue JSC_HOST_CALL jsTestOverrideBuiltinsPrototypeFunctionNamedItem(Ex
     if (UNLIKELY(!castedThis))
         return throwThisTypeError(*state, "TestOverrideBuiltins", "namedItem");
     ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestOverrideBuiltins::info());
-    auto& impl = castedThis->impl();
+    auto& impl = castedThis->wrapped();
     String name = state->argument(0).toString(state)->value(state);
     if (UNLIKELY(state->hadException()))
         return JSValue::encode(jsUndefined());
@@ -236,7 +211,7 @@ void JSTestOverrideBuiltinsOwner::finalize(JSC::Handle<JSC::Unknown> handle, voi
 {
     auto* jsTestOverrideBuiltins = jsCast<JSTestOverrideBuiltins*>(handle.slot()->asCell());
     auto& world = *static_cast<DOMWrapperWorld*>(context);
-    uncacheWrapper(world, &jsTestOverrideBuiltins->impl(), jsTestOverrideBuiltins);
+    uncacheWrapper(world, &jsTestOverrideBuiltins->wrapped(), jsTestOverrideBuiltins);
 }
 
 #if ENABLE(BINDING_INTEGRITY)
@@ -286,7 +261,7 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestOverride
 TestOverrideBuiltins* JSTestOverrideBuiltins::toWrapped(JSC::JSValue value)
 {
     if (auto* wrapper = jsDynamicCast<JSTestOverrideBuiltins*>(value))
-        return &wrapper->impl();
+        return &wrapper->wrapped();
     return nullptr;
 }
 

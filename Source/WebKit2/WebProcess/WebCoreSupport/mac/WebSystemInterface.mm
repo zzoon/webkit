@@ -42,7 +42,6 @@ void InitWebCoreSystemInterface(void)
         INIT(CALayerEnumerateRectsBeingDrawnWithBlock);
         INIT(CGContextGetShouldSmoothFonts);
         INIT(CGPatternCreateWithImageAndTransform);
-        INIT(CGContextResetClip);
 #if !PLATFORM(IOS)
         INIT(CGContextDrawsWithCorrectShadowOffsets);
 #endif
@@ -63,7 +62,6 @@ void InitWebCoreSystemInterface(void)
 #if !PLATFORM(IOS)
         INIT(SignedPublicKeyAndChallengeString);
 #endif
-        INIT(GetUserToBaseCTM);
         INIT(GetWebDefaultCFStringEncoding);
         INIT(CGContextIsPDFContext);
 #if !PLATFORM(IOS)
@@ -91,7 +89,6 @@ void InitWebCoreSystemInterface(void)
         INIT(QTClearMediaDownloadCache);
         INIT(SetCGFontRenderingMode);
 #endif
-        INIT(SetBaseCTM);
         INIT(SetCONNECTProxyAuthorizationForStream);
         INIT(SetCONNECTProxyForStream);
 #if !PLATFORM(IOS)
@@ -100,9 +97,7 @@ void InitWebCoreSystemInterface(void)
         INIT(SetHTTPRequestMaximumPriority);
         INIT(SetHTTPRequestPriority);
         INIT(SetHTTPRequestMinimumFastLanePriority);
-        INIT(SetNSURLConnectionDefersCallbacks);
         INIT(SetNSURLRequestShouldContentSniff);
-        INIT(SetPatternPhaseInUserSpace);
         INIT(CreatePrivateStorageSession);
         INIT(CopyRequestWithStorageSession);
         INIT(CopyHTTPCookieStorage);
@@ -156,27 +151,10 @@ void InitWebCoreSystemInterface(void)
 
         INIT(CFURLRequestAllowAllPostCaching);
 
-#if PLATFORM(IOS)
-        INIT(GetUserAgent);
-        INIT(GetDeviceName);
-        INIT(GetOSNameForUserAgent);
-        INIT(GetPlatformNameForNavigator);
-        INIT(GetVendorNameForNavigator);
-#endif
-
 #if !PLATFORM(IOS)
         INIT(NSElasticDeltaForTimeDelta);
         INIT(NSElasticDeltaForReboundDelta);
         INIT(NSReboundDeltaForElasticDelta);
-#endif
-#if PLATFORM(IOS)
-        INIT(ExecutableWasLinkedOnOrAfterIOSVersion);
-        INIT(GetDeviceClass);
-        INIT(GetScreenSize);
-        INIT(GetAvailableScreenSize);
-        INIT(GetScreenScaleFactor);
-        INIT(IsGB18030ComplianceRequired);
-        INIT(IsOptimizedFullscreenSupported);
 #endif
 
 #if ENABLE(PUBLIC_SUFFIX_LIST)

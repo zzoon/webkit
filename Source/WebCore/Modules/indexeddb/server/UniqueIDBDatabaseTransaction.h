@@ -34,22 +34,57 @@
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
+
+class IDBDatabaseInfo;
+class IDBError;
+class IDBKeyData;
+class IDBObjectStoreInfo;
+class IDBRequestData;
+class ThreadSafeDataBuffer;
+
+struct IDBKeyRangeData;
+
 namespace IDBServer {
 
 class UniqueIDBDatabaseConnection;
 
 class UniqueIDBDatabaseTransaction : public RefCounted<UniqueIDBDatabaseTransaction> {
 public:
-    static Ref<UniqueIDBDatabaseTransaction> create(UniqueIDBDatabaseConnection&, IDBTransactionInfo&);
+    static Ref<UniqueIDBDatabaseTransaction> create(UniqueIDBDatabaseConnection&, const IDBTransactionInfo&);
+
+    ~UniqueIDBDatabaseTransaction();
 
     UniqueIDBDatabaseConnection& databaseConnection() { return m_databaseConnection.get(); }
     const IDBTransactionInfo& info() const { return m_transactionInfo; }
+    bool isVersionChange() const;
+    bool isReadOnly() const;
+
+    IDBDatabaseInfo* originalDatabaseInfo() const;
+
+    void abort();
+    void commit();
+
+    void createObjectStore(const IDBRequestData&, const IDBObjectStoreInfo&);
+    void deleteObjectStore(const IDBRequestData&, const String& objectStoreName);
+    void clearObjectStore(const IDBRequestData&, uint64_t objectStoreIdentifier);
+    void putOrAdd(const IDBRequestData&, const IDBKeyData&, const ThreadSafeDataBuffer& valueData, IndexedDB::ObjectStoreOverwriteMode);
+    void getRecord(const IDBRequestData&, const IDBKeyRangeData&);
+    void getCount(const IDBRequestData&, const IDBKeyRangeData&);
+    void deleteRecord(const IDBRequestData&, const IDBKeyRangeData&);
+
+    void didActivateInBackingStore(const IDBError&);
+
+    const Vector<uint64_t>& objectStoreIdentifiers();
 
 private:
-    UniqueIDBDatabaseTransaction(UniqueIDBDatabaseConnection&, IDBTransactionInfo&);
+    UniqueIDBDatabaseTransaction(UniqueIDBDatabaseConnection&, const IDBTransactionInfo&);
 
     Ref<UniqueIDBDatabaseConnection> m_databaseConnection;
     IDBTransactionInfo m_transactionInfo;
+
+    std::unique_ptr<IDBDatabaseInfo> m_originalDatabaseInfo;
+
+    Vector<uint64_t> m_objectStoreIdentifiers;
 };
 
 } // namespace IDBServer

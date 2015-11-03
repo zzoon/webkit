@@ -56,12 +56,33 @@ public:
     // IDBConnectionToServer
     virtual void deleteDatabase(IDBRequestData&) override final;
     virtual void openDatabase(IDBRequestData&) override final;
+    virtual void abortTransaction(IDBResourceIdentifier&) override final;
+    virtual void commitTransaction(IDBResourceIdentifier&) override final;
+    virtual void createObjectStore(const IDBRequestData&, const IDBObjectStoreInfo&) override final;
+    virtual void deleteObjectStore(const IDBRequestData&, const String& objectStoreName) override final;
+    virtual void clearObjectStore(const IDBRequestData&, uint64_t objectStoreIdentifier) override final;
+    virtual void putOrAdd(const IDBRequestData&, IDBKey*, SerializedScriptValue&, const IndexedDB::ObjectStoreOverwriteMode) override final;
+    virtual void getRecord(const IDBRequestData&, const IDBKeyRangeData&) override final;
+    virtual void getCount(const IDBRequestData&, const IDBKeyRangeData&) override final;
+    virtual void deleteRecord(const IDBRequestData&, const IDBKeyRangeData&) override final;
+    virtual void establishTransaction(uint64_t databaseConnectionIdentifier, const IDBTransactionInfo&) override final;
+    virtual void databaseConnectionClosed(uint64_t databaseConnectionIdentifier) override final;
 
     // IDBConnectionToClient
     virtual uint64_t identifier() const override;
     virtual void didDeleteDatabase(const IDBResultData&) override final;
     virtual void didOpenDatabase(const IDBResultData&) override final;
+    virtual void didAbortTransaction(const IDBResourceIdentifier& transactionIdentifier, const IDBError&) override final;
+    virtual void didCommitTransaction(const IDBResourceIdentifier& transactionIdentifier, const IDBError&) override final;
+    virtual void didCreateObjectStore(const IDBResultData&) override final;
+    virtual void didDeleteObjectStore(const IDBResultData&) override final;
+    virtual void didClearObjectStore(const IDBResultData&) override final;
+    virtual void didPutOrAdd(const IDBResultData&) override final;
+    virtual void didGetRecord(const IDBResultData&) override final;
+    virtual void didGetCount(const IDBResultData&) override final;
+    virtual void didDeleteRecord(const IDBResultData&) override final;
     virtual void fireVersionChangeEvent(IDBServer::UniqueIDBDatabaseConnection&, uint64_t requestedVersion) override final;
+    virtual void didStartTransaction(const IDBResourceIdentifier& transactionIdentifier, const IDBError&) override final;
 
     virtual void ref() override { RefCounted<InProcessIDBServer>::ref(); }
     virtual void deref() override { RefCounted<InProcessIDBServer>::deref(); }

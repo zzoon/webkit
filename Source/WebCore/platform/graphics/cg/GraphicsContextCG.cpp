@@ -104,6 +104,23 @@ CGColorSpaceRef linearRGBColorSpaceRef()
 }
 #endif
 
+static InterpolationQuality convertInterpolationQuality(CGInterpolationQuality quality)
+{
+    switch (quality) {
+    case kCGInterpolationDefault:
+        return InterpolationDefault;
+    case kCGInterpolationNone:
+        return InterpolationNone;
+    case kCGInterpolationLow:
+        return InterpolationLow;
+    case kCGInterpolationMedium:
+        return InterpolationMedium;
+    case kCGInterpolationHigh:
+        return InterpolationHigh;
+    }
+    return InterpolationDefault;
+}
+
 void GraphicsContext::platformInit(CGContextRef cgContext)
 {
     m_data = new GraphicsContextPlatformPrivate(cgContext);
@@ -113,6 +130,7 @@ void GraphicsContext::platformInit(CGContextRef cgContext)
         setPlatformFillColor(fillColor(), fillColorSpace());
         setPlatformStrokeColor(strokeColor(), strokeColorSpace());
         setPlatformStrokeThickness(strokeThickness());
+        m_state.imageInterpolationQuality = convertInterpolationQuality(CGContextGetInterpolationQuality(platformContext()));
     }
 }
 
@@ -309,9 +327,11 @@ void GraphicsContext::drawPattern(Image& image, const FloatRect& tileRect, const
     // fall back to the less efficient CGPattern-based mechanism.
     float scaledTileWidth = tileRect.width() * narrowPrecisionToFloat(patternTransform.a());
     float w = CGImageGetWidth(tileImage);
-    if (w == image.size().width() && h == image.size().height() && !spacing.width() && !spacing.height())
+    if (w == image.size().width() && h == image.size().height() && !spacing.width() && !spacing.height()) {
+        // FIXME: CG seems to snap the images to integral sizes. When we care (e.g. with border-image-repeat: round),
+        // we should tile all but the last, and stetch the last image to fit.
         CGContextDrawTiledImage(context, FloatRect(adjustedX, adjustedY, scaledTileWidth, scaledTileHeight), subImage.get());
-    else {
+    } else {
         static const CGPatternCallbacks patternCallbacks = { 0, drawPatternCallback, patternReleaseCallback };
         CGAffineTransform matrix = CGAffineTransformMake(narrowPrecisionToCGFloat(patternTransform.a()), 0, 0, narrowPrecisionToCGFloat(patternTransform.d()), adjustedX, adjustedY);
         matrix = CGAffineTransformConcat(matrix, CGContextGetCTM(context));
@@ -336,13 +356,24 @@ void GraphicsContext::drawPattern(Image& image, const FloatRect& tileRect, const
         RetainPtr<CGColorRef> color = adoptCF(CGColorCreateWithPattern(patternSpace.get(), pattern.get(), &alpha));
         CGContextSetFillColorSpace(context, patternSpace.get());
 
-        // FIXME: Really want a public API for this. It is just CGContextSetBaseCTM(context, CGAffineTransformIdentiy).
-        wkSetBaseCTM(context, CGAffineTransformIdentity);
+        CGContextSetBaseCTM(context, CGAffineTransformIdentity);
         CGContextSetPatternPhase(context, CGSizeZero);
 
         CGContextSetFillColorWithColor(context, color.get());
-        CGContextFillRect(context, CGContextGetClipBoundingBox(context));
+        CGContextFillRect(context, CGContextGetClipBoundingBox(context)); // FIXME: we know the clip; we set it above.
     }
+}
+
+void GraphicsContext::clipToNativeImage(PassNativeImagePtr image, const FloatRect& destRect, const FloatSize& bufferSize)
+{
+    CGContextRef context = platformContext();
+    // FIXME: This image needs to be grayscale to be used as an alpha mask here.
+    CGContextTranslateCTM(context, destRect.x(), destRect.y() + bufferSize.height());
+    CGContextScaleCTM(context, 1, -1);
+    CGContextClipToRect(context, FloatRect(FloatPoint(0, bufferSize.height() - destRect.height()), destRect.size()));
+    CGContextClipToMask(context, FloatRect(FloatPoint(), bufferSize), image);
+    CGContextScaleCTM(context, 1, -1);
+    CGContextTranslateCTM(context, -destRect.x(), -destRect.y() - destRect.height());
 }
 
 // Draws a filled rectangle with a stroked border.
@@ -554,7 +585,7 @@ void GraphicsContext::clipConvexPolygon(size_t numberOfPoints, const FloatPoint*
 void GraphicsContext::applyStrokePattern()
 {
     CGContextRef cgContext = platformContext();
-    AffineTransform userToBaseCTM = AffineTransform(wkGetUserToBaseCTM(cgContext));
+    AffineTransform userToBaseCTM = AffineTransform(getUserToBaseCTM(cgContext));
 
     RetainPtr<CGPatternRef> platformPattern = adoptCF(m_state.strokePattern->createPlatformPattern(userToBaseCTM));
     if (!platformPattern)
@@ -570,7 +601,7 @@ void GraphicsContext::applyStrokePattern()
 void GraphicsContext::applyFillPattern()
 {
     CGContextRef cgContext = platformContext();
-    AffineTransform userToBaseCTM = AffineTransform(wkGetUserToBaseCTM(cgContext));
+    AffineTransform userToBaseCTM = AffineTransform(getUserToBaseCTM(cgContext));
 
     RetainPtr<CGPatternRef> platformPattern = adoptCF(m_state.fillPattern->createPlatformPattern(userToBaseCTM));
     if (!platformPattern)
@@ -951,20 +982,20 @@ void GraphicsContext::clipPath(const Path& path, WindRule clipRule)
     if (paintingDisabled())
         return;
 
-    // Why does clipping to an empty path do nothing?
-    // Why is this different from GraphicsContext::clip(const Path&).
-    if (path.isEmpty())
-        return;
-
     CGContextRef context = platformContext();
+    if (path.isEmpty())
+        CGContextClipToRect(context, CGRectZero);
+    else {
+        CGContextBeginPath(platformContext());
+        CGContextAddPath(platformContext(), path.platformPath());
 
-    CGContextBeginPath(platformContext());
-    CGContextAddPath(platformContext(), path.platformPath());
-
-    if (clipRule == RULE_EVENODD)
-        CGContextEOClip(context);
-    else
-        CGContextClip(context);
+        if (clipRule == RULE_EVENODD)
+            CGContextEOClip(context);
+        else
+            CGContextClip(context);
+    }
+    
+    m_data->clip(path);
 }
 
 IntRect GraphicsContext::clipBounds() const
@@ -1041,7 +1072,7 @@ void GraphicsContext::setPlatformShadow(const FloatSize& offset, float blur, con
     CGContextRef context = platformContext();
 
     if (!m_state.shadowsIgnoreTransforms) {
-        CGAffineTransform userToBaseCTM = wkGetUserToBaseCTM(context);
+        CGAffineTransform userToBaseCTM = getUserToBaseCTM(context);
 
         CGFloat A = userToBaseCTM.a * userToBaseCTM.a + userToBaseCTM.b * userToBaseCTM.b;
         CGFloat B = userToBaseCTM.a * userToBaseCTM.c + userToBaseCTM.b * userToBaseCTM.d;
@@ -1203,31 +1234,9 @@ void GraphicsContext::setLineJoin(LineJoin join)
     }
 }
 
-void GraphicsContext::clip(const Path& path, WindRule fillRule)
-{
-    if (paintingDisabled())
-        return;
-    CGContextRef context = platformContext();
-
-    // CGContextClip does nothing if the path is empty, so in this case, we
-    // instead clip against a zero rect to reduce the clipping region to
-    // nothing - which is the intended behavior of clip() if the path is empty.    
-    if (path.isEmpty())
-        CGContextClipToRect(context, CGRectZero);
-    else {
-        CGContextBeginPath(context);
-        CGContextAddPath(context, path.platformPath());
-        if (fillRule == RULE_NONZERO)
-            CGContextClip(context);
-        else
-            CGContextEOClip(context);
-    }
-    m_data->clip(path);
-}
-
 void GraphicsContext::canvasClip(const Path& path, WindRule fillRule)
 {
-    clip(path, fillRule);
+    clipPath(path, fillRule);
 }
 
 void GraphicsContext::clipOut(const Path& path)
@@ -1422,11 +1431,8 @@ void GraphicsContext::setURLForRect(const URL& link, const IntRect& destRect)
 #endif
 }
 
-void GraphicsContext::setImageInterpolationQuality(InterpolationQuality mode)
+void GraphicsContext::setPlatformImageInterpolationQuality(InterpolationQuality mode)
 {
-    if (paintingDisabled())
-        return;
-
     CGInterpolationQuality quality = kCGInterpolationDefault;
     switch (mode) {
     case InterpolationDefault:
@@ -1446,36 +1452,6 @@ void GraphicsContext::setImageInterpolationQuality(InterpolationQuality mode)
         break;
     }
     CGContextSetInterpolationQuality(platformContext(), quality);
-}
-
-InterpolationQuality GraphicsContext::imageInterpolationQuality() const
-{
-    if (paintingDisabled())
-        return InterpolationDefault;
-
-    CGInterpolationQuality quality = CGContextGetInterpolationQuality(platformContext());
-    switch (quality) {
-    case kCGInterpolationDefault:
-        return InterpolationDefault;
-    case kCGInterpolationNone:
-        return InterpolationNone;
-    case kCGInterpolationLow:
-        return InterpolationLow;
-    case kCGInterpolationMedium:
-        return InterpolationMedium;
-    case kCGInterpolationHigh:
-        return InterpolationHigh;
-    }
-    return InterpolationDefault;
-}
-
-void GraphicsContext::setAllowsFontSmoothing(bool allowsFontSmoothing)
-{
-    UNUSED_PARAM(allowsFontSmoothing);
-#if PLATFORM(COCOA)
-    CGContextRef context = platformContext();
-    CGContextSetAllowsFontSmoothing(context, allowsFontSmoothing);
-#endif
 }
 
 void GraphicsContext::setIsCALayerContext(bool isLayerContext)
@@ -1683,7 +1659,7 @@ void GraphicsContext::platformApplyDeviceScaleFactor(float deviceScaleFactor)
     // CoreGraphics expects the base CTM of a HiDPI context to have the scale factor applied to it.
     // Failing to change the base level CTM will cause certain CG features, such as focus rings,
     // to draw with a scale factor of 1 rather than the actual scale factor.
-    wkSetBaseCTM(platformContext(), CGAffineTransformScale(CGContextGetBaseCTM(platformContext()), deviceScaleFactor, deviceScaleFactor));
+    CGContextSetBaseCTM(platformContext(), CGAffineTransformScale(CGContextGetBaseCTM(platformContext()), deviceScaleFactor, deviceScaleFactor));
 }
 
 void GraphicsContext::platformFillEllipse(const FloatRect& ellipse)

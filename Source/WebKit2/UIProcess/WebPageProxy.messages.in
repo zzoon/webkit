@@ -30,10 +30,6 @@ messages -> WebPageProxy {
     RunJavaScriptPrompt(uint64_t frameID, struct WebCore::SecurityOriginData frameSecurityOrigin, String message, String defaultValue) -> (String result) Delayed
     MouseDidMoveOverElement(struct WebKit::WebHitTestResultData hitTestResultData, uint32_t modifiers, WebKit::UserData userData)
 
-    DidBeginTrackingPotentialLongMousePress(WebCore::IntPoint mouseDownPosition, struct WebKit::WebHitTestResultData hitTestResultData, WebKit::UserData userData)
-    DidRecognizeLongMousePress(WebKit::UserData userData)
-    DidCancelTrackingPotentialLongMousePress(WebKit::UserData userData)
-
 #if ENABLE(NETSCAPE_PLUGIN_API)
     UnavailablePluginButtonClicked(uint32_t pluginUnavailabilityReason, String mimeType, String pluginURLString, String pluginspageAttributeURLString, String frameURLString, String pageURLString)
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
@@ -130,14 +126,13 @@ messages -> WebPageProxy {
     DidReceiveServerRedirectForProvisionalLoadForFrame(uint64_t frameID, uint64_t navigationID, String url, WebKit::UserData userData)
     DidChangeProvisionalURLForFrame(uint64_t frameID, uint64_t navigationID, String url)
     DidFailProvisionalLoadForFrame(uint64_t frameID, struct WebCore::SecurityOriginData frameSecurityOrigin, uint64_t navigationID, String provisionalURL, WebCore::ResourceError error, WebKit::UserData userData)
-    DidCommitLoadForFrame(uint64_t frameID, uint64_t navigationID, String mimeType, bool hasCustomContentProvider, uint32_t loadType, WebCore::CertificateInfo certificateInfo, bool containsPluginDocument, WebKit::UserData userData)
+    DidCommitLoadForFrame(uint64_t frameID, uint64_t navigationID, String mimeType, bool hasCustomContentProvider, bool pluginHandlesPageScaleGesture, uint32_t loadType, WebCore::CertificateInfo certificateInfo, bool containsPluginDocument, WebKit::UserData userData)
     DidFailLoadForFrame(uint64_t frameID, uint64_t navigationID, WebCore::ResourceError error, WebKit::UserData userData)
     DidFinishDocumentLoadForFrame(uint64_t frameID, uint64_t navigationID, WebKit::UserData userData)
     DidFinishLoadForFrame(uint64_t frameID, uint64_t navigationID, WebKit::UserData userData)
     DidFirstLayoutForFrame(uint64_t frameID, WebKit::UserData userData)
     DidFirstVisuallyNonEmptyLayoutForFrame(uint64_t frameID, WebKit::UserData userData)
     DidLayout(uint32_t type)
-    DidRemoveFrameFromHierarchy(uint64_t frameID, WebKit::UserData userData)
     DidReceiveTitleForFrame(uint64_t frameID, String title, WebKit::UserData userData)
     DidDisplayInsecureContentForFrame(uint64_t frameID, WebKit::UserData userData)
     DidRunInsecureContentForFrame(uint64_t frameID, WebKit::UserData userData)
@@ -164,7 +159,7 @@ messages -> WebPageProxy {
     DataCallback(IPC::DataReference resultData, uint64_t callbackID)
     ImageCallback(WebKit::ShareableBitmap::Handle bitmapHandle, uint64_t callbackID)
     StringCallback(String resultString, uint64_t callbackID)
-    ScriptValueCallback(IPC::DataReference resultData, bool hadException, uint64_t callbackID)
+    ScriptValueCallback(IPC::DataReference resultData, bool hadException, struct WebCore::ExceptionDetails details, uint64_t callbackID)
     ComputedPagesCallback(Vector<WebCore::IntRect> pageRects, double totalScaleFactorForPrinting, uint64_t callbackID)
     ValidateCommandCallback(String command, bool isEnabled, int32_t state, uint64_t callbackID)
     EditingRangeCallback(struct WebKit::EditingRange range, uint64_t callbackID)
@@ -188,7 +183,7 @@ messages -> WebPageProxy {
     ZoomToRect(WebCore::FloatRect rect, double minimumScale, double maximumScale)
     CommitPotentialTapFailed()
     DidNotHandleTapAsClick(WebCore::IntPoint point)
-    ViewportMetaTagWidthDidChange(float width)
+    DisableDoubleTapGesturesDuringTapIfNecessary(uint64_t requestID)
     DidFinishDrawingPagesToPDF(IPC::DataReference pdfData)
 #endif
 #if PLATFORM(GTK)
@@ -248,8 +243,7 @@ messages -> WebPageProxy {
     HidePopupMenu()
 
 #if ENABLE(CONTEXT_MENUS)
-    # ContextMenu messages
-    ShowContextMenu(WebCore::IntPoint menuLocation, WebKit::ContextMenuContextData contextMenuContextData, Vector<WebKit::WebContextMenuItemData> items, WebKit::UserData userData)
+    ShowContextMenu(WebKit::ContextMenuContextData contextMenuContextData, WebKit::UserData userData)
 #endif
 
     # Authentication messages
@@ -379,8 +373,8 @@ messages -> WebPageProxy {
 #endif
 
     # Search popup menus
-    SaveRecentSearches(String name, Vector<String> searchItems)
-    LoadRecentSearches(String name) -> (Vector<String> result)
+    SaveRecentSearches(String name, Vector<WebCore::RecentSearch> searchItems)
+    LoadRecentSearches(String name) -> (Vector<WebCore::RecentSearch> result)
 
     SavePDFToFileInDownloadsFolder(String suggestedFilename, String originatingURLString, IPC::DataReference data)
 
@@ -407,10 +401,6 @@ messages -> WebPageProxy {
 #if PLATFORM(MAC)
     ShowTelephoneNumberMenu(String telephoneNumber, WebCore::IntPoint point)
 #endif
-#endif
-
-#if ENABLE(SERVICE_CONTROLS)
-    ShowSelectionServiceMenu(IPC::DataReference selectionAsRTFD, Vector<String> telephoneNumbers, bool isEditable, WebCore::IntPoint point)
 #endif
 
 #if USE(QUICK_LOOK)

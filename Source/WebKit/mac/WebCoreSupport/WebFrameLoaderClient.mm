@@ -79,6 +79,7 @@
 #import <WebCore/BlockExceptions.h>
 #import <WebCore/CachedFrame.h>
 #import <WebCore/Chrome.h>
+#import <WebCore/DNS.h>
 #import <WebCore/Document.h>
 #import <WebCore/DocumentLoader.h>
 #import <WebCore/EventHandler.h>
@@ -886,7 +887,7 @@ static BOOL shouldTryAppLink(WebView *webView, const NavigationAction& action, F
     if (!action.processingUserGesture())
         return NO;
 
-    if (targetFrame && targetFrame->document() && protocolHostAndPortAreEqual(targetFrame->document()->url(), action.url()))
+    if (targetFrame && targetFrame->document() && hostsAreEqual(targetFrame->document()->url(), action.url()))
         return NO;
 
     return YES;
@@ -2287,6 +2288,11 @@ void WebFrameLoaderClient::contentFilterDidBlockLoad(WebCore::ContentFilterUnblo
     core(m_webFrame.get())->loader().policyChecker().setContentFilterUnblockHandler(WTF::move(unblockHandler));
 }
 #endif
+
+void WebFrameLoaderClient::prefetchDNS(const String& hostname)
+{
+    WebCore::prefetchDNS(hostname);
+}
 
 @implementation WebFramePolicyListener
 

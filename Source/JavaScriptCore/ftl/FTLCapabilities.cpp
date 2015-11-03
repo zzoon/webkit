@@ -84,7 +84,6 @@ inline CapabilityLevel canCompile(Node* node)
     case StrCat:
     case ArithAdd:
     case ArithClz32:
-    case ArithSub:
     case ArithMul:
     case ArithDiv:
     case ArithMod:
@@ -160,6 +159,7 @@ inline CapabilityLevel canCompile(Node* node)
     case MakeRope:
     case NewArrayWithSize:
     case GetById:
+    case GetByIdFlush:
     case ToThis:
     case MultiGetByOffset:
     case MultiPutByOffset:
@@ -204,8 +204,18 @@ inline CapabilityLevel canCompile(Node* node)
     case ForwardVarargs:
     case Switch:
     case TypeOf:
+    case PutGetterById:
+    case PutSetterById:
+    case PutGetterSetterById:
+    case PutGetterByVal:
+    case PutSetterByVal:
         // These are OK.
         break;
+    case ArithSub:
+        if (node->result() == NodeResultJS)
+            return CannotCompile;
+        break;
+
     case Identity:
         // No backend handles this because it will be optimized out. But we may check
         // for capabilities before optimization. It would be a deep error to remove this
@@ -218,6 +228,7 @@ inline CapabilityLevel canCompile(Node* node)
         return CannotCompile;
     case PutByIdDirect:
     case PutById:
+    case PutByIdFlush:
         if (node->child1().useKind() == CellUse)
             break;
         return CannotCompile;
@@ -251,7 +262,7 @@ inline CapabilityLevel canCompile(Node* node)
         case Array::ScopedArguments:
             break;
         default:
-            if (isTypedView(node->arrayMode().typedArrayType()))
+            if (node->arrayMode().isSomeTypedArrayView())
                 break;
             return CannotCompile;
         }

@@ -52,22 +52,21 @@ public:
     void setNativeSurfaceHandleForCompositing(uint64_t);
 #endif
 
-    void forceResize() { sizeDidChange(); }
-
 private:
     // DrawingAreaProxy
-    virtual void sizeDidChange();
-    virtual void deviceScaleFactorDidChange();
+    virtual void sizeDidChange() override;
+    virtual void deviceScaleFactorDidChange() override;
 
-    virtual void setBackingStoreIsDiscardable(bool);
-    virtual void waitForBackingStoreUpdateOnNextPaint();
+    virtual void setBackingStoreIsDiscardable(bool) override;
+    virtual void waitForBackingStoreUpdateOnNextPaint() override;
 
     // IPC message handlers
-    virtual void update(uint64_t backingStoreStateID, const UpdateInfo&);
-    virtual void didUpdateBackingStoreState(uint64_t backingStoreStateID, const UpdateInfo&, const LayerTreeContext&);
-    virtual void enterAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&);
-    virtual void exitAcceleratedCompositingMode(uint64_t backingStoreStateID, const UpdateInfo&);
-    virtual void updateAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&);
+    virtual void update(uint64_t backingStoreStateID, const UpdateInfo&) override;
+    virtual void didUpdateBackingStoreState(uint64_t backingStoreStateID, const UpdateInfo&, const LayerTreeContext&) override;
+    virtual void enterAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&) override;
+    virtual void exitAcceleratedCompositingMode(uint64_t backingStoreStateID, const UpdateInfo&) override;
+    virtual void updateAcceleratedCompositingMode(uint64_t backingStoreStateID, const LayerTreeContext&) override;
+    virtual void willEnterAcceleratedCompositingMode(uint64_t backingStoreStateID) override;
 
     void incorporateUpdate(const UpdateInfo&);
 

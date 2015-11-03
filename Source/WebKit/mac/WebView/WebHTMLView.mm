@@ -106,6 +106,7 @@
 #import <WebCore/Image.h>
 #import <WebCore/KeyboardEvent.h>
 #import <WebCore/LegacyWebArchive.h>
+#import <WebCore/LocalizedStrings.h>
 #import <WebCore/MIMETypeRegistry.h>
 #import <WebCore/MainFrame.h>
 #import <WebCore/NSURLFileTypeMappingsSPI.h>
@@ -3329,6 +3330,321 @@ static void setMenuTargets(NSMenu* menu)
     }
 }
 
+static BOOL isPreVersion3Client(void)
+{
+    static BOOL preVersion3Client = !WebKitLinkedOnOrAfter(WEBKIT_FIRST_VERSION_WITH_3_0_CONTEXT_MENU_TAGS);
+    return preVersion3Client;
+}
+
+static BOOL isPreInspectElementTagClient(void)
+{
+    static BOOL preInspectElementTagClient = !WebKitLinkedOnOrAfter(WEBKIT_FIRST_VERSION_WITH_INSPECT_ELEMENT_MENU_TAG);
+    return preInspectElementTagClient;
+}
+
+static RetainPtr<NSArray> fixMenusToSendToOldClients(NSMutableArray *defaultMenuItems)
+{
+    auto savedItems = adoptNS([[NSMutableArray alloc] init]);
+
+    unsigned defaultItemsCount = [defaultMenuItems count];
+
+    if (isPreInspectElementTagClient() && defaultItemsCount >= 2) {
+        NSMenuItem *secondToLastItem = [defaultMenuItems objectAtIndex:defaultItemsCount - 2];
+        NSMenuItem *lastItem = [defaultMenuItems objectAtIndex:defaultItemsCount - 1];
+
+        if ([secondToLastItem isSeparatorItem] && [lastItem tag] == WebMenuItemTagInspectElement) {
+            savedItems = adoptNS([[NSMutableArray alloc] initWithCapacity:2]);
+            [savedItems addObject:secondToLastItem];
+            [savedItems addObject:lastItem];
+
+            [defaultMenuItems removeObject:secondToLastItem];
+            [defaultMenuItems removeObject:lastItem];
+            defaultItemsCount -= 2;
+        }
+    }
+
+    BOOL preVersion3Client = isPreVersion3Client();
+    if (!preVersion3Client)
+        return savedItems;
+
+    for (NSMenuItem *item in defaultMenuItems) {
+        int tag = item.tag;
+        int oldStyleTag = tag;
+
+        if (tag >= WEBMENUITEMTAG_WEBKIT_3_0_SPI_START) {
+            // Change all editing-related SPI tags listed in WebUIDelegatePrivate.h to WebMenuItemTagOther
+            // to match our old WebKit context menu behavior.
+            oldStyleTag = WebMenuItemTagOther;
+        } else {
+            // All items are expected to have useful tags coming into this method.
+            ASSERT(tag != WebMenuItemTagOther);
+            
+            // Use the pre-3.0 tags for the few items that changed tags as they moved from SPI to API. We
+            // do this only for old clients; new Mail already expects the new symbols in this case.
+            if (preVersion3Client) {
+                switch (tag) {
+                case WebMenuItemTagSearchInSpotlight:
+                    oldStyleTag = OldWebMenuItemTagSearchInSpotlight;
+                    break;
+                case WebMenuItemTagSearchWeb:
+                    oldStyleTag = OldWebMenuItemTagSearchWeb;
+                    break;
+                case WebMenuItemTagLookUpInDictionary:
+                    oldStyleTag = OldWebMenuItemTagLookUpInDictionary;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
+        item.tag = oldStyleTag;
+    }
+
+    return savedItems;
+}
+
+static RetainPtr<NSArray> fixMenusReceivedFromOldClients(NSArray *delegateSuppliedItems, NSArray *savedItems)
+{
+    auto newMenuItems = adoptNS([delegateSuppliedItems mutableCopy]);
+
+    if (savedItems)
+        [newMenuItems addObjectsFromArray:savedItems];
+
+    BOOL preVersion3Client = isPreVersion3Client();
+    if (!preVersion3Client)
+        return newMenuItems;
+    
+    // Restore the modern tags to the menu items whose tags we altered in fixMenusToSendToOldClients. 
+    unsigned newItemsCount = [newMenuItems count];
+    for (unsigned i = 0; i < newItemsCount; ++i) {
+        NSMenuItem *item = [newMenuItems objectAtIndex:i];
+        
+        int tag = [item tag];
+        int modernTag = tag;
+        
+        if (tag == WebMenuItemTagOther) {
+            // Restore the specific tag for items on which we temporarily set WebMenuItemTagOther to match old behavior.
+            NSString *title = [item title];
+            if ([title isEqualToString:contextMenuItemTagOpenLink()])
+                modernTag = WebMenuItemTagOpenLink;
+            else if ([title isEqualToString:contextMenuItemTagIgnoreGrammar()])
+                modernTag = WebMenuItemTagIgnoreGrammar;
+            else if ([title isEqualToString:contextMenuItemTagSpellingMenu()])
+                modernTag = WebMenuItemTagSpellingMenu;
+            else if ([title isEqualToString:contextMenuItemTagShowSpellingPanel(true)] || [title isEqualToString:contextMenuItemTagShowSpellingPanel(false)])
+                modernTag = WebMenuItemTagShowSpellingPanel;
+            else if ([title isEqualToString:contextMenuItemTagCheckSpelling()])
+                modernTag = WebMenuItemTagCheckSpelling;
+            else if ([title isEqualToString:contextMenuItemTagCheckSpellingWhileTyping()])
+                modernTag = WebMenuItemTagCheckSpellingWhileTyping;
+            else if ([title isEqualToString:contextMenuItemTagCheckGrammarWithSpelling()])
+                modernTag = WebMenuItemTagCheckGrammarWithSpelling;
+            else if ([title isEqualToString:contextMenuItemTagFontMenu()])
+                modernTag = WebMenuItemTagFontMenu;
+            else if ([title isEqualToString:contextMenuItemTagShowFonts()])
+                modernTag = WebMenuItemTagShowFonts;
+            else if ([title isEqualToString:contextMenuItemTagBold()])
+                modernTag = WebMenuItemTagBold;
+            else if ([title isEqualToString:contextMenuItemTagItalic()])
+                modernTag = WebMenuItemTagItalic;
+            else if ([title isEqualToString:contextMenuItemTagUnderline()])
+                modernTag = WebMenuItemTagUnderline;
+            else if ([title isEqualToString:contextMenuItemTagOutline()])
+                modernTag = WebMenuItemTagOutline;
+            else if ([title isEqualToString:contextMenuItemTagStyles()])
+                modernTag = WebMenuItemTagStyles;
+            else if ([title isEqualToString:contextMenuItemTagShowColors()])
+                modernTag = WebMenuItemTagShowColors;
+            else if ([title isEqualToString:contextMenuItemTagSpeechMenu()])
+                modernTag = WebMenuItemTagSpeechMenu;
+            else if ([title isEqualToString:contextMenuItemTagStartSpeaking()])
+                modernTag = WebMenuItemTagStartSpeaking;
+            else if ([title isEqualToString:contextMenuItemTagStopSpeaking()])
+                modernTag = WebMenuItemTagStopSpeaking;
+            else if ([title isEqualToString:contextMenuItemTagWritingDirectionMenu()])
+                modernTag = WebMenuItemTagWritingDirectionMenu;
+            else if ([title isEqualToString:contextMenuItemTagDefaultDirection()])
+                modernTag = WebMenuItemTagDefaultDirection;
+            else if ([title isEqualToString:contextMenuItemTagLeftToRight()])
+                modernTag = WebMenuItemTagLeftToRight;
+            else if ([title isEqualToString:contextMenuItemTagRightToLeft()])
+                modernTag = WebMenuItemTagRightToLeft;
+            else if ([title isEqualToString:contextMenuItemTagInspectElement()])
+                modernTag = WebMenuItemTagInspectElement;
+            else if ([title isEqualToString:contextMenuItemTagCorrectSpellingAutomatically()])
+                modernTag = WebMenuItemTagCorrectSpellingAutomatically;
+            else if ([title isEqualToString:contextMenuItemTagSubstitutionsMenu()])
+                modernTag = WebMenuItemTagSubstitutionsMenu;
+            else if ([title isEqualToString:contextMenuItemTagShowSubstitutions(true)] || [title isEqualToString:contextMenuItemTagShowSubstitutions(false)])
+                modernTag = WebMenuItemTagShowSubstitutions;
+            else if ([title isEqualToString:contextMenuItemTagSmartCopyPaste()])
+                modernTag = WebMenuItemTagSmartCopyPaste;
+            else if ([title isEqualToString:contextMenuItemTagSmartQuotes()])
+                modernTag = WebMenuItemTagSmartQuotes;
+            else if ([title isEqualToString:contextMenuItemTagSmartDashes()])
+                modernTag = WebMenuItemTagSmartDashes;
+            else if ([title isEqualToString:contextMenuItemTagSmartLinks()])
+                modernTag = WebMenuItemTagSmartLinks;
+            else if ([title isEqualToString:contextMenuItemTagTextReplacement()])
+                modernTag = WebMenuItemTagTextReplacement;
+            else if ([title isEqualToString:contextMenuItemTagTransformationsMenu()])
+                modernTag = WebMenuItemTagTransformationsMenu;
+            else if ([title isEqualToString:contextMenuItemTagMakeUpperCase()])
+                modernTag = WebMenuItemTagMakeUpperCase;
+            else if ([title isEqualToString:contextMenuItemTagMakeLowerCase()])
+                modernTag = WebMenuItemTagMakeLowerCase;
+            else if ([title isEqualToString:contextMenuItemTagCapitalize()])
+                modernTag = WebMenuItemTagCapitalize;
+            else {
+            // We don't expect WebMenuItemTagOther for any items other than the ones we explicitly handle.
+            // There's nothing to prevent an app from applying this tag, but they are supposed to only
+            // use tags in the range starting with WebMenuItemBaseApplicationTag=10000
+                ASSERT_NOT_REACHED();
+            }
+        } else if (preVersion3Client) {
+            // Restore the new API tag for items on which we temporarily set the old SPI tag. The old SPI tag was
+            // needed to avoid confusing clients linked against earlier WebKits; the new API tag is needed for
+            // WebCore to handle the menu items appropriately (without needing to know about the old SPI tags).
+            switch (tag) {
+            case OldWebMenuItemTagSearchInSpotlight:
+                modernTag = WebMenuItemTagSearchInSpotlight;
+                break;
+            case OldWebMenuItemTagSearchWeb:
+                modernTag = WebMenuItemTagSearchWeb;
+                break;
+            case OldWebMenuItemTagLookUpInDictionary:
+                modernTag = WebMenuItemTagLookUpInDictionary;
+                break;
+            default:
+                break;
+            }
+        }
+        
+        if (modernTag != tag)
+            [item setTag:modernTag];        
+    }
+
+    return newMenuItems;
+}
+
+static RetainPtr<NSMenuItem> createShareMenuItem(const HitTestResult& hitTestResult)
+{
+    if (![[NSMenuItem class] respondsToSelector:@selector(standardShareMenuItemWithItems:)])
+        return nil;
+
+    auto items = adoptNS([[NSMutableArray alloc] init]);
+
+    if (!hitTestResult.absoluteLinkURL().isEmpty()) {
+        NSURL *absoluteLinkURL = hitTestResult.absoluteLinkURL();
+        [items addObject:absoluteLinkURL];
+    }
+
+    if (!hitTestResult.absoluteMediaURL().isEmpty() && hitTestResult.isDownloadableMedia()) {
+        NSURL *downloadableMediaURL = hitTestResult.absoluteMediaURL();
+        [items addObject:downloadableMediaURL];
+    }
+
+    if (Image* image = hitTestResult.image()) {
+        if (RefPtr<SharedBuffer> buffer = image->data())
+            [items addObject:adoptNS([[NSImage alloc] initWithData:[NSData dataWithBytes:buffer->data() length:buffer->size()]]).get()];
+    }
+
+    if (!hitTestResult.selectedText().isEmpty()) {
+        NSString *selectedText = hitTestResult.selectedText();
+        [items addObject:selectedText];
+    }
+
+    if (![items count])
+        return nil;
+
+    return [NSMenuItem standardShareMenuItemWithItems:items.get()];
+}
+
+static RetainPtr<NSMutableArray> createMenuItems(const HitTestResult&, const Vector<ContextMenuItem>&);
+
+static RetainPtr<NSMenuItem> createMenuItem(const HitTestResult& hitTestResult, const ContextMenuItem& item)
+{
+    if (item.action() == ContextMenuItemTagShareMenu)
+        return createShareMenuItem(hitTestResult);
+
+    switch (item.type()) {
+    case WebCore::ActionType:
+    case WebCore::CheckableActionType: {
+        auto menuItem = adoptNS([[NSMenuItem alloc] initWithTitle:item.title() action:@selector(forwardContextMenuAction:) keyEquivalent:@""]);
+
+        [menuItem setTag:item.action()];
+        [menuItem setEnabled:item.enabled()];
+        [menuItem setState:item.checked() ? NSOnState : NSOffState];
+        [menuItem setTarget:[WebMenuTarget sharedMenuTarget]];
+
+        return menuItem;
+    }
+
+    case SeparatorType:
+        return [NSMenuItem separatorItem];
+
+    case SubmenuType: {
+        auto menu = adoptNS([[NSMenu alloc] init]);
+
+        auto submenuItems = createMenuItems(hitTestResult, contextMenuItemVector(item.platformSubMenu()));
+        for (NSMenuItem *menuItem in submenuItems.get())
+            [menu addItem:menuItem];
+
+        auto menuItem = adoptNS([[NSMenuItem alloc] initWithTitle:item.title() action:nullptr keyEquivalent:@""]);
+        [menuItem setEnabled:item.enabled()];
+        [menuItem setSubmenu:menu.get()];
+
+        return menuItem;
+    }
+    }
+}
+
+static RetainPtr<NSMutableArray> createMenuItems(const HitTestResult& hitTestResult, const Vector<ContextMenuItem>& items)
+{
+    auto menuItems = adoptNS([[NSMutableArray alloc] init]);
+
+    for (auto& item : items) {
+        if (auto menuItem = createMenuItem(hitTestResult, item))
+            [menuItems addObject:menuItem.get()];
+    }
+
+    return menuItems;
+}
+
+static RetainPtr<NSArray> customMenuFromDefaultItems(WebView *webView, const ContextMenu& defaultMenu)
+{
+    const auto& hitTestResult = webView.page->contextMenuController().hitTestResult();
+    auto defaultMenuItems = createMenuItems(hitTestResult, contextMenuItemVector(defaultMenu.platformDescription()));
+
+    id delegate = [webView UIDelegate];
+    SEL selector = @selector(webView:contextMenuItemsForElement:defaultMenuItems:);
+    if (![delegate respondsToSelector:selector])
+        return defaultMenuItems;
+
+    auto element = adoptNS([[WebElementDictionary alloc] initWithHitTestResult:hitTestResult]);
+
+    BOOL preVersion3Client = isPreVersion3Client();
+    if (preVersion3Client) {
+        DOMNode *node = [element objectForKey:WebElementDOMNodeKey];
+        if ([node isKindOfClass:[DOMHTMLInputElement class]] && [(DOMHTMLInputElement *)node _isTextField])
+            return defaultMenuItems;
+        if ([node isKindOfClass:[DOMHTMLTextAreaElement class]])
+            return defaultMenuItems;
+    }
+
+    for (NSMenuItem *menuItem in defaultMenuItems.get()) {
+        if (!menuItem.representedObject)
+            menuItem.representedObject = element.get();
+    }
+
+    auto savedItems = fixMenusToSendToOldClients(defaultMenuItems.get());
+
+    NSArray *delegateSuppliedItems = CallUIDelegate(webView, selector, element.get(), defaultMenuItems.get());
+
+    return fixMenusReceivedFromOldClients(delegateSuppliedItems, savedItems.get()).autorelease();
+}
+
 - (NSMenu *)menuForEvent:(NSEvent *)event
 {
     // There's a chance that if we run a nested event loop the event will be released.
@@ -3361,41 +3677,32 @@ static void setMenuTargets(NSMenu* menu)
     if (!page)
         return nil;
 
-    ContextMenu* coreMenu = page->contextMenuController().contextMenu();
-    if (!coreMenu)
+    ContextMenu* contextMenu = page->contextMenuController().contextMenu();
+    if (!contextMenu)
         return nil;
 
-    auto menuItemVector = contextMenuItemVector(coreMenu->platformDescription());
-    for (auto& menuItem : menuItemVector) {
-        if (menuItem.action() != ContextMenuItemTagShareMenu)
-            continue;
+    auto menuItems = customMenuFromDefaultItems([self _webView], *contextMenu);
+    if (![menuItems count])
+        return nil;
 
-        NSMenuItem *nsItem = menuItem.platformDescription();
-        if (![nsItem.representedObject isKindOfClass:[NSSharingServicePicker class]]) {
-            ASSERT_NOT_REACHED();
-            continue;
-        }
+    auto menu = adoptNS([[NSMenu alloc] init]);
+
+    for (NSMenuItem *item in menuItems.get()) {
+        [menu addItem:item];
+
+        if (item.tag == ContextMenuItemTagShareMenu) {
+            ASSERT([item.representedObject isKindOfClass:[NSSharingServicePicker class]]);
 #if ENABLE(SERVICE_CONTROLS)
-        _private->currentSharingServicePickerController = adoptNS([[WebSharingServicePickerController alloc] initWithSharingServicePicker:nsItem.representedObject client:static_cast<WebContextMenuClient&>(page->contextMenuController().client())]);
+            _private->currentSharingServicePickerController = adoptNS([[WebSharingServicePickerController alloc] initWithSharingServicePicker:item.representedObject client:static_cast<WebContextMenuClient&>(page->contextMenuController().client())]);
 #endif
+        }
     }
 
-    NSArray* menuItems = coreMenu->platformDescription();
-    if (!menuItems)
-        return nil;
-
-    NSUInteger count = [menuItems count];
-    if (!count)
-        return nil;
-
-    NSMenu* menu = [[[NSMenu alloc] init] autorelease];
-    for (NSUInteger i = 0; i < count; i++)
-        [menu addItem:[menuItems objectAtIndex:i]];
-    setMenuTargets(menu);
+    setMenuTargets(menu.get());
     
     [[WebMenuTarget sharedMenuTarget] setMenuController:&page->contextMenuController()];
     
-    return menu;
+    return menu.autorelease();
 }
 #endif // !PLATFORM(IOS)
 
@@ -6108,8 +6415,10 @@ static BOOL writingDirectionKeyBindingsEnabled()
     NSWindow *window = [self window];
     WebFrame *frame = [self _frame];
 
-    if (window)
-        thePoint = [window convertScreenToBase:thePoint];
+    if (window) {
+        NSRect screenRect = { thePoint, NSZeroSize };
+        thePoint = [window convertRectFromScreen:screenRect].origin;
+    }
     thePoint = [self convertPoint:thePoint fromView:nil];
 
     DOMRange *range = [frame _characterRangeAtPoint:thePoint];
@@ -6149,7 +6458,7 @@ static BOOL writingDirectionKeyBindingsEnabled()
 
     NSWindow *window = [self window];
     if (window)
-        resultRect.origin = [window convertBaseToScreen:resultRect.origin];
+        resultRect.origin = [window convertRectToScreen:resultRect].origin;
     
     LOG(TextInput, "firstRectForCharacterRange:(%u, %u) -> (%f, %f, %f, %f)", theRange.location, theRange.length, resultRect.origin.x, resultRect.origin.y, resultRect.size.width, resultRect.size.height);
     return resultRect;

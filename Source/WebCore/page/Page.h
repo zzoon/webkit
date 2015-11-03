@@ -109,6 +109,7 @@ class Range;
 class RenderObject;
 class RenderTheme;
 class ReplayController;
+class ResourceUsageOverlay;
 class VisibleSelection;
 class ScrollableArea;
 class ScrollingCoordinator;
@@ -244,6 +245,7 @@ public:
     enum { NoMatchAfterUserSelection = -1 };
     WEBCORE_EXPORT void findStringMatchingRanges(const String&, FindOptions, int maxCount, Vector<RefPtr<Range>>&, int& indexForSelection);
 #if PLATFORM(COCOA)
+    void platformInitialize();
     WEBCORE_EXPORT void addSchedulePair(Ref<SchedulePair>&&);
     WEBCORE_EXPORT void removeSchedulePair(Ref<SchedulePair>&&);
     SchedulePairHashSet* scheduledRunLoopPairs() { return m_scheduledRunLoopPairs.get(); }
@@ -331,6 +333,10 @@ public:
 
     void dnsPrefetchingStateChanged();
     void storageBlockingStateChanged();
+
+#if ENABLE(RESOURCE_USAGE_OVERLAY)
+    void setResourceUsageOverlayVisible(bool);
+#endif
 
     void setDebugger(JSC::Debugger*);
     JSC::Debugger* debugger() const { return m_debugger; }
@@ -428,9 +434,6 @@ public:
     UserContentController* userContentController() { return m_userContentController.get(); }
     WEBCORE_EXPORT void setUserContentController(UserContentController*);
 
-    bool userContentExtensionsEnabled() const { return m_userContentExtensionsEnabled; }
-    void setUserContentExtensionsEnabled(bool enabled) { m_userContentExtensionsEnabled = enabled; }
-
     VisitedLinkStore& visitedLinkStore();
     WEBCORE_EXPORT void setVisitedLinkStore(Ref<VisitedLinkStore>&&);
 
@@ -473,6 +476,9 @@ public:
 #if ENABLE(INDEXED_DATABASE)
     IDBClient::IDBConnectionToServer& idbConnection();
 #endif
+
+    void setShowAllPlugins(bool showAll) { m_showAllPlugins = showAll; }
+    bool showAllPlugins() const { return m_showAllPlugins; }
 
 private:
     WEBCORE_EXPORT void initGroup();
@@ -630,14 +636,18 @@ private:
 
     HashSet<ViewStateChangeObserver*> m_viewStateChangeObservers;
 
+#if ENABLE(RESOURCE_USAGE_OVERLAY)
+    std::unique_ptr<ResourceUsageOverlay> m_resourceUsageOverlay;
+#endif
+
     SessionID m_sessionID;
 
     bool m_isClosing;
 
     MediaProducer::MediaStateFlags m_mediaState { MediaProducer::IsNotPlaying };
     
-    bool m_userContentExtensionsEnabled { true };
     bool m_allowsMediaDocumentInlinePlayback { false };
+    bool m_showAllPlugins { false };
 };
 
 inline PageGroup& Page::group()

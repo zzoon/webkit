@@ -492,7 +492,7 @@ void JIT::emit_op_put_getter_by_id(Instruction* currentInstruction)
     emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
     int32_t options = currentInstruction[3].u.operand;
     emitGetVirtualRegister(currentInstruction[4].u.operand, regT1);
-    callOperation(operationPutGetterById, regT0, &m_codeBlock->identifier(currentInstruction[2].u.operand), options, regT1);
+    callOperation(operationPutGetterById, regT0, m_codeBlock->identifier(currentInstruction[2].u.operand).impl(), options, regT1);
 }
 
 void JIT::emit_op_put_setter_by_id(Instruction* currentInstruction)
@@ -500,16 +500,16 @@ void JIT::emit_op_put_setter_by_id(Instruction* currentInstruction)
     emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
     int32_t options = currentInstruction[3].u.operand;
     emitGetVirtualRegister(currentInstruction[4].u.operand, regT1);
-    callOperation(operationPutSetterById, regT0, &m_codeBlock->identifier(currentInstruction[2].u.operand), options, regT1);
+    callOperation(operationPutSetterById, regT0, m_codeBlock->identifier(currentInstruction[2].u.operand).impl(), options, regT1);
 }
 
-void JIT::emit_op_put_getter_setter(Instruction* currentInstruction)
+void JIT::emit_op_put_getter_setter_by_id(Instruction* currentInstruction)
 {
     emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
     int32_t attribute = currentInstruction[3].u.operand;
     emitGetVirtualRegister(currentInstruction[4].u.operand, regT1);
     emitGetVirtualRegister(currentInstruction[5].u.operand, regT2);
-    callOperation(operationPutGetterSetter, regT0, &m_codeBlock->identifier(currentInstruction[2].u.operand), attribute, regT1, regT2);
+    callOperation(operationPutGetterSetter, regT0, m_codeBlock->identifier(currentInstruction[2].u.operand).impl(), attribute, regT1, regT2);
 }
 
 void JIT::emit_op_put_getter_by_val(Instruction* currentInstruction)
@@ -561,7 +561,6 @@ void JIT::emit_op_get_by_id(Instruction* currentInstruction)
 
     emitValueProfilingSite();
     emitPutVirtualRegister(resultVReg);
-    assertStackPointerOffset();
 }
 
 void JIT::emitSlow_op_get_by_id(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -1455,8 +1454,7 @@ JIT::JumpList JIT::emitIntTypedArrayGetByVal(Instruction*, PatchableJump& badTyp
     load8(Address(base, JSCell::typeInfoTypeOffset()), scratch);
     badType = patchableBranch32(NotEqual, scratch, TrustedImm32(typeForTypedArrayType(type)));
     slowCases.append(branch32(AboveOrEqual, property, Address(base, JSArrayBufferView::offsetOfLength())));
-    loadPtr(Address(base, JSArrayBufferView::offsetOfVector()), scratch);
-    slowCases.append(branchIfNotToSpace(scratch));
+    slowCases.append(loadTypedArrayVector(base, scratch));
     
     switch (elementSize(type)) {
     case 1:
@@ -1527,8 +1525,7 @@ JIT::JumpList JIT::emitFloatTypedArrayGetByVal(Instruction*, PatchableJump& badT
     load8(Address(base, JSCell::typeInfoTypeOffset()), scratch);
     badType = patchableBranch32(NotEqual, scratch, TrustedImm32(typeForTypedArrayType(type)));
     slowCases.append(branch32(AboveOrEqual, property, Address(base, JSArrayBufferView::offsetOfLength())));
-    loadPtr(Address(base, JSArrayBufferView::offsetOfVector()), scratch);
-    slowCases.append(branchIfNotToSpace(scratch));
+    slowCases.append(loadTypedArrayVector(base, scratch));
     
     switch (elementSize(type)) {
     case 4:
@@ -1595,8 +1592,7 @@ JIT::JumpList JIT::emitIntTypedArrayPutByVal(Instruction* currentInstruction, Pa
     
     // We would be loading this into base as in get_by_val, except that the slow
     // path expects the base to be unclobbered.
-    loadPtr(Address(base, JSArrayBufferView::offsetOfVector()), lateScratch);
-    slowCases.append(branchIfNotToSpace(lateScratch));
+    slowCases.append(loadTypedArrayVector(base, lateScratch));
     
     if (isClamped(type)) {
         ASSERT(elementSize(type) == 1);
@@ -1681,8 +1677,7 @@ JIT::JumpList JIT::emitFloatTypedArrayPutByVal(Instruction* currentInstruction, 
     
     // We would be loading this into base as in get_by_val, except that the slow
     // path expects the base to be unclobbered.
-    loadPtr(Address(base, JSArrayBufferView::offsetOfVector()), lateScratch);
-    slowCases.append(branchIfNotToSpace(lateScratch));
+    slowCases.append(loadTypedArrayVector(base, lateScratch));
     
     switch (elementSize(type)) {
     case 4:

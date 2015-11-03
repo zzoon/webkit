@@ -55,7 +55,7 @@
 #define DEFAULT_TEXT_AREAS_ARE_RESIZABLE false
 #define DEFAULT_JAVASCRIPT_CAN_OPEN_WINDOWS_AUTOMATICALLY false
 #define DEFAULT_SHOULD_RESPECT_IMAGE_ORIENTATION true
-#define DEFAULT_MINIMUM_FONT_ZOOM_SIZE WKGetMinimumZoomFontSize()
+#define DEFAULT_MINIMUM_FONT_ZOOM_SIZE WebCore::Settings::defaultMinimumZoomFontSize()
 #define DEFAULT_PASSWORD_ECHO_ENABLED true
 #define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK false
 #define DEFAULT_INLINE_MEDIA_PLAYBACK_REQUIRES_PLAYS_INLINE_ATTRIBUTE true
@@ -204,7 +204,6 @@
     macro(EnableInheritURIQueryComponent, enableInheritURIQueryComponent, Bool, bool, false) \
     macro(ServiceControlsEnabled, serviceControlsEnabled, Bool, bool, false) \
     macro(GamepadsEnabled, gamepadsEnabled, Bool, bool, false) \
-    macro(LongMousePressEnabled, longMousePressEnabled, Bool, bool, false) \
     macro(NewBlockInsideInlineModelEnabled, newBlockInsideInlineModelEnabled, Bool, bool, false) \
     macro(AntialiasedFontDilationEnabled, antialiasedFontDilationEnabled, Bool, bool, false) \
     macro(HTTPEquivEnabled, httpEquivEnabled, Bool, bool, true) \
@@ -244,6 +243,7 @@
     macro(LogsPageMessagesToSystemConsoleEnabled, logsPageMessagesToSystemConsoleEnabled, Bool, bool, false) \
     macro(IgnoreViewportScalingConstraints, ignoreViewportScalingConstraints, Bool, bool, true) \
     macro(ForceAlwaysUserScalable, forceAlwaysUserScalable, Bool, bool, false) \
+    macro(ResourceUsageOverlayVisible, resourceUsageOverlayVisible, Bool, bool, false) \
     \
 
 #define FOR_EACH_WEBKIT_DEBUG_UINT32_PREFERENCE(macro) \

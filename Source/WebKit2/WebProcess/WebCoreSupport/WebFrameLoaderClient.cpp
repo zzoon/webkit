@@ -144,9 +144,6 @@ void WebFrameLoaderClient::detachedFromParent2()
 
     // Notify the bundle client.
     webPage->injectedBundleLoaderClient().didRemoveFrameFromHierarchy(webPage, m_frame, userData);
-
-    // Notify the UIProcess.
-    webPage->send(Messages::WebPageProxy::DidRemoveFrameFromHierarchy(m_frame->frameID(), UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
 }
 
 void WebFrameLoaderClient::detachedFromParent3()
@@ -461,7 +458,7 @@ void WebFrameLoaderClient::dispatchDidCommitLoad()
 
     // Notify the UIProcess.
 
-    webPage->send(Messages::WebPageProxy::DidCommitLoadForFrame(m_frame->frameID(), documentLoader.navigationID(), documentLoader.response().mimeType(), m_frameHasCustomContentProvider, static_cast<uint32_t>(m_frame->coreFrame()->loader().loadType()), documentLoader.response().certificateInfo(), m_frame->coreFrame()->document()->isPluginDocument(), UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
+    webPage->send(Messages::WebPageProxy::DidCommitLoadForFrame(m_frame->frameID(), documentLoader.navigationID(), documentLoader.response().mimeType(), m_frameHasCustomContentProvider, m_frame->handlesPageScaleGesture(), static_cast<uint32_t>(m_frame->coreFrame()->loader().loadType()), documentLoader.response().certificateInfo(), m_frame->coreFrame()->document()->isPluginDocument(), UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
     webPage->didCommitLoad(m_frame);
 }
 
@@ -1322,7 +1319,9 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
         int minimumLayoutHeight = std::max(webPage->minimumLayoutSize().height(), 1);
         int maximumSize = std::numeric_limits<int>::max();
         m_frame->coreFrame()->view()->enableAutoSizeMode(true, IntSize(minimumLayoutWidth, minimumLayoutHeight), IntSize(maximumSize, maximumSize));
-        m_frame->coreFrame()->view()->setAutoSizeFixedMinimumHeight(webPage->size().height());
+
+        if (webPage->autoSizingShouldExpandToViewHeight())
+            m_frame->coreFrame()->view()->setAutoSizeFixedMinimumHeight(webPage->size().height());
     }
 
     m_frame->coreFrame()->view()->setProhibitsScrolling(shouldDisableScrolling);
@@ -1716,5 +1715,10 @@ void WebFrameLoaderClient::didRequestAutocomplete(PassRefPtr<WebCore::FormState>
 {
 }
 #endif
+
+void WebFrameLoaderClient::prefetchDNS(const String& hostname)
+{
+    WebProcess::singleton().prefetchDNS(hostname);
+}
 
 } // namespace WebKit

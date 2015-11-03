@@ -67,6 +67,13 @@ class Node;
 
 typedef int ExceptionCode;
 
+struct ExceptionDetails {
+    String message;
+    int lineNumber { 0 };
+    int columnNumber { 0 };
+    String sourceURL;
+};
+
 DOMWindow& activeDOMWindow(JSC::ExecState*);
 DOMWindow& firstDOMWindow(JSC::ExecState*);
 
@@ -86,9 +93,9 @@ WEBCORE_EXPORT JSC::EncodedJSValue throwGetterTypeError(JSC::ExecState&, const c
 WEBCORE_EXPORT JSC::EncodedJSValue throwThisTypeError(JSC::ExecState&, const char* interfaceName, const char* functionName);
 
 // Base class for all constructor objects in the JSC bindings.
-class DOMConstructorObject : public JSDOMWrapper {
+class DOMConstructorObject : public JSDOMObject {
 public:
-    typedef JSDOMWrapper Base;
+    typedef JSDOMObject Base;
     static const unsigned StructureFlags = Base::StructureFlags | JSC::ImplementsHasInstance;
 
     static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
@@ -98,7 +105,7 @@ public:
 
 protected:
     DOMConstructorObject(JSC::Structure* structure, JSDOMGlobalObject& globalObject)
-        : JSDOMWrapper(structure, globalObject)
+        : JSDOMObject(structure, globalObject)
     {
     }
 };
@@ -163,11 +170,11 @@ inline JSC::WeakHandleOwner* wrapperOwner(DOMWrapperWorld& world, JSC::ArrayBuff
     return static_cast<WebCoreTypedArrayController*>(world.vm().m_typedArrayController.get())->wrapperOwner();
 }
 
-inline JSDOMWrapper* getInlineCachedWrapper(DOMWrapperWorld&, void*) { return nullptr; }
-inline bool setInlineCachedWrapper(DOMWrapperWorld&, void*, JSDOMWrapper*, JSC::WeakHandleOwner*) { return false; }
-inline bool clearInlineCachedWrapper(DOMWrapperWorld&, void*, JSDOMWrapper*) { return false; }
+inline JSDOMObject* getInlineCachedWrapper(DOMWrapperWorld&, void*) { return nullptr; }
+inline bool setInlineCachedWrapper(DOMWrapperWorld&, void*, JSDOMObject*, JSC::WeakHandleOwner*) { return false; }
+inline bool clearInlineCachedWrapper(DOMWrapperWorld&, void*, JSDOMObject*) { return false; }
 
-inline JSDOMWrapper* getInlineCachedWrapper(DOMWrapperWorld& world, ScriptWrappable* domObject)
+inline JSDOMObject* getInlineCachedWrapper(DOMWrapperWorld& world, ScriptWrappable* domObject)
 {
     if (!world.isNormal())
         return nullptr;
@@ -181,7 +188,7 @@ inline JSC::JSArrayBuffer* getInlineCachedWrapper(DOMWrapperWorld& world, JSC::A
     return buffer->m_wrapper.get();
 }
 
-inline bool setInlineCachedWrapper(DOMWrapperWorld& world, ScriptWrappable* domObject, JSDOMWrapper* wrapper, JSC::WeakHandleOwner* wrapperOwner)
+inline bool setInlineCachedWrapper(DOMWrapperWorld& world, ScriptWrappable* domObject, JSDOMObject* wrapper, JSC::WeakHandleOwner* wrapperOwner)
 {
     if (!world.isNormal())
         return false;
@@ -197,7 +204,7 @@ inline bool setInlineCachedWrapper(DOMWrapperWorld& world, JSC::ArrayBuffer* dom
     return true;
 }
 
-inline bool clearInlineCachedWrapper(DOMWrapperWorld& world, ScriptWrappable* domObject, JSDOMWrapper* wrapper)
+inline bool clearInlineCachedWrapper(DOMWrapperWorld& world, ScriptWrappable* domObject, JSDOMObject* wrapper)
 {
     if (!world.isNormal())
         return false;
@@ -236,7 +243,7 @@ template<typename DOMClass, typename WrapperClass> inline void uncacheWrapper(DO
 }
 
 #define CREATE_DOM_WRAPPER(globalObject, className, object) createWrapper<JS##className>(globalObject, static_cast<className*>(object))
-template<typename WrapperClass, typename DOMClass> inline JSDOMWrapper* createWrapper(JSDOMGlobalObject* globalObject, DOMClass* node)
+template<typename WrapperClass, typename DOMClass> inline JSDOMObject* createWrapper(JSDOMGlobalObject* globalObject, DOMClass* node)
 {
     ASSERT(node);
     ASSERT(!getCachedWrapper(globalObject->world(), node));
@@ -272,7 +279,7 @@ void addImpureProperty(const AtomicString&);
 const JSC::HashTable& getHashTableForGlobalData(JSC::VM&, const JSC::HashTable& staticTable);
 
 WEBCORE_EXPORT void reportException(JSC::ExecState*, JSC::JSValue exception, CachedScript* = nullptr);
-WEBCORE_EXPORT void reportException(JSC::ExecState*, JSC::Exception*, CachedScript* = nullptr);
+WEBCORE_EXPORT void reportException(JSC::ExecState*, JSC::Exception*, CachedScript* = nullptr, ExceptionDetails* = nullptr);
 void reportCurrentException(JSC::ExecState*);
 
 JSC::JSValue createDOMException(JSC::ExecState*, ExceptionCode);
@@ -645,7 +652,7 @@ template<typename DOMClass> inline const JSC::HashTableValue* getStaticValueSlot
     return entry;
 }
 
-template<> inline const JSC::HashTableValue* getStaticValueSlotEntryWithoutCaching<JSDOMWrapper>(JSC::ExecState*, JSC::PropertyName)
+template<> inline const JSC::HashTableValue* getStaticValueSlotEntryWithoutCaching<JSDOMObject>(JSC::ExecState*, JSC::PropertyName)
 {
     return nullptr;
 }

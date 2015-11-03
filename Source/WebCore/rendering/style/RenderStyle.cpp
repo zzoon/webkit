@@ -24,8 +24,10 @@
 #include "RenderStyle.h"
 
 #include "ContentData.h"
-#include "CursorList.h"
+#include "CSSCustomPropertyValue.h"
 #include "CSSPropertyNames.h"
+#include "CSSVariableDependentValue.h"
+#include "CursorList.h"
 #include "FloatRoundedRect.h"
 #include "FontCascade.h"
 #include "FontSelector.h"
@@ -42,6 +44,7 @@
 #include "StyleSelfAlignmentData.h"
 #include "WillChangeData.h"
 #include <wtf/MathExtras.h>
+#include <wtf/PointerComparison.h>
 #include <wtf/StdLibExtras.h>
 #include <algorithm>
 
@@ -310,10 +313,10 @@ bool RenderStyle::hasUniquePseudoStyle() const
 RenderStyle* RenderStyle::getCachedPseudoStyle(PseudoId pid) const
 {
     if (!m_cachedPseudoStyles || !m_cachedPseudoStyles->size())
-        return 0;
+        return nullptr;
 
     if (styleType() != NOPSEUDO) 
-        return 0;
+        return nullptr;
 
     for (size_t i = 0; i < m_cachedPseudoStyles->size(); ++i) {
         RenderStyle* pseudoStyle = m_cachedPseudoStyles->at(i).get();
@@ -321,13 +324,13 @@ RenderStyle* RenderStyle::getCachedPseudoStyle(PseudoId pid) const
             return pseudoStyle;
     }
 
-    return 0;
+    return nullptr;
 }
 
 RenderStyle* RenderStyle::addCachedPseudoStyle(PassRefPtr<RenderStyle> pseudo)
 {
     if (!pseudo)
-        return 0;
+        return nullptr;
 
     ASSERT(pseudo->styleType() > NOPSEUDO);
 
@@ -459,11 +462,11 @@ static bool positionChangeIsMovementOnly(const LengthBox& a, const LengthBox& b,
 inline bool RenderStyle::changeAffectsVisualOverflow(const RenderStyle& other) const
 {
     if (rareNonInheritedData.get() != other.rareNonInheritedData.get()
-        && !rareNonInheritedData->shadowDataEquivalent(*other.rareNonInheritedData.get()))
+        && !arePointingToEqualData(rareNonInheritedData->m_boxShadow, other.rareNonInheritedData->m_boxShadow))
         return true;
 
     if (rareInheritedData.get() != other.rareInheritedData.get()
-        && !rareInheritedData->shadowDataEquivalent(*other.rareInheritedData.get()))
+        && !arePointingToEqualData(rareInheritedData->textShadow, other.rareInheritedData->textShadow))
         return true;
 
     if (inherited_flags._text_decorations != other.inherited_flags._text_decorations
@@ -523,13 +526,12 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
             return true;
 #endif
 
-        if (rareNonInheritedData->m_deprecatedFlexibleBox.get() != other.rareNonInheritedData->m_deprecatedFlexibleBox.get()
-            && *rareNonInheritedData->m_deprecatedFlexibleBox.get() != *other.rareNonInheritedData->m_deprecatedFlexibleBox.get())
+        if (rareNonInheritedData->m_deprecatedFlexibleBox != other.rareNonInheritedData->m_deprecatedFlexibleBox)
             return true;
 
-        if (rareNonInheritedData->m_flexibleBox.get() != other.rareNonInheritedData->m_flexibleBox.get()
-            && *rareNonInheritedData->m_flexibleBox.get() != *other.rareNonInheritedData->m_flexibleBox.get())
+        if (rareNonInheritedData->m_flexibleBox != other.rareNonInheritedData->m_flexibleBox)
             return true;
+
         if (rareNonInheritedData->m_order != other.rareNonInheritedData->m_order
             || rareNonInheritedData->m_alignContent != other.rareNonInheritedData->m_alignContent
             || rareNonInheritedData->m_alignItems != other.rareNonInheritedData->m_alignItems
@@ -539,11 +541,10 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
             || rareNonInheritedData->m_justifySelf != other.rareNonInheritedData->m_justifySelf)
             return true;
 
-        if (!rareNonInheritedData->reflectionDataEquivalent(*other.rareNonInheritedData.get()))
+        if (!arePointingToEqualData(rareNonInheritedData->m_boxReflect, other.rareNonInheritedData->m_boxReflect))
             return true;
 
-        if (rareNonInheritedData->m_multiCol.get() != other.rareNonInheritedData->m_multiCol.get()
-            && *rareNonInheritedData->m_multiCol.get() != *other.rareNonInheritedData->m_multiCol.get())
+        if (rareNonInheritedData->m_multiCol != other.rareNonInheritedData->m_multiCol)
             return true;
 
         if (rareNonInheritedData->m_transform != other.rareNonInheritedData->m_transform) {
@@ -556,8 +557,8 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
         }
 
 #if ENABLE(CSS_GRID_LAYOUT)
-        if (rareNonInheritedData->m_grid.get() != other.rareNonInheritedData->m_grid.get()
-            || rareNonInheritedData->m_gridItem.get() != other.rareNonInheritedData->m_gridItem.get())
+        if (rareNonInheritedData->m_grid != other.rareNonInheritedData->m_grid
+            || rareNonInheritedData->m_gridItem != other.rareNonInheritedData->m_gridItem)
             return true;
 #endif
 
@@ -567,7 +568,7 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
             return true;
 #endif
 
-        if (!rareNonInheritedData->willChangeDataEquivalent(*other.rareNonInheritedData.get())) {
+        if (!arePointingToEqualData(rareNonInheritedData->m_willChange, other.rareNonInheritedData->m_willChange)) {
             changedContextSensitiveProperties |= ContextSensitivePropertyWillChange;
             // Don't return; keep looking for another change
         }
@@ -616,7 +617,7 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
             || rareInheritedData->useTouchOverflowScrolling != other.rareInheritedData->useTouchOverflowScrolling
 #endif
-            || rareInheritedData->listStyleImage != other.rareInheritedData->listStyleImage)
+            || rareInheritedData->listStyleImage != other.rareInheritedData->listStyleImage) // FIXME: needs arePointingToEqualData()?
             return true;
 
         if (textStrokeWidth() != other.textStrokeWidth())
@@ -700,9 +701,7 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
         return true;
 
     // If the counter directives change, trigger a relayout to re-calculate counter values and rebuild the counter node tree.
-    const CounterDirectiveMap* mapA = rareNonInheritedData->m_counterDirectives.get();
-    const CounterDirectiveMap* mapB = other.rareNonInheritedData->m_counterDirectives.get();
-    if (!(mapA == mapB || (mapA && mapB && *mapA == *mapB)))
+    if (!arePointingToEqualData(rareNonInheritedData->m_counterDirectives, other.rareNonInheritedData->m_counterDirectives))
         return true;
 
     if ((visibility() == COLLAPSE) != (other.visibility() == COLLAPSE))
@@ -725,9 +724,7 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle& other, unsigned& chang
         return true;
 #endif
 
-    const QuotesData* quotesDataA = rareInheritedData->quotes.get();
-    const QuotesData* quotesDataB = other.rareInheritedData->quotes.get();
-    if (!(quotesDataA == quotesDataB || (quotesDataA && quotesDataB && *quotesDataA == *quotesDataB)))
+    if (!arePointingToEqualData(rareInheritedData->quotes, other.rareInheritedData->quotes))
         return true;
 
     if (position() != StaticPosition) {
@@ -784,8 +781,7 @@ bool RenderStyle::changeRequiresLayerRepaint(const RenderStyle& other, unsigned&
         // Don't return; keep looking for another change.
     }
 
-    if (rareNonInheritedData->m_filter.get() != other.rareNonInheritedData->m_filter.get()
-        && *rareNonInheritedData->m_filter.get() != *other.rareNonInheritedData->m_filter.get()) {
+    if (rareNonInheritedData->m_filter != other.rareNonInheritedData->m_filter) {
         changedContextSensitiveProperties |= ContextSensitivePropertyFilter;
         // Don't return; keep looking for another change.
     }
@@ -946,8 +942,7 @@ void RenderStyle::setQuotes(PassRefPtr<QuotesData> q)
 
 void RenderStyle::setWillChange(PassRefPtr<WillChangeData> willChangeData)
 {
-    if (rareNonInheritedData->m_willChange == willChangeData
-        || (rareNonInheritedData->m_willChange && willChangeData && *rareNonInheritedData->m_willChange == *willChangeData))
+    if (arePointingToEqualData(rareNonInheritedData->m_willChange.get(), willChangeData.get()))
         return;
 
     rareNonInheritedData.access()->m_willChange = WTF::move(willChangeData);
@@ -1824,42 +1819,25 @@ LayoutBoxExtent RenderStyle::imageOutsets(const NinePieceImage& image) const
                            NinePieceImage::computeOutset(image.outset().left(), borderLeftWidth()));
 }
 
-void RenderStyle::getFontAndGlyphOrientation(FontOrientation& fontOrientation, NonCJKGlyphOrientation& glyphOrientation)
+std::pair<FontOrientation, NonCJKGlyphOrientation> RenderStyle::fontAndGlyphOrientation()
 {
-    if (isHorizontalWritingMode()) {
-        fontOrientation = Horizontal;
-        glyphOrientation = NonCJKGlyphOrientationVerticalRight;
-        return;
-    }
+    // FIXME: TextOrientationSideways should map to sideways-left in vertical-lr, which is not supported yet.
+
+    if (isHorizontalWritingMode())
+        return { Horizontal, NonCJKGlyphOrientation::Mixed };
 
     switch (textOrientation()) {
-    case TextOrientationVerticalRight:
-        fontOrientation = Vertical;
-        glyphOrientation = NonCJKGlyphOrientationVerticalRight;
-        return;
-    case TextOrientationUpright:
-        fontOrientation = Vertical;
-        glyphOrientation = NonCJKGlyphOrientationUpright;
-        return;
-    case TextOrientationSideways:
-        if (writingMode() == LeftToRightWritingMode) {
-            // FIXME: This should map to sideways-left, which is not supported yet.
-            fontOrientation = Vertical;
-            glyphOrientation = NonCJKGlyphOrientationVerticalRight;
-            return;
-        }
-        fontOrientation = Horizontal;
-        glyphOrientation = NonCJKGlyphOrientationVerticalRight;
-        return;
-    case TextOrientationSidewaysRight:
-        fontOrientation = Horizontal;
-        glyphOrientation = NonCJKGlyphOrientationVerticalRight;
-        return;
+    case TextOrientation::Mixed:
+        return { Vertical, NonCJKGlyphOrientation::Mixed };
+    case TextOrientation::Upright:
+        return { Vertical, NonCJKGlyphOrientation::Upright };
+    case TextOrientation::Sideways:
+        return { Horizontal, NonCJKGlyphOrientation::Mixed };
+    case TextOrientation::SidewaysRight:
+        return { Horizontal, NonCJKGlyphOrientation::Mixed };
     default:
         ASSERT_NOT_REACHED();
-        fontOrientation = Horizontal;
-        glyphOrientation = NonCJKGlyphOrientationVerticalRight;
-        return;
+        return { Horizontal, NonCJKGlyphOrientation::Mixed };
     }
 }
 
@@ -1993,5 +1971,55 @@ void RenderStyle::setScrollSnapCoordinates(Vector<LengthSize> coordinates)
 }
 
 #endif
+
+void RenderStyle::checkVariablesInCustomProperties()
+{
+    if (!rareInheritedData->m_customProperties->containsVariables())
+        return;
+    
+    // Our first pass checks the variables for validity and replaces any properties that became
+    // invalid with empty values.
+    auto& customProperties = rareInheritedData.access()->m_customProperties.access()->values();
+    HashSet<AtomicString> invalidProperties;
+    for (auto entry : customProperties) {
+        if (!entry.value->isVariableDependentValue())
+            continue;
+        HashSet<AtomicString> seenProperties;
+        downcast<CSSVariableDependentValue>(*entry.value).checkVariablesForCycles(entry.key, customProperties, seenProperties, invalidProperties);
+    }
+    
+    // Now insert invalid values.
+    if (!invalidProperties.isEmpty()) {
+        RefPtr<CSSValue> invalidValue = CSSCustomPropertyValue::createInvalid();
+        for (auto& property : invalidProperties)
+            customProperties.set(property, invalidValue);
+    }
+
+    // Now that all of the properties have been tested for validity and replaced with
+    // invalid values if they failed, we can perform variable substitution on the valid values.
+    Vector<RefPtr<CSSCustomPropertyValue>> resolvedValues;
+    for (auto entry : customProperties) {
+        if (!entry.value->isVariableDependentValue())
+            continue;
+        
+        CSSParserValueList parserList;
+        RefPtr<CSSCustomPropertyValue> result;
+        if (!downcast<CSSVariableDependentValue>(*entry.value).valueList()->buildParserValueListSubstitutingVariables(&parserList, customProperties)) {
+            RefPtr<CSSValue> invalidResult = CSSCustomPropertyValue::createInvalid();
+            result = CSSCustomPropertyValue::create(entry.key, invalidResult);
+        } else {
+            RefPtr<CSSValue> newValueList = CSSValueList::createFromParserValueList(parserList);
+            result = CSSCustomPropertyValue::create(entry.key, newValueList);
+        }
+        resolvedValues.append(result);
+    }
+    
+    // With all results computed, we can now mutate our table to eliminate the variables and
+    // hold the final values. This way when we inherit, we don't end up resubstituting variables, etc.
+    for (auto& resolvedValue : resolvedValues)
+        customProperties.set(resolvedValue->name(), resolvedValue->value());
+
+    rareInheritedData.access()->m_customProperties.access()->setContainsVariables(false);
+}
 
 } // namespace WebCore

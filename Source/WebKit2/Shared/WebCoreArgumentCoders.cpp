@@ -45,6 +45,7 @@
 #include <WebCore/GraphicsLayer.h>
 #include <WebCore/IDBGetResult.h>
 #include <WebCore/Image.h>
+#include <WebCore/JSDOMBinding.h>
 #include <WebCore/Length.h>
 #include <WebCore/Path.h>
 #include <WebCore/PluginData.h>
@@ -55,6 +56,7 @@
 #include <WebCore/ResourceResponse.h>
 #include <WebCore/ScrollingConstraints.h>
 #include <WebCore/ScrollingCoordinator.h>
+#include <WebCore/SearchPopupMenu.h>
 #include <WebCore/SessionID.h>
 #include <WebCore/TextCheckerClient.h>
 #include <WebCore/TextIndicator.h>
@@ -476,6 +478,22 @@ bool ArgumentCoder<Path>::decode(ArgumentDecoder& decoder, Path& path)
     return true;
 }
 
+void ArgumentCoder<RecentSearch>::encode(ArgumentEncoder& encoder, const RecentSearch& recentSearch)
+{
+    encoder << recentSearch.string << recentSearch.time;
+}
+
+bool ArgumentCoder<RecentSearch>::decode(ArgumentDecoder& decoder, RecentSearch& recentSearch)
+{
+    if (!decoder.decode(recentSearch.string))
+        return false;
+
+    if (!decoder.decode(recentSearch.time))
+        return false;
+
+    return true;
+}
+
 template<> struct ArgumentCoder<Region::Span> {
     static void encode(ArgumentEncoder&, const Region::Span&);
     static bool decode(ArgumentDecoder&, Region::Span&);
@@ -721,9 +739,9 @@ bool ArgumentCoder<Credential>::decode(ArgumentDecoder& decoder, Credential& cre
     return true;
 }
 
-static void encodeImage(ArgumentEncoder& encoder, Image* image)
+static void encodeImage(ArgumentEncoder& encoder, Image& image)
 {
-    RefPtr<ShareableBitmap> bitmap = ShareableBitmap::createShareable(IntSize(image->size()), ShareableBitmap::SupportsAlpha);
+    RefPtr<ShareableBitmap> bitmap = ShareableBitmap::createShareable(IntSize(image.size()), ShareableBitmap::SupportsAlpha);
     bitmap->createGraphicsContext()->drawImage(image, ColorSpaceDeviceRGB, IntPoint());
 
     ShareableBitmap::Handle handle;
@@ -753,7 +771,7 @@ static void encodeOptionalImage(ArgumentEncoder& encoder, Image* image)
     encoder << hasImage;
 
     if (hasImage)
-        encodeImage(encoder, image);
+        encodeImage(encoder, *image);
 }
 
 static bool decodeOptionalImage(ArgumentDecoder& decoder, RefPtr<Image>& image)
@@ -784,7 +802,7 @@ void ArgumentCoder<Cursor>::encode(ArgumentEncoder& encoder, const Cursor& curso
     }
 
     encoder << true;
-    encodeImage(encoder, cursor.image());
+    encodeImage(encoder, *cursor.image());
     encoder << cursor.hotSpot();
 #if ENABLE(MOUSE_CURSOR_SCALE)
     encoder << cursor.imageScaleFactor();
@@ -1253,7 +1271,7 @@ bool ArgumentCoder<PasteboardWebContent>::decode(ArgumentDecoder& decoder, Paste
 
 void ArgumentCoder<PasteboardImage>::encode(ArgumentEncoder& encoder, const PasteboardImage& pasteboardImage)
 {
-    encodeImage(encoder, pasteboardImage.image.get());
+    encodeOptionalImage(encoder, pasteboardImage.image.get());
     encoder << pasteboardImage.url.url;
     encoder << pasteboardImage.url.title;
     encoder << pasteboardImage.resourceMIMEType;
@@ -1263,7 +1281,7 @@ void ArgumentCoder<PasteboardImage>::encode(ArgumentEncoder& encoder, const Past
 
 bool ArgumentCoder<PasteboardImage>::decode(ArgumentDecoder& decoder, PasteboardImage& pasteboardImage)
 {
-    if (!decodeImage(decoder, pasteboardImage.image))
+    if (!decodeOptionalImage(decoder, pasteboardImage.image))
         return false;
     if (!decoder.decode(pasteboardImage.url.url))
         return false;
@@ -2017,6 +2035,31 @@ bool ArgumentCoder<DictionaryPopupInfo>::decode(IPC::ArgumentDecoder& decoder, D
     } else
         result.attributedString = nullptr;
 #endif
+    return true;
+}
+
+void ArgumentCoder<ExceptionDetails>::encode(IPC::ArgumentEncoder& encoder, const ExceptionDetails& info)
+{
+    encoder << info.message;
+    encoder << info.lineNumber;
+    encoder << info.columnNumber;
+    encoder << info.sourceURL;
+}
+
+bool ArgumentCoder<ExceptionDetails>::decode(IPC::ArgumentDecoder& decoder, ExceptionDetails& result)
+{
+    if (!decoder.decode(result.message))
+        return false;
+
+    if (!decoder.decode(result.lineNumber))
+        return false;
+
+    if (!decoder.decode(result.columnNumber))
+        return false;
+
+    if (!decoder.decode(result.sourceURL))
+        return false;
+
     return true;
 }
 

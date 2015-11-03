@@ -78,7 +78,6 @@
 #include "HitTestingTransformState.h"
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
-#include "InspectorInstrumentation.h"
 #include "OverflowEvent.h"
 #include "OverlapTestRequestClient.h"
 #include "Page.h"
@@ -2379,8 +2378,6 @@ void RenderLayer::scrollTo(int x, int y)
     IntPoint oldPosition = IntPoint(m_scrollOffset);
     m_scrollOffset = newScrollOffset;
 
-    InspectorInstrumentation::willScrollLayer(renderer().frame());
-
     RenderView& view = renderer().view();
 
     // Update the positions of our child layers (if needed as only fixed layers should be impacted by a scroll).
@@ -2433,7 +2430,6 @@ void RenderLayer::scrollTo(int x, int y)
         element->document().sendWillRevealEdgeEventsIfNeeded(oldPosition, IntPoint(newScrollOffset), visibleContentRect(), contentsSize(), element);
     }
 
-    InspectorInstrumentation::didScrollLayer(frame);
     if (scrollsOverflow())
         view.frameView().didChangeScrollOffset();
 
@@ -3655,12 +3651,16 @@ void RenderLayer::drawPlatformResizerImage(GraphicsContext& context, const Layou
         context.save();
         context.translate(resizerCornerRect.x() + cornerResizerSize.width(), resizerCornerRect.y() + resizerCornerRect.height() - cornerResizerSize.height());
         context.scale(FloatSize(-1.0, 1.0));
-        context.drawImage(resizeCornerImage.get(), renderer().style().colorSpace(), FloatRect(FloatPoint(), cornerResizerSize));
+        if (resizeCornerImage)
+            context.drawImage(*resizeCornerImage, renderer().style().colorSpace(), FloatRect(FloatPoint(), cornerResizerSize));
         context.restore();
         return;
     }
+    
+    if (!resizeCornerImage)
+        return;
     FloatRect imageRect = snapRectToDevicePixels(LayoutRect(resizerCornerRect.maxXMaxYCorner() - cornerResizerSize, cornerResizerSize), renderer().document().deviceScaleFactor());
-    context.drawImage(resizeCornerImage.get(), renderer().style().colorSpace(), imageRect);
+    context.drawImage(*resizeCornerImage, renderer().style().colorSpace(), imageRect);
 }
 
 void RenderLayer::paintResizer(GraphicsContext& context, const LayoutPoint& paintOffset, const LayoutRect& damageRect)

@@ -23,6 +23,7 @@
 
 #include "ExceptionCode.h"
 #include "JSDOMBinding.h"
+#include "JSDOMConstructor.h"
 #include "wtf/text/AtomicString.h"
 #include <runtime/Error.h>
 #include <wtf/GetPtr.h>
@@ -64,26 +65,7 @@ private:
     void finishCreation(JSC::VM&);
 };
 
-class JSTestCustomNamedGetterConstructor : public DOMConstructorObject {
-private:
-    JSTestCustomNamedGetterConstructor(JSC::Structure*, JSDOMGlobalObject&);
-    void finishCreation(JSC::VM&, JSDOMGlobalObject&);
-
-public:
-    typedef DOMConstructorObject Base;
-    static JSTestCustomNamedGetterConstructor* create(JSC::VM& vm, JSC::Structure* structure, JSDOMGlobalObject& globalObject)
-    {
-        JSTestCustomNamedGetterConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestCustomNamedGetterConstructor>(vm.heap)) JSTestCustomNamedGetterConstructor(structure, globalObject);
-        ptr->finishCreation(vm, globalObject);
-        return ptr;
-    }
-
-    DECLARE_INFO;
-    static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject& globalObject, JSC::JSValue prototype)
-    {
-        return JSC::Structure::create(vm, &globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), info());
-    }
-};
+typedef JSDOMConstructorNotConstructable<JSTestCustomNamedGetter> JSTestCustomNamedGetterConstructor;
 
 /* Hash table */
 
@@ -99,21 +81,14 @@ static const HashTableValue JSTestCustomNamedGetterTableValues[] =
 };
 
 static const HashTable JSTestCustomNamedGetterTable = { 1, 1, true, JSTestCustomNamedGetterTableValues, JSTestCustomNamedGetterTableIndex };
-const ClassInfo JSTestCustomNamedGetterConstructor::s_info = { "TestCustomNamedGetterConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestCustomNamedGetterConstructor) };
-
-JSTestCustomNamedGetterConstructor::JSTestCustomNamedGetterConstructor(Structure* structure, JSDOMGlobalObject& globalObject)
-    : Base(structure, globalObject)
+template<> void JSTestCustomNamedGetterConstructor::initializeProperties(VM& vm, JSDOMGlobalObject& globalObject)
 {
-}
-
-void JSTestCustomNamedGetterConstructor::finishCreation(VM& vm, JSDOMGlobalObject& globalObject)
-{
-    Base::finishCreation(vm);
-    ASSERT(inherits(info()));
     putDirect(vm, vm.propertyNames->prototype, JSTestCustomNamedGetter::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("TestCustomNamedGetter"))), ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
+
+template<> const ClassInfo JSTestCustomNamedGetterConstructor::s_info = { "TestCustomNamedGetterConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestCustomNamedGetterConstructor) };
 
 /* Hash table for prototype */
 
@@ -133,7 +108,7 @@ void JSTestCustomNamedGetterPrototype::finishCreation(VM& vm)
 const ClassInfo JSTestCustomNamedGetter::s_info = { "TestCustomNamedGetter", &Base::s_info, &JSTestCustomNamedGetterTable, CREATE_METHOD_TABLE(JSTestCustomNamedGetter) };
 
 JSTestCustomNamedGetter::JSTestCustomNamedGetter(Structure* structure, JSDOMGlobalObject& globalObject, Ref<TestCustomNamedGetter>&& impl)
-    : JSDOMWrapperWithImplementation<TestCustomNamedGetter>(structure, globalObject, WTF::move(impl))
+    : JSDOMWrapper<TestCustomNamedGetter>(structure, globalObject, WTF::move(impl))
 {
 }
 
@@ -208,7 +183,7 @@ EncodedJSValue JSC_HOST_CALL jsTestCustomNamedGetterPrototypeFunctionAnotherFunc
     if (UNLIKELY(!castedThis))
         return throwThisTypeError(*state, "TestCustomNamedGetter", "anotherFunction");
     ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestCustomNamedGetter::info());
-    auto& impl = castedThis->impl();
+    auto& impl = castedThis->wrapped();
     if (UNLIKELY(state->argumentCount() < 1))
         return throwVMError(state, createNotEnoughArgumentsError(state));
     String str = state->argument(0).toString(state)->value(state);
@@ -229,7 +204,7 @@ void JSTestCustomNamedGetterOwner::finalize(JSC::Handle<JSC::Unknown> handle, vo
 {
     auto* jsTestCustomNamedGetter = jsCast<JSTestCustomNamedGetter*>(handle.slot()->asCell());
     auto& world = *static_cast<DOMWrapperWorld*>(context);
-    uncacheWrapper(world, &jsTestCustomNamedGetter->impl(), jsTestCustomNamedGetter);
+    uncacheWrapper(world, &jsTestCustomNamedGetter->wrapped(), jsTestCustomNamedGetter);
 }
 
 #if ENABLE(BINDING_INTEGRITY)
@@ -279,7 +254,7 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestCustomNa
 TestCustomNamedGetter* JSTestCustomNamedGetter::toWrapped(JSC::JSValue value)
 {
     if (auto* wrapper = jsDynamicCast<JSTestCustomNamedGetter*>(value))
-        return &wrapper->impl();
+        return &wrapper->wrapped();
     return nullptr;
 }
 

@@ -387,7 +387,10 @@ JSObject* ScriptExecutable::prepareForExecutionImpl(
 {
     VM& vm = exec->vm();
     DeferGC deferGC(vm.heap);
-    
+
+    if (vm.getAndClearFailNextNewCodeBlock())
+        return createError(exec->callerFrame(), ASCIILiteral("Forced Failure"));
+
     JSObject* exception = 0;
     CodeBlock* codeBlock = newCodeBlockFor(kind, function, scope, exception);
     if (!codeBlock) {
@@ -738,8 +741,8 @@ void WebAssemblyExecutable::prepareForExecution(ExecState* exec)
     VM& vm = exec->vm();
     DeferGC deferGC(vm.heap);
 
-    WebAssemblyCodeBlock* codeBlock = WebAssemblyCodeBlock::create(vm,
-        this, exec->lexicalGlobalObject()));
+    WebAssemblyCodeBlock* codeBlock = WebAssemblyCodeBlock::create(&vm,
+        this, exec->lexicalGlobalObject());
 
     WASMFunctionParser::compile(vm, codeBlock, m_module.get(), m_source, m_functionIndex);
 

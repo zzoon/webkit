@@ -40,7 +40,7 @@
 
 #if PLATFORM(IOS)
 #import "UIKitSPI.h"
-#import "WebKitSystemInterfaceIOS.h"
+#import <WebCore/Device.h>
 #endif
 
 template<typename T> class LazyInitialized {
@@ -109,10 +109,9 @@ private:
 #if PLATFORM(IOS)
     _requiresUserActionForMediaPlayback = YES;
     _allowsPictureInPictureMediaPlayback = YES;
-    _allowsInlineMediaPlayback = WKGetDeviceClass() == WKDeviceClassiPad;
+    _allowsInlineMediaPlayback = WebCore::deviceClass() == MGDeviceClassiPad;
     _inlineMediaPlaybackRequiresPlaysInlineAttribute = !_allowsInlineMediaPlayback;
     _mediaDataLoadsAutomatically = NO;
-    _canAssistOnProgrammaticFocus = NO;
 #endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
@@ -364,16 +363,6 @@ static NSString *defaultApplicationNameForUserAgent()
 - (void)_setMediaDataLoadsAutomatically:(BOOL)mediaDataLoadsAutomatically
 {
     _mediaDataLoadsAutomatically = mediaDataLoadsAutomatically;
-}
-
-- (BOOL)_canAssistOnProgrammaticFocus
-{
-    return _canAssistOnProgrammaticFocus;
-}
-
-- (void)_setCanAssistOnProgrammaticFocus:(BOOL)canAssistOnProgrammaticFocus
-{
-    _canAssistOnProgrammaticFocus = canAssistOnProgrammaticFocus;
 }
 #endif
 

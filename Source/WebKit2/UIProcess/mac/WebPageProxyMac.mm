@@ -29,6 +29,7 @@
 #if PLATFORM(MAC)
 
 #import "APIUIClient.h"
+#import "AppKitSPI.h"
 #import "AttributedString.h"
 #import "ColorSpaceData.h"
 #import "DataReference.h"
@@ -56,10 +57,6 @@
 #import <mach-o/dyld.h>
 #import <wtf/NeverDestroyed.h>
 #import <wtf/text/StringConcatenate.h>
-
-@interface NSApplication ()
-- (void)speakString:(NSString *)string;
-@end
 
 #define MESSAGE_CHECK(assertion) MESSAGE_CHECK_BASE(assertion, process().connection())
 #define MESSAGE_CHECK_URL(url) MESSAGE_CHECK_BASE(m_process->checkURLReceivedFromWebProcess(url), m_process->connection())
@@ -558,11 +555,6 @@ bool WebPageProxy::acceptsFirstMouse(int eventNumber, const WebKit::WebMouseEven
     return result;
 }
 
-WKView* WebPageProxy::wkView() const
-{
-    return m_pageClient.wkView();
-}
-
 void WebPageProxy::intrinsicContentSizeDidChange(const IntSize& intrinsicContentSize)
 {
     m_pageClient.intrinsicContentSizeDidChange(intrinsicContentSize);
@@ -684,16 +676,6 @@ void WebPageProxy::showTelephoneNumberMenu(const String& telephoneNumber, const 
 }
 #endif
 
-#if ENABLE(SERVICE_CONTROLS)
-void WebPageProxy::showSelectionServiceMenu(const IPC::DataReference& selectionAsRTFD, const Vector<String>& telephoneNumbers, bool isEditable, const IntPoint& point)
-{
-    Vector<WebContextMenuItemData> items;
-    ContextMenuContextData contextData(selectionAsRTFD.vector(), telephoneNumbers, isEditable);
-
-    internalShowContextMenu(point, contextData, items, ContextMenuClientEligibility::NotEligibleForClient, UserData());
-}
-#endif
-
 CGRect WebPageProxy::boundsOfLayerInLayerBackedWindowCoordinates(CALayer *layer) const
 {
     return m_pageClient.boundsOfLayerInLayerBackedWindowCoordinates(layer);
@@ -748,38 +730,25 @@ void WebPageProxy::editorStateChanged(const EditorState& editorState)
 #endif
 }
 
-#if ENABLE(SERVICE_CONTROLS)
-ContextMenuItem WebPageProxy::platformInitializeShareMenuItem(const ContextMenuContextData& contextMenuContextData)
+void WebPageProxy::startWindowDrag()
 {
-    const WebHitTestResultData& hitTestData = contextMenuContextData.webHitTestResultData();
+    m_pageClient.startWindowDrag();
+}
 
-    URL absoluteLinkURL;
-    if (!hitTestData.absoluteLinkURL.isEmpty())
-        absoluteLinkURL = URL(ParsedURLString, hitTestData.absoluteLinkURL);
+NSWindow *WebPageProxy::platformWindow()
+{
+    return m_pageClient.platformWindow();
+}
 
-    URL downloadableMediaURL;
-    if (!hitTestData.absoluteMediaURL.isEmpty() && hitTestData.isDownloadableMedia)
-        downloadableMediaURL = URL(ParsedURLString, hitTestData.absoluteMediaURL);
+#if WK_API_ENABLED
+NSView *WebPageProxy::inspectorAttachmentView()
+{
+    return m_pageClient.inspectorAttachmentView();
+}
 
-    RetainPtr<NSImage> image;
-    if (hitTestData.imageSharedMemory && hitTestData.imageSize)
-        image = adoptNS([[NSImage alloc] initWithData:[NSData dataWithBytes:(unsigned char*)hitTestData.imageSharedMemory->data() length:hitTestData.imageSize]]);
-
-    ContextMenuItem item = ContextMenuItem::shareMenuItem(absoluteLinkURL, downloadableMediaURL, image.get(), contextMenuContextData.selectedText());
-
-    NSMenuItem *nsItem = item.platformDescription();
-
-    NSSharingServicePicker *sharingServicePicker = [nsItem representedObject];
-    sharingServicePicker.delegate = [WKSharingServicePickerDelegate sharedSharingServicePickerDelegate];
-    
-    [[WKSharingServicePickerDelegate sharedSharingServicePickerDelegate] setFiltersEditingServices:NO];
-    [[WKSharingServicePickerDelegate sharedSharingServicePickerDelegate] setHandlesEditingReplacement:NO];
-    [[WKSharingServicePickerDelegate sharedSharingServicePickerDelegate] setMenuProxy:static_cast<WebContextMenuProxyMac*>(m_activeContextMenu.get())];
-
-    // Setting the picker lets the delegate retain it to keep it alive, but this picker is kept alive by the menu item.
-    [[WKSharingServicePickerDelegate sharedSharingServicePickerDelegate] setPicker:nil];
-
-    return item;
+_WKRemoteObjectRegistry *WebPageProxy::remoteObjectRegistry()
+{
+    return m_pageClient.remoteObjectRegistry();
 }
 #endif
 

@@ -87,9 +87,11 @@
     macro(bytecodesID) \
     macro(callee) \
     macro(caller) \
+    macro(caseFirst) \
     macro(clear) \
     macro(close) \
     macro(closed) \
+    macro(collation) \
     macro(column) \
     macro(compilationKind) \
     macro(compilations) \
@@ -126,6 +128,7 @@
     macro(href) \
     macro(id) \
     macro(ignoreCase) \
+    macro(ignorePunctuation) \
     macro(index) \
     macro(indexedDB) \
     macro(inferredName) \
@@ -142,6 +145,7 @@
     macro(lastIndex) \
     macro(length) \
     macro(line) \
+    macro(locale) \
     macro(localeMatcher) \
     macro(message) \
     macro(multiline) \
@@ -151,6 +155,7 @@
     macro(numInlinedCalls) \
     macro(numInlinedGetByIds) \
     macro(numInlinedPutByIds) \
+    macro(numeric) \
     macro(of) \
     macro(opcode) \
     macro(origin) \
@@ -166,6 +171,7 @@
     macro(reload) \
     macro(replace) \
     macro(resolve) \
+    macro(sensitivity) \
     macro(set) \
     macro(showModalDialog) \
     macro(size) \
@@ -185,6 +191,7 @@
     macro(toLocaleString) \
     macro(toPrecision) \
     macro(toString) \
+    macro(usage) \
     macro(value) \
     macro(valueOf) \
     macro(values) \
@@ -249,12 +256,12 @@
     macro(search) \
     macro(species) \
     macro(split) \
-    macro(toPrimitive) \
-    macro(toStringTag)
+    macro(toPrimitive)
 
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL(macro) \
     macro(iterator) \
-    macro(unscopables)
+    macro(unscopables) \
+    macro(toStringTag)
 
 #define JSC_COMMON_BYTECODE_INTRINSICS_EACH_NAME(macro) \
     macro(putByValDirect) \
@@ -291,6 +298,7 @@
     macro(isFinite) \
     macro(getPrototypeOf) \
     macro(getOwnPropertyNames) \
+    macro(RangeError) \
     macro(TypeError) \
     macro(typedArrayLength) \
     macro(typedArraySort) \
@@ -310,6 +318,16 @@
     macro(InspectorInstrumentation) \
     macro(get) \
     macro(set) \
+    macro(allocateTypedArray) \
+    macro(Int8Array) \
+    macro(Int16Array) \
+    macro(Int32Array) \
+    macro(Uint8Array) \
+    macro(Uint8ClampedArray) \
+    macro(Uint16Array) \
+    macro(Uint32Array) \
+    macro(Float32Array) \
+    macro(Float64Array) \
 
 
 namespace JSC {

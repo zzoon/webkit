@@ -22,6 +22,7 @@
 #include "JSTestException.h"
 
 #include "JSDOMBinding.h"
+#include "JSDOMConstructor.h"
 #include "URL.h"
 #include <runtime/JSString.h>
 #include <wtf/GetPtr.h>
@@ -60,26 +61,7 @@ private:
     void finishCreation(JSC::VM&);
 };
 
-class JSTestExceptionConstructor : public DOMConstructorObject {
-private:
-    JSTestExceptionConstructor(JSC::Structure*, JSDOMGlobalObject&);
-    void finishCreation(JSC::VM&, JSDOMGlobalObject&);
-
-public:
-    typedef DOMConstructorObject Base;
-    static JSTestExceptionConstructor* create(JSC::VM& vm, JSC::Structure* structure, JSDOMGlobalObject& globalObject)
-    {
-        JSTestExceptionConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestExceptionConstructor>(vm.heap)) JSTestExceptionConstructor(structure, globalObject);
-        ptr->finishCreation(vm, globalObject);
-        return ptr;
-    }
-
-    DECLARE_INFO;
-    static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject& globalObject, JSC::JSValue prototype)
-    {
-        return JSC::Structure::create(vm, &globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), info());
-    }
-};
+typedef JSDOMConstructorNotConstructable<JSTestException> JSTestExceptionConstructor;
 
 /* Hash table */
 
@@ -95,21 +77,14 @@ static const HashTableValue JSTestExceptionTableValues[] =
 };
 
 static const HashTable JSTestExceptionTable = { 1, 1, true, JSTestExceptionTableValues, JSTestExceptionTableIndex };
-const ClassInfo JSTestExceptionConstructor::s_info = { "TestExceptionConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestExceptionConstructor) };
-
-JSTestExceptionConstructor::JSTestExceptionConstructor(Structure* structure, JSDOMGlobalObject& globalObject)
-    : Base(structure, globalObject)
+template<> void JSTestExceptionConstructor::initializeProperties(VM& vm, JSDOMGlobalObject& globalObject)
 {
-}
-
-void JSTestExceptionConstructor::finishCreation(VM& vm, JSDOMGlobalObject& globalObject)
-{
-    Base::finishCreation(vm);
-    ASSERT(inherits(info()));
     putDirect(vm, vm.propertyNames->prototype, JSTestException::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("TestException"))), ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
+
+template<> const ClassInfo JSTestExceptionConstructor::s_info = { "TestExceptionConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestExceptionConstructor) };
 
 /* Hash table for prototype */
 
@@ -129,7 +104,7 @@ void JSTestExceptionPrototype::finishCreation(VM& vm)
 const ClassInfo JSTestException::s_info = { "TestException", &Base::s_info, &JSTestExceptionTable, CREATE_METHOD_TABLE(JSTestException) };
 
 JSTestException::JSTestException(Structure* structure, JSDOMGlobalObject& globalObject, Ref<TestException>&& impl)
-    : JSDOMWrapperWithImplementation<TestException>(structure, globalObject, WTF::move(impl))
+    : JSDOMWrapper<TestException>(structure, globalObject, WTF::move(impl))
 {
 }
 
@@ -164,7 +139,7 @@ EncodedJSValue jsTestExceptionName(ExecState* state, JSObject* slotBase, Encoded
     UNUSED_PARAM(slotBase);
     UNUSED_PARAM(thisValue);
     auto* castedThis = jsCast<JSTestException*>(slotBase);
-    auto& impl = castedThis->impl();
+    auto& impl = castedThis->wrapped();
     JSValue result = jsStringWithCache(state, impl.name());
     return JSValue::encode(result);
 }
@@ -194,7 +169,7 @@ void JSTestExceptionOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* cont
 {
     auto* jsTestException = jsCast<JSTestException*>(handle.slot()->asCell());
     auto& world = *static_cast<DOMWrapperWorld*>(context);
-    uncacheWrapper(world, &jsTestException->impl(), jsTestException);
+    uncacheWrapper(world, &jsTestException->wrapped(), jsTestException);
 }
 
 #if ENABLE(BINDING_INTEGRITY)
@@ -244,7 +219,7 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestExceptio
 TestException* JSTestException::toWrapped(JSC::JSValue value)
 {
     if (auto* wrapper = jsDynamicCast<JSTestException*>(value))
-        return &wrapper->impl();
+        return &wrapper->wrapped();
     return nullptr;
 }
 

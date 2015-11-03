@@ -28,23 +28,50 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include "DOMRequestState.h"
 #include "EventQueue.h"
+#include "IDBBindingUtilities.h"
+#include "IDBEventDispatcher.h"
+#include "IDBKeyData.h"
+#include "IDBResultData.h"
+#include "Logging.h"
 #include "ScriptExecutionContext.h"
+#include "ThreadSafeDataBuffer.h"
 #include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 namespace IDBClient {
+
+Ref<IDBRequest> IDBRequest::create(ScriptExecutionContext& context, IDBObjectStore& objectStore, IDBTransaction& transaction)
+{
+    return adoptRef(*new IDBRequest(context, objectStore, transaction));
+}
 
 IDBRequest::IDBRequest(IDBConnectionToServer& connection, ScriptExecutionContext* context)
     : IDBOpenDBRequest(context)
     , m_connection(connection)
     , m_resourceIdentifier(connection)
 {
+    suspendIfNeeded();
+}
+
+IDBRequest::IDBRequest(ScriptExecutionContext& context, IDBObjectStore& objectStore, IDBTransaction& transaction)
+    : IDBOpenDBRequest(&context)
+    , m_transaction(&transaction)
+    , m_connection(transaction.serverConnection())
+    , m_resourceIdentifier(transaction.serverConnection())
+    , m_source(adoptRef(*IDBAny::create(objectStore).leakRef()))
+{
+    suspendIfNeeded();
+}
+
+IDBRequest::~IDBRequest()
+{
 }
 
 RefPtr<WebCore::IDBAny> IDBRequest::result(ExceptionCode&) const
 {
-    return nullptr;
+    return m_result;
 }
 
 unsigned short IDBRequest::errorCode(ExceptionCode&) const
@@ -54,7 +81,7 @@ unsigned short IDBRequest::errorCode(ExceptionCode&) const
 
 RefPtr<DOMError> IDBRequest::error(ExceptionCode&) const
 {
-    return nullptr;
+    return m_domError;
 }
 
 RefPtr<WebCore::IDBAny> IDBRequest::source() const
@@ -73,6 +100,18 @@ const String& IDBRequest::readyState() const
     return readyState;
 }
 
+uint64_t IDBRequest::sourceObjectStoreIdentifier() const
+{
+    if (!m_source)
+        return 0;
+    if (m_source->type() != IDBAny::Type::IDBObjectStore)
+        return 0;
+    if (!m_source->modernIDBObjectStore())
+        return 0;
+
+    return m_source->modernIDBObjectStore()->info().identifier();
+}
+
 EventTargetInterface IDBRequest::eventTargetInterface() const
 {
     return IDBRequestEventTargetInterfaceType;
@@ -88,6 +127,11 @@ bool IDBRequest::canSuspendForPageCache() const
     return false;
 }
 
+bool IDBRequest::hasPendingActivity() const
+{
+    return m_hasPendingActivity;
+}
+
 void IDBRequest::enqueueEvent(Ref<Event>&& event)
 {
     if (!scriptExecutionContext())
@@ -95,6 +139,103 @@ void IDBRequest::enqueueEvent(Ref<Event>&& event)
 
     event->setTarget(this);
     scriptExecutionContext()->eventQueue().enqueueEvent(&event.get());
+}
+
+bool IDBRequest::dispatchEvent(PassRefPtr<Event> prpEvent)
+{
+    LOG(IndexedDB, "IDBRequest::dispatchEvent - %s", prpEvent->type().characters8());
+
+    RefPtr<Event> event = prpEvent;
+
+    if (event->type() != eventNames().blockedEvent)
+        m_readyState = IDBRequestReadyState::Done;
+
+    Vector<RefPtr<EventTarget>> targets;
+    targets.append(this);
+
+    if (m_transaction) {
+        targets.append(m_transaction);
+        targets.append(m_transaction->db());
+    }
+
+    bool dontPreventDefault;
+    {
+        TransactionActivator activator(m_transaction.get());
+        dontPreventDefault = IDBEventDispatcher::dispatch(event.get(), targets);
+    }
+
+    m_hasPendingActivity = false;
+
+    // FIXME: When we implement reusable requests (for cursors) it will be incorrect to always remove the request from the transaction.
+    if (m_transaction)
+        m_transaction->removeRequest(*this);
+
+    return dontPreventDefault;
+}
+
+void IDBRequest::setResult(const IDBKeyData* keyData)
+{
+    if (!keyData) {
+        m_result = nullptr;
+        return;
+    }
+
+    Deprecated::ScriptValue value = idbKeyDataToScriptValue(scriptExecutionContext(), *keyData);
+    m_result = IDBAny::create(WTF::move(value));
+}
+
+void IDBRequest::setResult(uint64_t number)
+{
+    ASSERT(scriptExecutionContext());
+    m_result = IDBAny::create(Deprecated::ScriptValue(scriptExecutionContext()->vm(), JSC::JSValue(number)));
+}
+
+void IDBRequest::setResultToStructuredClone(const ThreadSafeDataBuffer& valueData)
+{
+    LOG(IndexedDB, "IDBRequest::setResultToStructuredClone");
+
+    auto context = scriptExecutionContext();
+    if (!context)
+        return;
+
+    Deprecated::ScriptValue value = deserializeIDBValueData(*context, valueData);
+    m_result = IDBAny::create(WTF::move(value));
+}
+
+void IDBRequest::setResultToUndefined()
+{
+    auto context = scriptExecutionContext();
+    if (!context)
+        return;
+
+    DOMRequestState state(context);
+    if (auto* execState = state.exec())
+        m_result = IDBAny::create(Deprecated::ScriptValue(execState->vm(), JSC::jsUndefined()));
+}
+
+void IDBRequest::requestCompleted(const IDBResultData& resultData)
+{
+    m_idbError = resultData.error();
+    if (!m_idbError.isNull())
+        onError();
+    else
+        onSuccess();
+}
+
+void IDBRequest::onError()
+{
+    LOG(IndexedDB, "IDBRequest::onError");
+
+    ASSERT(!m_idbError.isNull());
+    m_domError = DOMError::create(m_idbError.name());
+    enqueueEvent(Event::create(eventNames().errorEvent, true, true));
+}
+
+void IDBRequest::onSuccess()
+{
+    LOG(IndexedDB, "IDBRequest::onSuccess");
+
+    enqueueEvent(Event::create(eventNames().successEvent, false, false));
 }
 
 } // namespace IDBClient

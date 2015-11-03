@@ -520,8 +520,6 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     if (parameters.viewScaleFactor != 1)
         scaleView(parameters.viewScaleFactor);
 
-    m_page->setUserContentExtensionsEnabled(parameters.userContentExtensionsEnabled);
-
 #if PLATFORM(IOS)
     m_page->settings().setContentDispositionAttachmentSandboxEnabled(true);
 #endif
@@ -1164,7 +1162,7 @@ void WebPage::setDefersLoading(bool defersLoading)
     m_page->setDefersLoading(defersLoading);
 }
 
-void WebPage::reload(uint64_t navigationID, bool reloadFromOrigin, const SandboxExtension::Handle& sandboxExtensionHandle)
+void WebPage::reload(uint64_t navigationID, bool reloadFromOrigin, bool contentBlockersEnabled, const SandboxExtension::Handle& sandboxExtensionHandle)
 {
     SendStopResponsivenessTimer stopper(this);
 
@@ -1172,7 +1170,7 @@ void WebPage::reload(uint64_t navigationID, bool reloadFromOrigin, const Sandbox
     m_pendingNavigationID = navigationID;
 
     m_sandboxExtensionTracker.beginLoad(m_mainFrame.get(), sandboxExtensionHandle);
-    corePage()->userInputBridge().reloadFrame(m_mainFrame->coreFrame(), reloadFromOrigin);
+    corePage()->userInputBridge().reloadFrame(m_mainFrame->coreFrame(), reloadFromOrigin, contentBlockersEnabled);
 }
 
 void WebPage::goForward(uint64_t navigationID, uint64_t backForwardItemID)
@@ -1343,6 +1341,13 @@ void WebPage::drawRect(GraphicsContext& graphicsContext, const IntRect& rect)
 
 double WebPage::textZoomFactor() const
 {
+    PluginView* pluginView = pluginViewForFrame(&m_page->mainFrame());
+    if (pluginView && pluginView->requiresUnifiedScaleFactor()) {
+        if (pluginView->handlesPageScaleFactor())
+            return pluginView->pageScaleFactor();
+        return pageScaleFactor();
+    }
+
     Frame* frame = m_mainFrame->coreFrame();
     if (!frame)
         return 1;
@@ -1352,8 +1357,13 @@ double WebPage::textZoomFactor() const
 void WebPage::setTextZoomFactor(double zoomFactor)
 {
     PluginView* pluginView = pluginViewForFrame(&m_page->mainFrame());
-    if (pluginView && pluginView->handlesPageScaleFactor())
+    if (pluginView && pluginView->requiresUnifiedScaleFactor()) {
+        if (pluginView->handlesPageScaleFactor())
+            pluginView->setPageScaleFactor(zoomFactor, IntPoint());
+        else
+            scalePage(zoomFactor, IntPoint());
         return;
+    }
 
     Frame* frame = m_mainFrame->coreFrame();
     if (!frame)
@@ -1364,8 +1374,11 @@ void WebPage::setTextZoomFactor(double zoomFactor)
 double WebPage::pageZoomFactor() const
 {
     PluginView* pluginView = pluginViewForFrame(&m_page->mainFrame());
-    if (pluginView && pluginView->handlesPageScaleFactor())
-        return pluginView->pageScaleFactor();
+    if (pluginView && pluginView->requiresUnifiedScaleFactor()) {
+        if (pluginView->handlesPageScaleFactor())
+            return pluginView->pageScaleFactor();
+        return pageScaleFactor();
+    }
 
     Frame* frame = m_mainFrame->coreFrame();
     if (!frame)
@@ -1376,8 +1389,11 @@ double WebPage::pageZoomFactor() const
 void WebPage::setPageZoomFactor(double zoomFactor)
 {
     PluginView* pluginView = pluginViewForFrame(&m_page->mainFrame());
-    if (pluginView && pluginView->handlesPageScaleFactor()) {
-        pluginView->setPageScaleFactor(zoomFactor, IntPoint());
+    if (pluginView && pluginView->requiresUnifiedScaleFactor()) {
+        if (pluginView->handlesPageScaleFactor())
+            pluginView->setPageScaleFactor(zoomFactor, IntPoint());
+        else
+            scalePage(zoomFactor, IntPoint());
         return;
     }
 
@@ -1390,8 +1406,11 @@ void WebPage::setPageZoomFactor(double zoomFactor)
 void WebPage::setPageAndTextZoomFactors(double pageZoomFactor, double textZoomFactor)
 {
     PluginView* pluginView = pluginViewForFrame(&m_page->mainFrame());
-    if (pluginView && pluginView->handlesPageScaleFactor()) {
-        pluginView->setPageScaleFactor(pageZoomFactor, IntPoint());
+    if (pluginView && pluginView->requiresUnifiedScaleFactor()) {
+        if (pluginView->handlesPageScaleFactor())
+            pluginView->setPageScaleFactor(pageZoomFactor, IntPoint());
+        else
+            scalePage(pageZoomFactor, IntPoint());
         return;
     }
 
@@ -2179,6 +2198,27 @@ void WebPage::touchEvent(const WebTouchEvent& touchEvent)
 }
 #endif
 
+#if ENABLE(MAC_GESTURE_EVENTS)
+static bool handleGestureEvent(const WebGestureEvent& event, Page* page)
+{
+    if (!page->mainFrame().view())
+        return false;
+
+    return page->mainFrame().eventHandler().handleGestureEvent(platform(event));
+}
+
+void WebPage::gestureEvent(const WebGestureEvent& gestureEvent)
+{
+    bool handled = false;
+    if (canHandleUserEvents()) {
+        CurrentEvent currentEvent(gestureEvent);
+        handled = handleGestureEvent(gestureEvent, m_page.get());
+    }
+    send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(gestureEvent.type()), handled));
+}
+
+#endif
+
 bool WebPage::scroll(Page* page, ScrollDirection direction, ScrollGranularity granularity)
 {
     return page->userInputBridge().scrollRecursively(direction, granularity);
@@ -2486,7 +2526,8 @@ void WebPage::runJavaScriptInMainFrame(const String& script, uint64_t callbackID
     RefPtr<SerializedScriptValue> serializedResultValue;
     JSLockHolder lock(JSDOMWindow::commonVM());
     bool hadException = true;
-    if (JSValue resultValue = m_mainFrame->coreFrame()->script().executeScript(script, true).jsValue()) {
+    ExceptionDetails details;
+    if (JSValue resultValue = m_mainFrame->coreFrame()->script().executeScript(script, true, &details).jsValue()) {
         hadException = false;
         serializedResultValue = SerializedScriptValue::create(m_mainFrame->jsContext(),
             toRef(m_mainFrame->coreFrame()->script().globalObject(mainThreadNormalWorld())->globalExec(), resultValue), nullptr);
@@ -2495,7 +2536,7 @@ void WebPage::runJavaScriptInMainFrame(const String& script, uint64_t callbackID
     IPC::DataReference dataReference;
     if (serializedResultValue)
         dataReference = serializedResultValue->data();
-    send(Messages::WebPageProxy::ScriptValueCallback(dataReference, hadException, callbackID));
+    send(Messages::WebPageProxy::ScriptValueCallback(dataReference, hadException, details, callbackID));
 }
 
 void WebPage::getContentsAsString(uint64_t callbackID)
@@ -2505,11 +2546,9 @@ void WebPage::getContentsAsString(uint64_t callbackID)
 }
 
 #if ENABLE(MHTML)
-void WebPage::getContentsAsMHTMLData(uint64_t callbackID, bool useBinaryEncoding)
+void WebPage::getContentsAsMHTMLData(uint64_t callbackID)
 {
-    RefPtr<SharedBuffer> buffer = useBinaryEncoding
-        ? MHTMLArchive::generateMHTMLDataUsingBinaryEncoding(m_page.get())
-        : MHTMLArchive::generateMHTMLData(m_page.get());
+    RefPtr<SharedBuffer> buffer = MHTMLArchive::generateMHTMLData(m_page.get());
 
     // FIXME: Use SharedBufferDataReference.
     IPC::DataReference dataReference;
@@ -2806,6 +2845,10 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setAllowsAirPlayForMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::allowsAirPlayForMediaPlaybackKey()));
 #endif
 
+#if ENABLE(RESOURCE_USAGE_OVERLAY)
+    settings.setResourceUsageOverlayVisible(store.getBoolValueForKey(WebPreferencesKey::resourceUsageOverlayVisibleKey()));
+#endif
+
     settings.setSuppressesIncrementalRendering(store.getBoolValueForKey(WebPreferencesKey::suppressesIncrementalRenderingKey()));
     settings.setIncrementalRenderingSuppressionTimeoutInSeconds(store.getDoubleValueForKey(WebPreferencesKey::incrementalRenderingSuppressionTimeoutKey()));
     settings.setBackspaceKeyNavigationEnabled(store.getBoolValueForKey(WebPreferencesKey::backspaceKeyNavigationEnabledKey()));
@@ -2888,8 +2931,6 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setUseImageDocumentForSubframePDF(true);
 #endif
 
-    settings.setLongMousePressEnabled(store.getBoolValueForKey(WebPreferencesKey::longMousePressEnabledKey()));
-
 #if ENABLE(GAMEPAD)
     RuntimeEnabledFeatures::sharedFeatures().setGamepadsEnabled(store.getBoolValueForKey(WebPreferencesKey::gamepadsEnabledKey()));
 #endif
@@ -2927,6 +2968,8 @@ void WebPage::willCommitLayerTree(RemoteLayerTreeTransaction& layerTransaction)
     layerTransaction.setScaleWasSetByUIProcess(scaleWasSetByUIProcess());
     layerTransaction.setMinimumScaleFactor(m_viewportConfiguration.minimumScale());
     layerTransaction.setMaximumScaleFactor(m_viewportConfiguration.maximumScale());
+    layerTransaction.setInitialScaleFactor(m_viewportConfiguration.initialScale());
+    layerTransaction.setViewportMetaTagWidth(m_viewportConfiguration.viewportArguments().width);
     layerTransaction.setAllowsUserScaling(allowsUserScaling());
 #endif
 #if PLATFORM(MAC)
@@ -3429,7 +3472,7 @@ void WebPage::restoreSelectionInFocusedEditableElement()
 
     if (auto document = frame.document()) {
         if (auto element = document->focusedElement())
-            element->updateFocusAppearance(true /* restoreSelection */);
+            element->updateFocusAppearance(SelectionRestorationMode::Restore, SelectionRevealMode::DoNotReveal);
     }
 }
 
@@ -4903,8 +4946,6 @@ Ref<DocumentLoader> WebPage::createDocumentLoader(Frame& frame, const ResourceRe
             documentLoader->setNavigationID(m_pendingNavigationID);
             m_pendingNavigationID = 0;
         }
-        if (frame.page())
-            documentLoader->setUserContentExtensionsEnabled(frame.page()->userContentExtensionsEnabled());
     }
 
     return WTF::move(documentLoader);
@@ -5003,14 +5044,6 @@ void WebPage::setShouldScaleViewToFitDocument(bool shouldScaleViewToFitDocument)
         return;
 
     m_drawingArea->setShouldScaleViewToFitDocument(shouldScaleViewToFitDocument);
-}
-
-void WebPage::setUserContentExtensionsEnabled(bool userContentExtensionsEnabled)
-{
-    if (!m_page)
-        return;
-
-    m_page->setUserContentExtensionsEnabled(userContentExtensionsEnabled);
 }
 
 void WebPage::imageOrMediaDocumentSizeChanged(const IntSize& newSize)

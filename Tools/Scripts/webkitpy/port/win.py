@@ -245,7 +245,7 @@ class WinPort(ApplePort):
         command_file = self.create_debugger_command_file()
         if not command_file:
             return None
-        debugger_options = '"{0}" -p %ld -g -noio -lines -cf "{1}"'.format(cygpath(ntsd_path), cygpath(command_file))
+        debugger_options = '"{0}" -p %ld -e %ld -g -noio -lines -cf "{1}"'.format(cygpath(ntsd_path), cygpath(command_file))
         registry_settings = {'Debugger': debugger_options, 'Auto': "1"}
         for key in registry_settings:
             for arch in ["--wow32", "--wow64"]:
@@ -348,3 +348,16 @@ class WinPort(ApplePort):
                 pass
 
         return system_pid
+
+
+class WinCairoPort(WinPort):
+    port_name = "wincairo"
+
+    VERSION_FALLBACK_ORDER = ["wincairo-xp", "wincairo-vista", "wincairo-7sp0", "wincairo-win10", "wincairo"]
+
+    def default_baseline_search_path(self):
+        name = self._name.replace('-wk2', '')
+        fallback_names = self.VERSION_FALLBACK_ORDER[self.VERSION_FALLBACK_ORDER.index(name):-1] + [self.port_name]
+        fallback_names.append('win')
+        fallback_names.append('mac')
+        return map(self._webkit_baseline_path, fallback_names)

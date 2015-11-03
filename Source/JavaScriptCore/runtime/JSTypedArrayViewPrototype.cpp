@@ -200,6 +200,40 @@ static EncodedJSValue JSC_HOST_CALL typedArrayViewProtoFuncValues(ExecState* exe
     CALL_GENERIC_TYPEDARRAY_PROTOTYPE_FUNCTION(typedArrayViewProtoFuncValues);
 }
 
+static EncodedJSValue JSC_HOST_CALL typedArrayViewProtoGetterFuncToStringTag(ExecState* exec)
+{
+    JSValue thisValue = exec->thisValue();
+    if (!thisValue.isObject())
+        return throwVMError(exec, createTypeError(exec, "Receiver should be a typed array view but was not an object"));
+
+    VM& vm = exec->vm();
+    switch (thisValue.getObject()->classInfo()->typedArrayStorageType) {
+    case TypeUint8Clamped:
+        return JSValue::encode(jsString(&vm, "Uint8ClampedArray"));
+    case TypeInt32:
+        return JSValue::encode(jsString(&vm, "Int32Array"));
+    case TypeUint32:
+        return JSValue::encode(jsString(&vm, "Uint32Array"));
+    case TypeFloat64:
+        return JSValue::encode(jsString(&vm, "Float64Array"));
+    case TypeFloat32:
+        return JSValue::encode(jsString(&vm, "Float32Array"));
+    case TypeInt8:
+        return JSValue::encode(jsString(&vm, "Int8Array"));
+    case TypeUint8:
+        return JSValue::encode(jsString(&vm, "Uint8Array"));
+    case TypeInt16:
+        return JSValue::encode(jsString(&vm, "Int16Array"));
+    case TypeUint16:
+        return JSValue::encode(jsString(&vm, "Uint16Array"));
+    case NotTypedArray:
+    case TypeDataView:
+        return throwVMError(exec, createTypeError(exec, "Receiver should be a typed array view"));
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+
 #undef CALL_GENERIC_TYPEDARRAY_PROTOTYPE_FUNCTION
 
 JSTypedArrayViewPrototype::JSTypedArrayViewPrototype(VM& vm, Structure* structure)
@@ -213,8 +247,8 @@ void JSTypedArrayViewPrototype::finishCreation(VM& vm, JSGlobalObject* globalObj
 
     ASSERT(inherits(info()));
 
-    JSC_NATIVE_GETTER(vm.propertyNames->byteLength, typedArrayViewProtoGetterFuncByteLength, DontEnum | ReadOnly | DontDelete, 0);
-    JSC_NATIVE_GETTER(vm.propertyNames->byteOffset, typedArrayViewProtoGetterFuncByteOffset, DontEnum | ReadOnly | DontDelete, 0);
+    JSC_NATIVE_INTRINSIC_GETTER(vm.propertyNames->byteLength, typedArrayViewProtoGetterFuncByteLength, DontEnum | ReadOnly | DontDelete, TypedArrayByteLengthIntrinsic);
+    JSC_NATIVE_INTRINSIC_GETTER(vm.propertyNames->byteOffset, typedArrayViewProtoGetterFuncByteOffset, DontEnum | ReadOnly | DontDelete, TypedArrayByteOffsetIntrinsic);
     JSC_NATIVE_FUNCTION("copyWithin", typedArrayViewProtoFuncCopyWithin, DontEnum, 2);
     JSC_BUILTIN_FUNCTION("every", typedArrayPrototypeEveryCodeGenerator, DontEnum);
     JSC_BUILTIN_FUNCTION("filter", typedArrayPrototypeFilterCodeGenerator, DontEnum);
@@ -228,7 +262,7 @@ void JSTypedArrayViewPrototype::finishCreation(VM& vm, JSGlobalObject* globalObj
     JSC_NATIVE_FUNCTION(vm.propertyNames->join, typedArrayViewProtoFuncJoin, DontEnum, 1);
     JSC_NATIVE_FUNCTION(vm.propertyNames->keys, typedArrayViewProtoFuncKeys, DontEnum, 0);
     JSC_NATIVE_FUNCTION("lastIndexOf", typedArrayViewProtoFuncLastIndexOf, DontEnum, 1);
-    JSC_NATIVE_GETTER(vm.propertyNames->length, typedArrayViewProtoGetterFuncLength, DontEnum | ReadOnly | DontDelete, 0);
+    JSC_NATIVE_INTRINSIC_GETTER(vm.propertyNames->length, typedArrayViewProtoGetterFuncLength, DontEnum | ReadOnly | DontDelete, TypedArrayLengthIntrinsic);
     JSC_BUILTIN_FUNCTION("map", typedArrayPrototypeMapCodeGenerator, DontEnum);
     JSC_BUILTIN_FUNCTION("reduce", typedArrayPrototypeReduceCodeGenerator, DontEnum);
     JSC_BUILTIN_FUNCTION("reduceRight", typedArrayPrototypeReduceRightCodeGenerator, DontEnum);
@@ -239,6 +273,7 @@ void JSTypedArrayViewPrototype::finishCreation(VM& vm, JSGlobalObject* globalObj
     JSC_NATIVE_FUNCTION(vm.propertyNames->subarray, typedArrayViewProtoFuncSubarray, DontEnum, 2);
     JSC_BUILTIN_FUNCTION(vm.propertyNames->toLocaleString, typedArrayPrototypeToLocaleStringCodeGenerator, DontEnum);
     JSC_NATIVE_FUNCTION(vm.propertyNames->toString, arrayProtoFuncToString, DontEnum, 0);
+    JSC_NATIVE_GETTER(vm.propertyNames->toStringTagSymbol, typedArrayViewProtoGetterFuncToStringTag, DontEnum | ReadOnly);
 
     JSFunction* valuesFunction = JSFunction::create(vm, globalObject, 0, vm.propertyNames->values.string(), typedArrayViewProtoFuncValues);
 
@@ -251,8 +286,8 @@ JSTypedArrayViewPrototype* JSTypedArrayViewPrototype::create(
     VM& vm, JSGlobalObject* globalObject, Structure* structure)
 {
     JSTypedArrayViewPrototype* prototype =
-    new (NotNull, allocateCell<JSTypedArrayViewPrototype>(vm.heap))
-    JSTypedArrayViewPrototype(vm, structure);
+        new (NotNull, allocateCell<JSTypedArrayViewPrototype>(vm.heap))
+        JSTypedArrayViewPrototype(vm, structure);
     prototype->finishCreation(vm, globalObject);
     return prototype;
 }

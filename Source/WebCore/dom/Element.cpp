@@ -4,7 +4,7 @@
  *           (C) 2001 Peter Kelly (pmk@post.com)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
  *           (C) 2007 David Smith (catfish.man@gmail.com)
- * Copyright (C) 2004-2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2015 Apple Inc. All rights reserved.
  *           (C) 2007 Eric Seidel (eric@webkit.org)
  *
  * This library is free software; you can redistribute it and/or
@@ -33,6 +33,7 @@
 #include "ChromeClient.h"
 #include "ClientRect.h"
 #include "ClientRectList.h"
+#include "ComposedTreeAncestorIterator.h"
 #include "ContainerNodeAlgorithms.h"
 #include "DOMTokenList.h"
 #include "Dictionary.h"
@@ -974,7 +975,7 @@ LayoutRect Element::absoluteEventBounds(bool& boundsIncludeAllDescendantElements
         // Get the bounding rectangle from the SVG model.
         SVGElement& svgElement = downcast<SVGElement>(*this);
         FloatRect localRect;
-        if (svgElement.getBoundingBox(localRect))
+        if (svgElement.getBoundingBox(localRect, SVGLocatable::DisallowStyleUpdate))
             result = LayoutRect(renderer()->localToAbsoluteQuad(localRect, UseTransforms, &includesFixedPositionElements).boundingBox());
     } else {
         if (is<RenderBox>(renderer())) {
@@ -1380,6 +1381,17 @@ URL Element::absoluteLinkURL() const
     return document().completeURL(stripLeadingAndTrailingHTMLSpaces(linkAttribute));
 }
 
+#if ENABLE(TOUCH_EVENTS)
+bool Element::allowsDoubleTapGesture() const
+{
+    if (renderStyle() && renderStyle()->touchAction() != TouchAction::Auto)
+        return false;
+
+    Element* parent = parentElement();
+    return !parent || parent->allowsDoubleTapGesture();
+}
+#endif
+
 StyleResolver& Element::styleResolver()
 {
     if (auto* shadowRoot = containingShadowRoot())
@@ -1619,15 +1631,6 @@ ShadowRoot* Element::shadowRoot() const
     return hasRareData() ? elementRareData()->shadowRoot() : 0;
 }
 
-static bool shouldUseNodeRenderingTraversalSlowPath(const Element& element)
-{
-    return element.isShadowRoot() || element.shadowRoot();
-}
-
-void Element::resetNeedsNodeRenderingTraversalSlowPath()
-{
-    setNeedsNodeRenderingTraversalSlowPath(shouldUseNodeRenderingTraversalSlowPath(*this));
-}
 
 void Element::addShadowRoot(Ref<ShadowRoot>&& newShadowRoot)
 {
@@ -1643,8 +1646,6 @@ void Element::addShadowRoot(Ref<ShadowRoot>&& newShadowRoot)
     notifyChildNodeInserted(*this, shadowRoot, postInsertionNotificationTargets);
     for (auto& target : postInsertionNotificationTargets)
         target->finishedInsertingSubtree();
-
-    resetNeedsNodeRenderingTraversalSlowPath();
 
     setNeedsStyleRecalc(ReconstructRenderTree);
 
@@ -1856,8 +1857,8 @@ void Element::childrenChanged(const ChildChange& change)
         checkForSiblingStyleChanges(*this, checkType, change.previousSiblingElement, change.nextSiblingElement);
     }
 
-    if (ShadowRoot* shadowRoot = this->shadowRoot()) {
 #if ENABLE(SHADOW_DOM) || ENABLE(DETAILS_ELEMENT)
+    if (ShadowRoot* shadowRoot = this->shadowRoot()) {
         switch (change.type) {
         case ElementInserted:
         case ElementRemoved:
@@ -1872,8 +1873,8 @@ void Element::childrenChanged(const ChildChange& change)
         case NonContentsChildChanged:
             break;
         }
-#endif
     }
+#endif
 }
 
 void Element::removeAllEventListeners()
@@ -2229,7 +2230,7 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
     if (isFormControl)
         view->setProhibitsScrolling(true);
 #endif
-    updateFocusAppearance(restorePreviousSelection);
+    updateFocusAppearance(restorePreviousSelection ? SelectionRestorationMode::Restore : SelectionRestorationMode::SetDefault);
 #if PLATFORM(IOS)
     if (isFormControl)
         view->setProhibitsScrolling(false);
@@ -2244,11 +2245,11 @@ void Element::updateFocusAppearanceAfterAttachIfNeeded()
     if (!data->needsFocusAppearanceUpdateSoonAfterAttach())
         return;
     if (isFocusable() && document().focusedElement() == this)
-        document().updateFocusAppearanceSoon(false /* don't restore selection */);
+        document().updateFocusAppearanceSoon(SelectionRestorationMode::SetDefault);
     data->setNeedsFocusAppearanceUpdateSoonAfterAttach(false);
 }
 
-void Element::updateFocusAppearance(bool /*restorePreviousSelection*/)
+void Element::updateFocusAppearance(SelectionRestorationMode, SelectionRevealMode revealMode)
 {
     if (isRootEditableElement()) {
         Frame* frame = document().frame();
@@ -2264,9 +2265,10 @@ void Element::updateFocusAppearance(bool /*restorePreviousSelection*/)
         
         if (frame->selection().shouldChangeSelection(newSelection)) {
             frame->selection().setSelection(newSelection, FrameSelection::defaultSetSelectionOptions(), Element::defaultFocusTextStateChangeIntent());
-            frame->selection().revealSelection();
+            if (revealMode == SelectionRevealMode::Reveal)
+                frame->selection().revealSelection();
         }
-    } else if (renderer() && !renderer()->isWidget())
+    } else if (renderer() && !renderer()->isWidget() && revealMode == SelectionRevealMode::Reveal)
         renderer()->scrollRectToVisible(renderer()->anchorRect());
 }
 
@@ -2445,44 +2447,79 @@ void Element::setMinimumSizeForResizing(const LayoutSize& size)
     ensureElementRareData().setMinimumSizeForResizing(size);
 }
 
-static PseudoElement* beforeOrAfterPseudoElement(Element* host, PseudoId pseudoElementSpecifier)
+static PseudoElement* beforeOrAfterPseudoElement(Element& host, PseudoId pseudoElementSpecifier)
 {
     switch (pseudoElementSpecifier) {
     case BEFORE:
-        return host->beforePseudoElement();
+        return host.beforePseudoElement();
     case AFTER:
-        return host->afterPseudoElement();
+        return host.afterPseudoElement();
     default:
-        return 0;
+        return nullptr;
     }
+}
+
+RenderStyle* Element::existingComputedStyle()
+{
+    if (auto* renderTreeStyle = renderStyle())
+        return renderTreeStyle;
+
+    if (hasRareData())
+        return elementRareData()->computedStyle();
+
+    return nullptr;
+}
+
+RenderStyle& Element::resolveComputedStyle()
+{
+    ASSERT(inDocument());
+    ASSERT(!existingComputedStyle());
+
+    Deque<Element*, 32> elementsRequiringComputedStyle({ this });
+    RenderStyle* computedStyle = nullptr;
+
+    // Collect ancestors until we find one that has style.
+    auto composedAncestors = composedTreeAncestors(*this);
+    for (auto& ancestor : composedAncestors) {
+        if (!is<Element>(ancestor))
+            break;
+        auto& ancestorElement = downcast<Element>(ancestor);
+        elementsRequiringComputedStyle.prepend(&ancestorElement);
+        if (auto* existingStyle = ancestorElement.existingComputedStyle()) {
+            computedStyle = existingStyle;
+            break;
+        }
+    }
+
+    // Resolve and cache styles starting from the most distant ancestor.
+    for (auto* element : elementsRequiringComputedStyle) {
+        auto style = document().styleForElementIgnoringPendingStylesheets(*element, computedStyle);
+        computedStyle = style.ptr();
+        ElementRareData& rareData = element->ensureElementRareData();
+        rareData.setComputedStyle(WTF::move(style));
+    }
+
+    return *computedStyle;
 }
 
 RenderStyle* Element::computedStyle(PseudoId pseudoElementSpecifier)
 {
-    if (PseudoElement* pseudoElement = beforeOrAfterPseudoElement(this, pseudoElementSpecifier))
+    if (PseudoElement* pseudoElement = beforeOrAfterPseudoElement(*this, pseudoElementSpecifier))
         return pseudoElement->computedStyle();
 
-    // FIXME: Find and use the renderer from the pseudo element instead of the actual element so that the 'length'
-    // properties, which are only known by the renderer because it did the layout, will be correct and so that the
-    // values returned for the ":selection" pseudo-element will be correct.
-    if (RenderStyle* usedStyle = renderStyle()) {
-        if (pseudoElementSpecifier) {
-            RenderStyle* cachedPseudoStyle = usedStyle->getCachedPseudoStyle(pseudoElementSpecifier);
-            return cachedPseudoStyle ? cachedPseudoStyle : usedStyle;
-        }
-        return usedStyle;
+    auto* style = existingComputedStyle();
+    if (!style) {
+        if (!inDocument())
+            return nullptr;
+        style = &resolveComputedStyle();
     }
 
-    if (!inDocument()) {
-        // FIXME: Try to do better than this. Ensure that styleForElement() works for elements that are not in the
-        // document tree and figure out when to destroy the computed style for such elements.
-        return nullptr;
+    if (pseudoElementSpecifier) {
+        if (auto* cachedPseudoStyle = style->getCachedPseudoStyle(pseudoElementSpecifier))
+            return cachedPseudoStyle;
     }
 
-    ElementRareData& data = ensureElementRareData();
-    if (!data.computedStyle())
-        data.setComputedStyle(document().styleForElementIgnoringPendingStylesheets(this));
-    return pseudoElementSpecifier ? data.computedStyle()->getCachedPseudoStyle(pseudoElementSpecifier) : data.computedStyle();
+    return style;
 }
 
 void Element::setStyleAffectedByEmpty()

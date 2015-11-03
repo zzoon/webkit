@@ -29,6 +29,7 @@
 #import "PageLoadStateObserver.h"
 #import "WKAPICast.h"
 #import "WKNSURLExtras.h"
+#import "WKViewInternal.h"
 #import "WebPageGroup.h"
 #import "WebPageProxy.h"
 #import "WebPreferences.h"
@@ -84,6 +85,11 @@ using namespace WebKit;
     return _page->pageLoadState().hasOnlySecureContent();
 }
 
+- (BOOL)_webProcessIsResponsive
+{
+    return _page->process().responsivenessTimer()->isResponsive();
+}
+
 - (double)estimatedProgress
 {
     return _page->estimatedProgress();
@@ -99,6 +105,15 @@ using namespace WebKit;
 id <_WKObservablePageState> WKPageCreateObservableState(WKPageRef pageRef)
 {
     return [[WKObservablePageState alloc] initWithPage:toImpl(pageRef)];
+}
+
+_WKRemoteObjectRegistry *WKPageGetObjectRegistry(WKPageRef pageRef)
+{
+#if WK_API_ENABLED && !TARGET_OS_IPHONE
+    return toImpl(pageRef)->remoteObjectRegistry();
+#else
+    return nil;
+#endif
 }
 
 pid_t WKPageGetProcessIdentifier(WKPageRef pageRef)

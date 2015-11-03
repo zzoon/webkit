@@ -65,22 +65,22 @@ template<> const ClassInfo JSBuiltinReadableStreamControllerPrivateConstructor::
 
 template<> JSObject* JSBuiltinReadableStreamReaderPrivateConstructor::createJSObject()
 {
-    return JSReadableStreamReader::create(getDOMStructure<JSReadableStreamReader>(globalObject()->vm(), *globalObject()), globalObject(), ReadableStreamReader::create());
+    return JSReadableStreamReader::create(getDOMStructure<JSReadableStreamReader>(globalObject()->vm(), *globalObject()), globalObject());
 }
 
 template<> JSObject* JSBuiltinReadableStreamControllerPrivateConstructor::createJSObject()
 {
-    return JSReadableStreamController::create(getDOMStructure<JSReadableStreamController>(globalObject()->vm(), *globalObject()), globalObject(), ReadableStreamController::create());
+    return JSReadableStreamController::create(getDOMStructure<JSReadableStreamController>(globalObject()->vm(), *globalObject()), globalObject());
 }
 
-template<> JSFunction* JSBuiltinReadableStreamReaderPrivateConstructor::createInitializeFunction(JSC::VM& vm, JSC::JSGlobalObject& globalObject)
+template<> FunctionExecutable* JSBuiltinReadableStreamReaderPrivateConstructor::initializeExecutable(JSC::VM& vm)
 {
-    return JSFunction::createBuiltinFunction(vm, readableStreamInternalsPrivateInitializeReadableStreamReaderCodeGenerator(vm), &globalObject);
+    return readableStreamInternalsPrivateInitializeReadableStreamReaderCodeGenerator(vm);
 }
 
-template<> JSFunction* JSBuiltinReadableStreamControllerPrivateConstructor::createInitializeFunction(JSC::VM& vm, JSC::JSGlobalObject& globalObject)
+template<> FunctionExecutable* JSBuiltinReadableStreamControllerPrivateConstructor::initializeExecutable(JSC::VM& vm)
 {
-    return JSFunction::createBuiltinFunction(vm, readableStreamInternalsPrivateInitializeReadableStreamControllerCodeGenerator(vm), &globalObject);
+    return readableStreamInternalsPrivateInitializeReadableStreamControllerCodeGenerator(vm);
 }
 
 JSValue createReadableStreamReaderPrivateConstructor(VM& vm, JSDOMGlobalObject& globalObject)

@@ -28,10 +28,6 @@
 
 #include <objc/objc.h>
 
-#if PLATFORM(IOS)
-#include "WebCoreSystemInterfaceIOS.h"
-#endif
-
 typedef const struct __CFString * CFStringRef;
 typedef const struct __CFNumber * CFNumberRef;
 typedef const struct __CFDictionary * CFDictionaryRef;
@@ -131,7 +127,6 @@ typedef enum {
     wkPatternTilingConstantSpacingMinimalDistortion,
     wkPatternTilingConstantSpacing
 } wkPatternTiling;
-extern void (*wkCGContextResetClip)(CGContextRef);
 #if !PLATFORM(IOS)
 extern bool (*wkCGContextDrawsWithCorrectShadowOffsets)(CGContextRef);
 #endif
@@ -197,11 +192,7 @@ extern void (*wkSetCGFontRenderingMode)(CGContextRef, NSFont*, BOOL);
 extern void (*wkSetCookieStoragePrivateBrowsingEnabled)(BOOL);
 extern void (*wkSetDragImage)(NSImage*, NSPoint offset);
 #endif
-extern void (*wkSetNSURLConnectionDefersCallbacks)(NSURLConnection *, BOOL);
 extern void (*wkSetNSURLRequestShouldContentSniff)(NSMutableURLRequest *, BOOL);
-extern void (*wkSetBaseCTM)(CGContextRef, CGAffineTransform);
-extern void (*wkSetPatternPhaseInUserSpace)(CGContextRef, CGPoint);
-extern CGAffineTransform (*wkGetUserToBaseCTM)(CGContextRef);
 extern bool (*wkCGContextIsPDFContext)(CGContextRef);
 extern unsigned (*wkInitializeMaximumHTTPConnectionCountPerHost)(unsigned preferredConnectionCount);
 extern int (*wkGetHTTPRequestPriority)(CFURLRequestRef);
@@ -242,10 +233,7 @@ extern AXUIElementRef (*wkCreateAXUIElementRef)(id element);
 #endif // !PLATFORM(IOS)
 
 #if PLATFORM(IOS)
-extern CGSize (*wkGetScreenSize)(void);
-extern CGSize (*wkGetAvailableScreenSize)(void);
 extern void (*wkSetLayerContentsScale)(CALayer *);
-extern float (*wkGetScreenScaleFactor)(void);
 #endif
 
 typedef const struct __CFURLStorageSession* CFURLStorageSessionRef;

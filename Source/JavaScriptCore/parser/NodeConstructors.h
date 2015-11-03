@@ -915,6 +915,13 @@ namespace JSC {
     {
     }
 
+    inline YieldExprNode::YieldExprNode(const JSTokenLocation& location, ExpressionNode* argument, bool delegate)
+        : ExpressionNode(location)
+        , m_argument(argument)
+        , m_delegate(delegate)
+    {
+    }
+
 #if ENABLE(ES6_CLASS_SYNTAX)
     inline ClassDeclNode::ClassDeclNode(const JSTokenLocation& location, ExpressionNode* classDeclaration)
         : StatementNode(location)
@@ -922,8 +929,9 @@ namespace JSC {
     {
     }
 
-    inline ClassExprNode::ClassExprNode(const JSTokenLocation& location, const Identifier& name, ExpressionNode* constructorExpression, ExpressionNode* classHeritage, PropertyListNode* instanceMethods, PropertyListNode* staticMethods)
+    inline ClassExprNode::ClassExprNode(const JSTokenLocation& location, const Identifier& name, VariableEnvironment& classEnvironment, ExpressionNode* constructorExpression, ExpressionNode* classHeritage, PropertyListNode* instanceMethods, PropertyListNode* staticMethods)
         : ExpressionNode(location)
+        , VariableEnvironmentNode(classEnvironment)
         , m_name(name)
         , m_constructorExpression(constructorExpression)
         , m_classHeritage(classHeritage)

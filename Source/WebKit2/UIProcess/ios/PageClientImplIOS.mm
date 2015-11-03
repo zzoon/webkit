@@ -254,9 +254,12 @@ void PageClientImpl::didChangeContentSize(const WebCore::IntSize&)
     notImplemented();
 }
 
-void PageClientImpl::didChangeViewportMetaTagWidth(float newWidth)
+void PageClientImpl::disableDoubleTapGesturesDuringTapIfNecessary(uint64_t requestID)
 {
-    [m_webView _setViewportMetaTagWidth:newWidth];
+    if (!m_webView._allowsDoubleTapGestures)
+        return;
+
+    [m_contentView _disableDoubleTapGesturesDuringTapIfNecessary:requestID];
 }
 
 double PageClientImpl::minimumZoomScale() const
@@ -430,17 +433,17 @@ void PageClientImpl::doneWithTouchEvent(const NativeWebTouchEvent& nativeWebtouc
 }
 #endif
 
-RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy*)
+RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy&)
 {
-    notImplemented();
     return nullptr;
 }
 
-RefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy*)
+#if ENABLE(CONTEXT_MENUS)
+std::unique_ptr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy&, const UserData&)
 {
-    notImplemented();
     return nullptr;
 }
+#endif
 
 void PageClientImpl::setTextIndicator(Ref<TextIndicator> textIndicator, TextIndicatorWindowLifetime)
 {
@@ -464,6 +467,10 @@ void PageClientImpl::exitAcceleratedCompositingMode()
 }
 
 void PageClientImpl::updateAcceleratedCompositingMode(const LayerTreeContext&)
+{
+}
+
+void PageClientImpl::willEnterAcceleratedCompositingMode()
 {
 }
 

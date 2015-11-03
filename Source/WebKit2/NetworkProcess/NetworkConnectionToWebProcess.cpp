@@ -36,6 +36,7 @@
 #include "NetworkResourceLoaderMessages.h"
 #include "RemoteNetworkingContext.h"
 #include "SessionTracker.h"
+#include <WebCore/NotImplemented.h>
 #include <WebCore/PingHandle.h>
 #include <WebCore/PlatformCookieJar.h>
 #include <WebCore/ResourceLoaderOptions.h>
@@ -159,6 +160,11 @@ void NetworkConnectionToWebProcess::setDefersLoading(ResourceLoadIdentifier iden
     loader->setDefersLoading(defers);
 }
 
+void NetworkConnectionToWebProcess::prefetchDNS(const String& hostname)
+{
+    NetworkProcess::singleton().prefetchDNS(hostname);
+}
+
 static NetworkStorageSession& storageSession(SessionID sessionID)
 {
     if (sessionID.isEphemeral()) {
@@ -192,12 +198,17 @@ void NetworkConnectionToWebProcess::convertMainResourceLoadToDownload(uint64_t m
         return;
     }
 
+#if USE(NETWORK_SESSION)
+    // FIXME: Do something here.
+    notImplemented();
+#else
     networkProcess.downloadManager().convertHandleToDownload(downloadID, loader->handle(), request, response);
 
     // Unblock the URL connection operation queue.
     loader->handle()->continueDidReceiveResponse();
     
     loader->didConvertHandleToDownload();
+#endif
 }
 
 void NetworkConnectionToWebProcess::cookiesForDOM(SessionID sessionID, const URL& firstParty, const URL& url, String& result)

@@ -142,9 +142,7 @@ public:
     bool attached(Node*, ExceptionCode&);
 
     String visiblePlaceholder(Element*);
-#if ENABLE(INPUT_TYPE_COLOR)
     void selectColorInColorChooser(Element*, const String& colorValue);
-#endif
     Vector<String> formControlStateOfPreviousHistoryItem(ExceptionCode&);
     void setFormControlStateOfPreviousHistoryItem(const Vector<String>&, ExceptionCode&);
 
@@ -263,7 +261,6 @@ public:
     unsigned numberOfLiveNodes() const;
     unsigned numberOfLiveDocuments() const;
 
-    Vector<String> consoleMessageArgumentCounts() const;
     RefPtr<DOMWindow> openDummyInspectorFrontend(const String& url);
     void closeDummyInspectorFrontend();
     void setJavaScriptProfilingEnabled(bool enabled, ExceptionCode&);
@@ -436,6 +433,7 @@ public:
     String getCurrentMediaControlsStatusForElement(HTMLMediaElement*);
 
     String userVisibleString(const DOMURL*);
+    void setShowAllPlugins(bool);
 
 private:
     explicit Internals(Document*);

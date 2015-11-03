@@ -38,6 +38,7 @@
 #include "DFGSaneStringGetByValSlowPathGenerator.h"
 #include "DFGSlowPathGenerator.h"
 #include "DirectArguments.h"
+#include "JITSubGenerator.h"
 #include "JSArrowFunction.h"
 #include "JSCInlines.h"
 #include "JSEnvironmentRecord.h"
@@ -767,6 +768,7 @@ void SpeculativeJIT::checkArray(Node* node)
     const ClassInfo* expectedClassInfo = 0;
     
     switch (node->arrayMode().type()) {
+    case Array::AnyTypedArray:
     case Array::String:
         RELEASE_ASSERT_NOT_REACHED(); // Should have been a Phantom(String:)
         break;
@@ -958,6 +960,7 @@ void SpeculativeJIT::compileIn(Node* node)
             stubInfo->patch.valueGPR = static_cast<int8_t>(resultGPR);
 #if USE(JSVALUE32_64)
             stubInfo->patch.valueTagGPR = static_cast<int8_t>(InvalidGPRReg);
+            stubInfo->patch.baseTagGPR = static_cast<int8_t>(InvalidGPRReg);
 #endif
             stubInfo->patch.usedRegisters = usedRegisters();
 
@@ -2194,11 +2197,12 @@ void SpeculativeJIT::compileDoubleRep(Node* node)
             done.append(isNull);
 
             DFG_TYPE_CHECK(JSValueRegs(op1GPR), node->child1(), ~SpecCell,
-                m_jit.branchTest64(JITCompiler::NonZero, op1GPR, TrustedImm32(static_cast<int32_t>(~1))));
+                m_jit.branchTest64(JITCompiler::Zero, op1GPR, TrustedImm32(static_cast<int32_t>(TagBitBool))));
 
             JITCompiler::Jump isFalse = m_jit.branch64(JITCompiler::Equal, op1GPR, TrustedImm64(ValueFalse));
             static const double one = 1;
             m_jit.loadDouble(MacroAssembler::TrustedImmPtr(&one), resultFPR);
+            done.append(m_jit.jump());
             done.append(isFalse);
 
             isUndefined.link(&m_jit);
@@ -2247,6 +2251,7 @@ void SpeculativeJIT::compileDoubleRep(Node* node)
             JITCompiler::Jump isFalse = m_jit.branchTest32(JITCompiler::Zero, op1PayloadGPR, TrustedImm32(1));
             static const double one = 1;
             m_jit.loadDouble(MacroAssembler::TrustedImmPtr(&one), resultFPR);
+            done.append(m_jit.jump());
             done.append(isFalse);
 
             isUndefined.link(&m_jit);
@@ -3078,7 +3083,52 @@ void SpeculativeJIT::compileArithSub(Node* node)
         doubleResult(result.fpr(), node);
         return;
     }
-        
+
+    case UntypedUse: {
+        JSValueOperand left(this, node->child1());
+        JSValueOperand right(this, node->child2());
+
+        JSValueRegs leftRegs = left.jsValueRegs();
+        JSValueRegs rightRegs = right.jsValueRegs();
+
+        ResultType leftType = m_state.forNode(node->child1()).resultType();
+        ResultType rightType = m_state.forNode(node->child2()).resultType();
+
+        FPRTemporary leftNumber(this);
+        FPRTemporary rightNumber(this);
+        FPRReg leftFPR = leftNumber.fpr();
+        FPRReg rightFPR = rightNumber.fpr();
+
+#if USE(JSVALUE64)
+        GPRTemporary result(this);
+        JSValueRegs resultRegs = JSValueRegs(result.gpr());
+        GPRTemporary scratch(this);
+        GPRReg scratchGPR = scratch.gpr();
+        FPRReg scratchFPR = InvalidFPRReg;
+#else
+        GPRTemporary resultTag(this);
+        GPRTemporary resultPayload(this);
+        JSValueRegs resultRegs = JSValueRegs(resultPayload.gpr(), resultTag.gpr());
+        GPRReg scratchGPR = resultTag.gpr();
+        FPRTemporary fprScratch(this);
+        FPRReg scratchFPR = fprScratch.fpr();
+#endif
+
+        JITSubGenerator gen(resultRegs, leftRegs, rightRegs, leftType, rightType,
+            leftFPR, rightFPR, scratchGPR, scratchFPR);
+        gen.generateFastPath(m_jit);
+
+        gen.slowPathJumpList().link(&m_jit);
+        silentSpillAllRegisters(resultRegs);
+        callOperation(operationValueSub, resultRegs, leftRegs, rightRegs);
+        silentFillAllRegisters(resultRegs);
+        m_jit.exceptionCheck();
+
+        gen.endJumpList().link(&m_jit);
+        jsValueResult(resultRegs, node);
+        return;
+    }
+
     default:
         RELEASE_ASSERT_NOT_REACHED();
         return;
@@ -3734,7 +3784,7 @@ void SpeculativeJIT::compileArithSqrt(Node* node)
     SpeculateDoubleOperand op1(this, node->child1());
     FPRReg op1FPR = op1.fpr();
 
-    if (!MacroAssembler::supportsFloatingPointSqrt() || !Options::enableArchitectureSpecificOptimizations()) {
+    if (!MacroAssembler::supportsFloatingPointSqrt() || !Options::useArchitectureSpecificOptimizations()) {
         flushRegisters();
         FPRResult result(this);
         callOperation(sqrt, result.fpr(), op1FPR);
@@ -4385,14 +4435,11 @@ void SpeculativeJIT::compileGetIndexedPropertyStorage(Node* node)
         
     default:
         ASSERT(isTypedView(node->arrayMode().typedArrayType()));
-        m_jit.loadPtr(
-            MacroAssembler::Address(baseReg, JSArrayBufferView::offsetOfVector()),
-            storageReg);
+
+        JITCompiler::Jump fail = m_jit.loadTypedArrayVector(baseReg, storageReg);
 
         addSlowPathGenerator(
-            slowPathCall(
-                m_jit.branchIfNotToSpace(storageReg),
-                this, operationGetArrayBufferVector, storageReg, baseReg));
+            slowPathCall(fail, this, operationGetArrayBufferVector, storageReg, baseReg));
         break;
     }
     
@@ -4417,7 +4464,11 @@ void SpeculativeJIT::compileGetTypedArrayByteOffset(Node* node)
     m_jit.loadPtr(MacroAssembler::Address(baseGPR, JSObject::butterflyOffset()), dataGPR);
     m_jit.removeSpaceBits(dataGPR);
     m_jit.loadPtr(MacroAssembler::Address(baseGPR, JSArrayBufferView::offsetOfVector()), vectorGPR);
+    JITCompiler::JumpList vectorReady;
+    vectorReady.append(m_jit.branchIfToSpace(vectorGPR));
+    vectorReady.append(m_jit.branchIfNotFastTypedArray(baseGPR));
     m_jit.removeSpaceBits(vectorGPR);
+    vectorReady.link(&m_jit);
     m_jit.loadPtr(MacroAssembler::Address(dataGPR, Butterfly::offsetOfArrayBuffer()), dataGPR);
     m_jit.loadPtr(MacroAssembler::Address(dataGPR, ArrayBuffer::offsetOfData()), dataGPR);
     m_jit.subPtr(dataGPR, vectorGPR);
@@ -4665,7 +4716,7 @@ void SpeculativeJIT::compileGetArrayLength(Node* node)
         break;
     }
     default: {
-        ASSERT(isTypedView(node->arrayMode().typedArrayType()));
+        ASSERT(node->arrayMode().isSomeTypedArrayView());
         SpeculateCellOperand base(this, node->child1());
         GPRTemporary result(this, Reuse, base);
         GPRReg baseGPR = base.gpr();
@@ -6689,6 +6740,79 @@ void SpeculativeJIT::writeBarrier(GPRReg ownerGPR, GPRReg scratch1, GPRReg scrat
     JITCompiler::Jump ownerIsRememberedOrInEden = m_jit.jumpIfIsRememberedOrInEden(ownerGPR);
     storeToWriteBarrierBuffer(ownerGPR, scratch1, scratch2);
     ownerIsRememberedOrInEden.link(&m_jit);
+}
+
+void SpeculativeJIT::compilePutAccessorById(Node* node)
+{
+    SpeculateCellOperand base(this, node->child1());
+    SpeculateCellOperand accessor(this, node->child2());
+
+    GPRReg baseGPR = base.gpr();
+    GPRReg accessorGPR = accessor.gpr();
+
+    flushRegisters();
+    callOperation(node->op() == PutGetterById ? operationPutGetterById : operationPutSetterById, NoResult, baseGPR, identifierUID(node->identifierNumber()), node->accessorAttributes(), accessorGPR);
+    m_jit.exceptionCheck();
+
+    noResult(node);
+}
+
+void SpeculativeJIT::compilePutGetterSetterById(Node* node)
+{
+    SpeculateCellOperand base(this, node->child1());
+    JSValueOperand getter(this, node->child2());
+    JSValueOperand setter(this, node->child3());
+
+#if USE(JSVALUE64)
+    GPRReg baseGPR = base.gpr();
+    GPRReg getterGPR = getter.gpr();
+    GPRReg setterGPR = setter.gpr();
+
+    flushRegisters();
+    callOperation(operationPutGetterSetter, NoResult, baseGPR, identifierUID(node->identifierNumber()), node->accessorAttributes(), getterGPR, setterGPR);
+#else
+    // These JSValues may be JSUndefined OR JSFunction*.
+    // At that time,
+    // 1. If the JSValue is JSUndefined, its payload becomes nullptr.
+    // 2. If the JSValue is JSFunction*, its payload becomes JSFunction*.
+    // So extract payload and pass it to operationPutGetterSetter. This hack is used as the same way in baseline JIT.
+    GPRReg baseGPR = base.gpr();
+    JSValueRegs getterRegs = getter.jsValueRegs();
+    JSValueRegs setterRegs = setter.jsValueRegs();
+
+    flushRegisters();
+    callOperation(operationPutGetterSetter, NoResult, baseGPR, identifierUID(node->identifierNumber()), node->accessorAttributes(), getterRegs.payloadGPR(), setterRegs.payloadGPR());
+#endif
+    m_jit.exceptionCheck();
+
+    noResult(node);
+}
+
+void SpeculativeJIT::compilePutAccessorByVal(Node* node)
+{
+    SpeculateCellOperand base(this, node->child1());
+    JSValueOperand subscript(this, node->child2());
+    SpeculateCellOperand accessor(this, node->child3());
+
+    auto operation = node->op() == PutGetterByVal ? operationPutGetterByVal : operationPutSetterByVal;
+#if USE(JSVALUE64)
+    GPRReg baseGPR = base.gpr();
+    GPRReg subscriptGPR = subscript.gpr();
+    GPRReg accessorGPR = accessor.gpr();
+
+    flushRegisters();
+    callOperation(operation, NoResult, baseGPR, subscriptGPR, node->accessorAttributes(), accessorGPR);
+#else
+    GPRReg baseGPR = base.gpr();
+    JSValueRegs subscriptRegs = subscript.jsValueRegs();
+    GPRReg accessorGPR = accessor.gpr();
+
+    flushRegisters();
+    callOperation(operation, NoResult, baseGPR, subscriptRegs.tagGPR(), subscriptRegs.payloadGPR(), node->accessorAttributes(), accessorGPR);
+#endif
+    m_jit.exceptionCheck();
+
+    noResult(node);
 }
 
 } } // namespace JSC::DFG

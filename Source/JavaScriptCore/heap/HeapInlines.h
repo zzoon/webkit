@@ -39,9 +39,13 @@ inline bool Heap::shouldCollect()
 {
     if (isDeferred())
         return false;
+    if (!m_isSafeToCollect)
+        return false;
+    if (m_operationInProgress != NoOperation)
+        return false;
     if (Options::gcMaxHeapSize())
-        return m_bytesAllocatedThisCycle > Options::gcMaxHeapSize() && m_isSafeToCollect && m_operationInProgress == NoOperation;
-    return m_bytesAllocatedThisCycle > m_maxEdenSize && m_isSafeToCollect && m_operationInProgress == NoOperation;
+        return m_bytesAllocatedThisCycle > Options::gcMaxHeapSize();
+    return m_bytesAllocatedThisCycle > m_maxEdenSize;
 }
 
 inline bool Heap::isBusy()
@@ -274,9 +278,6 @@ inline void Heap::decrementDeferralDepth()
 
 inline bool Heap::collectIfNecessaryOrDefer()
 {
-    if (isDeferred())
-        return false;
-
     if (!shouldCollect())
         return false;
 
@@ -306,7 +307,25 @@ inline void Heap::unregisterWeakGCMap(void* weakGCMap)
 {
     m_weakGCMaps.remove(weakGCMap);
 }
-    
+
+inline void Heap::didAllocateBlock(size_t capacity)
+{
+#if ENABLE(RESOURCE_USAGE_OVERLAY)
+    m_blockBytesAllocated += capacity;
+#else
+    UNUSED_PARAM(capacity);
+#endif
+}
+
+inline void Heap::didFreeBlock(size_t capacity)
+{
+#if ENABLE(RESOURCE_USAGE_OVERLAY)
+    m_blockBytesAllocated -= capacity;
+#else
+    UNUSED_PARAM(capacity);
+#endif
+}
+
 } // namespace JSC
 
 #endif // HeapInlines_h

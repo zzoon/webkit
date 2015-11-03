@@ -35,8 +35,11 @@
 namespace JSC {
 
 class MacroAssemblerARM64 : public AbstractMacroAssembler<ARM64Assembler, MacroAssemblerARM64> {
+public:
     static const RegisterID dataTempRegister = ARM64Registers::ip0;
     static const RegisterID memoryTempRegister = ARM64Registers::ip1;
+
+private:
     static const ARM64Registers::FPRegisterID fpTempRegister = ARM64Registers::q31;
     static const ARM64Assembler::SetFlags S = ARM64Assembler::S;
     static const intptr_t maskHalfWord0 = 0xffffl;
@@ -995,6 +998,11 @@ public:
     void store64(RegisterID src, const void* address)
     {
         store<64>(src, address);
+    }
+
+    void store64(TrustedImm32 imm, ImplicitAddress address)
+    {
+        store64(TrustedImm64(imm.m_value), address);
     }
 
     void store64(TrustedImm64 imm, ImplicitAddress address)
@@ -2528,6 +2536,10 @@ public:
     {
         ARM64Assembler::repatchPointer(call.dataLabelPtrAtOffset(REPATCH_OFFSET_CALL_TO_POINTER).dataLocation(), destination.executableAddress());
     }
+
+#if ENABLE(MASM_PROBE)
+    void probe(ProbeFunction, void* arg1, void* arg2);
+#endif // ENABLE(MASM_PROBE)
 
 protected:
     ALWAYS_INLINE Jump makeBranch(ARM64Assembler::Condition cond)

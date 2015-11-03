@@ -89,25 +89,41 @@ void printCPURegisters(CPUState& cpu, int indentation)
     #undef PRINT_FPREGISTER
 }
 
-void printRegister(CPUState& cpu, RegisterID regID)
+static void printPC(CPUState& cpu)
 {
-    const char* name = CPUState::registerName(regID);
     union {
         void* voidPtr;
         intptr_t intptrValue;
     } u;
-    u.voidPtr = cpu.registerValue(regID);
+#if CPU(X86) || CPU(X86_64)
+    u.voidPtr = cpu.eip;
+#elif CPU(ARM_TRADITIONAL) || CPU(ARM_THUMB2) || CPU(ARM64)
+    u.voidPtr = cpu.pc;
+#else
+#error "Unsupported CPU"
+#endif
+    dataLogF("pc:<%p %ld>", u.voidPtr, u.intptrValue);
+}
+
+void printRegister(CPUState& cpu, RegisterID regID)
+{
+    const char* name = CPUState::gprName(regID);
+    union {
+        void* voidPtr;
+        intptr_t intptrValue;
+    } u;
+    u.voidPtr = cpu.gpr(regID);
     dataLogF("%s:<%p %ld>", name, u.voidPtr, u.intptrValue);
 }
 
 void printRegister(CPUState& cpu, FPRegisterID regID)
 {
-    const char* name = CPUState::registerName(regID);
+    const char* name = CPUState::fprName(regID);
     union {
         double doubleValue;
         uint64_t uint64Value;
     } u;
-    u.doubleValue = cpu.registerValue(regID);
+    u.doubleValue = cpu.fpr(regID);
     dataLogF("%s:<0x%016llx %.13g>", name, u.uint64Value, u.doubleValue);
 }
 
@@ -116,7 +132,7 @@ void printMemory(CPUState& cpu, const Memory& memory)
     uint8_t* ptr = nullptr;
     switch (memory.addressType) {
     case Memory::AddressType::Address: {
-        ptr = reinterpret_cast<uint8_t*>(cpu.registerValue(memory.u.address.base));
+        ptr = reinterpret_cast<uint8_t*>(cpu.gpr(memory.u.address.base));
         ptr += memory.u.address.offset;
         break;
     }
@@ -177,6 +193,9 @@ void MacroAssemblerPrinter::printCallback(ProbeContext* context)
         switch (arg.type) {
         case Arg::Type::AllRegisters:
             printCPU(context->cpu, 1);
+            break;
+        case Arg::Type::PCRegister:
+            printPC(context->cpu);
             break;
         case Arg::Type::RegisterID:
             printRegister(context->cpu, arg.u.gpRegisterID);

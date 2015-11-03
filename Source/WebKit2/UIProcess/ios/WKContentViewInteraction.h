@@ -126,7 +126,7 @@ struct WKAutoCorrectionData {
 
     id <UITextInputDelegate> _inputDelegate;
 
-    uint64_t _latestTapHighlightID;
+    uint64_t _latestTapID;
     struct TapHighlightInformation {
         WebCore::Color color;
         Vector<WebCore::FloatQuad> quads;
@@ -158,6 +158,8 @@ struct WKAutoCorrectionData {
     BOOL _usingGestureForSelection;
     BOOL _inspectorNodeSearchEnabled;
     BOOL _didAccessoryTabInitiateFocus;
+    BOOL _isExpectingFastSingleTapCommit;
+    BOOL _showDebugTapHighlightsForFastClicking;
 }
 
 @end
@@ -182,6 +184,8 @@ struct WKAutoCorrectionData {
 - (void)_commitPotentialTapFailed;
 - (void)_didGetTapHighlightForRequest:(uint64_t)requestID color:(const WebCore::Color&)color quads:(const Vector<WebCore::FloatQuad>&)highlightedQuads topLeftRadius:(const WebCore::IntSize&)topLeftRadius topRightRadius:(const WebCore::IntSize&)topRightRadius bottomLeftRadius:(const WebCore::IntSize&)bottomLeftRadius bottomRightRadius:(const WebCore::IntSize&)bottomRightRadius;
 
+- (BOOL)_mayDisableDoubleTapGesturesDuringSingleTap;
+- (void)_disableDoubleTapGesturesDuringTapIfNecessary:(uint64_t)requestID;
 - (void)_startAssistingNode:(const WebKit::AssistedNodeInformation&)information userIsInteracting:(BOOL)userIsInteracting blurPreviousNode:(BOOL)blurPreviousNode userObject:(NSObject <NSSecureCoding> *)userObject;
 - (void)_stopAssistingNode;
 - (void)_selectionChanged;
@@ -203,6 +207,7 @@ struct WKAutoCorrectionData {
 - (void)_enableInspectorNodeSearch;
 - (void)_disableInspectorNodeSearch;
 - (void)_becomeFirstResponderWithSelectionMovingForward:(BOOL)selectingForward completionHandler:(void (^)(BOOL didBecomeFirstResponder))completionHandler;
+- (void)_setDoubleTapGesturesEnabled:(BOOL)enabled;
 @end
 
 #if HAVE(LINK_PREVIEW)

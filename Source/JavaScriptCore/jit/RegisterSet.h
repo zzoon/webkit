@@ -62,7 +62,8 @@ public:
     static RegisterSet allFPRs();
     static RegisterSet allRegisters();
 
-    static RegisterSet registersToNotSaveForCall();
+    static RegisterSet registersToNotSaveForJSCall();
+    static RegisterSet registersToNotSaveForCCall();
     
     void set(Reg reg, bool value = true)
     {
@@ -117,6 +118,13 @@ public:
     
     bool operator==(const RegisterSet& other) const { return m_vector == other.m_vector; }
     unsigned hash() const { return m_vector.hash(); }
+
+    template<typename Functor>
+    void forEach(const Functor& functor) const
+    {
+        for (size_t index : m_vector.setBits())
+            functor(Reg::fromIndex(index));
+    }
     
 private:
     void setAny(Reg reg) { set(reg); }

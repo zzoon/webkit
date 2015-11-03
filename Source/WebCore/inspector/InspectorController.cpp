@@ -46,9 +46,9 @@
 #include "InspectorIndexedDBAgent.h"
 #include "InspectorInstrumentation.h"
 #include "InspectorLayerTreeAgent.h"
+#include "InspectorNetworkAgent.h"
 #include "InspectorPageAgent.h"
 #include "InspectorReplayAgent.h"
-#include "InspectorResourceAgent.h"
 #include "InspectorTimelineAgent.h"
 #include "InspectorWorkerAgent.h"
 #include "InstrumentingAgents.h"
@@ -70,6 +70,7 @@
 #include <inspector/InspectorFrontendDispatchers.h>
 #include <inspector/InspectorFrontendRouter.h>
 #include <inspector/agents/InspectorAgent.h>
+#include <inspector/agents/InspectorHeapAgent.h>
 #include <profiler/LegacyProfiler.h>
 #include <runtime/JSLock.h>
 #include <wtf/Stopwatch.h>
@@ -137,6 +138,8 @@ InspectorController::InspectorController(Page& page, InspectorClient* inspectorC
     InspectorDatabaseAgent* databaseAgent = databaseAgentPtr.get();
     m_agents.append(WTF::move(databaseAgentPtr));
 
+    m_agents.append(std::make_unique<InspectorNetworkAgent>(pageContext, pageAgent));
+
 #if ENABLE(INDEXED_DATABASE)
     m_agents.append(std::make_unique<InspectorIndexedDBAgent>(pageContext, pageAgent));
 #endif
@@ -153,10 +156,6 @@ InspectorController::InspectorController(Page& page, InspectorClient* inspectorC
     m_timelineAgent = timelineAgentPtr.get();
     m_agents.append(WTF::move(timelineAgentPtr));
 
-    auto resourceAgentPtr = std::make_unique<InspectorResourceAgent>(pageContext, pageAgent);
-    m_resourceAgent = resourceAgentPtr.get();
-    m_agents.append(WTF::move(resourceAgentPtr));
-
     auto consoleAgentPtr = std::make_unique<PageConsoleAgent>(pageContext, m_domAgent);
     WebConsoleAgent* consoleAgent = consoleAgentPtr.get();
     m_instrumentingAgents->setWebConsoleAgent(consoleAgentPtr.get());
@@ -166,10 +165,8 @@ InspectorController::InspectorController(Page& page, InspectorClient* inspectorC
     PageDebuggerAgent* debuggerAgent = debuggerAgentPtr.get();
     m_agents.append(WTF::move(debuggerAgentPtr));
 
-    auto domDebuggerAgentPtr = std::make_unique<InspectorDOMDebuggerAgent>(pageContext, m_domAgent, debuggerAgent);
-    m_domDebuggerAgent = domDebuggerAgentPtr.get();
-    m_agents.append(WTF::move(domDebuggerAgentPtr));
-
+    m_agents.append(std::make_unique<InspectorDOMDebuggerAgent>(pageContext, m_domAgent, debuggerAgent));
+    m_agents.append(std::make_unique<InspectorHeapAgent>(pageContext));
     m_agents.append(std::make_unique<InspectorApplicationCacheAgent>(pageContext, pageAgent));
     m_agents.append(std::make_unique<InspectorWorkerAgent>(pageContext));
     m_agents.append(std::make_unique<InspectorLayerTreeAgent>(pageContext));
@@ -438,7 +435,7 @@ bool InspectorController::canAccessInspectedScriptState(JSC::ExecState* scriptSt
     if (!inspectedWindow)
         return false;
 
-    return BindingSecurity::shouldAllowAccessToDOMWindow(scriptState, inspectedWindow->impl(), DoNotReportSecurityError);
+    return BindingSecurity::shouldAllowAccessToDOMWindow(scriptState, inspectedWindow->wrapped(), DoNotReportSecurityError);
 }
 
 InspectorFunctionCallHandler InspectorController::functionCallHandler() const
@@ -472,6 +469,11 @@ void InspectorController::frontendInitialized()
 Ref<Stopwatch> InspectorController::executionStopwatch()
 {
     return m_executionStopwatch.copyRef();
+}
+
+JSC::VM& InspectorController::vm()
+{
+    return JSDOMWindowBase::commonVM();
 }
 
 void InspectorController::didComposite(Frame& frame)

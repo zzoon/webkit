@@ -134,6 +134,7 @@ XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext& context)
     , m_responseCacheIsValid(false)
     , m_resumeTimer(*this, &XMLHttpRequest::resumeTimerFired)
     , m_dispatchErrorOnResuming(false)
+    , m_networkErrorTimer(*this, &XMLHttpRequest::networkErrorTimerFired)
     , m_timeoutTimer(*this, &XMLHttpRequest::didReachTimeout)
 {
 #ifndef NDEBUG
@@ -372,16 +373,11 @@ void XMLHttpRequest::callReadyStateChangeListener()
     if (!scriptExecutionContext())
         return;
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchXHRReadyStateChangeEvent(scriptExecutionContext(), *this);
-
     if (m_async || (m_state <= OPENED || m_state == DONE))
         m_progressEventThrottle.dispatchReadyStateChangeEvent(Event::create(eventNames().readystatechangeEvent, false, false), m_state == DONE ? FlushProgressEvent : DoNotFlushProgressEvent);
 
-    InspectorInstrumentation::didDispatchXHRReadyStateChangeEvent(cookie);
     if (m_state == DONE && !m_error) {
-        InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchXHRLoadEvent(scriptExecutionContext(), *this);
         m_progressEventThrottle.dispatchProgressEvent(eventNames().loadEvent);
-        InspectorInstrumentation::didDispatchXHRLoadEvent(cookie);
         m_progressEventThrottle.dispatchProgressEvent(eventNames().loadendEvent);
     }
 }
@@ -776,17 +772,17 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
         if (m_upload)
             request.setReportUploadProgress(true);
 
-        // ThreadableLoader::create can return null here, for example if we're no longer attached to a page.
+        // ThreadableLoader::create can return null here, for example if we're no longer attached to a page or if a content blocker blocks the load.
         // This is true while running onunload handlers.
         // FIXME: Maybe we need to be able to send XMLHttpRequests from onunload, <http://bugs.webkit.org/show_bug.cgi?id=10904>.
-        // FIXME: Maybe create() can return null for other reasons too?
         m_loader = ThreadableLoader::create(scriptExecutionContext(), this, request, options);
-        if (m_loader) {
-            // Neither this object nor the JavaScript wrapper should be deleted while
-            // a request is in progress because we need to keep the listeners alive,
-            // and they are referenced by the JavaScript wrapper.
-            setPendingActivity(this);
-        }
+
+        // Neither this object nor the JavaScript wrapper should be deleted while
+        // a request is in progress because we need to keep the listeners alive,
+        // and they are referenced by the JavaScript wrapper.
+        setPendingActivity(this);
+        if (!m_loader)
+            m_networkErrorTimer.startOneShot(0);
     } else {
         InspectorInstrumentation::willLoadXHRSynchronously(scriptExecutionContext());
         ThreadableLoader::loadResourceSynchronously(scriptExecutionContext(), request, *this, options);
@@ -896,6 +892,12 @@ void XMLHttpRequest::networkError()
     internalAbort();
 }
 
+void XMLHttpRequest::networkErrorTimerFired()
+{
+    networkError();
+    dropProtection();
+}
+    
 void XMLHttpRequest::abortError()
 {
     genericError();

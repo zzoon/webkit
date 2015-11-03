@@ -50,7 +50,6 @@ void InitWebCoreSystemInterface(void)
     INIT(CGContextGetShouldSmoothFonts);
 #endif
     INIT(CGPatternCreateWithImageAndTransform);
-    INIT(CGContextResetClip);
 #if !PLATFORM(IOS)
     INIT(CGContextDrawsWithCorrectShadowOffsets);
 #endif
@@ -84,7 +83,6 @@ void InitWebCoreSystemInterface(void)
     INIT(WindowSetScaledFrame);
     INIT(SetCGFontRenderingMode);
 #endif
-    INIT(SetBaseCTM);
     INIT(SetCONNECTProxyAuthorizationForStream);
     INIT(SetCONNECTProxyForStream);
 #if !PLATFORM(IOS)
@@ -94,11 +92,8 @@ void InitWebCoreSystemInterface(void)
     INIT(SetHTTPRequestPriority);
     INIT(SetHTTPRequestMinimumFastLanePriority);
     INIT(HTTPRequestEnablePipelining);
-    INIT(SetNSURLConnectionDefersCallbacks);
     INIT(SetNSURLRequestShouldContentSniff);
-    INIT(SetPatternPhaseInUserSpace);
     INIT(CGContextIsPDFContext);
-    INIT(GetUserToBaseCTM);
 #if ENABLE(VIDEO) && !PLATFORM(IOS)
     INIT(QTIncludeOnlyModernMediaFileTypes);
     INIT(QTMovieDisableComponent);
@@ -114,16 +109,6 @@ void InitWebCoreSystemInterface(void)
     INIT(QTGetSitesInMediaDownloadCache);
     INIT(QTClearMediaDownloadCacheForSite);
     INIT(QTClearMediaDownloadCache);
-#endif
-
-#if PLATFORM(IOS)
-    INIT(ExecutableWasLinkedOnOrAfterIOSVersion);
-    INIT(GetDeviceClass);
-    INIT(GetScreenSize);
-    INIT(GetAvailableScreenSize);
-    INIT(GetScreenScaleFactor);
-    INIT(IsGB18030ComplianceRequired);
-    INIT(IsOptimizedFullscreenSupported);
 #endif
 
 #if !PLATFORM(IOS)
@@ -174,14 +159,6 @@ void InitWebCoreSystemInterface(void)
 #endif
 
     INIT(CFURLRequestAllowAllPostCaching);
-
-#if PLATFORM(IOS)
-    INIT(GetUserAgent);
-    INIT(GetDeviceName);
-    INIT(GetOSNameForUserAgent);
-    INIT(GetPlatformNameForNavigator);
-    INIT(GetVendorNameForNavigator);
-#endif
 
 #if !PLATFORM(IOS)
     INIT(NSElasticDeltaForTimeDelta);

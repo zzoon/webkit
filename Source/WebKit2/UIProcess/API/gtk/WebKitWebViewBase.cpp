@@ -65,6 +65,7 @@
 #include <glib/gi18n-lib.h>
 #include <memory>
 #include <wtf/HashMap.h>
+#include <wtf/glib/GMainLoopSource.h>
 #include <wtf/glib/GRefPtr.h>
 #include <wtf/text/CString.h>
 
@@ -189,6 +190,7 @@ struct _WebKitWebViewBasePrivate {
 
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
     std::unique_ptr<RedirectedXCompositeWindow> redirectedWindow;
+    GMainLoopSource clearRedirectedWindowSoon;
 #endif
 
 #if ENABLE(DRAG_SUPPORT)
@@ -1249,9 +1251,16 @@ void webkitWebViewBaseSetInspectorViewSize(WebKitWebViewBase* webkitWebViewBase,
         gtk_widget_queue_resize_no_redraw(GTK_WIDGET(webkitWebViewBase));
 }
 
+static void activeContextMenuUnmapped(GtkMenu* menu, WebKitWebViewBase* webViewBase)
+{
+    if (webViewBase->priv->activeContextMenuProxy && webViewBase->priv->activeContextMenuProxy->gtkMenu() == menu)
+        webViewBase->priv->activeContextMenuProxy = nullptr;
+}
+
 void webkitWebViewBaseSetActiveContextMenuProxy(WebKitWebViewBase* webkitWebViewBase, WebContextMenuProxyGtk* contextMenuProxy)
 {
     webkitWebViewBase->priv->activeContextMenuProxy = contextMenuProxy;
+    g_signal_connect_object(contextMenuProxy->gtkMenu(), "unmap", G_CALLBACK(activeContextMenuUnmapped), webkitWebViewBase, static_cast<GConnectFlags>(0));
 }
 
 WebContextMenuProxyGtk* webkitWebViewBaseGetActiveContextMenuProxy(WebKitWebViewBase* webkitWebViewBase)
@@ -1338,7 +1347,19 @@ void webkitWebViewBaseResetClickCounter(WebKitWebViewBase* webkitWebViewBase)
     webkitWebViewBase->priv->clickCounter.reset();
 }
 
-void webkitWebViewBaseEnterAcceleratedCompositingMode(WebKitWebViewBase* webkitWebViewBase)
+#if USE(REDIRECTED_XCOMPOSITE_WINDOW)
+static void webkitWebViewBaseClearRedirectedWindowSoon(WebKitWebViewBase* webkitWebViewBase)
+{
+    WebKitWebViewBasePrivate* priv = webkitWebViewBase->priv;
+    static const std::chrono::seconds clearRedirectedWindowSoonDelay = 2_s;
+    priv->clearRedirectedWindowSoon.scheduleAfterDelay("[WebKit] Clear RedirectedWindow soon", [priv]() {
+        if (priv->redirectedWindow)
+            priv->redirectedWindow->resize(IntSize());
+    }, clearRedirectedWindowSoonDelay);
+}
+#endif
+
+void webkitWebViewBaseWillEnterAcceleratedCompositingMode(WebKitWebViewBase* webkitWebViewBase)
 {
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
     WebKitWebViewBasePrivate* priv = webkitWebViewBase->priv;
@@ -1350,8 +1371,18 @@ void webkitWebViewBaseEnterAcceleratedCompositingMode(WebKitWebViewBase* webkitW
 
     priv->redirectedWindow->setDeviceScaleFactor(webkitWebViewBase->priv->pageProxy->deviceScaleFactor());
     priv->redirectedWindow->resize(drawingArea->size());
-    // Force a resize to ensure the new redirected window size is used by the WebProcess.
-    drawingArea->forceResize();
+
+    // Clear the redirected window if we don't enter AC mode in the end.
+    webkitWebViewBaseClearRedirectedWindowSoon(webkitWebViewBase);
+#else
+    UNUSED_PARAM(webkitWebViewBase);
+#endif
+}
+
+void webkitWebViewBaseEnterAcceleratedCompositingMode(WebKitWebViewBase* webkitWebViewBase)
+{
+#if USE(REDIRECTED_XCOMPOSITE_WINDOW)
+    webkitWebViewBase->priv->clearRedirectedWindowSoon.cancel();
 #else
     UNUSED_PARAM(webkitWebViewBase);
 #endif
@@ -1360,9 +1391,10 @@ void webkitWebViewBaseEnterAcceleratedCompositingMode(WebKitWebViewBase* webkitW
 void webkitWebViewBaseExitAcceleratedCompositingMode(WebKitWebViewBase* webkitWebViewBase)
 {
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
-    WebKitWebViewBasePrivate* priv = webkitWebViewBase->priv;
-    if (priv->redirectedWindow)
-        priv->redirectedWindow->resize(IntSize());
+    // Resize the window later to ensure we have already rendered the
+    // non composited contents and avoid flickering. We can also avoid the
+    // window resize entirely if we switch back to AC mode quickly.
+    webkitWebViewBaseClearRedirectedWindowSoon(webkitWebViewBase);
 #else
     UNUSED_PARAM(webkitWebViewBase);
 #endif

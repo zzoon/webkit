@@ -52,6 +52,7 @@ my (
     $canvasProxySupport,
     $channelMessagingSupport,
     $classSyntax,
+    $currentsrcSupport,
     $templateLiteralSyntax,
     $cspNextSupport,
     $css3TextSupport,
@@ -78,6 +79,7 @@ my (
     $ftpDirSupport,
     $fullscreenAPISupport,
     $gamepadSupport,
+    $generatorsSupport,
     $geolocationSupport,
     $hardwareConcurrencySupport,
     $highDPICanvasSupport,
@@ -113,7 +115,6 @@ my (
     $orientationEventsSupport,
     $pageVisibilityAPISupport,
     $performanceTimelineSupport,
-    $pictureSizesSupport,
     $promiseSupport,
     $proximityEventsSupport,
     $quotaSupport,
@@ -182,6 +183,9 @@ my @features = (
     { option => "class-syntax", desc => "Toggle ES6 class syntax support",
       define => "ENABLE_ES6_CLASS_SYNTAX", default => 1, value => \$classSyntax },
 
+    { option => "generators", desc => "Toggle ES6 generators support",
+      define => "ENABLE_ES6_GENERATORS", default => 0, value => \$generatorsSupport },
+
     { option => "modules", desc => "Toggle ES6 modules support",
       define => "ENABLE_ES6_MODULES", default => 0, value => \$modulesSupport },
 
@@ -223,6 +227,9 @@ my @features = (
 
     { option => "css-compositing", desc => "Toggle CSS Compositing support",
       define => "ENABLE_CSS_COMPOSITING", default => isAppleWebKit(), value => \$cssCompositingSupport },
+
+    { option => "currentsrc", desc => "Toggle currentSrc attribute support",
+      define => "ENABLE_CURRENTSRC", default => 1, value => \$currentsrcSupport },
 
     { option => "custom-scheme-handler", desc => "Toggle Custom Scheme Handler support",
       define => "ENABLE_CUSTOM_SCHEME_HANDLER", default => isEfl(), value => \$customSchemeHandlerSupport },
@@ -356,9 +363,6 @@ my @features = (
     { option => "performance-timeline", desc => "Toggle Performance Timeline support",
       define => "ENABLE_PERFORMANCE_TIMELINE", default => isGtk(), value => \$performanceTimelineSupport },
 
-    { option => "picture-sizes", desc => "Toggle sizes attribute support",
-      define => "ENABLE_PICTURE_SIZES", default => 1, value => \$pictureSizesSupport },
-
     { option => "promises", desc => "Toggle Promise support",
       define => "ENABLE_PROMISES", default => 1, value => \$promiseSupport },
 
@@ -395,7 +399,7 @@ my @features = (
     { option => "svg-fonts", desc => "Toggle SVG Fonts support",
       define => "ENABLE_SVG_FONTS", default => 1, value => \$svgFontsSupport },
 
-    { option => "system-malloc", desc => "Toggle system allocator instead of TCmalloc",
+    { option => "system-malloc", desc => "Toggle system allocator instead of bmalloc",
       define => "USE_SYSTEM_MALLOC", default => 0, value => \$systemMallocSupport },
 
     { option => "template-element", desc => "Toggle HTMLTemplateElement support",

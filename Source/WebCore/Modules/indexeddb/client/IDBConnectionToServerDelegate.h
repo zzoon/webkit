@@ -28,9 +28,22 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include <wtf/text/WTFString.h>
+
 namespace WebCore {
 
+class IDBKey;
+class IDBObjectStoreInfo;
 class IDBRequestData;
+class IDBResourceIdentifier;
+class IDBTransactionInfo;
+class SerializedScriptValue;
+
+namespace IndexedDB {
+enum class ObjectStoreOverwriteMode;
+}
+
+struct IDBKeyRangeData;
 
 namespace IDBClient {
 
@@ -41,6 +54,18 @@ public:
     virtual uint64_t identifier() const = 0;
     virtual void deleteDatabase(IDBRequestData&) = 0;
     virtual void openDatabase(IDBRequestData&) = 0;
+    virtual void abortTransaction(IDBResourceIdentifier&) = 0;
+    virtual void commitTransaction(IDBResourceIdentifier&) = 0;
+    virtual void createObjectStore(const IDBRequestData&, const IDBObjectStoreInfo&) = 0;
+    virtual void deleteObjectStore(const IDBRequestData&, const String& objectStoreName) = 0;
+    virtual void clearObjectStore(const IDBRequestData&, uint64_t objectStoreIdentifier) = 0;
+    virtual void putOrAdd(const IDBRequestData&, IDBKey*, SerializedScriptValue&, const IndexedDB::ObjectStoreOverwriteMode) = 0;
+    virtual void getRecord(const IDBRequestData&, const IDBKeyRangeData&) = 0;
+    virtual void getCount(const IDBRequestData&, const IDBKeyRangeData&) = 0;
+    virtual void deleteRecord(const IDBRequestData&, const IDBKeyRangeData&) = 0;
+    virtual void establishTransaction(uint64_t databaseConnectionIdentifier, const IDBTransactionInfo&) = 0;
+
+    virtual void databaseConnectionClosed(uint64_t databaseConnectionIdentifier) = 0;
 
     virtual void ref() = 0;
     virtual void deref() = 0;

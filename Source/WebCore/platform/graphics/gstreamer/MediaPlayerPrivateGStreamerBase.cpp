@@ -525,8 +525,8 @@ void MediaPlayerPrivateGStreamerBase::paint(GraphicsContext& context, const Floa
     if (!gstImage)
         return;
 
-    context.drawImage(reinterpret_cast<Image*>(gstImage->image().get()), ColorSpaceSRGB,
-        rect, gstImage->rect(), CompositeCopy);
+    if (Image* image = reinterpret_cast<Image*>(gstImage->image().get()))
+        context.drawImage(*image, ColorSpaceSRGB, rect, gstImage->rect(), CompositeCopy);
 }
 
 #if USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
@@ -560,9 +560,7 @@ void MediaPlayerPrivateGStreamerBase::paintToTextureMapper(TextureMapper* textur
         return;
 
     unsigned textureID = *reinterpret_cast<unsigned*>(videoFrame.data[0]);
-    BitmapTexture::Flags flags = BitmapTexture::NoFlag;
-    if (GST_VIDEO_INFO_HAS_ALPHA(&videoInfo))
-        flags |= BitmapTexture::SupportsAlpha;
+    TextureMapperGL::Flags flags = GST_VIDEO_INFO_HAS_ALPHA(&videoInfo) ? TextureMapperGL::ShouldBlend : 0;
 
     IntSize size = IntSize(GST_VIDEO_INFO_WIDTH(&videoInfo), GST_VIDEO_INFO_HEIGHT(&videoInfo));
     TextureMapperGL* textureMapperGL = reinterpret_cast<TextureMapperGL*>(textureMapper);

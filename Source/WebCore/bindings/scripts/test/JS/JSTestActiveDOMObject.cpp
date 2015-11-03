@@ -23,6 +23,7 @@
 
 #include "ExceptionCode.h"
 #include "JSDOMBinding.h"
+#include "JSDOMConstructor.h"
 #include "JSNode.h"
 #include <runtime/Error.h>
 #include <wtf/GetPtr.h>
@@ -66,26 +67,7 @@ private:
     void finishCreation(JSC::VM&);
 };
 
-class JSTestActiveDOMObjectConstructor : public DOMConstructorObject {
-private:
-    JSTestActiveDOMObjectConstructor(JSC::Structure*, JSDOMGlobalObject&);
-    void finishCreation(JSC::VM&, JSDOMGlobalObject&);
-
-public:
-    typedef DOMConstructorObject Base;
-    static JSTestActiveDOMObjectConstructor* create(JSC::VM& vm, JSC::Structure* structure, JSDOMGlobalObject& globalObject)
-    {
-        JSTestActiveDOMObjectConstructor* ptr = new (NotNull, JSC::allocateCell<JSTestActiveDOMObjectConstructor>(vm.heap)) JSTestActiveDOMObjectConstructor(structure, globalObject);
-        ptr->finishCreation(vm, globalObject);
-        return ptr;
-    }
-
-    DECLARE_INFO;
-    static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject& globalObject, JSC::JSValue prototype)
-    {
-        return JSC::Structure::create(vm, &globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), info());
-    }
-};
+typedef JSDOMConstructorNotConstructable<JSTestActiveDOMObject> JSTestActiveDOMObjectConstructor;
 
 /* Hash table */
 
@@ -104,21 +86,14 @@ static const HashTableValue JSTestActiveDOMObjectTableValues[] =
 };
 
 static const HashTable JSTestActiveDOMObjectTable = { 2, 3, true, JSTestActiveDOMObjectTableValues, JSTestActiveDOMObjectTableIndex };
-const ClassInfo JSTestActiveDOMObjectConstructor::s_info = { "TestActiveDOMObjectConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestActiveDOMObjectConstructor) };
-
-JSTestActiveDOMObjectConstructor::JSTestActiveDOMObjectConstructor(Structure* structure, JSDOMGlobalObject& globalObject)
-    : Base(structure, globalObject)
+template<> void JSTestActiveDOMObjectConstructor::initializeProperties(VM& vm, JSDOMGlobalObject& globalObject)
 {
-}
-
-void JSTestActiveDOMObjectConstructor::finishCreation(VM& vm, JSDOMGlobalObject& globalObject)
-{
-    Base::finishCreation(vm);
-    ASSERT(inherits(info()));
     putDirect(vm, vm.propertyNames->prototype, JSTestActiveDOMObject::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral("TestActiveDOMObject"))), ReadOnly | DontEnum);
     putDirect(vm, vm.propertyNames->length, jsNumber(0), ReadOnly | DontEnum);
 }
+
+template<> const ClassInfo JSTestActiveDOMObjectConstructor::s_info = { "TestActiveDOMObjectConstructor", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestActiveDOMObjectConstructor) };
 
 /* Hash table for prototype */
 
@@ -139,7 +114,7 @@ void JSTestActiveDOMObjectPrototype::finishCreation(VM& vm)
 const ClassInfo JSTestActiveDOMObject::s_info = { "TestActiveDOMObject", &Base::s_info, &JSTestActiveDOMObjectTable, CREATE_METHOD_TABLE(JSTestActiveDOMObject) };
 
 JSTestActiveDOMObject::JSTestActiveDOMObject(Structure* structure, JSDOMGlobalObject& globalObject, Ref<TestActiveDOMObject>&& impl)
-    : JSDOMWrapperWithImplementation<TestActiveDOMObject>(structure, globalObject, WTF::move(impl))
+    : JSDOMWrapper<TestActiveDOMObject>(structure, globalObject, WTF::move(impl))
 {
 }
 
@@ -174,9 +149,9 @@ EncodedJSValue jsTestActiveDOMObjectExcitingAttr(ExecState* state, JSObject* slo
     UNUSED_PARAM(slotBase);
     UNUSED_PARAM(thisValue);
     auto* castedThis = jsCast<JSTestActiveDOMObject*>(slotBase);
-    if (!BindingSecurity::shouldAllowAccessToDOMWindow(state, castedThis->impl()))
+    if (!BindingSecurity::shouldAllowAccessToDOMWindow(state, castedThis->wrapped()))
         return JSValue::encode(jsUndefined());
-    auto& impl = castedThis->impl();
+    auto& impl = castedThis->wrapped();
     JSValue result = jsNumber(impl.excitingAttr());
     return JSValue::encode(result);
 }
@@ -187,7 +162,7 @@ EncodedJSValue jsTestActiveDOMObjectConstructor(ExecState* state, JSObject*, Enc
     JSTestActiveDOMObject* domObject = jsDynamicCast<JSTestActiveDOMObject*>(JSValue::decode(thisValue));
     if (!domObject)
         return throwVMTypeError(state);
-    if (!BindingSecurity::shouldAllowAccessToDOMWindow(state, domObject->impl()))
+    if (!BindingSecurity::shouldAllowAccessToDOMWindow(state, domObject->wrapped()))
         return JSValue::encode(jsUndefined());
     return JSValue::encode(JSTestActiveDOMObject::getConstructor(state->vm(), domObject->globalObject()));
 }
@@ -204,9 +179,9 @@ EncodedJSValue JSC_HOST_CALL jsTestActiveDOMObjectPrototypeFunctionExcitingFunct
     if (UNLIKELY(!castedThis))
         return throwThisTypeError(*state, "TestActiveDOMObject", "excitingFunction");
     ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestActiveDOMObject::info());
-    if (!BindingSecurity::shouldAllowAccessToDOMWindow(state, castedThis->impl()))
+    if (!BindingSecurity::shouldAllowAccessToDOMWindow(state, castedThis->wrapped()))
         return JSValue::encode(jsUndefined());
-    auto& impl = castedThis->impl();
+    auto& impl = castedThis->wrapped();
     if (UNLIKELY(state->argumentCount() < 1))
         return throwVMError(state, createNotEnoughArgumentsError(state));
     Node* nextChild = JSNode::toWrapped(state->argument(0));
@@ -223,7 +198,7 @@ EncodedJSValue JSC_HOST_CALL jsTestActiveDOMObjectPrototypeFunctionPostMessage(E
     if (UNLIKELY(!castedThis))
         return throwThisTypeError(*state, "TestActiveDOMObject", "postMessage");
     ASSERT_GC_OBJECT_INHERITS(castedThis, JSTestActiveDOMObject::info());
-    auto& impl = castedThis->impl();
+    auto& impl = castedThis->wrapped();
     if (UNLIKELY(state->argumentCount() < 1))
         return throwVMError(state, createNotEnoughArgumentsError(state));
     String message = state->argument(0).toString(state)->value(state);
@@ -244,7 +219,7 @@ void JSTestActiveDOMObjectOwner::finalize(JSC::Handle<JSC::Unknown> handle, void
 {
     auto* jsTestActiveDOMObject = jsCast<JSTestActiveDOMObject*>(handle.slot()->asCell());
     auto& world = *static_cast<DOMWrapperWorld*>(context);
-    uncacheWrapper(world, &jsTestActiveDOMObject->impl(), jsTestActiveDOMObject);
+    uncacheWrapper(world, &jsTestActiveDOMObject->wrapped(), jsTestActiveDOMObject);
 }
 
 #if ENABLE(BINDING_INTEGRITY)
@@ -294,7 +269,7 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestActiveDO
 TestActiveDOMObject* JSTestActiveDOMObject::toWrapped(JSC::JSValue value)
 {
     if (auto* wrapper = jsDynamicCast<JSTestActiveDOMObject*>(value))
-        return &wrapper->impl();
+        return &wrapper->wrapped();
     return nullptr;
 }
 

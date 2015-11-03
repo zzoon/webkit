@@ -37,7 +37,10 @@
 namespace WebCore {
 
 class Event;
+class IDBKeyData;
 class IDBResultData;
+class ThreadSafeDataBuffer;
+
 
 namespace IDBClient {
 
@@ -45,7 +48,11 @@ class IDBConnectionToServer;
 
 class IDBRequest : public WebCore::IDBOpenDBRequest, public RefCounted<IDBRequest> {
 public:
+    static Ref<IDBRequest> create(ScriptExecutionContext&, IDBObjectStore&, IDBTransaction&);
+
     const IDBResourceIdentifier& resourceIdentifier() const { return m_resourceIdentifier; }
+
+    virtual ~IDBRequest() override;
 
     virtual RefPtr<WebCore::IDBAny> result(ExceptionCode&) const override;
     virtual unsigned short errorCode(ExceptionCode&) const override;
@@ -53,6 +60,8 @@ public:
     virtual RefPtr<WebCore::IDBAny> source() const override;
     virtual RefPtr<WebCore::IDBTransaction> transaction() const override;
     virtual const String& readyState() const override;
+
+    uint64_t sourceObjectStoreIdentifier() const;
 
     // EventTarget
     virtual EventTargetInterface eventTargetInterface() const override;
@@ -62,15 +71,25 @@ public:
     using RefCounted<IDBRequest>::deref;
 
     void enqueueEvent(Ref<Event>&&);
+    virtual bool dispatchEvent(PassRefPtr<Event>) override final;
 
     IDBConnectionToServer& connection() { return m_connection; }
 
+    void requestCompleted(const IDBResultData&);
+
+    void setResult(const IDBKeyData*);
+    void setResult(uint64_t);
+    void setResultToStructuredClone(const ThreadSafeDataBuffer&);
+    void setResultToUndefined();
+
 protected:
     IDBRequest(IDBConnectionToServer&, ScriptExecutionContext*);
+    IDBRequest(ScriptExecutionContext&, IDBObjectStore&, IDBTransaction&);
 
     // ActiveDOMObject.
     virtual const char* activeDOMObjectName() const override final;
     virtual bool canSuspendForPageCache() const override final;
+    virtual bool hasPendingActivity() const override final;
     
     // EventTarget.
     virtual void refEventTarget() override final { RefCounted<IDBRequest>::ref(); }
@@ -79,10 +98,17 @@ protected:
     IDBRequestReadyState m_readyState { IDBRequestReadyState::Pending };
     RefPtr<IDBAny> m_result;
     RefPtr<IDBTransaction> m_transaction;
+    RefPtr<DOMError> m_domError;
+    IDBError m_idbError;
 
 private:
+    void onError();
+    void onSuccess();
+
     IDBConnectionToServer& m_connection;
     IDBResourceIdentifier m_resourceIdentifier;
+    RefPtr<IDBAny> m_source;
+    bool m_hasPendingActivity { true };
 };
 
 } // namespace IDBClient

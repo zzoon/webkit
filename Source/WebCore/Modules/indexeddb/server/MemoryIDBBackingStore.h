@@ -30,9 +30,14 @@
 
 #include "IDBBackingStore.h"
 #include "IDBDatabaseIdentifier.h"
+#include "IDBResourceIdentifier.h"
+#include "MemoryBackingStoreTransaction.h"
+#include <wtf/HashMap.h>
 
 namespace WebCore {
 namespace IDBServer {
+
+class MemoryObjectStore;
 
 class MemoryIDBBackingStore : public IDBBackingStore {
     friend std::unique_ptr<MemoryIDBBackingStore> std::make_unique<MemoryIDBBackingStore>(const WebCore::IDBDatabaseIdentifier&);
@@ -42,12 +47,38 @@ public:
     virtual ~MemoryIDBBackingStore() override final;
 
     virtual const IDBDatabaseInfo& getOrEstablishDatabaseInfo() override final;
-    
+    void setDatabaseInfo(const IDBDatabaseInfo&);
+
+    virtual IDBError beginTransaction(const IDBTransactionInfo&) override final;
+    virtual IDBError abortTransaction(const IDBResourceIdentifier& transactionIdentifier) override final;
+    virtual IDBError commitTransaction(const IDBResourceIdentifier& transactionIdentifier) override final;
+    virtual IDBError createObjectStore(const IDBResourceIdentifier& transactionIdentifier, const IDBObjectStoreInfo&) override final;
+    virtual IDBError deleteObjectStore(const IDBResourceIdentifier& transactionIdentifier, const String& objectStoreName) override final;
+    virtual IDBError clearObjectStore(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier) override final;
+    virtual IDBError keyExistsInObjectStore(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyData&, bool& keyExists) override final;
+    virtual IDBError deleteRange(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyRangeData&) override final;
+    virtual IDBError putRecord(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyData&, const ThreadSafeDataBuffer& value) override final;
+    virtual IDBError getRecord(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyRangeData&, ThreadSafeDataBuffer& outValue) override final;
+    virtual IDBError getCount(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyRangeData&, uint64_t& outCount) override final;
+    virtual IDBError generateKeyNumber(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, uint64_t& keyNumber) override final;
+
+    void removeObjectStoreForVersionChangeAbort(MemoryObjectStore&);
+    void restoreObjectStoreForVersionChangeAbort(std::unique_ptr<MemoryObjectStore>&&);
+
 private:
     MemoryIDBBackingStore(const IDBDatabaseIdentifier&);
 
+    std::unique_ptr<MemoryObjectStore> takeObjectStoreByName(const String& name);
+
     IDBDatabaseIdentifier m_identifier;
     std::unique_ptr<IDBDatabaseInfo> m_databaseInfo;
+
+    HashMap<IDBResourceIdentifier, std::unique_ptr<MemoryBackingStoreTransaction>> m_transactions;
+
+    void registerObjectStore(std::unique_ptr<MemoryObjectStore>&&);
+    void unregisterObjectStore(MemoryObjectStore&);
+    HashMap<uint64_t, std::unique_ptr<MemoryObjectStore>> m_objectStoresByIdentifier;
+    HashMap<String, MemoryObjectStore*> m_objectStoresByName;
 };
 
 } // namespace IDBServer

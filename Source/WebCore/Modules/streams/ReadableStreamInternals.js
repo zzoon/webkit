@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 Canon Inc. All rights reserved.
+ * Copyright (C) 2015 Igalia.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,7 +24,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// @optional=STREAMS_API
+// @conditional=ENABLE(STREAMS_API)
 // @internals
 
 function privateInitializeReadableStreamReader(stream)
@@ -37,23 +38,20 @@ function privateInitializeReadableStreamReader(stream)
 
     this.@state = stream.@state;
     this.@readRequests = [];
-    if (stream.@state === @readableStreamReadable) {
+    if (stream.@state === @streamReadable) {
         this.@ownerReadableStream = stream;
         this.@storedError = undefined;
         stream.@reader = this;
-        this.@closedPromise = new Promise(function(resolve, reject) {
-            stream.@reader.@closedPromiseResolve = resolve;
-            stream.@reader.@closedPromiseReject = reject;
-        });
+        this.@closedPromise = @createNewStreamsPromise();
         return this;
     }
-    if (stream.@state === @readableStreamClosed) {
+    if (stream.@state === @streamClosed) {
         this.@ownerReadableStream = null;
         this.@storedError = undefined;
         this.@closedPromise = Promise.resolve();
         return this;
     }
-    // TODO: ASSERT(stream.@state === @readableStreamErrored);
+    // FIXME: ASSERT(stream.@state === @streamErrored);
     this.@ownerReadableStream = null;
     this.@storedError = stream.@storedError;
     this.@closedPromise = Promise.reject(stream.@storedError);
@@ -78,7 +76,99 @@ function teeReadableStream(stream, shouldClone)
 {
     "use strict";
 
-    throw new @TypeError("tee is not implemented");
+    // TODO: Assert: IsReadableStream(stream) is true.
+    // TODO: Assert: Type(shouldClone) is Boolean.
+
+    let reader = stream.getReader();
+
+    let teeState = {
+        closedOrErrored: false,
+        canceled1: false,
+        canceled2: false,
+        reason1: undefined,
+        reason: undefined,
+    };
+
+    teeState.cancelPromise = new @InternalPromise(function(resolve, reject) {
+       teeState.resolvePromise = resolve;
+       teeState.rejectPromise = reject;
+    });
+
+    let pullFunction = @teeReadableStreamPullFunction(teeState, reader, shouldClone);
+
+    let underlyingSource1 = {
+        "pull": pullFunction,
+        "cancel": @teeReadableStreamBranch1CancelFunction(teeState, stream)
+    };
+
+    let underlyingSource2 = {
+        "pull": pullFunction,
+        "cancel": @teeReadableStreamBranch2CancelFunction(teeState, stream)
+    };
+
+    let branch1 = new ReadableStream(underlyingSource1);
+    let branch2 = new ReadableStream(underlyingSource2);
+
+    reader.closed.catch(function(e) {
+        if (teeState.closedOrErrored)
+            return;
+        @errorReadableStream(branch1, e);
+        @errorReadableStream(branch2, e);
+        teeState.closedOrErrored = true;
+    });
+
+    // Additional fields compared to the spec, as they are needed within pull/cancel functions.
+    teeState.branch1 = branch1;
+    teeState.branch2 = branch2;
+
+    return [branch1, branch2];
+}
+
+function teeReadableStreamPullFunction(teeState, reader, shouldClone)
+{
+    return function() {
+        reader.read().then(function(result) {
+            if (result.done && !teeState.closedOrErrored) {
+                @closeReadableStream(teeState.branch1);
+                @closeReadableStream(teeState.branch2);
+                teeState.closedOrErrored = true;
+            }
+            if (teeState.closedOrErrored)
+                return;
+            if (!teeState.canceled1) {
+                // TODO: Implement cloning if shouldClone is true
+                @enqueueInReadableStream(teeState.branch1, result.value);
+            }
+            if (!teeState.canceled2) {
+                // TODO: Implement cloning if shouldClone is true
+                @enqueueInReadableStream(teeState.branch2, result.value);
+            }
+        });
+    }
+}
+
+function teeReadableStreamBranch1CancelFunction(teeState, stream)
+{
+    return function(r) {
+        teeState.canceled1 = true;
+        teeState.reason1 = r;
+        if (teeState.canceled2) {
+            @cancelReadableStream(stream, [teeState.reason1, teeState.reason2]).then(teeState.resolvePromise, teeState.rejectPromise);
+        }
+        return teeState.cancelPromise;
+    }
+}
+
+function teeReadableStreamBranch2CancelFunction(teeState, stream)
+{
+    return function(r) {
+        teeState.canceled2 = true;
+        teeState.reason2 = r;
+        if (teeState.canceled1) {
+            @cancelReadableStream(stream, [teeState.reason1, teeState.reason2]).then(teeState.resolvePromise, teeState.rejectPromise);
+        }
+        return teeState.cancelPromise;
+    }
 }
 
 function isReadableStream(stream)
@@ -106,10 +196,10 @@ function errorReadableStream(stream, error)
 {
     "use strict";
 
-    // TODO: ASSERT(stream.@state === @readableStreamReadable);
-    stream.@queue = [];
+    // FIXME: ASSERT(stream.@state === @streamReadable);
+    stream.@queue = @newQueue();
     stream.@storedError = error;
-    stream.@state = @readableStreamErrored;
+    stream.@state = @streamErrored;
 
     if (!stream.@reader)
         return;
@@ -117,21 +207,21 @@ function errorReadableStream(stream, error)
 
     var requests = reader.@readRequests;
     for (var index = 0, length = requests.length; index < length; ++index)
-        requests[index].reject(error);
+        @rejectStreamsPromise(requests[index], error);
     reader.@readRequests = [];
 
     @releaseReadableStreamReader(reader);
     reader.@storedError = error;
-    reader.@state = @readableStreamErrored;
+    reader.@state = @streamErrored;
 
-    reader.@closedPromiseReject(error);
+    @rejectStreamsPromise(reader.@closedPromise, error);
 }
 
 function requestReadableStreamPull(stream)
 {
     "use strict";
 
-    if (stream.@state !== @readableStreamReadable)
+    if (stream.@state !== @streamReadable)
         return;
     if (stream.@closeRequested)
         return;
@@ -170,7 +260,7 @@ function getReadableStreamDesiredSize(stream)
 {
    "use strict";
 
-   return stream.@highWaterMark - stream.@queueSize;
+   return stream.@strategy.highWaterMark - stream.@queue.size;
 }
 
 function releaseReadableStreamReader(reader)
@@ -185,11 +275,11 @@ function cancelReadableStream(stream, reason)
 {
     "use strict";
 
-    if (stream.@state === @readableStreamClosed)
+    if (stream.@state === @streamClosed)
         return Promise.resolve();
-    if (stream.@state === @readableStreamErrored)
+    if (stream.@state === @streamErrored)
         return Promise.reject(stream.@storedError);
-    stream.@queue = [];
+    stream.@queue = @newQueue();
     @finishClosingReadableStream(stream);
     return @promiseInvokeOrNoop(stream.@underlyingSource, "cancel", [reason]).then(function() { });
 }
@@ -198,8 +288,8 @@ function finishClosingReadableStream(stream)
 {
     "use strict";
 
-    // TODO: ASSERT(stream.@state ===  @readableStreamReadable);
-    stream.@state = @readableStreamClosed;
+    // FIXME: ASSERT(stream.@state ===  @streamReadable);
+    stream.@state = @streamClosed;
     var reader = stream.@reader;
     if (reader)
         @closeReadableStreamReader(reader);
@@ -209,12 +299,12 @@ function closeReadableStream(stream)
 {
     "use strict";
 
-    // TODO. ASSERT(!stream.@closeRequested);
-    // TODO: ASSERT(stream.@state !== @readableStreamErrored);
-    if (stream.@state === @readableStreamClosed)
+    // FIXME: ASSERT(!stream.@closeRequested);
+    // FIXME: ASSERT(stream.@state !== @streamErrored);
+    if (stream.@state === @streamClosed)
         return; 
     stream.@closeRequested = true;
-    if (!stream.@queue.length)
+    if (!stream.@queue.content.length)
         @finishClosingReadableStream(stream);
 }
 
@@ -224,35 +314,34 @@ function closeReadableStreamReader(reader)
 
     var requests = reader.@readRequests;
     for (var index = 0, length = requests.length; index < length; ++index)
-        requests[index].resolve({value:undefined, done: true});
+        @resolveStreamsPromise(requests[index], {value:undefined, done: true});
     reader.@readRequests = [];
     @releaseReadableStreamReader(reader);
-    reader.@state = @readableStreamClosed;
-    reader.@closedPromiseResolve();
+    reader.@state = @streamClosed;
+    @resolveStreamsPromise(reader.@closedPromise);
 }
 
 function enqueueInReadableStream(stream, chunk)
 {
     "use strict";
 
-    // TODO: ASSERT(!stream.@closeRequested);
-    // TODO: ASSERT(stream.@state !== @readableStreamErrored);
-    if (stream.@state === @readableStreamClosed)
+    // FIXME: ASSERT(!stream.@closeRequested);
+    // FIXME: ASSERT(stream.@state !== @streamErrored);
+    if (stream.@state === @streamClosed)
         return undefined;
     if (@isReadableStreamLocked(stream) && stream.@reader.@readRequests.length) {
-        stream.@reader.@readRequests.shift().resolve({value: chunk, done: false});
+        @resolveStreamsPromise(stream.@reader.@readRequests.shift(), {value: chunk, done: false});
         @requestReadableStreamPull(stream);
         return;
     }
     try {
         var size = 1;
-        if (stream.@strategySize) {
-            size = Number(stream.@strategySize(chunk));
+        if (stream.@strategy.size) {
+            size = Number(stream.@strategy.size(chunk));
             if (Number.isNaN(size) || size === +Infinity || size < 0)
                 throw new RangeError("Chunk size is not valid");
         }
-        stream.@queue.push({ value: chunk, size: size });
-        stream.@queueSize += size;
+        @enqueueValueWithSize(stream.@queue, chunk, size);
     }
     catch(error) {
         @errorReadableStream(stream, error);
@@ -265,54 +354,23 @@ function readFromReadableStreamReader(reader)
 {
     "use strict";
 
-    if (reader.@state === @readableStreamClosed)
+    if (reader.@state === @streamClosed)
         return Promise.resolve({value: undefined, done: true});
-    if (reader.@state === @readableStreamErrored)
+    if (reader.@state === @streamErrored)
         return Promise.reject(reader.@storedError);
-    // TODO: ASSERT(!!reader.@ownerReadableStream);
-    // TODO: ASSERT(reader.@ownerReadableStream.@state === @readableStreamReadable);
+    // FIXME: ASSERT(!!reader.@ownerReadableStream);
+    // FIXME: ASSERT(reader.@ownerReadableStream.@state === @streamReadable);
     var stream = reader.@ownerReadableStream;
-    if (stream.@queue.length) {
-        var chunk = stream.@queue.shift();
-        stream.@queueSize -= chunk.size;
+    if (stream.@queue.content.length) {
+        var chunk = @dequeueValue(stream.@queue);
         if (!stream.@closeRequested)
             @requestReadableStreamPull(stream);
-        else if (!stream.@queue.length)
+        else if (!stream.@queue.content.length)
             @finishClosingReadableStream(stream);
-        return Promise.resolve({value: chunk.value, done: false});
+        return Promise.resolve({value: chunk, done: false});
     }
-    var readRequest = {};
-    var readPromise = new Promise(function(resolve, reject) {
-        readRequest.resolve = resolve;
-        readRequest.reject = reject;
-    });
-    reader.@readRequests.push(readRequest);
+    var readPromise = @createNewStreamsPromise();
+    reader.@readRequests.push(readPromise);
     @requestReadableStreamPull(stream);
     return readPromise;
-}
-
-function invokeOrNoop(object, key, args)
-{
-    "use strict";
-
-    var method = object[key];
-    if (typeof method === "undefined")
-        return;
-    return method.@apply(object, args);
-}
-
-function promiseInvokeOrNoop(object, key, args)
-{
-    "use strict";
-
-    try {
-        var method = object[key];
-        if (typeof method === "undefined")
-            return Promise.resolve();
-        var result = method.@apply(object, args);
-        return Promise.resolve(result);
-    }
-    catch(error) {
-        return Promise.reject(error);
-    }
 }

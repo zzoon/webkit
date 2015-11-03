@@ -45,6 +45,7 @@ class AbstractEarlyWarningSystemTest(QueuesTest):
         # Needed to define port_name, used in AbstractEarlyWarningSystem.__init__
         class TestEWS(AbstractEarlyWarningSystem):
             port_name = "win"  # Needs to be a port which port/factory understands.
+            _build_style = None
 
         ews = TestEWS()
         ews.bind_to_tool(MockTool())
@@ -67,7 +68,7 @@ class EarlyWarningSystemTest(QueuesTest):
             "build_style": ews.build_style(),
         }
         if ews.run_tests:
-            run_tests_line = "Running: webkit-patch --status-host=example.com build-and-test --no-clean --no-update --test --non-interactive --port=%(port)s%(architecture)s\n" % string_replacements
+            run_tests_line = "Running: webkit-patch --status-host=example.com build-and-test --no-clean --no-update --test --non-interactive --build-style=%(build_style)s --port=%(port)s%(architecture)s\n" % string_replacements
         else:
             run_tests_line = ""
         string_replacements['run_tests_line'] = run_tests_line

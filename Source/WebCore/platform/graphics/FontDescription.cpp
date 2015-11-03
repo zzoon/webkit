@@ -46,12 +46,12 @@ COMPILE_ASSERT(sizeof(FontCascadeDescription) == sizeof(SameSizeAsFontCascadeDes
 
 FontDescription::FontDescription()
     : m_orientation(Horizontal)
-    , m_nonCJKGlyphOrientation(NonCJKGlyphOrientationVerticalRight)
+    , m_nonCJKGlyphOrientation(static_cast<unsigned>(NonCJKGlyphOrientation::Mixed))
     , m_widthVariant(RegularWidth)
     , m_italic(FontItalicOff)
     , m_smallCaps(FontSmallCapsOff)
     , m_weight(FontWeightNormal)
-    , m_renderingMode(NormalRenderingMode)
+    , m_renderingMode(static_cast<unsigned>(FontRenderingMode::Normal))
     , m_textRendering(AutoTextRendering)
     , m_script(USCRIPT_COMMON)
     , m_fontSynthesis(FontSynthesisWeight | FontSynthesisStyle)
@@ -83,7 +83,7 @@ FontTraitsMask FontDescription::traitsMask() const
 
 FontCascadeDescription::FontCascadeDescription()
     : m_isAbsoluteSize(false)
-    , m_kerning(AutoKerning)
+    , m_kerning(static_cast<unsigned>(Kerning::Auto))
     , m_keywordSize(0)
     , m_fontSmoothing(AutoSmoothing)
     , m_isSpecifiedFont(false)

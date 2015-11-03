@@ -2997,7 +2997,18 @@ RegisterID* ArrowFuncExprNode::emitBytecode(BytecodeGenerator& generator, Regist
 {
     return generator.emitNewArrowFunctionExpression(generator.finalDestination(dst), this);
 }
-    
+
+// ------------------------------ YieldExprNode --------------------------------
+
+RegisterID* YieldExprNode::emitBytecode(BytecodeGenerator& generator, RegisterID* dst)
+{
+    // FIXME: This is just a stub. When completing ES6 Generators, we need to implement it.
+    generator.emitThrowTypeError(ASCIILiteral("Not implemented yet."));
+    if (dst == generator.ignoredResult())
+        return 0;
+    return generator.emitLoad(dst, jsUndefined());
+}
+
 #if ENABLE(ES6_CLASS_SYNTAX)
 // ------------------------------ ClassDeclNode ---------------------------------
 
@@ -3010,6 +3021,9 @@ void ClassDeclNode::emitBytecode(BytecodeGenerator& generator, RegisterID* dst)
 
 RegisterID* ClassExprNode::emitBytecode(BytecodeGenerator& generator, RegisterID* dst)
 {
+    if (!m_name.isNull())
+        generator.pushLexicalScope(this, true);
+
     RefPtr<RegisterID> superclass;
     if (m_classHeritage) {
         superclass = generator.newTemporary();
@@ -3073,6 +3087,14 @@ RegisterID* ClassExprNode::emitBytecode(BytecodeGenerator& generator, RegisterID
 
     if (m_instanceMethods)
         generator.emitNode(prototype.get(), m_instanceMethods);
+
+    if (!m_name.isNull()) {
+        Variable classNameVar = generator.variable(m_name);
+        RELEASE_ASSERT(classNameVar.isResolved());
+        RefPtr<RegisterID> scope = generator.emitResolveScope(nullptr, classNameVar);
+        generator.emitPutToScope(scope.get(), classNameVar, constructor.get(), ThrowIfNotFound, Initialization);
+        generator.popLexicalScope(this);
+    }
 
     return generator.moveToDestinationIfNeeded(dst, constructor.get());
 }

@@ -1353,79 +1353,7 @@ static void putAccessorByVal(ExecState* exec, JSObject* base, JSValue subscript,
         base->putSetter(exec, propertyKey, accessor, attribute);
 }
 
-#if USE(JSVALUE64)
-void JIT_OPERATION operationPutGetterById(ExecState* exec, EncodedJSValue encodedObjectValue, Identifier* identifier, int32_t options, EncodedJSValue encodedGetterValue)
-{
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-
-    ASSERT(JSValue::decode(encodedObjectValue).isObject());
-    JSObject* baseObj = asObject(JSValue::decode(encodedObjectValue));
-
-    JSValue getter = JSValue::decode(encodedGetterValue);
-    ASSERT(getter.isObject());
-    baseObj->putGetter(exec, *identifier, asObject(getter), options);
-}
-
-void JIT_OPERATION operationPutSetterById(ExecState* exec, EncodedJSValue encodedObjectValue, Identifier* identifier, int32_t options, EncodedJSValue encodedSetterValue)
-{
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-
-    ASSERT(JSValue::decode(encodedObjectValue).isObject());
-    JSObject* baseObj = asObject(JSValue::decode(encodedObjectValue));
-
-    JSValue setter = JSValue::decode(encodedSetterValue);
-    ASSERT(setter.isObject());
-    baseObj->putSetter(exec, *identifier, asObject(setter), options);
-}
-
-void JIT_OPERATION operationPutGetterSetter(ExecState* exec, EncodedJSValue encodedObjectValue, Identifier* identifier, int32_t attribute,
-    EncodedJSValue encodedGetterValue, EncodedJSValue encodedSetterValue)
-{
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-
-    ASSERT(JSValue::decode(encodedObjectValue).isObject());
-    JSObject* baseObj = asObject(JSValue::decode(encodedObjectValue));
-
-    GetterSetter* accessor = GetterSetter::create(vm, exec->lexicalGlobalObject());
-
-    JSValue getter = JSValue::decode(encodedGetterValue);
-    JSValue setter = JSValue::decode(encodedSetterValue);
-    ASSERT(getter.isObject() || getter.isUndefined());
-    ASSERT(setter.isObject() || setter.isUndefined());
-    ASSERT(getter.isObject() || setter.isObject());
-
-    if (!getter.isUndefined())
-        accessor->setGetter(vm, exec->lexicalGlobalObject(), asObject(getter));
-    if (!setter.isUndefined())
-        accessor->setSetter(vm, exec->lexicalGlobalObject(), asObject(setter));
-    baseObj->putDirectAccessor(exec, *identifier, accessor, attribute);
-}
-
-void JIT_OPERATION operationPutGetterByVal(ExecState* exec, EncodedJSValue encodedBase, EncodedJSValue encodedSubscript, int32_t attribute, EncodedJSValue encodedGetter)
-{
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-    JSObject* base = asObject(JSValue::decode(encodedBase));
-    JSValue subscript = JSValue::decode(encodedSubscript);
-    JSObject* getter = asObject(JSValue::decode(encodedGetter));
-    putAccessorByVal(exec, base, subscript, attribute, getter, AccessorType::Getter);
-}
-
-void JIT_OPERATION operationPutSetterByVal(ExecState* exec, EncodedJSValue encodedBase, EncodedJSValue encodedSubscript, int32_t attribute, EncodedJSValue encodedSetter)
-{
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-    JSObject* base = asObject(JSValue::decode(encodedBase));
-    JSValue subscript = JSValue::decode(encodedSubscript);
-    JSObject* setter = asObject(JSValue::decode(encodedSetter));
-    putAccessorByVal(exec, base, subscript, attribute, setter, AccessorType::Setter);
-}
-
-#else
-void JIT_OPERATION operationPutGetterById(ExecState* exec, JSCell* object, Identifier* identifier, int32_t options, JSCell* getter)
+void JIT_OPERATION operationPutGetterById(ExecState* exec, JSCell* object, UniquedStringImpl* uid, int32_t options, JSCell* getter)
 {
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
@@ -1434,10 +1362,10 @@ void JIT_OPERATION operationPutGetterById(ExecState* exec, JSCell* object, Ident
     JSObject* baseObj = object->getObject();
 
     ASSERT(getter->isObject());
-    baseObj->putGetter(exec, *identifier, getter, options);
+    baseObj->putGetter(exec, uid, getter, options);
 }
 
-void JIT_OPERATION operationPutSetterById(ExecState* exec, JSCell* object, Identifier* identifier, int32_t options, JSCell* setter)
+void JIT_OPERATION operationPutSetterById(ExecState* exec, JSCell* object, UniquedStringImpl* uid, int32_t options, JSCell* setter)
 {
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
@@ -1446,28 +1374,7 @@ void JIT_OPERATION operationPutSetterById(ExecState* exec, JSCell* object, Ident
     JSObject* baseObj = object->getObject();
 
     ASSERT(setter->isObject());
-    baseObj->putSetter(exec, *identifier, setter, options);
-}
-
-void JIT_OPERATION operationPutGetterSetter(ExecState* exec, JSCell* object, Identifier* identifier, int32_t attribute, JSCell* getter, JSCell* setter)
-{
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-
-    ASSERT(object && object->isObject());
-    JSObject* baseObj = object->getObject();
-
-    GetterSetter* accessor = GetterSetter::create(vm, exec->lexicalGlobalObject());
-
-    ASSERT(!getter || getter->isObject());
-    ASSERT(!setter || setter->isObject());
-    ASSERT(getter || setter);
-
-    if (getter)
-        accessor->setGetter(vm, exec->lexicalGlobalObject(), getter->getObject());
-    if (setter)
-        accessor->setSetter(vm, exec->lexicalGlobalObject(), setter->getObject());
-    baseObj->putDirectAccessor(exec, *identifier, accessor, attribute);
+    baseObj->putSetter(exec, uid, setter, options);
 }
 
 void JIT_OPERATION operationPutGetterByVal(ExecState* exec, JSCell* base, EncodedJSValue encodedSubscript, int32_t attribute, JSCell* getter)
@@ -1486,6 +1393,51 @@ void JIT_OPERATION operationPutSetterByVal(ExecState* exec, JSCell* base, Encode
     putAccessorByVal(exec, asObject(base), JSValue::decode(encodedSubscript), attribute, asObject(setter), AccessorType::Setter);
 }
 
+#if USE(JSVALUE64)
+void JIT_OPERATION operationPutGetterSetter(ExecState* exec, JSCell* object, UniquedStringImpl* uid, int32_t attribute, EncodedJSValue encodedGetterValue, EncodedJSValue encodedSetterValue)
+{
+    VM& vm = exec->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+
+    ASSERT(object && object->isObject());
+    JSObject* baseObj = asObject(object);
+
+    GetterSetter* accessor = GetterSetter::create(vm, exec->lexicalGlobalObject());
+
+    JSValue getter = JSValue::decode(encodedGetterValue);
+    JSValue setter = JSValue::decode(encodedSetterValue);
+    ASSERT(getter.isObject() || getter.isUndefined());
+    ASSERT(setter.isObject() || setter.isUndefined());
+    ASSERT(getter.isObject() || setter.isObject());
+
+    if (!getter.isUndefined())
+        accessor->setGetter(vm, exec->lexicalGlobalObject(), asObject(getter));
+    if (!setter.isUndefined())
+        accessor->setSetter(vm, exec->lexicalGlobalObject(), asObject(setter));
+    baseObj->putDirectAccessor(exec, uid, accessor, attribute);
+}
+
+#else
+void JIT_OPERATION operationPutGetterSetter(ExecState* exec, JSCell* object, UniquedStringImpl* uid, int32_t attribute, JSCell* getter, JSCell* setter)
+{
+    VM& vm = exec->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+
+    ASSERT(object && object->isObject());
+    JSObject* baseObj = asObject(object);
+
+    GetterSetter* accessor = GetterSetter::create(vm, exec->lexicalGlobalObject());
+
+    ASSERT(!getter || getter->isObject());
+    ASSERT(!setter || setter->isObject());
+    ASSERT(getter || setter);
+
+    if (getter)
+        accessor->setGetter(vm, exec->lexicalGlobalObject(), getter->getObject());
+    if (setter)
+        accessor->setSetter(vm, exec->lexicalGlobalObject(), setter->getObject());
+    baseObj->putDirectAccessor(exec, uid, accessor, attribute);
+}
 #endif
 
 void JIT_OPERATION operationPopScope(ExecState* exec, int32_t scopeReg)
@@ -2183,7 +2135,7 @@ asm (
 ".globl " SYMBOL_STRING(getHostCallReturnValue) "\n"
 HIDE_SYMBOL(getHostCallReturnValue) "\n"
 SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
-    "mov %rbp, %rdi\n"
+    "lea -8(%rsp), %rdi\n"
     "jmp " LOCAL_REFERENCE(getHostCallReturnValueWithExecState) "\n"
 );
 
@@ -2194,8 +2146,9 @@ asm (
 HIDE_SYMBOL(getHostCallReturnValue) "\n"
 SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
     "push %ebp\n"
+    "mov %esp, %eax\n"
     "leal -4(%esp), %esp\n"
-    "push %ebp\n"
+    "push %eax\n"
     "call " LOCAL_REFERENCE(getHostCallReturnValueWithExecState) "\n"
     "leal 8(%esp), %esp\n"
     "pop %ebp\n"
@@ -2211,7 +2164,7 @@ HIDE_SYMBOL(getHostCallReturnValue) "\n"
 ".thumb" "\n"
 ".thumb_func " THUMB_FUNC_PARAM(getHostCallReturnValue) "\n"
 SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
-    "mov r0, r7" "\n"
+    "sub r0, sp, #8" "\n"
     "b " LOCAL_REFERENCE(getHostCallReturnValueWithExecState) "\n"
 );
 
@@ -2222,7 +2175,7 @@ asm (
 HIDE_SYMBOL(getHostCallReturnValue) "\n"
 INLINE_ARM_FUNCTION(getHostCallReturnValue)
 SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
-    "mov r0, r11" "\n"
+    "sub r0, sp, #8" "\n"
     "b " LOCAL_REFERENCE(getHostCallReturnValueWithExecState) "\n"
 );
 
@@ -2233,7 +2186,7 @@ asm (
 ".globl " SYMBOL_STRING(getHostCallReturnValue) "\n"
 HIDE_SYMBOL(getHostCallReturnValue) "\n"
 SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
-     "mov x0, x29" "\n"
+     "sub x0, sp, #16" "\n"
      "b " LOCAL_REFERENCE(getHostCallReturnValueWithExecState) "\n"
 );
 
@@ -2255,7 +2208,7 @@ asm (
 HIDE_SYMBOL(getHostCallReturnValue) "\n"
 SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
     LOAD_FUNCTION_TO_T9(getHostCallReturnValueWithExecState)
-    "move $a0, $fp" "\n"
+    "subi $a0, $sp, 8" "\n"
     "b " LOCAL_REFERENCE(getHostCallReturnValueWithExecState) "\n"
 );
 
@@ -2268,7 +2221,8 @@ asm (
 ".globl " SYMBOL_STRING(getHostCallReturnValue) "\n"
 HIDE_SYMBOL(getHostCallReturnValue) "\n"
 SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
-    "mov r14, r4" "\n"
+    "mov r15, r4" "\n"
+    "add -8, r4" "\n"
     "mov.l 2f, " SH4_SCRATCH_REGISTER "\n"
     "braf " SH4_SCRATCH_REGISTER "\n"
     "nop" "\n"
@@ -2280,7 +2234,8 @@ SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
 extern "C" {
     __declspec(naked) EncodedJSValue HOST_CALL_RETURN_VALUE_OPTION getHostCallReturnValue()
     {
-        __asm mov [esp + 4], ebp;
+        __asm lea eax, [esp - 4]
+        __asm mov [esp + 4], eax;
         __asm jmp getHostCallReturnValueWithExecState
     }
 }

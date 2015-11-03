@@ -34,6 +34,10 @@
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
+
+class IDBError;
+class IDBResultData;
+
 namespace IDBServer {
 
 class IDBConnectionToClient;
@@ -44,14 +48,27 @@ class UniqueIDBDatabaseConnection : public RefCounted<UniqueIDBDatabaseConnectio
 public:
     static Ref<UniqueIDBDatabaseConnection> create(UniqueIDBDatabase&, IDBConnectionToClient&);
 
+    ~UniqueIDBDatabaseConnection();
+
     uint64_t identifier() const { return m_identifier; }
     UniqueIDBDatabase& database() { return m_database; }
     IDBConnectionToClient& connectionToClient() { return m_connectionToClient; }
 
+    void connectionClosedFromClient();
+
     bool closePending() const { return m_closePending; }
 
+    bool hasNonFinishedTransactions() const;
+
     void fireVersionChangeEvent(uint64_t requestedVersion);
-    Ref<UniqueIDBDatabaseTransaction> createVersionChangeTransaction(uint64_t newVersion);
+    UniqueIDBDatabaseTransaction& createVersionChangeTransaction(uint64_t newVersion);
+
+    void establishTransaction(const IDBTransactionInfo&);
+    void didAbortTransaction(UniqueIDBDatabaseTransaction&, const IDBError&);
+    void didCommitTransaction(UniqueIDBDatabaseTransaction&, const IDBError&);
+    void didCreateObjectStore(const IDBResultData&);
+    void didDeleteObjectStore(const IDBResultData&);
+    void didClearObjectStore(const IDBResultData&);
 
 private:
     UniqueIDBDatabaseConnection(UniqueIDBDatabase&, IDBConnectionToClient&);

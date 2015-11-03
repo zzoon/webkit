@@ -57,6 +57,7 @@ namespace WebCore {
     macro(beforeload) \
     macro(beforepaste) \
     macro(beforeunload) \
+    macro(beginEvent) \
     macro(blocked) \
     macro(blur) \
     macro(boundary) \
@@ -95,6 +96,7 @@ namespace WebCore {
     macro(durationchange) \
     macro(emptied) \
     macro(end) \
+    macro(endEvent) \
     macro(ended) \
     macro(enter) \
     macro(error) \

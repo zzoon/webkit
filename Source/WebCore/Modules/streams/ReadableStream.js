@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2015 Canon Inc.
+ * Copyright (C) 2015 Igalia.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,7 +24,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// @optional=STREAMS_API
+// @conditional=ENABLE(STREAMS_API)
 
 function initializeReadableStream(underlyingSource, strategy)
 {
@@ -42,9 +43,8 @@ function initializeReadableStream(underlyingSource, strategy)
 
     this.@underlyingSource = underlyingSource;
 
-    this.@queue = [];
-    this.@queueSize = 0;
-    this.@state = @readableStreamReadable;
+    this.@queue = @newQueue();
+    this.@state = @streamReadable;
     this.@started = false;
     this.@closeRequested = false;
     this.@pullAgain = false;
@@ -52,13 +52,7 @@ function initializeReadableStream(underlyingSource, strategy)
     this.@reader = undefined;
     this.@storedError = undefined;
     this.@controller = new @ReadableStreamController(this);
-    this.@strategySize = strategy.size;
-    this.@highWaterMark = Number(strategy.highWaterMark);
-
-    if (Number.isNaN(this.@highWaterMark))
-        throw new TypeError("highWaterMark parameter is not correct");
-    if (this.@highWaterMark < 0)
-        throw new RangeError("highWaterMark is negative");
+    this.@strategy = @validateAndNormalizeQueuingStrategy(strategy.size, strategy.highWaterMark);
 
     var result = @invokeOrNoop(underlyingSource, "start", [this.@controller]);
     var _this = this;
@@ -66,7 +60,7 @@ function initializeReadableStream(underlyingSource, strategy)
         _this.@started = true;
         @requestReadableStreamPull(_this);
     }, function(error) {
-        if (_this.@state === @readableStreamReadable)
+        if (_this.@state === @streamReadable)
             @errorReadableStream(_this, error);
     });
 
@@ -121,7 +115,7 @@ function tee()
     if (!@isReadableStream(this))
         throw new @TypeError("Function should be called on a ReadableStream");
 
-    throw new @TypeError("tee is not implemented");
+    return @teeReadableStream(this, false);
 }
 
 function locked()

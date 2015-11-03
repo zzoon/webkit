@@ -1,3 +1,150 @@
+2015-11-02  Philippe Normand  <pnormand@igalia.com>
+
+        [Mac][GTK] Disable Ninja response file support
+        https://bugs.webkit.org/show_bug.cgi?id=150801
+
+        Reviewed by Alex Christensen.
+
+        * Source/cmake/OptionsCommon.cmake: The OSX toolchain doesn't
+        support response files, so instruct Ninja to not generate those.
+
+2015-11-02  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Fix the FTL JIT build with system LLVM on Linux
+        https://bugs.webkit.org/show_bug.cgi?id=150795
+
+        Reviewed by Filip Pizlo.
+
+        * Source/cmake/FindLLVM.cmake:
+
+2015-11-02  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Bump GTK+ versions numbers.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2015-11-01  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [ES6] Support Generator Syntax
+        https://bugs.webkit.org/show_bug.cgi?id=150769
+
+        Reviewed by Geoffrey Garen.
+
+        Added ENABLE_ES6_GENERATORS flag.
+
+        * Source/cmake/OptionsWin.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+
+2015-10-30  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Add Shadow DOM feature
+        https://bugs.webkit.org/show_bug.cgi?id=150611
+
+        Reviewed by Csaba Osztrogonác.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/WebKitFeatures.cmake: Add ENABLE_SHADOW_DOM cmake variable.
+
+2015-10-29  Alex Christensen  <achristensen@webkit.org>
+
+        Fix Mac CMake build
+        https://bugs.webkit.org/show_bug.cgi?id=150686
+
+        Reviewed by Filip Pizlo.
+
+        * Source/cmake/WebKitMacros.cmake:
+
+2015-10-28  Alex Christensen  <achristensen@webkit.org>
+
+        Compile and link with CMake on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=150632
+
+        Reviewed by Tim Horton.
+
+        * Source/cmake/OptionsMac.cmake:
+
+2015-10-26  Dana Burkart  <dburkart@apple.com>
+
+        `make analyze` should build using the debug configuration
+        https://bugs.webkit.org/show_bug.cgi?id=150571
+
+        Reviewed by Lucas Forschler.
+
+        * Makefile.shared:
+
+2015-10-26  Philippe Normand  <pnormand@igalia.com>
+
+        Unreviewed, rolling out r191576.
+
+        broke the http/tests/media tests
+
+        Reverted changeset:
+
+        "[GStreamer] Bump internal jhbuild versions to 1.6.0"
+        https://bugs.webkit.org/show_bug.cgi?id=149594
+        http://trac.webkit.org/changeset/191576
+
+2015-10-26  ChangSeok Oh  <changseok.oh@collabora.com>
+
+        [GStreamer] Bump internal jhbuild versions to 1.6.0
+        https://bugs.webkit.org/show_bug.cgi?id=149594
+
+        Reviewed by Philippe Normand.
+
+        Bump up the minimum reqirement version of gstreamer-gl to 1.6.0.
+
+        * Source/cmake/FindGStreamer.cmake:
+
+2015-10-22  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK][Mac] ICU-related build fixes
+        https://bugs.webkit.org/show_bug.cgi?id=150032
+
+        Rubber-stamped by Darin Adler.
+
+        * Source/cmake/FindICU.cmake: Use pkg-config to hint at icu-i18n's library location.
+
+2015-10-20  Yoav Weiss  <yoav@yoav.ws>
+
+        Rename the PICTURE_SIZES flag to CURRENTSRC
+        https://bugs.webkit.org/show_bug.cgi?id=150275
+
+        Reviewed by Dean Jackson.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/OptionsWin.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+
+2015-10-14  Tomas Popela  <tpopela@redhat.com>
+
+        [GTK][EFL] Fix build with cmake 3.4
+        https://bugs.webkit.org/show_bug.cgi?id=150117
+
+        Explicitely include the CheckIncludeFiles module before using
+        the CHECK_INCLUDE_FILES command.
+
+        Reviewed by Žan Doberšek.
+
+        * Source/cmake/FindOpenGL.cmake:
+        * Source/cmake/FindWebP.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+
+2015-10-13  Dean Jackson  <dino@apple.com>
+
+        Device motion and orientation should only be visible from the main frame's security origin
+        https://bugs.webkit.org/show_bug.cgi?id=150072
+        <rdar://problem/23082036>
+
+        Reviewed by Brent Fulgham.
+
+        Add a manual test for cross-origin device orientation events, while
+        we're waiting on the mock client to be supported everywhere.
+
+        * ManualTests/deviceorientation-child-frame.html: Added.
+        * ManualTests/deviceorientation-main-frame-only.html: Added.
+
 2015-10-12  Philip Chimento  <philip.chimento@gmail.com>
 
         [GTK] OSX linker doesn't understand --whole-archive

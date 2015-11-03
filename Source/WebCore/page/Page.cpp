@@ -50,7 +50,6 @@
 #include "HTMLElement.h"
 #include "HistoryController.h"
 #include "HistoryItem.h"
-#include "IDBConnectionToServer.h"
 #include "InspectorController.h"
 #include "InspectorInstrumentation.h"
 #include "Logging.h"
@@ -74,6 +73,7 @@
 #include "RenderTheme.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
+#include "ResourceUsageOverlay.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
 #include "ScriptController.h"
@@ -115,6 +115,7 @@
 #endif
 
 #if ENABLE(INDEXED_DATABASE)
+#include "IDBConnectionToServer.h"
 #include "InProcessIDBServer.h"
 #endif
 
@@ -247,6 +248,10 @@ Page::Page(PageConfiguration& pageConfiguration)
 
 #if ENABLE(REMOTE_INSPECTOR)
     m_inspectorDebuggable->init();
+#endif
+
+#if PLATFORM(COCOA)
+    platformInitialize();
 #endif
 }
 
@@ -1775,6 +1780,19 @@ IDBClient::IDBConnectionToServer& Page::idbConnection()
     }
     
     return *m_idbIDBConnectionToServer;
+}
+#endif
+
+#if ENABLE(RESOURCE_USAGE_OVERLAY)
+void Page::setResourceUsageOverlayVisible(bool visible)
+{
+    if (!visible) {
+        m_resourceUsageOverlay = nullptr;
+        return;
+    }
+
+    if (!m_resourceUsageOverlay)
+        m_resourceUsageOverlay = std::make_unique<ResourceUsageOverlay>(*this);
 }
 #endif
 

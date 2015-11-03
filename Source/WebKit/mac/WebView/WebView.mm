@@ -243,6 +243,7 @@
 #import "WebStorageManagerPrivate.h"
 #import "WebUIKitSupport.h"
 #import "WebVisiblePosition.h"
+#import <WebCore/DynamicLinkerSPI.h>
 #import <WebCore/EventNames.h>
 #import <WebCore/FontCache.h>
 #import <WebCore/GraphicsLayer.h>
@@ -250,6 +251,7 @@
 #import <WebCore/LegacyTileCache.h>
 #import <WebCore/MobileGestaltSPI.h>
 #import <WebCore/NetworkStateNotifier.h>
+#import <WebCore/PlatformScreen.h>
 #import <WebCore/RuntimeApplicationChecksIOS.h>
 #import <WebCore/SQLiteDatabaseTracker.h>
 #import <WebCore/SmartReplace.h>
@@ -624,8 +626,6 @@ NSString * const WebViewWillCloseNotification = @"WebViewWillCloseNotification";
 NSString *_WebViewRemoteInspectorHasSessionChangedNotification = @"_WebViewRemoteInspectorHasSessionChangedNotification";
 #endif
 
-NSString *WebKitKerningAndLigaturesEnabledByDefaultDefaultsKey = @"WebKitKerningAndLigaturesEnabledByDefault";
-
 @interface WebProgressItem : NSObject
 {
 @public
@@ -852,7 +852,7 @@ static bool shouldAllowDisplayAndRunningOfInsecureContent()
 static bool shouldAllowPictureInPictureMediaPlayback()
 {
 #if PLATFORM(IOS)
-    static bool shouldAllowPictureInPictureMediaPlayback = iosExecutableWasLinkedOnOrAfterVersion(wkIOSSystemVersion_9_0);
+    static bool shouldAllowPictureInPictureMediaPlayback = dyld_get_program_sdk_version() >= DYLD_IOS_VERSION_9_0;
     return shouldAllowPictureInPictureMediaPlayback;
 #else
     return false;
@@ -3871,7 +3871,7 @@ static inline IMP getMethod(id o, SEL s)
 
 - (void)_setBaseCTM:(CGAffineTransform)transform forContext:(CGContextRef)context
 {
-    WKSetBaseCTM(context, transform);
+    CGContextSetBaseCTM(context, transform);
 }
 
 - (BOOL)interactiveFormValidationEnabled
@@ -4696,21 +4696,15 @@ static Vector<String> toStringVector(NSArray* patterns)
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_cacheModelChangedNotification:) name:WebPreferencesCacheModelChangedInternalNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_preferencesRemovedNotification:) name:WebPreferencesRemovedNotification object:nil];
 
-    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
-    [defaults registerDefaults:[NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:WebKitKerningAndLigaturesEnabledByDefaultDefaultsKey]];
-
 #if PLATFORM(IOS)
     continuousSpellCheckingEnabled = NO;
-#endif
 
-#if !PLATFORM(IOS)
+#else
+
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
     continuousSpellCheckingEnabled = [defaults boolForKey:WebContinuousSpellCheckingEnabled];
     grammarCheckingEnabled = [defaults boolForKey:WebGrammarCheckingEnabled];
-#endif
 
-    FontCascade::setDefaultTypesettingFeatures([defaults boolForKey:WebKitKerningAndLigaturesEnabledByDefaultDefaultsKey] ? Kerning | Ligatures : 0);
-
-#if !PLATFORM(IOS)
     automaticQuoteSubstitutionEnabled = [self _shouldAutomaticQuoteSubstitutionBeEnabled];
     automaticLinkDetectionEnabled = [defaults boolForKey:WebAutomaticLinkDetectionEnabled];
     automaticDashSubstitutionEnabled = [self _shouldAutomaticDashSubstitutionBeEnabled];
@@ -5406,7 +5400,7 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     if (WAKWindow *window = [self window])
         scaleFactor = [window screenScale];
     else
-        scaleFactor = WKGetScreenScaleFactor();
+        scaleFactor = screenScaleFactor();
 
     _private->page->setDeviceScaleFactor(scaleFactor);
 }

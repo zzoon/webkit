@@ -508,6 +508,7 @@ static EncodedJSValue JSC_HOST_CALL functionJSCStack(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionGCAndSweep(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionFullGC(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionEdenGC(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionForceGCSlowPaths(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionHeapSize(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionAddressOf(ExecState*);
 #ifndef NDEBUG
@@ -526,6 +527,7 @@ static EncodedJSValue JSC_HOST_CALL functionOptimizeNextInvocation(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionNumberOfDFGCompiles(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionReoptimizationRetryCount(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionTransferArrayBuffer(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionFailNextNewCodeBlock(ExecState*);
 static NO_RETURN_WITH_VALUE EncodedJSValue JSC_HOST_CALL functionQuit(ExecState*);
 static NO_RETURN_DUE_TO_CRASH EncodedJSValue JSC_HOST_CALL functionAbort(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionFalse1(ExecState*);
@@ -667,6 +669,7 @@ protected:
         addFunction(vm, "gc", functionGCAndSweep, 0);
         addFunction(vm, "fullGC", functionFullGC, 0);
         addFunction(vm, "edenGC", functionEdenGC, 0);
+        addFunction(vm, "forceGCSlowPaths", functionForceGCSlowPaths, 0);
         addFunction(vm, "gcHeapSize", functionHeapSize, 0);
         addFunction(vm, "addressOf", functionAddressOf, 1);
 #ifndef NDEBUG
@@ -687,6 +690,7 @@ protected:
         addFunction(vm, "optimizeNextInvocation", functionOptimizeNextInvocation, 1);
         addFunction(vm, "reoptimizationRetryCount", functionReoptimizationRetryCount, 1);
         addFunction(vm, "transferArrayBuffer", functionTransferArrayBuffer, 1);
+        addFunction(vm, "failNextNewCodeBlock", functionFailNextNewCodeBlock, 1);
 #if ENABLE(SAMPLING_FLAGS)
         addFunction(vm, "setSamplingFlags", functionSetSamplingFlags, 1);
         addFunction(vm, "clearSamplingFlags", functionClearSamplingFlags, 1);
@@ -1184,6 +1188,14 @@ EncodedJSValue JSC_HOST_CALL functionEdenGC(ExecState* exec)
     return JSValue::encode(jsNumber(exec->heap()->sizeAfterLastEdenCollection()));
 }
 
+EncodedJSValue JSC_HOST_CALL functionForceGCSlowPaths(ExecState*)
+{
+    // It's best for this to be the first thing called in the 
+    // JS program so the option is set to true before we JIT.
+    Options::forceGCSlowPaths() = true;
+    return JSValue::encode(jsUndefined());
+}
+
 EncodedJSValue JSC_HOST_CALL functionHeapSize(ExecState* exec)
 {
     JSLockHolder lock(exec);
@@ -1375,6 +1387,12 @@ EncodedJSValue JSC_HOST_CALL functionTransferArrayBuffer(ExecState* exec)
     return JSValue::encode(jsUndefined());
 }
 
+EncodedJSValue JSC_HOST_CALL functionFailNextNewCodeBlock(ExecState* exec)
+{
+    exec->vm().setFailNextNewCodeBlock();
+    return JSValue::encode(jsUndefined());
+}
+
 EncodedJSValue JSC_HOST_CALL functionQuit(ExecState*)
 {
     jscExit(EXIT_SUCCESS);
@@ -1489,7 +1507,7 @@ EncodedJSValue JSC_HOST_CALL functionHasBasicBlockExecuted(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL functionEnableExceptionFuzz(ExecState*)
 {
-    Options::enableExceptionFuzz() = true;
+    Options::useExceptionFuzz() = true;
     return JSValue::encode(jsUndefined());
 }
 
@@ -1962,13 +1980,13 @@ int jscmain(int argc, char** argv)
         }
         
 #if ENABLE(JIT)
-        if (Options::enableExceptionFuzz())
+        if (Options::useExceptionFuzz())
             printf("JSC EXCEPTION FUZZ: encountered %u checks.\n", numberOfExceptionFuzzChecks());
         bool fireAtEnabled =
             Options::fireExecutableAllocationFuzzAt() || Options::fireExecutableAllocationFuzzAtOrAfter();
-        if (Options::enableExecutableAllocationFuzz() && (!fireAtEnabled || Options::verboseExecutableAllocationFuzz()))
+        if (Options::useExecutableAllocationFuzz() && (!fireAtEnabled || Options::verboseExecutableAllocationFuzz()))
             printf("JSC EXECUTABLE ALLOCATION FUZZ: encountered %u checks.\n", numberOfExecutableAllocationFuzzChecks());
-        if (Options::enableOSRExitFuzz()) {
+        if (Options::useOSRExitFuzz()) {
             printf("JSC OSR EXIT FUZZ: encountered %u static checks.\n", numberOfStaticOSRExitFuzzChecks());
             printf("JSC OSR EXIT FUZZ: encountered %u dynamic checks.\n", numberOfOSRExitFuzzChecks());
         }

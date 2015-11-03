@@ -32,16 +32,88 @@
 
 namespace WebCore {
 
-static const std::pair<String, String>& idbExceptionEntry(IDBExceptionCode code)
+static const String& idbErrorName(IDBExceptionCode code)
 {
-    NeverDestroyed<Vector<std::pair<String, String>>> entries;
-    if (entries.get().isEmpty()) {
-        entries.get().append(std::make_pair<String, String>(
-            ASCIILiteral("UnknownError"),
-            ASCIILiteral("Operation failed for reasons unrelated to the database itself and not covered by any other errors.")));
+    switch (code) {
+    case IDBExceptionCode::Unknown: {
+        static NeverDestroyed<String> entry = ASCIILiteral("UnknownError");
+        return entry;
+    }
+    case IDBExceptionCode::ConstraintError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("ConstraintError");
+        return entry;
+    }
+    case IDBExceptionCode::VersionError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("VersionError");
+        return entry;
+    }
+    case IDBExceptionCode::InvalidStateError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("InvalidStateError");
+        return entry;
+    }
+    case IDBExceptionCode::DataError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("DataError");
+        return entry;
+    }
+    case IDBExceptionCode::TransactionInactiveError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("TransactionInactiveError");
+        return entry;
+    }
+    case IDBExceptionCode::ReadOnlyError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("ReadOnlyError");
+        return entry;
+    }
+    case IDBExceptionCode::DataCloneError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("DataCloneError");
+        return entry;
+    }
+    case IDBExceptionCode::None:
+        RELEASE_ASSERT_NOT_REACHED();
     }
 
-    return entries.get()[(int)code - 1];
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+static const String& idbErrorDescription(IDBExceptionCode code)
+{
+    switch (code) {
+    case IDBExceptionCode::Unknown: {
+        static NeverDestroyed<String> entry = ASCIILiteral("Operation failed for reasons unrelated to the database itself and not covered by any other errors.");
+        return entry.get();
+    }
+    case IDBExceptionCode::ConstraintError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("Mutation operation in the transaction failed because a constraint was not satisfied.");
+        return entry.get();
+    }
+    case IDBExceptionCode::VersionError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("An attempt was made to open a database using a lower version than the existing version.");
+        return entry.get();
+    }
+    case IDBExceptionCode::InvalidStateError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("Operation was called on an object on which it is not allowed or at a time when it is not allowed.");
+        return entry;
+    }
+    case IDBExceptionCode::DataError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("Data provided to an operation does not meet requirements.");
+        return entry;
+    }
+    case IDBExceptionCode::TransactionInactiveError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("Request was placed against a transaction which is currently not active, or which is finished.");
+        return entry;
+    }
+    case IDBExceptionCode::ReadOnlyError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("A mutating operation was attempted in a \"readonly\" transaction.");
+        return entry;
+    }
+    case IDBExceptionCode::DataCloneError: {
+        static NeverDestroyed<String> entry = ASCIILiteral("Data being stored could not be cloned by the structured cloning algorithm.");
+        return entry;
+    }
+    case IDBExceptionCode::None:
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 IDBError::IDBError(IDBExceptionCode code)
@@ -55,6 +127,11 @@ IDBError::IDBError(IDBExceptionCode code, const String& message)
 {
 }
 
+IDBError IDBError::isolatedCopy() const
+{
+    return { m_code, m_message.isolatedCopy() };
+}
+
 IDBError& IDBError::operator=(const IDBError& other)
 {
     m_code = other.m_code;
@@ -64,7 +141,7 @@ IDBError& IDBError::operator=(const IDBError& other)
 
 const String& IDBError::name() const
 {
-    return idbExceptionEntry(m_code).first;
+    return idbErrorName(m_code);
 }
 
 const String& IDBError::message() const
@@ -72,7 +149,7 @@ const String& IDBError::message() const
     if (!m_message.isEmpty())
         return m_message;
 
-    return idbExceptionEntry(m_code).second;
+    return idbErrorDescription(m_code);
 }
 
 } // namespace WebCore

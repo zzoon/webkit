@@ -74,6 +74,7 @@ list(APPEND WebCore_SOURCES
     loader/soup/CachedRawResourceSoup.cpp
     loader/soup/SubresourceLoaderSoup.cpp
 
+    platform/KillRingNone.cpp
     platform/PlatformStrategies.cpp
 
     platform/audio/gstreamer/AudioDestinationGStreamer.cpp
@@ -162,8 +163,8 @@ list(APPEND WebCore_SOURCES
     platform/gtk/LanguageGtk.cpp
     platform/gtk/LoggingGtk.cpp
     platform/gtk/MIMETypeRegistryGtk.cpp
+    platform/gtk/MainThreadSharedTimerGtk.cpp
     platform/gtk/SharedBufferGtk.cpp
-    platform/gtk/SharedTimerGtk.cpp
     platform/gtk/TemporaryLinkStubs.cpp
     platform/gtk/UserAgentGtk.cpp
 
@@ -216,6 +217,7 @@ list(APPEND WebCore_SOURCES
     platform/soup/SharedBufferSoup.cpp
     platform/soup/URLSoup.cpp
 
+    platform/text/Hyphenation.cpp
     platform/text/LocaleICU.cpp
 
     platform/text/enchant/TextCheckerEnchant.cpp
@@ -416,12 +418,17 @@ if (USE_TEXTURE_MAPPER)
     )
     list(APPEND WebCore_SOURCES
         platform/graphics/texmap/BitmapTexture.cpp
-        platform/graphics/texmap/BitmapTextureGL.cpp
         platform/graphics/texmap/BitmapTexturePool.cpp
         platform/graphics/texmap/GraphicsLayerTextureMapper.cpp
-        platform/graphics/texmap/TextureMapperGL.cpp
-        platform/graphics/texmap/TextureMapperShaderProgram.cpp
     )
+
+    if (USE_TEXTURE_MAPPER_GL)
+        list(APPEND WebCore_SOURCES
+            platform/graphics/texmap/BitmapTextureGL.cpp
+            platform/graphics/texmap/TextureMapperGL.cpp
+            platform/graphics/texmap/TextureMapperShaderProgram.cpp
+        )
+    endif ()
 endif ()
 
 if (ENABLE_THREADED_COMPOSITOR)
@@ -610,7 +617,6 @@ list(APPEND GObjectDOMBindingsStable_IDL_FILES
     html/HTMLAreaElement.idl
     html/HTMLBRElement.idl
     html/HTMLBaseElement.idl
-    html/HTMLBaseFontElement.idl
     html/HTMLBodyElement.idl
     html/HTMLButtonElement.idl
     html/HTMLCanvasElement.idl

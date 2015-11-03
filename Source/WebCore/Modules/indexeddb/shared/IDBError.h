@@ -35,7 +35,15 @@ namespace WebCore {
 enum class IDBExceptionCode {
     None = 0,
     Unknown,
+    ConstraintError,
+    DataError,
+    TransactionInactiveError,
+    ReadOnlyError,
     VersionError,
+
+    // Indexed DB existing exception codes with IDB-specific error messages:
+    InvalidStateError,
+    DataCloneError,
 };
 
 class IDBError {
@@ -50,6 +58,8 @@ public:
     const String& message() const;
 
     bool isNull() const { return m_code == IDBExceptionCode::None; }
+
+    IDBError isolatedCopy() const;
 
 private:
     IDBExceptionCode m_code { IDBExceptionCode::None };

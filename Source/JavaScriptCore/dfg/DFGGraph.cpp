@@ -35,8 +35,12 @@
 #include "DFGBlockWorklist.h"
 #include "DFGClobberSet.h"
 #include "DFGClobbersExitState.h"
+#include "DFGCFG.h"
+#include "DFGDominators.h"
 #include "DFGJITCode.h"
 #include "DFGMayExit.h"
+#include "DFGNaturalLoops.h"
+#include "DFGPrePostNumbering.h"
 #include "DFGVariableAccessDataDump.h"
 #include "FullBytecodeLiveness.h"
 #include "FunctionExecutableDump.h"
@@ -64,6 +68,7 @@ Graph::Graph(VM& vm, Plan& plan, LongLivedState& longLivedState)
     , m_codeBlock(m_plan.codeBlock)
     , m_profiledBlock(m_codeBlock->alternative())
     , m_allocator(longLivedState.m_allocator)
+    , m_cfg(std::make_unique<CFG>(*this))
     , m_nextMachineLocal(0)
     , m_fixpointState(BeforeFixpoint)
     , m_structureRegistrationState(HaveNotStartedRegistering)
@@ -401,22 +406,22 @@ void Graph::dumpBlockHeader(PrintStream& out, const char* prefix, BasicBlock* bl
     if (block->terminal()) {
         for (BasicBlock* successor : block->successors()) {
             out.print(" ", *successor);
-            if (m_prePostNumbering.isValid())
-                out.print(" (", m_prePostNumbering.edgeKind(block, successor), ")");
+            if (m_prePostNumbering)
+                out.print(" (", m_prePostNumbering->edgeKind(block, successor), ")");
         }
     } else
         out.print(" <invalid>");
     out.print("\n");
-    if (m_dominators.isValid() && terminalsAreValid()) {
-        out.print(prefix, "  Dominated by: ", m_dominators.dominatorsOf(block), "\n");
-        out.print(prefix, "  Dominates: ", m_dominators.blocksDominatedBy(block), "\n");
-        out.print(prefix, "  Dominance Frontier: ", m_dominators.dominanceFrontierOf(block), "\n");
-        out.print(prefix, "  Iterated Dominance Frontier: ", m_dominators.iteratedDominanceFrontierOf(BlockList(1, block)), "\n");
+    if (m_dominators && terminalsAreValid()) {
+        out.print(prefix, "  Dominated by: ", m_dominators->dominatorsOf(block), "\n");
+        out.print(prefix, "  Dominates: ", m_dominators->blocksDominatedBy(block), "\n");
+        out.print(prefix, "  Dominance Frontier: ", m_dominators->dominanceFrontierOf(block), "\n");
+        out.print(prefix, "  Iterated Dominance Frontier: ", m_dominators->iteratedDominanceFrontierOf(BlockList(1, block)), "\n");
     }
-    if (m_prePostNumbering.isValid())
-        out.print(prefix, "  Pre/Post Numbering: ", m_prePostNumbering.preNumber(block), "/", m_prePostNumbering.postNumber(block), "\n");
-    if (m_naturalLoops.isValid()) {
-        if (const NaturalLoop* loop = m_naturalLoops.headerOf(block)) {
+    if (m_prePostNumbering)
+        out.print(prefix, "  Pre/Post Numbering: ", m_prePostNumbering->preNumber(block), "/", m_prePostNumbering->postNumber(block), "\n");
+    if (m_naturalLoops) {
+        if (const NaturalLoop* loop = m_naturalLoops->headerOf(block)) {
             out.print(prefix, "  Loop header, contains:");
             Vector<BlockIndex> sortedBlockList;
             for (unsigned i = 0; i < loop->size(); ++i)
@@ -428,7 +433,7 @@ void Graph::dumpBlockHeader(PrintStream& out, const char* prefix, BasicBlock* bl
         }
         
         Vector<const NaturalLoop*> containingLoops =
-            m_naturalLoops.loopsOf(block);
+            m_naturalLoops->loopsOf(block);
         if (!containingLoops.isEmpty()) {
             out.print(prefix, "  Containing loop headers:");
             for (unsigned i = 0; i < containingLoops.size(); ++i)
@@ -746,9 +751,9 @@ void Graph::killUnreachableBlocks()
 
 void Graph::invalidateCFG()
 {
-    m_dominators.invalidate();
-    m_naturalLoops.invalidate();
-    m_prePostNumbering.invalidate();
+    m_dominators = nullptr;
+    m_naturalLoops = nullptr;
+    m_prePostNumbering = nullptr;
 }
 
 void Graph::substituteGetLocal(BasicBlock& block, unsigned startIndexInBlock, VariableAccessData* variableAccessData, Node* newGetLocal)
@@ -802,13 +807,13 @@ BlockList Graph::blocksInPostOrder()
     worklist.push(block(0));
     while (BlockWithOrder item = worklist.pop()) {
         switch (item.order) {
-        case PreOrder:
-            worklist.pushPost(item.block);
-            for (unsigned i = item.block->numSuccessors(); i--;)
-                worklist.push(item.block->successor(i));
+        case VisitOrder::Pre:
+            worklist.pushPost(item.node);
+            for (unsigned i = item.node->numSuccessors(); i--;)
+                worklist.push(item.node->successor(i));
             break;
-        case PostOrder:
-            result.append(item.block);
+        case VisitOrder::Post:
+            result.append(item.node);
             break;
         }
     }
@@ -1215,7 +1220,7 @@ JSArrayBufferView* Graph::tryGetFoldableView(JSValue value)
 
 JSArrayBufferView* Graph::tryGetFoldableView(JSValue value, ArrayMode arrayMode)
 {
-    if (arrayMode.typedArrayType() == NotTypedArray)
+    if (arrayMode.type() != Array::AnyTypedArray && arrayMode.typedArrayType() == NotTypedArray)
         return nullptr;
     return tryGetFoldableView(value);
 }
@@ -1408,6 +1413,25 @@ void Graph::handleAssertionFailure(
     BasicBlock* block, const char* file, int line, const char* function, const char* assertion)
 {
     crash(*this, toCString("While handling block ", pointerDump(block), "\n\n"), file, line, function, assertion);
+}
+
+void Graph::ensureDominators()
+{
+    if (!m_dominators)
+        m_dominators = std::make_unique<Dominators>(*this);
+}
+
+void Graph::ensurePrePostNumbering()
+{
+    if (!m_prePostNumbering)
+        m_prePostNumbering = std::make_unique<PrePostNumbering>(*this);
+}
+
+void Graph::ensureNaturalLoops()
+{
+    ensureDominators();
+    if (!m_naturalLoops)
+        m_naturalLoops = std::make_unique<NaturalLoops>(*this);
 }
 
 ValueProfile* Graph::valueProfileFor(Node* node)

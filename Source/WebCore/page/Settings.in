@@ -163,7 +163,6 @@ DOMPasteAllowed initial=false
 windowFocusRestricted initial=true
 
 diagnosticLoggingEnabled initial=false
-applyDeviceScaleFactorInCompositor initial=true
 delegatesPageScaling initial=false
 plugInSnapshottingEnabled initial=false
 snapshotAllPlugIns initial=false
@@ -231,8 +230,6 @@ useImageDocumentForSubframePDF initial=false
 # Allow SourceBuffers to store up to 304MB each, enough for approximately five minutes
 # of 1080p video and stereo audio.
 maximumSourceBufferSize type=int, initial=318767104, conditional=MEDIA_SOURCE
-
-longMousePressEnabled initial=false
 
 serviceControlsEnabled initial=false, conditional=SERVICE_CONTROLS
 

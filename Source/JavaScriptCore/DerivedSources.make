@@ -33,67 +33,55 @@ VPATH = \
 	$(JavaScriptCore)/builtins \
 #
 
-.PHONY : all
-all : \
-    ArrayConstructor.lut.h \
-    ArrayIteratorPrototype.lut.h \
-    BooleanPrototype.lut.h \
-    DateConstructor.lut.h \
-    DatePrototype.lut.h \
-    ErrorPrototype.lut.h \
-    InspectorInstrumentationObject.lut.h \
-    IntlCollatorConstructor.lut.h \
-    IntlCollatorPrototype.lut.h \
-    IntlDateTimeFormatConstructor.lut.h \
-    IntlDateTimeFormatPrototype.lut.h \
-    IntlNumberFormatConstructor.lut.h \
-    IntlNumberFormatPrototype.lut.h \
-    JSDataViewPrototype.lut.h \
-    JSONObject.lut.h \
-    JSGlobalObject.lut.h \
-    JSInternalPromiseConstructor.lut.h \
-    JSPromisePrototype.lut.h \
-    JSPromiseConstructor.lut.h \
-    KeywordLookup.h \
-    Lexer.lut.h \
-    ModuleLoaderObject.lut.h \
-    NumberConstructor.lut.h \
-    NumberPrototype.lut.h \
-    ObjectConstructor.lut.h \
-    ReflectObject.lut.h \
-    RegExpConstructor.lut.h \
-    RegExpPrototype.lut.h \
-    RegExpJitTables.h \
-    StringConstructor.lut.h \
-    StringIteratorPrototype.lut.h \
-    SymbolConstructor.lut.h \
-    SymbolPrototype.lut.h \
-    udis86_itab.h \
-    Bytecodes.h \
-    InitBytecodes.asm \
-    JSCBuiltins \
-#
-
-# builtin functions
 PYTHON = python
 PERL = perl
+RUBY = ruby
+
+JavaScriptCore_SCRIPTS_DIR = $(JavaScriptCore)/Scripts
 
 ifeq ($(OS),Windows_NT)
     DELETE = cmd //C del
 else
     DELETE = rm -f
 endif
+
 # --------
 
-.PHONY: JSCBuiltins
-JSCBuiltins: $(JavaScriptCore)/generate-js-builtins JSCBuiltins.h JSCBuiltins.cpp
-JSCBuiltins.h: $(JavaScriptCore)/generate-js-builtins $(JavaScriptCore)/builtins JSCBuiltinsSources
-	$(PYTHON) $(JavaScriptCore)/generate-js-builtins --input-directory $(JavaScriptCore)/builtins --output $@
+.PHONY : all
+all : \
+    udis86_itab.h \
+    Bytecodes.h \
+    CombinedDomains.json \
+    InitBytecodes.asm \
+    InjectedScriptSource.h \
+    InspectorFrontendDispatchers.h \
+    JSReplayInputs.h \
+    JSCBuiltins.h \
+    Lexer.lut.h \
+    KeywordLookup.h \
+    RegExpJitTables.h \
+    B3LoweringMatcher.h \
+    B3AddressMatcher.h \
+    AirOpcode.h \
+#
 
-JSCBuiltins.cpp: JSCBuiltins.h
+# JavaScript builtins.
 
-.PHONY: JSCBuiltinsSources
-JSCBuiltinsSources: \
+BUILTINS_GENERATOR_SCRIPTS = \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins/__init__.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generator.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_model.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_templates.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generate_combined_header.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generate_combined_implementation.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generate_separate_header.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/builtins/builtins_generate_separate_implementation.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/generate-js-builtins.py \
+    $(JavaScriptCore_SCRIPTS_DIR)/lazywriter.py \
+#
+
+JavaScriptCore_BUILTINS_SOURCES = \
     $(JavaScriptCore)/builtins/ArrayConstructor.js \
     $(JavaScriptCore)/builtins/ArrayIterator.prototype.js \
     $(JavaScriptCore)/builtins/Array.prototype.js \
@@ -110,14 +98,68 @@ JSCBuiltinsSources: \
     $(JavaScriptCore)/builtins/ReflectObject.js \
     $(JavaScriptCore)/builtins/StringConstructor.js \
     $(JavaScriptCore)/builtins/StringIterator.prototype.js \
+    $(JavaScriptCore)/builtins/TypedArrayConstructor.js \
+    $(JavaScriptCore)/builtins/TypedArray.prototype.js \
 #
 
-# lookup tables for classes
+# The combined output file depends on the contents of builtins and generator scripts, so
+# adding, modifying, or removing builtins or scripts will trigger regeneration of files.
 
-%.lut.h: create_hash_table %.cpp
-	$(PERL) $^ -i > $@
-Lexer.lut.h: create_hash_table Keywords.table
-	$(PERL) $^ > $@
+.PHONY: force
+JavaScriptCore_BUILTINS_DEPENDENCIES_LIST : $(JavaScriptCore_SCRIPTS_DIR)/UpdateContents.py force
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/UpdateContents.py '$(JavaScriptCore_BUILTINS_SOURCES) $(BUILTINS_GENERATOR_SCRIPTS)' $@
+
+JSCBuiltins.h: $(BUILTINS_GENERATOR_SCRIPTS) $(JavaScriptCore_BUILTINS_SOURCES) JavaScriptCore_BUILTINS_DEPENDENCIES_LIST
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/generate-js-builtins.py --combined --output-directory . --framework JavaScriptCore $(JavaScriptCore_BUILTINS_SOURCES)
+
+# Perfect hash lookup tables for JavaScript classes.
+
+NATIVE_OBJECT_LUT_HEADERS = \
+    BooleanPrototype.lut.h \
+    DateConstructor.lut.h \
+    DatePrototype.lut.h \
+    ErrorPrototype.lut.h \
+    IntlCollatorConstructor.lut.h \
+    IntlCollatorPrototype.lut.h \
+    IntlDateTimeFormatConstructor.lut.h \
+    IntlDateTimeFormatPrototype.lut.h \
+    IntlNumberFormatConstructor.lut.h \
+    IntlNumberFormatPrototype.lut.h \
+    JSDataViewPrototype.lut.h \
+    JSONObject.lut.h \
+    NumberConstructor.lut.h \
+    NumberPrototype.lut.h \
+    RegExpConstructor.lut.h \
+    RegExpPrototype.lut.h \
+    SymbolConstructor.lut.h \
+    SymbolPrototype.lut.h \
+#
+
+# If an object's implementation contains at least one builtin, then it must
+# be added to this section so it is generated with builtin-specific includes.
+
+BUILTIN_OBJECT_LUT_HEADERS = \
+    ArrayConstructor.lut.h \
+    ArrayIteratorPrototype.lut.h \
+    InspectorInstrumentationObject.lut.h \
+    JSGlobalObject.lut.h \
+    JSInternalPromiseConstructor.lut.h \
+    JSPromisePrototype.lut.h \
+    JSPromiseConstructor.lut.h \
+    ModuleLoaderObject.lut.h \
+    ObjectConstructor.lut.h \
+    ReflectObject.lut.h \
+    StringConstructor.lut.h \
+    StringIteratorPrototype.lut.h \
+#
+
+$(NATIVE_OBJECT_LUT_HEADERS): %.lut.h : %.cpp $(JavaScriptCore)/create_hash_table
+	$(PERL) $(JavaScriptCore)/create_hash_table -i $< > $@
+$(BUILTIN_OBJECT_LUT_HEADERS): %.lut.h : %.cpp $(JavaScriptCore)/create_hash_table
+	$(PERL) $(JavaScriptCore)/create_hash_table -i -b $< > $@
+
+Lexer.lut.h: Keywords.table $(JavaScriptCore)/create_hash_table
+	$(PERL) $(JavaScriptCore)/create_hash_table -i $< > $@
 
 # character tables for Yarr
 
@@ -152,6 +194,7 @@ INSPECTOR_DOMAINS = \
     $(JavaScriptCore)/inspector/protocol/Database.json \
     $(JavaScriptCore)/inspector/protocol/Debugger.json \
     $(JavaScriptCore)/inspector/protocol/GenericTypes.json \
+    $(JavaScriptCore)/inspector/protocol/Heap.json \
     $(JavaScriptCore)/inspector/protocol/Inspector.json \
     $(JavaScriptCore)/inspector/protocol/LayerTree.json \
     $(JavaScriptCore)/inspector/protocol/Network.json \
@@ -184,34 +227,28 @@ INSPECTOR_GENERATOR_SCRIPTS = \
 	$(JavaScriptCore)/inspector/scripts/codegen/generator_templates.py \
 	$(JavaScriptCore)/inspector/scripts/codegen/generator.py \
 	$(JavaScriptCore)/inspector/scripts/codegen/models.py \
-	$(JavaScriptCore)/inspector/scripts/generate-combined-inspector-json.py \
 	$(JavaScriptCore)/inspector/scripts/generate-inspector-protocol-bindings.py \
-#
-
-all : \
-    CombinedDomains.json \
-    InspectorFrontendDispatchers.h \
-    InjectedScriptSource.h \
+	$(JavaScriptCore_SCRIPTS_DIR)/generate-combined-inspector-json.py \
 #
 
 # The combined JSON file depends on the actual set of domains and their file contents, so that
 # adding, modifying, or removing domains will trigger regeneration of inspector files.
 
 .PHONY: force
-EnabledInspectorDomains : $(JavaScriptCore)/UpdateContents.py force
-	$(PYTHON) $(JavaScriptCore)/UpdateContents.py '$(INSPECTOR_DOMAINS)' $@
+EnabledInspectorDomains : $(JavaScriptCore_SCRIPTS_DIR)/UpdateContents.py force
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/UpdateContents.py '$(INSPECTOR_DOMAINS)' $@
 
-CombinedDomains.json : inspector/scripts/generate-combined-inspector-json.py $(INSPECTOR_DOMAINS) EnabledInspectorDomains
-	$(PYTHON) $(JavaScriptCore)/inspector/scripts/generate-combined-inspector-json.py $(INSPECTOR_DOMAINS) > ./CombinedDomains.json
+CombinedDomains.json : $(JavaScriptCore_SCRIPTS_DIR)/generate-combined-inspector-json.py $(INSPECTOR_DOMAINS) EnabledInspectorDomains
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/generate-combined-inspector-json.py $(INSPECTOR_DOMAINS) > ./CombinedDomains.json
 
 # Inspector Backend Dispatchers, Frontend Dispatchers, Type Builders
 InspectorFrontendDispatchers.h : CombinedDomains.json $(INSPECTOR_GENERATOR_SCRIPTS)
 	$(PYTHON) $(JavaScriptCore)/inspector/scripts/generate-inspector-protocol-bindings.py --framework JavaScriptCore --outputDir . ./CombinedDomains.json
 
-InjectedScriptSource.h : inspector/InjectedScriptSource.js $(JavaScriptCore)/inspector/scripts/jsmin.py $(JavaScriptCore)/inspector/scripts/xxd.pl
+InjectedScriptSource.h : inspector/InjectedScriptSource.js $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl
 	echo "//# sourceURL=__WebInspectorInjectedScript__" > ./InjectedScriptSource.min.js
-	$(PYTHON) $(JavaScriptCore)/inspector/scripts/jsmin.py < $(JavaScriptCore)/inspector/InjectedScriptSource.js >> ./InjectedScriptSource.min.js
-	$(PERL) $(JavaScriptCore)/inspector/scripts/xxd.pl InjectedScriptSource_js ./InjectedScriptSource.min.js InjectedScriptSource.h
+	$(PYTHON) $(JavaScriptCore_SCRIPTS_DIR)/jsmin.py < $(JavaScriptCore)/inspector/InjectedScriptSource.js >> ./InjectedScriptSource.min.js
+	$(PERL) $(JavaScriptCore_SCRIPTS_DIR)/xxd.pl InjectedScriptSource_js ./InjectedScriptSource.min.js InjectedScriptSource.h
 	$(DELETE) InjectedScriptSource.min.js
 
 # Web Replay inputs generator
@@ -225,7 +262,20 @@ INPUT_GENERATOR_SPECIFICATIONS = \
     $(JavaScriptCore)/replay/JSInputs.json \
 #
 
-all : JSReplayInputs.h
-
 JSReplayInputs.h : $(INPUT_GENERATOR_SPECIFICATIONS) $(INPUT_GENERATOR_SCRIPTS)
 	$(PYTHON) $(JavaScriptCore)/replay/scripts/CodeGeneratorReplayInputs.py --outputDir . --framework JavaScriptCore $(INPUT_GENERATOR_SPECIFICATIONS)
+
+B3LoweringMatcher.h: $(JavaScriptCore)/b3/generate_pattern_matcher.rb $(JavaScriptCore)/b3/B3LoweringMatcher.patterns
+	$(RUBY) $^ 
+B3AddressMatcher.h: $(JavaScriptCore)/b3/generate_pattern_matcher.rb $(JavaScriptCore)/b3/B3AddressMatcher.patterns
+	$(RUBY) $^
+
+AirOpcode.h: $(JavaScriptCore)/b3/air/opcode_generator.rb $(JavaScriptCore)/b3/air/AirOpcode.opcodes
+	$(RUBY) $^
+
+# Dynamically-defined targets are listed below. Static targets belong up top.
+
+all : \
+    $(BUILTIN_OBJECT_LUT_HEADERS) \
+    $(NATIVE_OBJECT_LUT_HEADERS) \
+#

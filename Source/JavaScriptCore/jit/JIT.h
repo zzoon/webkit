@@ -403,6 +403,8 @@ namespace JSC {
         void emitGetVirtualRegister(int src, JSValueRegs dst);
         void emitPutVirtualRegister(int dst, JSValueRegs src);
 
+        int32_t getOperandConstantInt(int src);
+
 #if USE(JSVALUE32_64)
         bool getOperandConstantInt(int op1, int op2, int& op, int32_t& constant);
 
@@ -427,7 +429,6 @@ namespace JSC {
         void compileGetByIdHotPath(const Identifier*);
 
         // Arithmetic opcode helpers
-        void emitAdd32Constant(int dst, int op, int32_t constant, ResultType opType);
         void emitSub32Constant(int dst, int op, int32_t constant, ResultType opType);
         void emitBinaryDoubleOp(OpcodeID, int dst, int op1, int op2, OperandTypes, JumpList& notInt32Op1, JumpList& notInt32Op2, bool op1IsInRegisters = true, bool op2IsInRegisters = true);
 
@@ -446,8 +447,6 @@ namespace JSC {
         {
             emitPutVirtualRegister(dst, payload);
         }
-
-        int32_t getOperandConstantInt(int src);
 
         Jump emitJumpIfJSCell(RegisterID);
         Jump emitJumpIfBothJSCells(RegisterID, RegisterID, RegisterID);
@@ -560,7 +559,7 @@ namespace JSC {
         void emit_op_put_by_val(Instruction*);
         void emit_op_put_getter_by_id(Instruction*);
         void emit_op_put_setter_by_id(Instruction*);
-        void emit_op_put_getter_setter(Instruction*);
+        void emit_op_put_getter_setter_by_id(Instruction*);
         void emit_op_put_getter_by_val(Instruction*);
         void emit_op_put_setter_by_val(Instruction*);
         void emit_op_ret(Instruction*);
@@ -762,9 +761,13 @@ namespace JSC {
         MacroAssembler::Call callOperation(V_JITOperation_E);
         MacroAssembler::Call callOperation(V_JITOperation_EC, RegisterID);
         MacroAssembler::Call callOperation(V_JITOperation_ECC, RegisterID, RegisterID);
-        MacroAssembler::Call callOperation(V_JITOperation_ECIZC, RegisterID, const Identifier*, int32_t, RegisterID);
-        MacroAssembler::Call callOperation(V_JITOperation_ECIZCC, RegisterID, const Identifier*, int32_t, RegisterID, RegisterID);
+        MacroAssembler::Call callOperation(V_JITOperation_ECIZC, RegisterID, UniquedStringImpl*, int32_t, RegisterID);
+        MacroAssembler::Call callOperation(V_JITOperation_ECIZCC, RegisterID, UniquedStringImpl*, int32_t, RegisterID, RegisterID);
+#if USE(JSVALUE64)
+        MacroAssembler::Call callOperation(V_JITOperation_ECJZC, RegisterID, RegisterID, int32_t, RegisterID);
+#else
         MacroAssembler::Call callOperation(V_JITOperation_ECJZC, RegisterID, RegisterID, RegisterID, int32_t, RegisterID);
+#endif
         MacroAssembler::Call callOperation(J_JITOperation_EE, RegisterID);
         MacroAssembler::Call callOperation(V_JITOperation_EZSymtabJ, int, SymbolTable*, RegisterID);
         MacroAssembler::Call callOperation(J_JITOperation_EZSymtabJ, int, SymbolTable*, RegisterID);
@@ -775,12 +778,10 @@ namespace JSC {
 #else
         MacroAssembler::Call callOperationNoExceptionCheck(V_JITOperation_EJ, RegisterID, RegisterID);
 #endif
-        MacroAssembler::Call callOperation(V_JITOperation_EJIdZJ, RegisterID, const Identifier*, int32_t, RegisterID);
-        MacroAssembler::Call callOperation(V_JITOperation_EJIdZJJ, RegisterID, const Identifier*, int32_t, RegisterID, RegisterID);
-        MacroAssembler::Call callOperation(V_JITOperation_EJJZJ, RegisterID, RegisterID, int32_t, RegisterID);
 #if USE(JSVALUE64)
         MacroAssembler::Call callOperation(F_JITOperation_EFJZZ, RegisterID, RegisterID, int32_t, RegisterID);
         MacroAssembler::Call callOperation(V_JITOperation_ESsiJJI, StructureStubInfo*, RegisterID, RegisterID, UniquedStringImpl*);
+        MacroAssembler::Call callOperation(V_JITOperation_ECIZJJ, RegisterID, UniquedStringImpl*, int32_t, RegisterID, RegisterID);
 #else
         MacroAssembler::Call callOperation(V_JITOperation_ESsiJJI, StructureStubInfo*, RegisterID, RegisterID, RegisterID, RegisterID, UniquedStringImpl*);
 #endif

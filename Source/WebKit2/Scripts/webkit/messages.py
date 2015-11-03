@@ -352,6 +352,7 @@ def headers_for_type(type):
     special_cases = {
         'String': ['<wtf/text/WTFString.h>'],
         'WebCore::CompositionUnderline': ['<WebCore/Editor.h>'],
+        'WebCore::ExceptionDetails': ['<WebCore/JSDOMBinding.h>'],
         'WebCore::GrammarDetail': ['<WebCore/TextCheckerClient.h>'],
         'WebCore::TextureMapperAnimations': ['<WebCore/TextureMapperAnimation.h>'],
         'WebCore::KeyframeValueList': ['<WebCore/GraphicsLayer.h>'],
@@ -361,6 +362,7 @@ def headers_for_type(type):
         'WebCore::PluginInfo': ['<WebCore/PluginData.h>'],
         'WebCore::PasteboardImage': ['<WebCore/Pasteboard.h>'],
         'WebCore::PasteboardWebContent': ['<WebCore/Pasteboard.h>'],
+        'WebCore::RecentSearch': ['<WebCore/SearchPopupMenu.h>'],
         'WebCore::TextCheckingRequestData': ['<WebCore/TextChecking.h>'],
         'WebCore::TextCheckingResult': ['<WebCore/TextCheckerClient.h>'],
         'WebCore::TextIndicatorData': ['<WebCore/TextIndicator.h>'],

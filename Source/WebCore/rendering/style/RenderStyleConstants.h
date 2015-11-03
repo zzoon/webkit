@@ -30,6 +30,8 @@
 
 namespace WebCore {
 
+class TextStream;
+
 static const size_t PrintColorAdjustBits = 1;
 enum PrintColorAdjust {
     PrintColorAdjustEconomy,
@@ -584,7 +586,7 @@ enum TextEmphasisPositions {
 };
 typedef unsigned TextEmphasisPosition;
 
-enum TextOrientation { TextOrientationVerticalRight, TextOrientationUpright, TextOrientationSideways, TextOrientationSidewaysRight };
+enum class TextOrientation { Mixed, Upright, Sideways, SidewaysRight };
 
 enum TextOverflow { TextOverflowClip = 0, TextOverflowEllipsis };
 
@@ -641,6 +643,13 @@ enum Isolation { IsolationAuto, IsolationIsolate };
 // Fill, Stroke, ViewBox are just used for SVG.
 enum CSSBoxType { BoxMissing = 0, MarginBox, BorderBox, PaddingBox, ContentBox, Fill, Stroke, ViewBox };
 
+#if ENABLE(TOUCH_EVENTS)
+enum class TouchAction {
+    Auto,
+    Manipulation
+};
+#endif
+
 #if ENABLE(CSS_SCROLL_SNAP)
 enum class ScrollSnapType {
     None,
@@ -655,6 +664,13 @@ enum class TrailingWord {
     PartiallyBalanced
 };
 #endif
+
+TextStream& operator<<(TextStream&, EFillSizeType);
+TextStream& operator<<(TextStream&, EFillAttachment);
+TextStream& operator<<(TextStream&, EFillBox);
+TextStream& operator<<(TextStream&, EFillRepeat);
+TextStream& operator<<(TextStream&, EMaskSourceType);
+TextStream& operator<<(TextStream&, BackgroundEdgeOrigin);
 
 } // namespace WebCore
 

@@ -327,7 +327,7 @@ public:
     static AXTextStateChangeIntent defaultFocusTextStateChangeIntent() { return AXTextStateChangeIntent(AXTextStateChangeTypeSelectionMove, AXTextSelection { AXTextSelectionDirectionDiscontiguous, AXTextSelectionGranularityUnknown, true }); }
     void updateFocusAppearanceAfterAttachIfNeeded();
     virtual void focus(bool restorePreviousSelection = true, FocusDirection = FocusDirectionNone);
-    virtual void updateFocusAppearance(bool restorePreviousSelection);
+    virtual void updateFocusAppearance(SelectionRestorationMode, SelectionRevealMode = SelectionRevealMode::Reveal);
     virtual void blur();
 
     String innerHTML() const;
@@ -487,6 +487,10 @@ public:
 
     WEBCORE_EXPORT URL absoluteLinkURL() const;
 
+#if ENABLE(TOUCH_EVENTS)
+    virtual bool allowsDoubleTapGesture() const override;
+#endif
+
     StyleResolver& styleResolver();
     Ref<RenderStyle> resolveStyle(RenderStyle* parentStyle);
 
@@ -518,8 +522,6 @@ private:
     bool isUserActionElementActive() const;
     bool isUserActionElementFocused() const;
     bool isUserActionElementHovered() const;
-
-    void resetNeedsNodeRenderingTraversalSlowPath();
 
     virtual void didAddUserAgentShadowRoot(ShadowRoot*) { }
     virtual bool alwaysCreateUserAgentShadowRoot() const { return false; }
@@ -574,6 +576,9 @@ private:
     virtual Ref<Element> cloneElementWithoutAttributesAndChildren(Document&);
 
     void removeShadowRoot();
+
+    RenderStyle* existingComputedStyle();
+    RenderStyle& resolveComputedStyle();
 
     bool rareDataStyleAffectedByEmpty() const;
     bool rareDataChildrenAffectedByHover() const;

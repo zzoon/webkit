@@ -114,8 +114,6 @@
 
 // The methods in this file are specific to the Mac OS X platform.
 
-// FIXME: The platform-independent code in this class should be factored out and merged with RenderThemeSafari.
-
 // We estimate the animation rate of a Mac OS X progress bar is 33 fps.
 // Hard code the value here because we haven't found API for it.
 const double progressAnimationFrameRate = 0.033;
@@ -1158,7 +1156,7 @@ bool RenderThemeMac::paintProgressBar(const RenderObject& renderObject, const Pa
         paintInfo.context().scale(FloatSize(-1, 1));
     }
 
-    paintInfo.context().drawImageBuffer(imageBuffer.get(), ColorSpaceDeviceRGB, inflatedRect.location());
+    paintInfo.context().drawImageBuffer(*imageBuffer, ColorSpaceDeviceRGB, inflatedRect.location());
     return false;
 }
 
@@ -1912,7 +1910,7 @@ bool RenderThemeMac::paintSnapshottedPluginOverlay(const RenderObject& renderer,
     if (alignedPluginRect.width() <= 0 || alignedPluginRect.height() <= 0)
         return true;
 
-    context.drawImage(snapshot, plugInRenderer.style().colorSpace(), alignedPluginRect, CompositeSourceOver);
+    context.drawImage(*snapshot, plugInRenderer.style().colorSpace(), alignedPluginRect, CompositeSourceOver);
     return false;
 }
 

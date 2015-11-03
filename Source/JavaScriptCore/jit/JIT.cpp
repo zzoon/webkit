@@ -278,7 +278,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_put_by_val)
         DEFINE_OP(op_put_getter_by_id)
         DEFINE_OP(op_put_setter_by_id)
-        DEFINE_OP(op_put_getter_setter)
+        DEFINE_OP(op_put_getter_setter_by_id)
         DEFINE_OP(op_put_getter_by_val)
         DEFINE_OP(op_put_setter_by_val)
 
@@ -500,7 +500,7 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
     if (m_vm->typeProfiler())
         m_vm->typeProfilerLog()->processLogEntries(ASCIILiteral("Preparing for JIT compilation."));
     
-    if (Options::showDisassembly() || m_vm->m_perBytecodeProfiler)
+    if (Options::dumpDisassembly() || m_vm->m_perBytecodeProfiler)
         m_disassembler = std::make_unique<JITDisassembler>(m_codeBlock);
     if (m_vm->m_perBytecodeProfiler) {
         m_compilation = adoptRef(
@@ -691,7 +691,7 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
     if (m_codeBlock->codeType() == FunctionCode)
         withArityCheck = patchBuffer.locationOf(arityCheck);
 
-    if (Options::showDisassembly()) {
+    if (Options::dumpDisassembly()) {
         m_disassembler->dump(patchBuffer);
         patchBuffer.didAlreadyDisassemble();
     }

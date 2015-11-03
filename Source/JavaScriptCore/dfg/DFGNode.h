@@ -853,6 +853,9 @@ struct Node {
         case PutById:
         case PutByIdFlush:
         case PutByIdDirect:
+        case PutGetterById:
+        case PutSetterById:
+        case PutGetterSetterById:
             return true;
         default:
             return false;
@@ -863,6 +866,37 @@ struct Node {
     {
         ASSERT(hasIdentifier());
         return m_opInfo;
+    }
+
+    bool hasAccessorAttributes()
+    {
+        switch (op()) {
+        case PutGetterById:
+        case PutSetterById:
+        case PutGetterSetterById:
+        case PutGetterByVal:
+        case PutSetterByVal:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    int32_t accessorAttributes()
+    {
+        ASSERT(hasAccessorAttributes());
+        switch (op()) {
+        case PutGetterById:
+        case PutSetterById:
+        case PutGetterSetterById:
+            return m_opInfo2;
+        case PutGetterByVal:
+        case PutSetterByVal:
+            return m_opInfo;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            return 0;
+        }
     }
     
     bool hasPromotedLocationDescriptor()
@@ -1245,6 +1279,10 @@ struct Node {
         {
             return iterator(m_terminal, m_terminal->numSuccessors());
         }
+
+        size_t size() const { return m_terminal->numSuccessors(); }
+        BasicBlock* at(size_t index) const { return m_terminal->successor(index); }
+        BasicBlock* operator[](size_t index) const { return at(index); }
         
     private:
         Node* m_terminal;
@@ -1975,6 +2013,16 @@ struct Node {
     bool shouldSpeculateNotCell()
     {
         return isNotCellSpeculation(prediction());
+    }
+    
+    bool shouldSpeculateUntypedForArithmetic()
+    {
+        return isUntypedSpeculationForArithmetic(prediction());
+    }
+
+    static bool shouldSpeculateUntypedForArithmetic(Node* op1, Node* op2)
+    {
+        return op1->shouldSpeculateUntypedForArithmetic() || op2->shouldSpeculateUntypedForArithmetic();
     }
     
     static bool shouldSpeculateBoolean(Node* op1, Node* op2)

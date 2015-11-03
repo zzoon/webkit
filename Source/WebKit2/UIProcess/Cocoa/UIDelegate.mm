@@ -37,6 +37,7 @@
 #import "WKWebViewInternal.h"
 #import "WKWindowFeaturesInternal.h"
 #import "WKUIDelegatePrivate.h"
+#import "_WKContextMenuElementInfo.h"
 #import "_WKFrameHandleInternal.h"
 #import <WebCore/SecurityOriginData.h>
 #import <WebCore/URL.h>
@@ -51,6 +52,13 @@ UIDelegate::UIDelegate(WKWebView *webView)
 UIDelegate::~UIDelegate()
 {
 }
+
+#if ENABLE(CONTEXT_MENUS)
+std::unique_ptr<API::ContextMenuClient> UIDelegate::createContextMenuClient()
+{
+    return std::make_unique<ContextMenuClient>(*this);
+}
+#endif
 
 std::unique_ptr<API::UIClient> UIDelegate::createUIClient()
 {
@@ -86,7 +94,36 @@ void UIDelegate::setDelegate(id <WKUIDelegate> delegate)
     m_delegateMethods.webViewDidNotHandleTapAsClickAtPoint = [delegate respondsToSelector:@selector(_webView:didNotHandleTapAsClickAtPoint:)];
 #endif
     m_delegateMethods.webViewImageOrMediaDocumentSizeChanged = [delegate respondsToSelector:@selector(_webView:imageOrMediaDocumentSizeChanged:)];
+
+#if ENABLE(CONTEXT_MENUS)
+    m_delegateMethods.webViewContextMenuForElement = [delegate respondsToSelector:@selector(_webView:contextMenu:forElement:)];
+#endif
 }
+
+#if ENABLE(CONTEXT_MENUS)
+UIDelegate::ContextMenuClient::ContextMenuClient(UIDelegate& uiDelegate)
+    : m_uiDelegate(uiDelegate)
+{
+}
+
+UIDelegate::ContextMenuClient::~ContextMenuClient()
+{
+}
+
+RetainPtr<NSMenu> UIDelegate::ContextMenuClient::menuFromProposedMenu(WebKit::WebPageProxy&, NSMenu *menu, const WebKit::WebHitTestResultData&)
+{
+    if (!m_uiDelegate.m_delegateMethods.webViewContextMenuForElement)
+        return menu;
+
+    auto delegate = m_uiDelegate.m_delegate.get();
+    if (!delegate)
+        return menu;
+
+    auto contextMenuElementInfo = adoptNS([[_WKContextMenuElementInfo alloc] init]);
+
+    return [(id <WKUIDelegatePrivate>)delegate _webView:m_uiDelegate.m_webView contextMenu:menu forElement:contextMenuElementInfo.get()];
+}
+#endif
 
 UIDelegate::UIClient::UIClient(UIDelegate& uiDelegate)
     : m_uiDelegate(uiDelegate)
@@ -111,12 +148,12 @@ PassRefPtr<WebKit::WebPageProxy> UIDelegate::UIClient::createNewPage(WebKit::Web
 
     auto sourceFrameInfo = API::FrameInfo::create(*initiatingFrame, securityOriginData.securityOrigin());
 
-    bool shouldOpenAppLinks = !protocolHostAndPortAreEqual(WebCore::URL(WebCore::ParsedURLString, initiatingFrame->url()), request.url());
+    bool shouldOpenAppLinks = !hostsAreEqual(WebCore::URL(WebCore::ParsedURLString, initiatingFrame->url()), request.url());
     auto apiNavigationAction = API::NavigationAction::create(navigationActionData, sourceFrameInfo.ptr(), nullptr, request, WebCore::URL(), shouldOpenAppLinks);
 
     auto apiWindowFeatures = API::WindowFeatures::create(windowFeatures);
 
-    RetainPtr<WKWebView> webView = [delegate.get() webView:m_uiDelegate.m_webView createWebViewWithConfiguration:configuration.get() forNavigationAction:wrapper(apiNavigationAction) windowFeatures:wrapper(apiWindowFeatures)];
+    RetainPtr<WKWebView> webView = [delegate webView:m_uiDelegate.m_webView createWebViewWithConfiguration:configuration.get() forNavigationAction:wrapper(apiNavigationAction) windowFeatures:wrapper(apiWindowFeatures)];
 
     if (!webView)
         return nullptr;

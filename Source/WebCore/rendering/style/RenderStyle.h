@@ -518,7 +518,7 @@ public:
     void setCustomPropertyValue(const AtomicString& name, const RefPtr<CSSValue>& value) { rareInheritedData.access()->m_customProperties.access()->setCustomPropertyValue(name, value); }
     RefPtr<CSSValue> getCustomPropertyValue(const AtomicString& name) const { return rareInheritedData->m_customProperties->getCustomPropertyValue(name); }
     bool hasCustomProperty(const AtomicString& name) const { return rareInheritedData->m_customProperties->hasCustomProperty(name); }
-    const HashMap<AtomicString, RefPtr<CSSValue>>* customProperties() const { return &(rareInheritedData->m_customProperties->m_values); }
+    const CustomPropertyValueMap& customProperties() const { return rareInheritedData->m_customProperties->m_values; }
 
     void setHasViewportUnits(bool hasViewportUnits = true) { noninherited_flags.setHasViewportUnits(hasViewportUnits); }
     bool hasViewportUnits() const { return noninherited_flags.hasViewportUnits(); }
@@ -710,7 +710,7 @@ public:
     float specifiedFontSize() const;
     float computedFontSize() const;
     int fontSize() const;
-    void getFontAndGlyphOrientation(FontOrientation&, NonCJKGlyphOrientation&);
+    std::pair<FontOrientation, NonCJKGlyphOrientation> fontAndGlyphOrientation();
 
 #if ENABLE(TEXT_AUTOSIZING)
     float textAutosizingMultiplier() const { return visual->m_textAutosizingMultiplier; }
@@ -1119,6 +1119,10 @@ public:
     int initialLetterDrop() const { return initialLetter().width(); }
     int initialLetterHeight() const { return initialLetter().height(); }
 
+#if ENABLE(TOUCH_EVENTS)
+    TouchAction touchAction() const { return static_cast<TouchAction>(rareNonInheritedData->m_touchAction); }
+#endif
+
 #if ENABLE(CSS_SCROLL_SNAP)
     ScrollSnapType scrollSnapType() const { return static_cast<ScrollSnapType>(rareNonInheritedData->m_scrollSnapType); }
     const ScrollSnapPoints* scrollSnapPointsX() const;
@@ -1201,7 +1205,9 @@ public:
 #if ENABLE(CSS_TRAILING_WORD)
     TrailingWord trailingWord() const { return static_cast<TrailingWord>(rareInheritedData->trailingWord); }
 #endif
-        
+    
+    void checkVariablesInCustomProperties();
+
 // attribute setter methods
 
     void setDisplay(EDisplay v) { noninherited_flags.setEffectiveDisplay(v); }
@@ -1677,6 +1683,10 @@ public:
     
     void setInitialLetter(const IntSize& size) { SET_VAR(rareNonInheritedData, m_initialLetter, size); }
     
+#if ENABLE(TOUCH_EVENTS)
+    void setTouchAction(TouchAction touchAction) { SET_VAR(rareNonInheritedData, m_touchAction, static_cast<unsigned>(touchAction)); }
+#endif
+
 #if ENABLE(CSS_SCROLL_SNAP)
     void setScrollSnapType(ScrollSnapType type) { SET_VAR(rareNonInheritedData, m_scrollSnapType, static_cast<unsigned>(type)); }
     void setScrollSnapPointsX(std::unique_ptr<ScrollSnapPoints>);
@@ -1894,7 +1904,8 @@ public:
     static TextDirection initialDirection() { return LTR; }
     static WritingMode initialWritingMode() { return TopToBottomWritingMode; }
     static TextCombine initialTextCombine() { return TextCombineNone; }
-    static TextOrientation initialTextOrientation() { return TextOrientationVerticalRight; }
+    static TextOrientation initialTextOrientation() { return TextOrientation::
+    Mixed; }
     static ObjectFit initialObjectFit() { return ObjectFitFill; }
     static EEmptyCell initialEmptyCells() { return SHOW; }
     static EListStylePosition initialListStylePosition() { return OUTSIDE; }
@@ -2029,6 +2040,10 @@ public:
     static const AtomicString& initialContentAltText() { return emptyAtom; }
 
     static WillChangeData* initialWillChange() { return nullptr; }
+
+#if ENABLE(TOUCH_EVENTS)
+    static TouchAction initialTouchAction() { return TouchAction::Auto; }
+#endif
 
 #if ENABLE(CSS_SCROLL_SNAP)
     static ScrollSnapType initialScrollSnapType() { return ScrollSnapType::None; }
@@ -2272,10 +2287,10 @@ inline bool RenderStyle::setEffectiveZoom(float f)
 
 inline bool RenderStyle::setTextOrientation(TextOrientation textOrientation)
 {
-    if (compareEqual(rareInheritedData->m_textOrientation, textOrientation))
+    if (compareEqual(rareInheritedData->m_textOrientation, static_cast<unsigned>(textOrientation)))
         return false;
 
-    rareInheritedData.access()->m_textOrientation = textOrientation;
+    rareInheritedData.access()->m_textOrientation = static_cast<unsigned>(textOrientation);
     return true;
 }
 

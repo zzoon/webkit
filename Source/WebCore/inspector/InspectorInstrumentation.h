@@ -146,8 +146,6 @@ public:
 
     static InspectorInstrumentationCookie willCallFunction(ScriptExecutionContext*, const String& scriptName, int scriptLine);
     static void didCallFunction(const InspectorInstrumentationCookie&, ScriptExecutionContext*);
-    static InspectorInstrumentationCookie willDispatchXHRReadyStateChangeEvent(ScriptExecutionContext*, XMLHttpRequest&);
-    static void didDispatchXHRReadyStateChangeEvent(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willDispatchEvent(Document&, const Event&, bool hasEventListeners);
     static void didDispatchEvent(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willHandleEvent(ScriptExecutionContext*, const Event&);
@@ -163,10 +161,6 @@ public:
     static InspectorInstrumentationCookie willLayout(Frame&);
     static void didLayout(const InspectorInstrumentationCookie&, RenderObject*);
     static void didScroll(Page&);
-    static InspectorInstrumentationCookie willDispatchXHRLoadEvent(ScriptExecutionContext*, XMLHttpRequest&);
-    static void didDispatchXHRLoadEvent(const InspectorInstrumentationCookie&);
-    static void willScrollLayer(Frame&);
-    static void didScrollLayer(Frame&);
     static void willComposite(Frame&);
     static void didComposite(Frame&);
     static void willPaint(RenderObject*);
@@ -259,7 +253,7 @@ public:
 #endif
 
 #if ENABLE(WEB_SOCKETS)
-    static void didCreateWebSocket(Document*, unsigned long identifier, const URL& requestURL, const URL& documentURL, const String& protocol);
+    static void didCreateWebSocket(Document*, unsigned long identifier, const URL& requestURL);
     static void willSendWebSocketHandshakeRequest(Document*, unsigned long identifier, const ResourceRequest&);
     static void didReceiveWebSocketHandshakeResponse(Document*, unsigned long identifier, const ResourceResponse&);
     static void didCloseWebSocket(Document*, unsigned long identifier);
@@ -329,8 +323,6 @@ private:
 
     static InspectorInstrumentationCookie willCallFunctionImpl(InstrumentingAgents&, const String& scriptName, int scriptLine, ScriptExecutionContext*);
     static void didCallFunctionImpl(const InspectorInstrumentationCookie&, ScriptExecutionContext*);
-    static InspectorInstrumentationCookie willDispatchXHRReadyStateChangeEventImpl(InstrumentingAgents&, XMLHttpRequest&, ScriptExecutionContext*);
-    static void didDispatchXHRReadyStateChangeEventImpl(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willDispatchEventImpl(InstrumentingAgents&, Document&, const Event&, bool hasEventListeners);
     static InspectorInstrumentationCookie willHandleEventImpl(InstrumentingAgents&, const Event&);
     static void didHandleEventImpl(const InspectorInstrumentationCookie&);
@@ -346,10 +338,6 @@ private:
     static InspectorInstrumentationCookie willLayoutImpl(InstrumentingAgents&, Frame&);
     static void didLayoutImpl(const InspectorInstrumentationCookie&, RenderObject*);
     static void didScrollImpl(InstrumentingAgents&);
-    static InspectorInstrumentationCookie willDispatchXHRLoadEventImpl(InstrumentingAgents&, XMLHttpRequest&, ScriptExecutionContext*);
-    static void didDispatchXHRLoadEventImpl(const InspectorInstrumentationCookie&);
-    static void willScrollLayerImpl(InstrumentingAgents&, Frame&);
-    static void didScrollLayerImpl(InstrumentingAgents&);
     static void willCompositeImpl(InstrumentingAgents&, Frame&);
     static void didCompositeImpl(InstrumentingAgents&);
     static void willPaintImpl(InstrumentingAgents&, RenderObject*);
@@ -441,10 +429,10 @@ private:
 #endif
 
 #if ENABLE(WEB_SOCKETS)
-    static void didCreateWebSocketImpl(InstrumentingAgents&, unsigned long identifier, const URL& requestURL, const URL& documentURL, const String& protocol, Document*);
-    static void willSendWebSocketHandshakeRequestImpl(InstrumentingAgents&, unsigned long identifier, const ResourceRequest&, Document*);
-    static void didReceiveWebSocketHandshakeResponseImpl(InstrumentingAgents&, unsigned long identifier, const ResourceResponse&, Document*);
-    static void didCloseWebSocketImpl(InstrumentingAgents&, unsigned long identifier, Document*);
+    static void didCreateWebSocketImpl(InstrumentingAgents&, unsigned long identifier, const URL& requestURL);
+    static void willSendWebSocketHandshakeRequestImpl(InstrumentingAgents&, unsigned long identifier, const ResourceRequest&);
+    static void didReceiveWebSocketHandshakeResponseImpl(InstrumentingAgents&, unsigned long identifier, const ResourceResponse&);
+    static void didCloseWebSocketImpl(InstrumentingAgents&, unsigned long identifier);
     static void didReceiveWebSocketFrameImpl(InstrumentingAgents&, unsigned long identifier, const WebSocketFrame&);
     static void didSendWebSocketFrameImpl(InstrumentingAgents&, unsigned long identifier, const WebSocketFrame&);
     static void didReceiveWebSocketFrameErrorImpl(InstrumentingAgents&, unsigned long identifier, const String&);
@@ -709,21 +697,6 @@ inline void InspectorInstrumentation::didCallFunction(const InspectorInstrumenta
         didCallFunctionImpl(cookie, context);
 }
 
-inline InspectorInstrumentationCookie InspectorInstrumentation::willDispatchXHRReadyStateChangeEvent(ScriptExecutionContext* context, XMLHttpRequest& request)
-{
-    FAST_RETURN_IF_NO_FRONTENDS(InspectorInstrumentationCookie());
-    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForContext(context))
-        return willDispatchXHRReadyStateChangeEventImpl(*instrumentingAgents, request, context);
-    return InspectorInstrumentationCookie();
-}
-
-inline void InspectorInstrumentation::didDispatchXHRReadyStateChangeEvent(const InspectorInstrumentationCookie& cookie)
-{
-    FAST_RETURN_IF_NO_FRONTENDS(void());
-    if (cookie.isValid())
-        didDispatchXHRReadyStateChangeEventImpl(cookie);
-}
-
 inline InspectorInstrumentationCookie InspectorInstrumentation::willDispatchEvent(Document& document, const Event& event, bool hasEventListeners)
 {
     FAST_RETURN_IF_NO_FRONTENDS(InspectorInstrumentationCookie());
@@ -833,21 +806,6 @@ inline void InspectorInstrumentation::didScroll(Page& page)
     didScrollImpl(instrumentingAgentsForPage(page));
 }
 
-inline InspectorInstrumentationCookie InspectorInstrumentation::willDispatchXHRLoadEvent(ScriptExecutionContext* context, XMLHttpRequest& request)
-{
-    FAST_RETURN_IF_NO_FRONTENDS(InspectorInstrumentationCookie());
-    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForContext(context))
-        return willDispatchXHRLoadEventImpl(*instrumentingAgents, request, context);
-    return InspectorInstrumentationCookie();
-}
-
-inline void InspectorInstrumentation::didDispatchXHRLoadEvent(const InspectorInstrumentationCookie& cookie)
-{
-    FAST_RETURN_IF_NO_FRONTENDS(void());
-    if (cookie.isValid())
-        didDispatchXHRLoadEventImpl(cookie);
-}
-
 inline void InspectorInstrumentation::willComposite(Frame& frame)
 {
     FAST_RETURN_IF_NO_FRONTENDS(void());
@@ -874,20 +832,6 @@ inline void InspectorInstrumentation::didPaint(RenderObject* renderer, const Lay
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForRenderer(renderer))
         didPaintImpl(*instrumentingAgents, renderer, rect);
-}
-
-inline void InspectorInstrumentation::willScrollLayer(Frame& frame)
-{
-    FAST_RETURN_IF_NO_FRONTENDS(void());
-    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
-        willScrollLayerImpl(*instrumentingAgents, frame);
-}
-
-inline void InspectorInstrumentation::didScrollLayer(Frame& frame)
-{
-    FAST_RETURN_IF_NO_FRONTENDS(void());
-    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
-        didScrollLayerImpl(*instrumentingAgents);
 }
 
 inline InspectorInstrumentationCookie InspectorInstrumentation::willRecalculateStyle(Document& document)
@@ -1128,6 +1072,13 @@ inline void InspectorInstrumentation::didWriteHTML(const InspectorInstrumentatio
         didWriteHTMLImpl(cookie, endLine);
 }
 
+inline void InspectorInstrumentation::didOpenDatabase(ScriptExecutionContext* context, RefPtr<Database>&& database, const String& domain, const String& name, const String& version)
+{
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForContext(context))
+        didOpenDatabaseImpl(*instrumentingAgents, WTF::move(database), domain, name, version);
+}
+
 inline void InspectorInstrumentation::didDispatchDOMStorageEvent(const String& key, const String& oldValue, const String& newValue, StorageType storageType, SecurityOrigin* securityOrigin, Page* page)
 {
     FAST_RETURN_IF_NO_FRONTENDS(void());
@@ -1156,44 +1107,51 @@ inline void InspectorInstrumentation::workerGlobalScopeTerminated(ScriptExecutio
 }
 
 #if ENABLE(WEB_SOCKETS)
-inline void InspectorInstrumentation::didCreateWebSocket(Document* document, unsigned long identifier, const URL& requestURL, const URL& documentURL, const String& protocol)
+inline void InspectorInstrumentation::didCreateWebSocket(Document* document, unsigned long identifier, const URL& requestURL)
 {
+    FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        didCreateWebSocketImpl(*instrumentingAgents, identifier, requestURL, documentURL, protocol, document);
+        didCreateWebSocketImpl(*instrumentingAgents, identifier, requestURL);
 }
 
 inline void InspectorInstrumentation::willSendWebSocketHandshakeRequest(Document* document, unsigned long identifier, const ResourceRequest& request)
 {
+    FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        willSendWebSocketHandshakeRequestImpl(*instrumentingAgents, identifier, request, document);
+        willSendWebSocketHandshakeRequestImpl(*instrumentingAgents, identifier, request);
 }
 
 inline void InspectorInstrumentation::didReceiveWebSocketHandshakeResponse(Document* document, unsigned long identifier, const ResourceResponse& response)
 {
+    FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        didReceiveWebSocketHandshakeResponseImpl(*instrumentingAgents, identifier, response, document);
+        didReceiveWebSocketHandshakeResponseImpl(*instrumentingAgents, identifier, response);
 }
 
 inline void InspectorInstrumentation::didCloseWebSocket(Document* document, unsigned long identifier)
 {
+    FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
-        didCloseWebSocketImpl(*instrumentingAgents, identifier, document);
+        didCloseWebSocketImpl(*instrumentingAgents, identifier);
 }
 
 inline void InspectorInstrumentation::didReceiveWebSocketFrame(Document* document, unsigned long identifier, const WebSocketFrame& frame)
 {
+    FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
         didReceiveWebSocketFrameImpl(*instrumentingAgents, identifier, frame);
 }
 
 inline void InspectorInstrumentation::didReceiveWebSocketFrameError(Document* document, unsigned long identifier, const String& errorMessage)
 {
+    FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
         didReceiveWebSocketFrameErrorImpl(*instrumentingAgents, identifier, errorMessage);
 }
 
 inline void InspectorInstrumentation::didSendWebSocketFrame(Document* document, unsigned long identifier, const WebSocketFrame& frame)
 {
+    FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
         didSendWebSocketFrameImpl(*instrumentingAgents, identifier, frame);
 }

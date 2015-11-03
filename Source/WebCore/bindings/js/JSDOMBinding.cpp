@@ -159,7 +159,7 @@ void reportException(ExecState* exec, JSValue exceptionValue, CachedScript* cach
     reportException(exec, exception, cachedScript);
 }
 
-void reportException(ExecState* exec, Exception* exception, CachedScript* cachedScript)
+void reportException(ExecState* exec, Exception* exception, CachedScript* cachedScript, ExceptionDetails* exceptionDetails)
 {
     RELEASE_ASSERT(exec->vm().currentThreadIsHoldingAPILock());
     if (isTerminatedExecutionException(exception))
@@ -173,7 +173,7 @@ void reportException(ExecState* exec, Exception* exception, CachedScript* cached
 
     JSDOMGlobalObject* globalObject = jsCast<JSDOMGlobalObject*>(exec->lexicalGlobalObject());
     if (JSDOMWindow* window = jsDynamicCast<JSDOMWindow*>(globalObject)) {
-        if (!window->impl().isCurrentlyDisplayedInFrame())
+        if (!window->wrapped().isCurrentlyDisplayedInFrame())
             return;
     }
 
@@ -202,6 +202,13 @@ void reportException(ExecState* exec, Exception* exception, CachedScript* cached
 
     ScriptExecutionContext* scriptExecutionContext = globalObject->scriptExecutionContext();
     scriptExecutionContext->reportException(errorMessage, lineNumber, columnNumber, exceptionSourceURL, callStack->size() ? callStack : 0, cachedScript);
+
+    if (exceptionDetails) {
+        exceptionDetails->message = errorMessage;
+        exceptionDetails->lineNumber = lineNumber;
+        exceptionDetails->columnNumber = columnNumber;
+        exceptionDetails->sourceURL = exceptionSourceURL;
+    }
 }
 
 void reportCurrentException(ExecState* exec)
@@ -508,12 +515,12 @@ uint64_t toUInt64(ExecState* exec, JSValue value, IntegerConversionConfiguration
 
 DOMWindow& activeDOMWindow(ExecState* exec)
 {
-    return asJSDOMWindow(exec->lexicalGlobalObject())->impl();
+    return asJSDOMWindow(exec->lexicalGlobalObject())->wrapped();
 }
 
 DOMWindow& firstDOMWindow(ExecState* exec)
 {
-    return asJSDOMWindow(exec->vmEntryGlobalObject())->impl();
+    return asJSDOMWindow(exec->vmEntryGlobalObject())->wrapped();
 }
 
 static inline bool canAccessDocument(JSC::ExecState* state, Document* targetDocument, SecurityReportingOption reportingOption = ReportSecurityError)

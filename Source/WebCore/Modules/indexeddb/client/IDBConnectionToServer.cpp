@@ -28,10 +28,12 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include "IDBKeyRangeData.h"
 #include "IDBOpenDBRequestImpl.h"
 #include "IDBRequestData.h"
 #include "IDBResultData.h"
 #include "Logging.h"
+#include "TransactionOperation.h"
 
 namespace WebCore {
 namespace IDBClient {
@@ -93,23 +95,222 @@ void IDBConnectionToServer::didOpenDatabase(const IDBResultData& resultData)
     request->requestCompleted(resultData);
 }
 
-void IDBConnectionToServer::fireVersionChangeEvent(uint64_t /*databaseConnectionIdentifier*/ , uint64_t /*requestedVersion*/)
+void IDBConnectionToServer::createObjectStore(TransactionOperation& operation, const IDBObjectStoreInfo& info)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::createObjectStore");
+
+    saveOperation(operation);
+
+    m_delegate->createObjectStore(IDBRequestData(operation), info);
+}
+
+void IDBConnectionToServer::didCreateObjectStore(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didCreateObjectStore");
+    completeOperation(resultData);
+}
+
+void IDBConnectionToServer::deleteObjectStore(TransactionOperation& operation, const String& objectStoreName)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::deleteObjectStore");
+
+    saveOperation(operation);
+
+    m_delegate->deleteObjectStore(IDBRequestData(operation), objectStoreName);
+}
+
+void IDBConnectionToServer::didDeleteObjectStore(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didDeleteObjectStore");
+    completeOperation(resultData);
+}
+
+void IDBConnectionToServer::clearObjectStore(TransactionOperation& operation, uint64_t objectStoreIdentifier)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::clearObjectStore");
+
+    saveOperation(operation);
+
+    m_delegate->clearObjectStore(IDBRequestData(operation), objectStoreIdentifier);
+}
+
+void IDBConnectionToServer::didClearObjectStore(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didClearObjectStore");
+    completeOperation(resultData);
+}
+
+void IDBConnectionToServer::putOrAdd(TransactionOperation& operation, RefPtr<IDBKey>& key, RefPtr<SerializedScriptValue>& value, const IndexedDB::ObjectStoreOverwriteMode overwriteMode)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::putOrAdd");
+
+    saveOperation(operation);
+    m_delegate->putOrAdd(IDBRequestData(operation), key.get(), *value, overwriteMode);
+}
+
+void IDBConnectionToServer::didPutOrAdd(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didPutOrAdd");
+    completeOperation(resultData);
+}
+
+void IDBConnectionToServer::getRecord(TransactionOperation& operation, const IDBKeyRangeData& keyRangeData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::getRecord");
+
+    ASSERT(!keyRangeData.isNull);
+
+    saveOperation(operation);
+    m_delegate->getRecord(IDBRequestData(operation), keyRangeData);
+}
+
+void IDBConnectionToServer::didGetRecord(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didGetRecord");
+    completeOperation(resultData);
+}
+
+void IDBConnectionToServer::getCount(TransactionOperation& operation, const IDBKeyRangeData& keyRangeData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::getCount");
+
+    ASSERT(!keyRangeData.isNull);
+
+    saveOperation(operation);
+    m_delegate->getCount(IDBRequestData(operation), keyRangeData);
+}
+
+void IDBConnectionToServer::didGetCount(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didGetCount");
+    completeOperation(resultData);
+}
+
+void IDBConnectionToServer::deleteRecord(TransactionOperation& operation, const IDBKeyRangeData& keyRangeData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::deleteRecord");
+
+    ASSERT(!keyRangeData.isNull);
+
+    saveOperation(operation);
+    m_delegate->deleteRecord(IDBRequestData(operation), keyRangeData);
+}
+
+void IDBConnectionToServer::didDeleteRecord(const IDBResultData& resultData)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didDeleteRecord");
+    completeOperation(resultData);
+}
+
+void IDBConnectionToServer::establishTransaction(IDBTransaction& transaction)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::establishTransaction");
+
+    ASSERT(!hasRecordOfTransaction(transaction));
+    m_pendingTransactions.set(transaction.info().identifier(), &transaction);
+
+    m_delegate->establishTransaction(transaction.database().databaseConnectionIdentifier(), transaction.info());
+}
+
+void IDBConnectionToServer::commitTransaction(IDBTransaction& transaction)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::commitTransaction");
+    ASSERT(!m_committingTransactions.contains(transaction.info().identifier()));
+    m_committingTransactions.set(transaction.info().identifier(), &transaction);
+
+    auto identifier = transaction.info().identifier();
+    m_delegate->commitTransaction(identifier);
+}
+
+void IDBConnectionToServer::didCommitTransaction(const IDBResourceIdentifier& transactionIdentifier, const IDBError& error)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didCommitTransaction");
+
+    auto transaction = m_committingTransactions.take(transactionIdentifier);
+    ASSERT(transaction);
+
+    transaction->didCommit(error);
+}
+
+void IDBConnectionToServer::abortTransaction(IDBTransaction& transaction)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::abortTransaction");
+    ASSERT(!m_abortingTransactions.contains(transaction.info().identifier()));
+    m_abortingTransactions.set(transaction.info().identifier(), &transaction);
+
+    auto identifier = transaction.info().identifier();
+    m_delegate->abortTransaction(identifier);
+}
+
+void IDBConnectionToServer::didAbortTransaction(const IDBResourceIdentifier& transactionIdentifier, const IDBError& error)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didAbortTransaction");
+
+    auto transaction = m_abortingTransactions.take(transactionIdentifier);
+    ASSERT(transaction);
+
+    transaction->didAbort(error);
+}
+
+void IDBConnectionToServer::fireVersionChangeEvent(uint64_t databaseConnectionIdentifier, uint64_t requestedVersion)
 {
     LOG(IndexedDB, "IDBConnectionToServer::fireVersionChangeEvent");
 
-    // FIXME: Implement versionchange events firing on already-open transactions.
+    auto connection = m_databaseConnectionMap.get(databaseConnectionIdentifier);
+    if (!connection)
+        return;
+
+    connection->fireVersionChangeEvent(requestedVersion);
+}
+
+void IDBConnectionToServer::didStartTransaction(const IDBResourceIdentifier& transactionIdentifier, const IDBError& error)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::didStartTransaction");
+
+    auto transaction = m_pendingTransactions.take(transactionIdentifier);
+    ASSERT(transaction);
+
+    transaction->didStart(error);
+}
+
+void IDBConnectionToServer::databaseConnectionClosed(IDBDatabase& database)
+{
+    LOG(IndexedDB, "IDBConnectionToServer::databaseConnectionClosed");
+
+    m_delegate->databaseConnectionClosed(database.databaseConnectionIdentifier());
 }
 
 void IDBConnectionToServer::registerDatabaseConnection(IDBDatabase& database)
 {
-    ASSERT(!m_databaseConnections.contains(&database));
-    m_databaseConnections.add(&database);
+    ASSERT(!m_databaseConnectionMap.contains(database.databaseConnectionIdentifier()));
+    m_databaseConnectionMap.set(database.databaseConnectionIdentifier(), &database);
 }
 
 void IDBConnectionToServer::unregisterDatabaseConnection(IDBDatabase& database)
 {
-    ASSERT(m_databaseConnections.contains(&database));
-    m_databaseConnections.remove(&database);
+    ASSERT(m_databaseConnectionMap.contains(database.databaseConnectionIdentifier()));
+    ASSERT(m_databaseConnectionMap.get(database.databaseConnectionIdentifier()) == &database);
+    m_databaseConnectionMap.remove(database.databaseConnectionIdentifier());
+}
+
+void IDBConnectionToServer::saveOperation(TransactionOperation& operation)
+{
+    ASSERT(!m_activeOperations.contains(operation.identifier()));
+    m_activeOperations.set(operation.identifier(), &operation);
+}
+
+void IDBConnectionToServer::completeOperation(const IDBResultData& resultData)
+{
+    auto operation = m_activeOperations.take(resultData.requestIdentifier());
+    ASSERT(operation);
+
+    operation->completed(resultData);
+}
+
+bool IDBConnectionToServer::hasRecordOfTransaction(const IDBTransaction& transaction) const
+{
+    auto identifier = transaction.info().identifier();
+    return m_pendingTransactions.contains(identifier) || m_committingTransactions.contains(identifier) || m_abortingTransactions.contains(identifier);
 }
 
 } // namespace IDBClient
