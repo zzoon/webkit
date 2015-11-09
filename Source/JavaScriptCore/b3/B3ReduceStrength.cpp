@@ -28,6 +28,7 @@
 
 #if ENABLE(B3_JIT)
 
+#include "B3BasicBlockInlines.h"
 #include "B3ControlValue.h"
 #include "B3IndexSet.h"
 #include "B3InsertionSetInlines.h"
@@ -43,6 +44,42 @@ namespace JSC { namespace B3 {
 
 namespace {
 
+// The goal of this phase is to:
+//
+// - Replace operations with less expensive variants. This includes constant folding and classic
+//   strength reductions like turning Mul(x, 1 << k) into Shl(x, k).
+//
+// - Reassociate constant operations. For example, Load(Add(x, c)) is turned into Load(x, offset = c)
+//   and Add(Add(x, c), d) is turned into Add(x, c + d).
+//
+// - Canonicalize operations. There are some cases where it's not at all obvious which kind of
+//   operation is less expensive, but it's useful for subsequent phases - particularly LowerToAir -
+//   to have only one way of representing things.
+//
+// This phase runs to fixpoint. Therefore, the canonicalizations must be designed to be monotonic.
+// For example, if we had a canonicalization that said that Add(x, -c) should be Sub(x, c) and
+// another canonicalization that said that Sub(x, d) should be Add(x, -d), then this phase would end
+// up running forever. We don't want that.
+//
+// Therefore, we need to prioritize certain canonical forms over others. Naively, we want strength
+// reduction to reduce the number of values, and so a form involving fewer total values is more
+// canonical. But we might break this, for example when reducing strength of Mul(x, 9). This could be
+// better written as Add(Shl(x, 3), x), which also happens to be representable using a single
+// instruction on x86.
+//
+// Here are some of the rules we have:
+//
+// Canonical form of logical not: BitXor(value, 1). We may have to avoid using this form if we don't
+// know for sure that 'value' is 0-or-1 (i.e. returnsBool). In that case we fall back on
+// Equal(value, 0).
+//
+// Canonical form of commutative operations: if the operation involves a constant, the constant must
+// come second. Add(x, constant) is canonical, while Add(constant, x) is not. If there are no
+// constants then the canonical form involves the lower-indexed value first. Given Add(x, y), it's
+// canonical if x->index() <= y->index().
+
+bool verbose = false;
+
 class ReduceStrength {
 public:
     ReduceStrength(Procedure& proc)
@@ -54,9 +91,19 @@ public:
     bool run()
     {
         bool result = false;
+        bool first = true;
+        unsigned index = 0;
         do {
             m_changed = false;
             m_changedCFG = false;
+            ++index;
+
+            if (first)
+                first = false;
+            else if (verbose) {
+                dataLog("B3 after iteration #", index - 1, " of reduceStrength:\n");
+                dataLog(m_proc);
+            }
 
             for (BasicBlock* block : m_proc.blocksInPreOrder()) {
                 m_block = block;
@@ -65,6 +112,8 @@ public:
                     process();
                 m_insertionSet.execute(m_block);
             }
+
+            simplifyCFG();
 
             if (m_changedCFG) {
                 m_proc.resetReachability();
@@ -137,6 +186,191 @@ private:
 
             break;
 
+        case BitAnd:
+            handleCommutativity();
+
+            // Turn this: BitAnd(constant1, constant2)
+            // Into this: constant1 & constant2
+            if (Value* constantBitAnd = m_value->child(0)->bitAndConstant(m_proc, m_value->child(1))) {
+                replaceWithNewValue(constantBitAnd);
+                break;
+            }
+
+            // Turn this: BitAnd(BitAnd(value, constant1), constant2)
+            // Into this: BitAnd(value, constant1 & constant2).
+            if (m_value->child(0)->opcode() == BitAnd) {
+                Value* newConstant = m_value->child(1)->bitAndConstant(m_proc, m_value->child(0)->child(1));
+                if (newConstant) {
+                    m_insertionSet.insertValue(m_index, newConstant);
+                    m_value->child(0) = m_value->child(0)->child(0);
+                    m_value->child(1) = newConstant;
+                    m_changed = true;
+                }
+            }
+
+            // Turn this: BitAnd(valueX, valueX)
+            // Into this: valueX.
+            if (m_value->child(0) == m_value->child(1)) {
+                m_value->replaceWithIdentity(m_value->child(0));
+                m_changed = true;
+                break;
+            }
+
+            // Turn this: BitAnd(value, zero-constant)
+            // Into this: zero-constant.
+            if (m_value->child(1)->isInt(0)) {
+                m_value->replaceWithIdentity(m_value->child(1));
+                m_changed = true;
+                break;
+            }
+
+            // Turn this: BitAnd(value, all-ones)
+            // Into this: value.
+            if ((m_value->type() == Int64 && m_value->child(1)->isInt(0xffffffffffffffff))
+                || (m_value->type() == Int32 && m_value->child(1)->isInt(0xffffffff))) {
+                m_value->replaceWithIdentity(m_value->child(0));
+                m_changed = true;
+                break;
+            }
+
+            break;
+
+        case BitOr:
+            handleCommutativity();
+
+            // Turn this: BitOr(constant1, constant2)
+            // Into this: constant1 | constant2
+            if (Value* constantBitOr = m_value->child(0)->bitOrConstant(m_proc, m_value->child(1))) {
+                replaceWithNewValue(constantBitOr);
+                break;
+            }
+
+            // Turn this: BitOr(BitOr(value, constant1), constant2)
+            // Into this: BitOr(value, constant1 & constant2).
+            if (m_value->child(0)->opcode() == BitOr) {
+                Value* newConstant = m_value->child(1)->bitOrConstant(m_proc, m_value->child(0)->child(1));
+                if (newConstant) {
+                    m_insertionSet.insertValue(m_index, newConstant);
+                    m_value->child(0) = m_value->child(0)->child(0);
+                    m_value->child(1) = newConstant;
+                    m_changed = true;
+                }
+            }
+
+            // Turn this: BitOr(valueX, valueX)
+            // Into this: valueX.
+            if (m_value->child(0) == m_value->child(1)) {
+                m_value->replaceWithIdentity(m_value->child(0));
+                m_changed = true;
+                break;
+            }
+
+            // Turn this: BitOr(value, zero-constant)
+            // Into this: value.
+            if (m_value->child(1)->isInt(0)) {
+                m_value->replaceWithIdentity(m_value->child(0));
+                m_changed = true;
+                break;
+            }
+
+            // Turn this: BitOr(value, all-ones)
+            // Into this: all-ones.
+            if ((m_value->type() == Int64 && m_value->child(1)->isInt(0xffffffffffffffff))
+                || (m_value->type() == Int32 && m_value->child(1)->isInt(0xffffffff))) {
+                m_value->replaceWithIdentity(m_value->child(1));
+                m_changed = true;
+                break;
+            }
+
+            break;
+
+        case BitXor:
+            handleCommutativity();
+
+            // Turn this: BitXor(constant1, constant2)
+            // Into this: constant1 ^ constant2
+            if (Value* constantBitXor = m_value->child(0)->bitXorConstant(m_proc, m_value->child(1))) {
+                replaceWithNewValue(constantBitXor);
+                break;
+            }
+
+            // Turn this: BitXor(BitXor(value, constant1), constant2)
+            // Into this: BitXor(value, constant1 ^ constant2).
+            if (m_value->child(0)->opcode() == BitXor) {
+                Value* newConstant = m_value->child(1)->bitXorConstant(m_proc, m_value->child(0)->child(1));
+                if (newConstant) {
+                    m_insertionSet.insertValue(m_index, newConstant);
+                    m_value->child(0) = m_value->child(0)->child(0);
+                    m_value->child(1) = newConstant;
+                    m_changed = true;
+                }
+            }
+
+            // Turn this: BitXor(compare, 1)
+            // Into this: invertedCompare
+            if (m_value->child(1)->isInt32(1)) {
+                if (Value* invertedCompare = m_value->child(0)->invertedCompare(m_proc)) {
+                    replaceWithNewValue(invertedCompare);
+                    break;
+                }
+            }
+
+            // Turn this: BitXor(valueX, valueX)
+            // Into this: zero-constant.
+            if (m_value->child(0) == m_value->child(1)) {
+                replaceWithNewValue(m_proc.addIntConstant(m_value->type(), 0));
+                break;
+            }
+
+            // Turn this: BitXor(value, zero-constant)
+            // Into this: value.
+            if (m_value->child(1)->isInt(0)) {
+                m_value->replaceWithIdentity(m_value->child(0));
+                m_changed = true;
+                break;
+            }
+
+            break;
+
+        case Shl:
+            // Turn this: Shl(constant1, constant2)
+            // Into this: constant1 << constant2
+            if (Value* constant = m_value->child(0)->shlConstant(m_proc, m_value->child(1))) {
+                replaceWithNewValue(constant);
+                break;
+            }
+
+            if (handleShiftByZero())
+                break;
+
+            break;
+
+        case SShr:
+            // Turn this: SShr(constant1, constant2)
+            // Into this: constant1 >> constant2
+            if (Value* constant = m_value->child(0)->sShrConstant(m_proc, m_value->child(1))) {
+                replaceWithNewValue(constant);
+                break;
+            }
+
+            if (handleShiftByZero())
+                break;
+
+            break;
+
+        case ZShr:
+            // Turn this: ZShr(constant1, constant2)
+            // Into this: (unsigned)constant1 >> constant2
+            if (Value* constant = m_value->child(0)->zShrConstant(m_proc, m_value->child(1))) {
+                replaceWithNewValue(constant);
+                break;
+            }
+
+            if (handleShiftByZero())
+                break;
+
+            break;
+
         case Load8Z:
         case Load8S:
         case Load16Z:
@@ -192,16 +426,15 @@ private:
         case Equal:
             handleCommutativity();
 
-            // Turn this: Equal(Equal(x, 0), 0)
-            // Into this: NotEqual(x, 0)
-            if (m_value->child(0)->opcode() == Equal && m_value->child(1)->isInt32(0)
-                && m_value->child(0)->child(1)->isLikeZero()) {
+            // Turn this: Equal(bool, 0)
+            // Into this: BitXor(bool, 1)
+            if (m_value->child(0)->returnsBool() && m_value->child(1)->isInt32(0)) {
                 replaceWithNew<Value>(
-                    NotEqual, m_value->origin(),
-                    m_value->child(0)->child(0), m_value->child(0)->child(1));
+                    BitXor, m_value->origin(), m_value->child(0),
+                    m_insertionSet.insert<Const32Value>(m_index, m_value->origin(), 1));
                 break;
             }
-
+            
             // Turn this Equal(bool, 1)
             // Into this: bool
             if (m_value->child(0)->returnsBool() && m_value->child(1)->isInt32(1)) {
@@ -210,13 +443,10 @@ private:
                 break;
             }
 
-            // FIXME: Have a compare-flipping optimization, like Equal(LessThan(a, b), 0) turns into
-            // GreaterEqual(a, b).
-            // https://bugs.webkit.org/show_bug.cgi?id=150726
-
             // Turn this: Equal(const1, const2)
             // Into this: const1 == const2
-            replaceWithNewValue(m_value->child(0)->equalConstant(m_proc, m_value->child(1)));
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->equalConstant(m_value->child(1))));
             break;
             
         case NotEqual:
@@ -242,7 +472,51 @@ private:
 
             // Turn this: NotEqual(const1, const2)
             // Into this: const1 != const2
-            replaceWithNewValue(m_value->child(0)->notEqualConstant(m_proc, m_value->child(1)));
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->notEqualConstant(m_value->child(1))));
+            break;
+
+        case LessThan:
+            // FIXME: We could do a better job of canonicalizing integer comparisons.
+            // https://bugs.webkit.org/show_bug.cgi?id=150958
+
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->lessThanConstant(m_value->child(1))));
+            break;
+
+        case GreaterThan:
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->greaterThanConstant(m_value->child(1))));
+            break;
+
+        case LessEqual:
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->lessEqualConstant(m_value->child(1))));
+            break;
+
+        case GreaterEqual:
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->greaterEqualConstant(m_value->child(1))));
+            break;
+
+        case Above:
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->aboveConstant(m_value->child(1))));
+            break;
+
+        case Below:
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->belowConstant(m_value->child(1))));
+            break;
+
+        case AboveEqual:
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->aboveEqualConstant(m_value->child(1))));
+            break;
+
+        case BelowEqual:
+            replaceWithNewValue(
+                m_proc.addBoolConstant(m_value->child(0)->belowEqualConstant(m_value->child(1))));
             break;
 
         case Branch: {
@@ -250,14 +524,24 @@ private:
 
             // Turn this: Branch(NotEqual(x, 0))
             // Into this: Branch(x)
-            if (branch->child(0)->opcode() == NotEqual && branch->child(0)->child(1)->isLikeZero()) {
+            if (branch->child(0)->opcode() == NotEqual && branch->child(0)->child(1)->isInt(0)) {
                 branch->child(0) = branch->child(0)->child(0);
                 m_changed = true;
             }
 
             // Turn this: Branch(Equal(x, 0), then, else)
             // Into this: Branch(x, else, then)
-            if (branch->child(0)->opcode() == Equal && branch->child(0)->child(1)->isLikeZero()) {
+            if (branch->child(0)->opcode() == Equal && branch->child(0)->child(1)->isInt(0)) {
+                branch->child(0) = branch->child(0)->child(0);
+                std::swap(branch->taken(), branch->notTaken());
+                m_changed = true;
+            }
+            
+            // Turn this: Branch(BitXor(bool, 1), then, else)
+            // Into this: Branch(bool, else, then)
+            if (branch->child(0)->opcode() == BitXor
+                && branch->child(0)->child(1)->isInt32(1)
+                && branch->child(0)->child(0)->returnsBool()) {
                 branch->child(0) = branch->child(0)->child(0);
                 std::swap(branch->taken(), branch->notTaken());
                 m_changed = true;
@@ -268,6 +552,7 @@ private:
             // Turn this: Branch(0, then, else)
             // Into this: Jump(else)
             if (triState == FalseTriState) {
+                branch->taken().block()->removePredecessor(m_block);
                 branch->convertToJump(branch->notTaken());
                 m_changedCFG = true;
                 break;
@@ -276,6 +561,7 @@ private:
             // Turn this: Branch(not 0, then, else)
             // Into this: Jump(then)
             if (triState == TrueTriState) {
+                branch->notTaken().block()->removePredecessor(m_block);
                 branch->convertToJump(branch->taken());
                 m_changedCFG = true;
                 break;
@@ -330,6 +616,129 @@ private:
         m_insertionSet.insertValue(m_index, newValue);
         m_value->replaceWithIdentity(newValue);
         m_changed = true;
+    }
+
+    bool handleShiftByZero()
+    {
+        // Shift anything by zero is identity.
+        if (m_value->child(1)->isInt(0)) {
+            m_value->replaceWithIdentity(m_value->child(0));
+            m_changed = true;
+            return true;
+        }
+        return false;
+    }
+
+    void simplifyCFG()
+    {
+        // We have three easy simplification rules:
+        //
+        // 1) If a successor is a block that just jumps to another block, then jump directly to
+        //    that block.
+        //
+        // 2) If all successors are the same and the operation has no effects, then use a jump
+        //    instead.
+        //
+        // 3) If you jump to a block that is not you and has one predecessor, then merge.
+        //
+        // Note that because of the first rule, this phase may introduce critical edges. That's fine.
+        // If you need broken critical edges, then you have to break them yourself.
+
+        // Note that this relies on predecessors being at least conservatively correct. It's fine for
+        // predecessors to mention a block that isn't actually a predecessor. It's *not* fine for a
+        // predecessor to be omitted. We assert as much in the loop. In practice, we precisely preserve
+        // predecessors during strength reduction since that minimizes the total number of fixpoint
+        // iterations needed to kill a lot of code.
+
+        for (BasicBlock* block : m_proc) {
+            checkPredecessorValidity();
+
+            // We don't care about blocks that don't have successors.
+            if (!block->numSuccessors())
+                continue;
+
+            // First check if any of the successors of this block can be forwarded over.
+            for (BasicBlock*& successor : block->successorBlocks()) {
+                if (successor != block
+                    && successor->size() == 1
+                    && successor->last()->opcode() == Jump) {
+                    BasicBlock* newSuccessor = successor->successorBlock(0);
+                    if (newSuccessor != successor) {
+                        newSuccessor->replacePredecessor(successor, block);
+                        successor = newSuccessor;
+                        m_changedCFG = true;
+                    }
+                }
+            }
+
+            // Now check if the block's terminal can be replaced with a jump.
+            if (block->numSuccessors() > 1) {
+                // The terminal must not have weird effects.
+                Effects effects = block->last()->effects();
+                effects.terminal = false;
+                if (!effects.mustExecute()) {
+                    // All of the successors must be the same.
+                    bool allSame = true;
+                    FrequentedBlock firstSuccessor = block->successor(0);
+                    for (unsigned i = 1; i < block->numSuccessors(); ++i) {
+                        if (block->successorBlock(i) != firstSuccessor.block()) {
+                            allSame = false;
+                            break;
+                        }
+                    }
+                    if (allSame) {
+                        block->last()->as<ControlValue>()->convertToJump(firstSuccessor);
+                        m_changedCFG = true;
+                    }
+                }
+            }
+
+            // Finally handle jumps to a block with one predecessor.
+            if (block->numSuccessors() == 1) {
+                BasicBlock* successor = block->successorBlock(0);
+                if (successor != block && successor->numPredecessors() == 1) {
+                    RELEASE_ASSERT(successor->predecessor(0) == block);
+                    
+                    // We can merge the two blocks, because the predecessor only jumps to the successor
+                    // and the successor is only reachable from the predecessor.
+                    
+                    // Remove the terminal.
+                    Value* value = block->values().takeLast();
+                    Origin jumpOrigin = value->origin();
+                    RELEASE_ASSERT(value->as<ControlValue>());
+                    m_proc.deleteValue(value);
+                    
+                    // Append the full contents of the successor to the predecessor.
+                    block->values().appendVector(successor->values());
+                    
+                    // Make sure that the successor has nothing left in it. Make sure that the block
+                    // has a terminal so that nobody chokes when they look at it.
+                    successor->values().resize(0);
+                    successor->appendNew<ControlValue>(m_proc, Oops, jumpOrigin);
+                    
+                    // Ensure that predecessors of block's new successors know what's up.
+                    for (BasicBlock* newSuccessor : block->successorBlocks())
+                        newSuccessor->replacePredecessor(successor, block);
+                    m_changedCFG = true;
+                }
+            }
+        }
+
+        if (m_changedCFG && verbose) {
+            dataLog("B3 after simplifyCFG:\n");
+            dataLog(m_proc);
+        }
+    }
+
+    void checkPredecessorValidity()
+    {
+        if (!shouldValidateIRAtEachPhase())
+            return;
+
+        for (BasicBlock* block : m_proc) {
+            for (BasicBlock* successor : block->successorBlocks())
+                RELEASE_ASSERT(successor->containsPredecessor(block));
+        }
     }
 
     void killDeadCode()

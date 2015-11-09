@@ -47,7 +47,7 @@ public:
     }
 
 protected:
-    void dumpMeta(PrintStream&) const override;
+    void dumpMeta(CommaPrinter&, PrintStream&) const override;
 
 private:
     friend class Procedure;
@@ -56,7 +56,7 @@ private:
     // the Upsilons without the Phi, then create the Phi, then go back and tell the Upsilons about
     // the Phi. This allows you to emit code in its natural order.
     UpsilonValue(unsigned index, Origin origin, Value* value, Value* phi = nullptr)
-        : Value(index, Upsilon, Void, origin, value)
+        : Value(index, CheckedOpcode, Upsilon, Void, origin, value)
         , m_phi(phi)
     {
         if (phi) {

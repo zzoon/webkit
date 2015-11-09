@@ -30,15 +30,21 @@
 
 #include "IDBKeyData.h"
 #include "IDBObjectStoreInfo.h"
+#include "MemoryIndex.h"
 #include "ThreadSafeDataBuffer.h"
 #include <set>
 #include <wtf/HashMap.h>
 
 namespace WebCore {
 
+class IDBError;
 class IDBKeyData;
 
 struct IDBKeyRangeData;
+
+namespace IndexedDB {
+enum class IndexRecordType;
+}
 
 namespace IDBServer {
 
@@ -56,6 +62,8 @@ public:
     void writeTransactionStarted(MemoryBackingStoreTransaction&);
     void writeTransactionFinished(MemoryBackingStoreTransaction&);
 
+    IDBError createIndex(MemoryBackingStoreTransaction&, const IDBIndexInfo&);
+
     bool containsRecord(const IDBKeyData&);
     void deleteRecord(const IDBKeyData&);
     void deleteRange(const IDBKeyRangeData&);
@@ -70,7 +78,8 @@ public:
     void replaceKeyValueStore(std::unique_ptr<KeyValueMap>&&);
 
     ThreadSafeDataBuffer valueForKeyRange(const IDBKeyRangeData&) const;
-    uint64_t countForKeyRange(const IDBKeyRangeData&) const;
+    IDBGetResult indexValueForKeyRange(uint64_t indexIdentifier, IndexedDB::IndexRecordType, const IDBKeyRangeData&) const;
+    uint64_t countForKeyRange(uint64_t indexIdentifier, const IDBKeyRangeData&) const;
 
     const IDBObjectStoreInfo& info() const { return m_info; }
 
@@ -86,6 +95,11 @@ private:
 
     std::unique_ptr<KeyValueMap> m_keyValueStore;
     std::unique_ptr<std::set<IDBKeyData>> m_orderedKeys;
+
+    void registerIndex(std::unique_ptr<MemoryIndex>&&);
+    void unregisterIndex(MemoryIndex&);
+    HashMap<uint64_t, std::unique_ptr<MemoryIndex>> m_indexesByIdentifier;
+    HashMap<String, MemoryIndex*> m_indexesByName;
 };
 
 } // namespace IDBServer

@@ -25,7 +25,7 @@
  */
 
 // @conditional=ENABLE(STREAMS_API)
-// @internals
+// @internal
 
 function isWritableStream(stream)
 {
@@ -39,20 +39,20 @@ function syncWritableStreamStateWithQueue(stream)
     "use strict";
 
     if (stream.@state === @streamClosing)
-        return undefined;
+        return;
 
     // FIXME
     // assert(stream.@state === @streamWritable || stream.@state === @streamWaiting);
 
-    if (stream.@queue.size > stream.@strategy.highWaterMark) {
+    const shouldApplyBackpressure = stream.@queue.size > stream.@strategy.highWaterMark;
+    if (shouldApplyBackpressure && stream.@state === @streamWritable) {
         stream.@state = @streamWaiting;
-        stream.@readyPromise = @createNewStreamsPromise();
-    } else {
-        stream.@state = @streamWritable;
-        @resolveStreamsPromise(stream.@readyPromise, undefined);
+        stream.@readyPromiseCapability = @newPromiseCapability(@Promise);
     }
-
-    return undefined;
+    if (!shouldApplyBackpressure && stream.@state === @streamWaiting) {
+        stream.@state = @streamWritable;
+        stream.@readyPromiseCapability.@resolve.@call(undefined, undefined);
+    }
 }
 
 function errorWritableStream(e)
@@ -63,13 +63,13 @@ function errorWritableStream(e)
         return undefined;
     while (this.@queue.content.length > 0) {
         var writeRecord = @dequeueValue(this.@queue);
-        if (writeRecord !== "close" && writeRecord.promise)
-            @rejectStreamsPromise(writeRecord.promise, e);
+        if (writeRecord !== "close")
+            writeRecord.promiseCapability.@reject.@call(undefined, e);
     }
     this.@storedError = e;
     if (this.@state === @streamWaiting)
-        @resolveStreamsPromise(this.@readyPromise, undefined);
-    @rejectStreamsPromise(this.@closedPromise, e);
+        this.@readyPromiseCapability.@resolve.@call(undefined, undefined);
+    this.@closedPromiseCapability.@reject.@call(undefined, e);
     this.@state = @streamErrored;
     return undefined;
 }
@@ -106,7 +106,7 @@ function writableStreamAdvanceQueue(stream)
             if (stream.@state === @streamErrored)
                 return;
             stream.@writing = false;
-            @resolveStreamsPromise(writeRecord.promise, undefined);
+            writeRecord.promiseCapability.@resolve.@call(undefined, undefined);
             @dequeueValue(stream.@queue);
             @syncWritableStreamStateWithQueue(stream);
             @writableStreamAdvanceQueue(stream);
@@ -129,7 +129,7 @@ function closeWritableStream(stream)
                 return;
             // FIXME
             // assert(stream.@state === @streamClosing);
-            @resolveStreamsPromise(stream.@closedPromise, undefined);
+            stream.@closedPromiseCapability.@resolve.@call(undefined, undefined);
             stream.@state = @streamClosed;
         },
         function(r) {

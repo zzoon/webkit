@@ -57,14 +57,14 @@ public:
     }
 
 protected:
-    void dumpMeta(PrintStream&) const override;
+    void dumpMeta(CommaPrinter&, PrintStream&) const override;
 
 private:
     friend class Air::StackSlot;
     friend class Procedure;
 
     StackSlotValue(unsigned index, Origin origin, unsigned byteSize, StackSlotKind kind)
-        : Value(index, StackSlot, pointerType(), origin)
+        : Value(index, CheckedOpcode, StackSlot, pointerType(), origin)
         , m_byteSize(byteSize)
         , m_kind(kind)
         , m_offsetFromFP(0)

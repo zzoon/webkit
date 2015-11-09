@@ -318,6 +318,8 @@ public:
             && negate->canSpeculateInt52(pass);
     }
 
+    bool canOptimizeStringObjectAccess(const CodeOrigin&);
+
     bool roundShouldSpeculateInt32(Node* arithRound, PredictionPass pass)
     {
         ASSERT(arithRound->op() == ArithRound);
@@ -762,7 +764,7 @@ public:
             for (VirtualRegister reg = exclusionStart; reg < exclusionEnd; reg += 1)
                 functor(reg);
             
-            codeOriginPtr = inlineCallFrame->getCallerSkippingDeadFrames();
+            codeOriginPtr = inlineCallFrame->getCallerSkippingTailCalls();
 
             // The first inline call frame could be an inline tail call
             if (!codeOriginPtr)
@@ -913,7 +915,9 @@ public:
     bool m_hasDebuggerEnabled;
     bool m_hasExceptionHandlers { false };
 private:
-    
+
+    bool isStringPrototypeMethodSane(JSObject* stringPrototype, Structure* stringPrototypeStructure, UniquedStringImpl*);
+
     void handleSuccessor(Vector<BasicBlock*, 16>& worklist, BasicBlock*, BasicBlock* successor);
     
     AddSpeculationMode addImmediateShouldSpeculateInt32(Node* add, bool variableShouldSpeculateInt32, Node* operand, Node*immediate, RareCaseProfilingSource source)

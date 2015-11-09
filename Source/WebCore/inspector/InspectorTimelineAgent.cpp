@@ -85,18 +85,17 @@ void InspectorTimelineAgent::didCreateFrontendAndBackend(Inspector::FrontendRout
 {
     m_instrumentingAgents.setPersistentInspectorTimelineAgent(this);
 
-    if (m_scriptDebugServer)
-        m_scriptDebugServer->recompileAllJSFunctions();
+    // Recompile to include profiling information.
+    // FIXME: This doesn't seem like the most appropriate place.
+    m_environment.scriptDebugServer().recompileAllJSFunctions();
 }
 
 void InspectorTimelineAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason reason)
 {
     m_instrumentingAgents.setPersistentInspectorTimelineAgent(nullptr);
 
-    if (reason != Inspector::DisconnectReason::InspectedTargetDestroyed) {
-        if (m_scriptDebugServer)
-            m_scriptDebugServer->recompileAllJSFunctions();
-    }
+    if (reason != Inspector::DisconnectReason::InspectedTargetDestroyed)
+        m_environment.scriptDebugServer().recompileAllJSFunctions();
 
     ErrorString unused;
     stop(unused);
@@ -128,8 +127,7 @@ void InspectorTimelineAgent::internalStart(const int* maxCallStackDepth)
 
     m_instrumentingAgents.setInspectorTimelineAgent(this);
 
-    if (m_scriptDebugServer)
-        m_scriptDebugServer->addListener(this);
+    m_environment.scriptDebugServer().addListener(this);
 
     m_enabled = true;
 
@@ -137,7 +135,7 @@ void InspectorTimelineAgent::internalStart(const int* maxCallStackDepth)
 
 #if PLATFORM(COCOA)
     m_frameStartObserver = RunLoopObserver::create(0, [this]() {
-        if (!m_enabled || m_scriptDebugServer->isPaused())
+        if (!m_enabled || m_environment.scriptDebugServer().isPaused())
             return;
 
         if (!m_runLoopNestingLevel)
@@ -146,7 +144,7 @@ void InspectorTimelineAgent::internalStart(const int* maxCallStackDepth)
     });
 
     m_frameStopObserver = RunLoopObserver::create(frameStopRunLoopOrder, [this]() {
-        if (!m_enabled || m_scriptDebugServer->isPaused())
+        if (!m_enabled || m_environment.scriptDebugServer().isPaused())
             return;
 
         ASSERT(m_runLoopNestingLevel > 0);
@@ -180,8 +178,7 @@ void InspectorTimelineAgent::internalStop()
 
     m_instrumentingAgents.setInspectorTimelineAgent(nullptr);
 
-    if (m_scriptDebugServer)
-        m_scriptDebugServer->removeListener(this, true);
+    m_environment.scriptDebugServer().removeListener(this, true);
 
 #if PLATFORM(COCOA)
     m_frameStartObserver = nullptr;
@@ -203,15 +200,7 @@ void InspectorTimelineAgent::internalStop()
 
 double InspectorTimelineAgent::timestamp()
 {
-    return m_instrumentingAgents.inspectorEnvironment().executionStopwatch()->elapsedTime();
-}
-
-void InspectorTimelineAgent::setPageScriptDebugServer(PageScriptDebugServer* scriptDebugServer)
-{
-    ASSERT(!m_enabled);
-    ASSERT(!m_scriptDebugServer);
-
-    m_scriptDebugServer = scriptDebugServer;
+    return m_environment.executionStopwatch()->elapsedTime();
 }
 
 static inline void startProfiling(JSC::ExecState* exec, const String& title, RefPtr<Stopwatch>&& stopwatch)
@@ -250,7 +239,7 @@ void InspectorTimelineAgent::startFromConsole(JSC::ExecState* exec, const String
     if (!m_enabled && m_pendingConsoleProfileRecords.isEmpty())
         internalStart();
 
-    startProfiling(exec, title, m_instrumentingAgents.inspectorEnvironment().executionStopwatch());
+    startProfiling(exec, title, m_environment.executionStopwatch());
 
     m_pendingConsoleProfileRecords.append(createRecordEntry(TimelineRecordFactory::createConsoleProfileData(title), TimelineRecordType::ConsoleProfile, true, frameFromExecState(exec)));
 }
@@ -289,7 +278,7 @@ void InspectorTimelineAgent::willCallFunction(const String& scriptName, int scri
     pushCurrentRecord(TimelineRecordFactory::createFunctionCallData(scriptName, scriptLine), TimelineRecordType::FunctionCall, true, frame);
 
     if (frame && !m_callStackDepth)
-        startProfiling(frame, ASCIILiteral("Timeline FunctionCall"), m_instrumentingAgents.inspectorEnvironment().executionStopwatch());
+        startProfiling(frame, ASCIILiteral("Timeline FunctionCall"), m_environment.executionStopwatch());
 
     ++m_callStackDepth;
 }
@@ -395,20 +384,6 @@ void InspectorTimelineAgent::didPaint(RenderObject* renderer, const LayoutRect& 
     didCompleteCurrentRecord(TimelineRecordType::Paint);
 }
 
-void InspectorTimelineAgent::willWriteHTML(unsigned startLine, Frame* frame)
-{
-    pushCurrentRecord(TimelineRecordFactory::createParseHTMLData(startLine), TimelineRecordType::ParseHTML, true, frame);
-}
-
-void InspectorTimelineAgent::didWriteHTML(unsigned endLine)
-{
-    if (!m_recordStack.isEmpty()) {
-        const TimelineRecordEntry& entry = m_recordStack.last();
-        entry.data->setInteger("endLine", endLine);
-        didCompleteCurrentRecord(TimelineRecordType::ParseHTML);
-    }
-}
-
 void InspectorTimelineAgent::didInstallTimer(int timerId, int timeout, bool singleShot, Frame* frame)
 {
     appendRecord(TimelineRecordFactory::createTimerInstallData(timerId, timeout, singleShot), TimelineRecordType::TimerInstall, true, frame);
@@ -435,7 +410,7 @@ void InspectorTimelineAgent::willEvaluateScript(const String& url, int lineNumbe
 
     if (!m_callStackDepth) {
         ++m_callStackDepth;
-        startProfiling(&frame, ASCIILiteral("Timeline EvaluateScript"), m_instrumentingAgents.inspectorEnvironment().executionStopwatch());
+        startProfiling(&frame, ASCIILiteral("Timeline EvaluateScript"), m_environment.executionStopwatch());
     }
 }
 
@@ -530,9 +505,6 @@ static Inspector::Protocol::Timeline::EventType toProtocol(TimelineRecordType ty
         return Inspector::Protocol::Timeline::EventType::Composite;
     case TimelineRecordType::RenderingFrame:
         return Inspector::Protocol::Timeline::EventType::RenderingFrame;
-
-    case TimelineRecordType::ParseHTML:
-        return Inspector::Protocol::Timeline::EventType::ParseHTML;
 
     case TimelineRecordType::TimerInstall:
         return Inspector::Protocol::Timeline::EventType::TimerInstall;

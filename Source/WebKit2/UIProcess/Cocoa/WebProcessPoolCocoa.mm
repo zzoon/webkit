@@ -44,6 +44,7 @@
 #import <WebCore/NotImplemented.h>
 #import <WebCore/PlatformPasteboard.h>
 #import <WebCore/SharedBuffer.h>
+#import <WebCore/RuntimeApplicationChecks.h>
 #import <sys/param.h>
 
 #if ENABLE(NETWORK_PROCESS)
@@ -83,6 +84,9 @@ static NSString * const WebKit2HTTPSProxyDefaultsKey = @"WebKit2HTTPSProxy";
 #if ENABLE(NETWORK_CACHE)
 static NSString * const WebKitNetworkCacheEnabledDefaultsKey = @"WebKitNetworkCacheEnabled";
 static NSString * const WebKitNetworkCacheEfficacyLoggingEnabledDefaultsKey = @"WebKitNetworkCacheEfficacyLoggingEnabled";
+#if ENABLE(NETWORK_CACHE_SPECULATIVE_REVALIDATION)
+static NSString * const WebKitNetworkCacheSpeculativeRevalidationEnabledDefaultsKey = @"WebKitNetworkCacheResourceRevalidationEnabled";
+#endif
 #endif
 
 namespace WebKit {
@@ -105,6 +109,9 @@ static void registerUserDefaultsIfNeeded()
 #if ENABLE(NETWORK_CACHE)
     [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitNetworkCacheEnabledDefaultsKey];
     [registrationDictionary setObject:[NSNumber numberWithBool:NO] forKey:WebKitNetworkCacheEfficacyLoggingEnabledDefaultsKey];
+#if ENABLE(NETWORK_CACHE_SPECULATIVE_REVALIDATION)
+    [registrationDictionary setObject:[NSNumber numberWithBool:NO] forKey:WebKitNetworkCacheSpeculativeRevalidationEnabledDefaultsKey];
+#endif
 #endif
 
     [[NSUserDefaults standardUserDefaults] registerDefaults:registrationDictionary];
@@ -173,6 +180,10 @@ void WebProcessPool::platformInitializeWebProcess(WebProcessCreationParameters& 
     parameters.shouldEnableJIT = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitJSCJITEnabledDefaultsKey];
     parameters.shouldEnableFTLJIT = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitJSCFTLJITEnabledDefaultsKey];
     parameters.shouldEnableMemoryPressureReliefLogging = [[NSUserDefaults standardUserDefaults] boolForKey:@"LogMemoryJetsamDetails"];
+
+#if PLATFORM(MAC)
+    parameters.shouldRewriteConstAsVar = applicationIsIBooks();
+#endif
 
 #if HAVE(HOSTED_CORE_ANIMATION)
 #if !PLATFORM(IOS)
@@ -249,6 +260,9 @@ void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationPara
 #if ENABLE(NETWORK_CACHE)
     parameters.shouldEnableNetworkCache = isNetworkCacheEnabled();
     parameters.shouldEnableNetworkCacheEfficacyLogging = [defaults boolForKey:WebKitNetworkCacheEfficacyLoggingEnabledDefaultsKey];
+#if ENABLE(NETWORK_CACHE_SPECULATIVE_REVALIDATION)
+    parameters.shouldEnableNetworkCacheSpeculativeRevalidation = [defaults boolForKey:WebKitNetworkCacheSpeculativeRevalidationEnabledDefaultsKey];
+#endif
 #endif
 
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100

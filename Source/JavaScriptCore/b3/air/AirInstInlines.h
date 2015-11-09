@@ -31,7 +31,6 @@
 #include "AirInst.h"
 #include "AirOpcodeUtils.h"
 #include "AirSpecial.h"
-#include "B3Stackmap.h"
 #include "B3Value.h"
 
 namespace JSC { namespace B3 { namespace Air {
@@ -97,7 +96,7 @@ inline bool isShiftValid(const Inst& inst)
     UNUSED_PARAM(inst);
     return true;
 #endif
-}   
+}
 
 inline bool isLshift32Valid(const Inst& inst)
 {
@@ -105,6 +104,26 @@ inline bool isLshift32Valid(const Inst& inst)
 }
 
 inline bool isLshift64Valid(const Inst& inst)
+{
+    return isShiftValid(inst);
+}
+
+inline bool isRshift32Valid(const Inst& inst)
+{
+    return isShiftValid(inst);
+}
+
+inline bool isRshift64Valid(const Inst& inst)
+{
+    return isShiftValid(inst);
+}
+
+inline bool isUrshift32Valid(const Inst& inst)
+{
+    return isShiftValid(inst);
+}
+
+inline bool isUrshift64Valid(const Inst& inst)
 {
     return isShiftValid(inst);
 }

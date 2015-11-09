@@ -261,6 +261,9 @@ fast/css/draggable-region-parser.html
 # Font features are not implemented on Mavericks.
 webkit.org/b/149246 [ Mavericks ] css3/font-feature-settings-rendering.html [ ImageOnlyFailure ]
 webkit.org/b/149246 [ Mavericks ] css3/font-variant-all.html [ ImageOnlyFailure ]
+webkit.org/b/149246 [ Mavericks ] css3/font-feature-settings-font-face-rendering.html [ ImageOnlyFailure ]
+webkit.org/b/149246 [ Mavericks ] css3/font-variant-font-face-all.html [ ImageOnlyFailure ]
+webkit.org/b/149246 [ Mavericks ] css3/font-variant-font-face-override.html [ ImageOnlyFailure ]
 
 # This feature is disabled on Mavericks.
 [ Mavericks ] http/tests/navigation/page-cache-pending-image-load.html [ Skip ]
@@ -1260,7 +1263,7 @@ http/tests/media/video-served-as-text.html [ Failure ]
 http/tests/media/video-throttled-load-metadata.html [ Failure ]
 http/tests/security/contentSecurityPolicy/media-src-allowed.html [ Skip ]
 
-[ Yosemite ] fast/canvas/webgl/oes-texture-half-float-linear.html [ Pass Failure ]
+webkit.org/b/150978 fast/canvas/webgl/oes-texture-half-float-linear.html [ Pass Failure ]
 
 webkit.org/b/147763 [ Mavericks Yosemite ] accessibility/mac/loaded-notification.html [ Skip ]
 
@@ -1358,3 +1361,5 @@ webkit.org/b/150823 imported/w3c/web-platform-tests/XMLHttpRequest/getresponsehe
 
 # WOFF2 is only supported on certain Operating Systems.
 webkit.org/b/150830 [ Mavericks Yosemite ElCapitan ] fast/text/woff2.html [ ImageOnlyFailure ]
+
+webkit.org/b/150956 imported/w3c/web-platform-tests/html/semantics/embedded-content/media-elements/event_loadeddata.html [ Pass Timeout ]

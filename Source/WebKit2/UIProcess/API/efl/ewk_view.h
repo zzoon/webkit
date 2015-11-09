@@ -153,6 +153,7 @@ struct Ewk_View_Smart_Class {
     void (*run_javascript_alert)(Ewk_View_Smart_Data *sd, const char *message);
     Eina_Bool (*run_javascript_confirm)(Ewk_View_Smart_Data *sd, const char *message);
     const char *(*run_javascript_prompt)(Ewk_View_Smart_Data *sd, const char *message, const char *default_value); /**< return string should be stringshared. */
+    Eina_Bool (*run_javascript_before_unload_confirm)(Ewk_View_Smart_Data *sd, const char *message);
 
     // color picker:
     //   - Shows and hides color picker.
@@ -173,7 +174,7 @@ struct Ewk_View_Smart_Class {
  * The version you have to put into the version field
  * in the @a Ewk_View_Smart_Class structure.
  */
-#define EWK_VIEW_SMART_CLASS_VERSION 8UL
+#define EWK_VIEW_SMART_CLASS_VERSION 9UL
 
 /**
  * Initializer for whole Ewk_View_Smart_Class structure.
@@ -185,7 +186,7 @@ struct Ewk_View_Smart_Class {
  * @see EWK_VIEW_SMART_CLASS_INIT_VERSION
  * @see EWK_VIEW_SMART_CLASS_INIT_NAME_VERSION
  */
-#define EWK_VIEW_SMART_CLASS_INIT(smart_class_init) {smart_class_init, EWK_VIEW_SMART_CLASS_VERSION, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+#define EWK_VIEW_SMART_CLASS_INIT(smart_class_init) {smart_class_init, EWK_VIEW_SMART_CLASS_VERSION, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 /**
  * Initializer to zero a whole Ewk_View_Smart_Class structure.
@@ -362,6 +363,17 @@ EAPI Evas_Object *ewk_view_add(Evas *e);
  * @return view object on success or @c NULL on failure
  */
 EAPI Evas_Object *ewk_view_add_with_context(Evas *e, Ewk_Context *context);
+
+/**
+ * Tries to close this view.
+ *
+ * If current web page in @a o contains onbeforeunload event, this will fire
+ * run_javascript_confirm callback in smart class.
+ * If not, this will fire window_close callback in smart class.
+ *
+ * @param o the view object to try to close.
+ */
+EAPI void ewk_view_try_close(Evas_Object *o);
 
 /**
  * Gets the Ewk_Context of this view.

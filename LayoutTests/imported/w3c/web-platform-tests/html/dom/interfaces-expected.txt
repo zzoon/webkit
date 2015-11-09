@@ -221,6 +221,7 @@ CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'dateTime' on 
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'alt' on a non-HTMLImageElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'src' on a non-HTMLImageElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'srcset' on a non-HTMLImageElement object.
+CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'sizes' on a non-HTMLImageElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'crossOrigin' on a non-HTMLImageElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'useMap' on a non-HTMLImageElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'isMap' on a non-HTMLImageElement object.
@@ -464,6 +465,7 @@ CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'willValidate'
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'validity' on a non-HTMLButtonElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'validationMessage' on a non-HTMLButtonElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'labels' on a non-HTMLButtonElement object.
+CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'autocomplete' on a non-HTMLSelectElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'autofocus' on a non-HTMLSelectElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'disabled' on a non-HTMLSelectElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'form' on a non-HTMLSelectElement object.
@@ -490,6 +492,7 @@ CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'selected' on 
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'value' on a non-HTMLOptionElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'text' on a non-HTMLOptionElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'index' on a non-HTMLOptionElement object.
+CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'autocomplete' on a non-HTMLTextAreaElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'autofocus' on a non-HTMLTextAreaElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'cols' on a non-HTMLTextAreaElement object.
 CONSOLE MESSAGE: line 1152: Deprecated attempt to access property 'dirName' on a non-HTMLTextAreaElement object.
@@ -2719,7 +2722,9 @@ FAIL HTMLImageElement interface: attribute src assert_throws: getting property o
 FAIL HTMLImageElement interface: attribute srcset assert_throws: getting property on prototype object must throw TypeError function "function () {
     [native code]
 }" did not throw
-FAIL HTMLImageElement interface: attribute sizes assert_true: The prototype object must have a property "sizes" expected true got false
+FAIL HTMLImageElement interface: attribute sizes assert_throws: getting property on prototype object must throw TypeError function "function () {
+    [native code]
+}" did not throw
 FAIL HTMLImageElement interface: attribute crossOrigin assert_throws: getting property on prototype object must throw TypeError function "function () {
     [native code]
 }" did not throw
@@ -2771,7 +2776,7 @@ PASS Stringification of document.createElement("img")
 PASS HTMLImageElement interface: document.createElement("img") must inherit property "alt" with the proper type (0) 
 PASS HTMLImageElement interface: document.createElement("img") must inherit property "src" with the proper type (1) 
 PASS HTMLImageElement interface: document.createElement("img") must inherit property "srcset" with the proper type (2) 
-FAIL HTMLImageElement interface: document.createElement("img") must inherit property "sizes" with the proper type (3) assert_inherits: property "sizes" not found in prototype chain
+PASS HTMLImageElement interface: document.createElement("img") must inherit property "sizes" with the proper type (3) 
 PASS HTMLImageElement interface: document.createElement("img") must inherit property "crossOrigin" with the proper type (4) 
 PASS HTMLImageElement interface: document.createElement("img") must inherit property "useMap" with the proper type (5) 
 PASS HTMLImageElement interface: document.createElement("img") must inherit property "isMap" with the proper type (6) 
@@ -2793,7 +2798,7 @@ PASS Stringification of new Image()
 PASS HTMLImageElement interface: new Image() must inherit property "alt" with the proper type (0) 
 PASS HTMLImageElement interface: new Image() must inherit property "src" with the proper type (1) 
 PASS HTMLImageElement interface: new Image() must inherit property "srcset" with the proper type (2) 
-FAIL HTMLImageElement interface: new Image() must inherit property "sizes" with the proper type (3) assert_inherits: property "sizes" not found in prototype chain
+PASS HTMLImageElement interface: new Image() must inherit property "sizes" with the proper type (3) 
 PASS HTMLImageElement interface: new Image() must inherit property "crossOrigin" with the proper type (4) 
 PASS HTMLImageElement interface: new Image() must inherit property "useMap" with the proper type (5) 
 PASS HTMLImageElement interface: new Image() must inherit property "isMap" with the proper type (6) 
@@ -4423,7 +4428,9 @@ FAIL HTMLSelectElement interface: existence and properties of interface object a
 PASS HTMLSelectElement interface object length 
 PASS HTMLSelectElement interface: existence and properties of interface prototype object 
 FAIL HTMLSelectElement interface: existence and properties of interface prototype object's "constructor" property assert_own_property: HTMLSelectElement.prototype does not have own property "constructor" expected property "constructor" missing
-FAIL HTMLSelectElement interface: attribute autocomplete assert_true: The prototype object must have a property "autocomplete" expected true got false
+FAIL HTMLSelectElement interface: attribute autocomplete assert_throws: getting property on prototype object must throw TypeError function "function () {
+    [native code]
+}" did not throw
 FAIL HTMLSelectElement interface: attribute autofocus assert_throws: getting property on prototype object must throw TypeError function "function () {
     [native code]
 }" did not throw
@@ -4483,7 +4490,7 @@ FAIL HTMLSelectElement interface: attribute labels assert_throws: getting proper
 }" did not throw
 PASS HTMLSelectElement must be primary interface of document.createElement("select") 
 PASS Stringification of document.createElement("select") 
-FAIL HTMLSelectElement interface: document.createElement("select") must inherit property "autocomplete" with the proper type (0) assert_inherits: property "autocomplete" not found in prototype chain
+PASS HTMLSelectElement interface: document.createElement("select") must inherit property "autocomplete" with the proper type (0) 
 PASS HTMLSelectElement interface: document.createElement("select") must inherit property "autofocus" with the proper type (1) 
 PASS HTMLSelectElement interface: document.createElement("select") must inherit property "disabled" with the proper type (2) 
 PASS HTMLSelectElement interface: document.createElement("select") must inherit property "form" with the proper type (3) 
@@ -4590,7 +4597,9 @@ FAIL HTMLTextAreaElement interface: existence and properties of interface object
 PASS HTMLTextAreaElement interface object length 
 PASS HTMLTextAreaElement interface: existence and properties of interface prototype object 
 FAIL HTMLTextAreaElement interface: existence and properties of interface prototype object's "constructor" property assert_true: HTMLTextAreaElement.prototype.constructor is not writable expected true got false
-FAIL HTMLTextAreaElement interface: attribute autocomplete assert_true: The prototype object must have a property "autocomplete" expected true got false
+FAIL HTMLTextAreaElement interface: attribute autocomplete assert_throws: getting property on prototype object must throw TypeError function "function () {
+    [native code]
+}" did not throw
 FAIL HTMLTextAreaElement interface: attribute autofocus assert_throws: getting property on prototype object must throw TypeError function "function () {
     [native code]
 }" did not throw
@@ -4671,7 +4680,7 @@ PASS HTMLTextAreaElement interface: operation setRangeText(DOMString,unsigned lo
 FAIL HTMLTextAreaElement interface: operation setSelectionRange(unsigned long,unsigned long,DOMString) assert_equals: property has wrong .length expected 2 but got 0
 PASS HTMLTextAreaElement must be primary interface of document.createElement("textarea") 
 PASS Stringification of document.createElement("textarea") 
-FAIL HTMLTextAreaElement interface: document.createElement("textarea") must inherit property "autocomplete" with the proper type (0) assert_inherits: property "autocomplete" not found in prototype chain
+PASS HTMLTextAreaElement interface: document.createElement("textarea") must inherit property "autocomplete" with the proper type (0) 
 PASS HTMLTextAreaElement interface: document.createElement("textarea") must inherit property "autofocus" with the proper type (1) 
 PASS HTMLTextAreaElement interface: document.createElement("textarea") must inherit property "cols" with the proper type (2) 
 PASS HTMLTextAreaElement interface: document.createElement("textarea") must inherit property "dirName" with the proper type (3) 

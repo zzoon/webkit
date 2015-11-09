@@ -470,6 +470,10 @@ fast/css/draggable-region-parser.html [ Skip ]
 # Font feature settings is not implemented.
 css3/font-feature-settings-rendering.html [ Skip ]
 
+webkit.org/b/149771 css3/font-feature-settings-font-face-rendering.html [ Skip ] # WontFix
+webkit.org/b/149771 css3/font-variant-font-face-all.html [ Skip ] # WontFix
+webkit.org/b/149771 css3/font-variant-font-face-override.html [ Skip ] # WontFix
+
 # TODO HiDPI tests require test infrastructure enhancements (e.g. testRunner.setBackingScaleFactor)
 # https://bugs.webkit.org/show_bug.cgi?id=87919
 webkit.org/b/87919 compositing/tiled-layers-hidpi.html
@@ -653,6 +657,10 @@ webkit.org/b/140970 sputnik/Unicode/Unicode_410/S7.6_A3.1.html [ Skip ]  # Crash
 
 sputnik/Conformance/15_Native_Objects/15.2_Object/15.2.2/S15.2.2.1_A2_T5.html [ Failure ]
 sputnik/Conformance/07_Lexical_Conventions/7.8_Literals/7.8.5_Regular_Expression_Literals/S7.8.5_A1.4_T2.html [ Pass Timeout ]
+
+webkit.org/b/150973 sputnik/Conformance/07_Lexical_Conventions/7.8_Literals/7.8.5_Regular_Expression_Literals/S7.8.5_A1.1_T2.html [ Pass Timeout ]
+webkit.org/b/150973 sputnik/Conformance/07_Lexical_Conventions/7.8_Literals/7.8.5_Regular_Expression_Literals/S7.8.5_A2.1_T2.html [ Pass Timeout ]
+webkit.org/b/150973 sputnik/Conformance/07_Lexical_Conventions/7.8_Literals/7.8.5_Regular_Expression_Literals/S7.8.5_A2.4_T2.html [ Pass Timeout ]
 ################################################################################
 ##############               End Sputnik Errors                 ################
 ################################################################################
@@ -1702,6 +1710,10 @@ webkit.org/b/140869 [ Debug ] accessibility/aria-combobox.html [ Skip ]
 webkit.org/b/146903 accessibility/aria-table-hierarchy.html [ Skip ]
 webkit.org/b/146903 accessibility/roles-table-and-cell.html [ Skip ]
 
+# Skip aria-modal tests for win
+webkit.org/b/138566 accessibility/aria-modal.html [ Skip ]
+webkit.org/b/138566 accessibility/aria-modal-multiple-dialogs.html [ Skip ]
+
 ################################################################################
 #######################   End Accessibility Issues   ###########################
 ################################################################################
@@ -2059,6 +2071,8 @@ css3/flexbox/button.html [ Failure ]
 css3/flexbox/flexitem.html [ Failure ]
 css3/flexbox/image-percent-max-height.html [ ImageOnlyFailure ]
 webkit.org/b/107356 fast/css/sticky/sticky-top-zoomed.html [ ImageOnlyFailure ]
+
+webkit.org/b/150949 imported/blink/fast/css/transformed-overflow-hidden-clips-fixed.html [ ImageOnlyFailure ]
 ################################################################################
 #################            End CSS Issues              #######################
 ################################################################################
@@ -2131,6 +2145,8 @@ fast/forms/state-restore-to-non-autocomplete-form.html [ Skip ]
 fast/forms/state-restore-to-non-edited-controls.html [ Skip ]
 fast/forms/state-save-of-detached-control.html [ Skip ]
 fast/forms/textarea/textarea-state-restore.html [ Skip ]
+
+webkit.org/b/150909 fast/forms/HTMLOptionElement_label03.html [ ImageOnlyFailure ]
 ################################################################################
 #################          End Forms Issues              #######################
 ################################################################################
@@ -2561,6 +2577,8 @@ webkit.org/b/149632 fast/events/check-defocus-event-order-when-triggered-by-mous
 webkit.org/b/149632 fast/events/shadow-event-path-2.html [ Skip ]
 webkit.org/b/149632 fast/forms/input-appearance-preventDefault.html [ Skip ]
 webkit.org/b/149632 fast/forms/textarea-input-event.html [ Skip ]
+
+webkit.org/b/150830 fast/text/woff2.html [ Skip ]
 
 ################################################################################
 ######################### Start list of UNREVIEWED failures ########################
@@ -3287,4 +3305,11 @@ webkit.org/b/150596 imported/w3c/web-platform-tests/html/semantics/forms/the-inp
 webkit.org/b/150684 editing/input/reveal-caret-of-multiline-contenteditable.html [ Pass Failure ]
 webkit.org/b/150684 editing/input/reveal-caret-of-multiline-input.html [ Pass Failure ]
 
-webkit.org/b/150808 fast/text/multiple-feature-properties.html [ Pass Failure ]
+webkit.org/b/150808 fast/text/multiple-feature-properties.html [ ImageOnlyFailure ]
+
+webkit.org/b/147933 streams/reference-implementation/writable-stream-abort.html [ Pass Failure ]
+webkit.org/b/147933 streams/reference-implementation/count-queuing-strategy.html [ Pass Failure ]
+
+webkit.org/b/150946 [ Debug ] scrollbars/custom-scrollbar-appearance-property.html [ Crash ]
+
+webkit.org/b/150948 [ Debug ] imported/blink/transitions/unprefixed-transform.html [ Pass Failure ]

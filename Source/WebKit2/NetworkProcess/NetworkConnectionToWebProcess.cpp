@@ -30,6 +30,7 @@
 
 #include "NetworkBlobRegistry.h"
 #include "NetworkConnectionToWebProcessMessages.h"
+#include "NetworkLoad.h"
 #include "NetworkProcess.h"
 #include "NetworkResourceLoadParameters.h"
 #include "NetworkResourceLoader.h"
@@ -117,14 +118,14 @@ void NetworkConnectionToWebProcess::didReceiveInvalidMessage(IPC::Connection&, I
 
 void NetworkConnectionToWebProcess::scheduleResourceLoad(const NetworkResourceLoadParameters& loadParameters)
 {
-    auto loader = NetworkResourceLoader::create(loadParameters, this);
+    auto loader = NetworkResourceLoader::create(loadParameters, *this);
     m_networkResourceLoaders.add(loadParameters.identifier, loader.ptr());
     loader->start();
 }
 
-void NetworkConnectionToWebProcess::performSynchronousLoad(const NetworkResourceLoadParameters& loadParameters, PassRefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply> reply)
+void NetworkConnectionToWebProcess::performSynchronousLoad(const NetworkResourceLoadParameters& loadParameters, RefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>&& reply)
 {
-    auto loader = NetworkResourceLoader::create(loadParameters, this, reply);
+    auto loader = NetworkResourceLoader::create(loadParameters, *this, WTF::move(reply));
     m_networkResourceLoaders.add(loadParameters.identifier, loader.ptr());
     loader->start();
 }
@@ -168,9 +169,9 @@ void NetworkConnectionToWebProcess::prefetchDNS(const String& hostname)
 static NetworkStorageSession& storageSession(SessionID sessionID)
 {
     if (sessionID.isEphemeral()) {
-        NetworkStorageSession* privateSession = SessionTracker::session(sessionID);
-        if (privateSession)
-            return *privateSession;
+        NetworkStorageSession* privateStorageSession = SessionTracker::storageSession(sessionID);
+        if (privateStorageSession)
+            return *privateStorageSession;
         // Some requests with private browsing mode requested may still be coming shortly after NetworkProcess was told to destroy its session.
         // FIXME: Find a way to track private browsing sessions more rigorously.
         LOG_ERROR("Private browsing was requested, but there was no session for it. Please file a bug unless you just disabled private browsing, in which case it's an expected race.");
@@ -202,10 +203,10 @@ void NetworkConnectionToWebProcess::convertMainResourceLoadToDownload(uint64_t m
     // FIXME: Do something here.
     notImplemented();
 #else
-    networkProcess.downloadManager().convertHandleToDownload(downloadID, loader->handle(), request, response);
+    networkProcess.downloadManager().convertHandleToDownload(downloadID, loader->networkLoad()->handle(), request, response);
 
     // Unblock the URL connection operation queue.
-    loader->handle()->continueDidReceiveResponse();
+    loader->networkLoad()->handle()->continueDidReceiveResponse();
     
     loader->didConvertHandleToDownload();
 #endif

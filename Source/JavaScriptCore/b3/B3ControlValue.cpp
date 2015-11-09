@@ -29,7 +29,6 @@
 #if ENABLE(B3_JIT)
 
 #include "B3BasicBlock.h"
-#include <wtf/ListDump.h>
 
 namespace JSC { namespace B3 {
 
@@ -50,9 +49,10 @@ void ControlValue::convertToJump(const FrequentedBlock& destination)
     this->owner = owner;
 }
 
-void ControlValue::dumpMeta(PrintStream& out) const
+void ControlValue::dumpMeta(CommaPrinter& comma, PrintStream& out) const
 {
-    out.print(listDump(m_successors));
+    for (FrequentedBlock successor : m_successors)
+        out.print(comma, successor);
 }
 
 } } // namespace JSC::B3

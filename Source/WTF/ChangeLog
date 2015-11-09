@@ -1,3 +1,67 @@
+2015-11-05  Nikos Andronikos  <nikos.andronikos-webkit@cisra.canon.com.au>
+
+        Add runtime and compile time flags for enabling Web Animations API and model.
+        https://bugs.webkit.org/show_bug.cgi?id=150914
+
+        Reviewed by Benjamin Poulain.
+
+        Add ENABLE_WEB_ANIMATIONS compile time flag, runtime flag webAnimationsEnabled and Expose WK2 preference for runtime flag.
+
+        * wtf/FeatureDefines.h:
+
+2015-11-05  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GLib] Avoid gint64, std::chrono::microseconds overflows in RunLoop::TimerBase
+        https://bugs.webkit.org/show_bug.cgi?id=150930
+
+        Reviewed by Carlos Garcia Campos.
+
+        In RunLoop::TimerBase::start(), avoid overflowing the std::chrono::microseconds
+        value in case the passed-in fire interval (in seconds) is too large (e.g. when
+        std::chrono::microseconds::max() is used as the desired interval). This is
+        achieved by using the passed-in fire interval, converted in microseconds, only
+        if the value of this interval is smaller than std::chrono::microseconds::max().
+
+        In RunLoop::TimerBase::updateReadyTime(), the zero-delay is still considered a
+        short cut, but we use G_MAXINT64 in case the sum of the current time and the
+        desired fire interval (now in microseconds) would overflow.
+
+        * wtf/glib/RunLoopGLib.cpp:
+        (WTF::RunLoop::TimerBase::updateReadyTime):
+        (WTF::RunLoop::TimerBase::start):
+
+2015-11-02  Filip Pizlo  <fpizlo@apple.com>
+
+        B3/Air should use bubble sort for their insertion sets, because it's faster than std::stable_sort
+        https://bugs.webkit.org/show_bug.cgi?id=150828
+
+        Reviewed by Geoffrey Garen.
+
+        Add a pretty good bubble sort implementation to WTF. This implementation has three
+        common tricks:
+
+        - Forward and backward scans. This reduces the severity of certain kinds of bubble sort
+          pathologies.
+
+        - Return if a scan finds the list to be sorted. This gives the algorithm one of its most
+          attractive properties: it's super fast when the list is already sorted.
+
+        - Each scan eliminates one element from future scans. This makes the algorithm no worse
+          than insertion sort.
+
+        Why do we want this? Because bubble sort is a really great stable sort for small lists,
+        or large lists in which only a handful of elements are out of order. Compiler insertion
+        sets tend to be one of those or somewhere in between: usually they are very small, and
+        usually they are sorted. It's rare that an element will be out of order, and when it is,
+        it's usually very close to where it's supposed to be.
+
+        This is a significant speed-up for B3 compile times.
+
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/BubbleSort.h: Added.
+        (WTF::bubbleSort):
+        * wtf/CMakeLists.txt:
+
 2015-11-02  Andy Estes  <aestes@apple.com>
 
         [Cocoa] Add tvOS and watchOS to SUPPORTED_PLATFORMS

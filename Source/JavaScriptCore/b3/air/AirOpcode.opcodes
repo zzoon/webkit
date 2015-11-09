@@ -89,6 +89,13 @@ Sub64 U:G, UD:G
     Tmp, Tmp
     Imm, Tmp
 
+Neg32 UD:G
+    Tmp
+    Addr
+
+Neg64 UD:G
+    Tmp
+
 Lea UA:G, D:G
     Addr, Tmp
 
@@ -111,6 +118,45 @@ Lshift64 U:G, UD:G
     Tmp*, Tmp
     Imm, Tmp
 
+Rshift32 U:G, UD:G
+    Tmp*, Tmp
+    Imm, Tmp
+
+Rshift64 U:G, UD:G
+    Tmp*, Tmp
+    Imm, Tmp
+
+Urshift32 U:G, UD:G
+    Tmp*, Tmp
+    Imm, Tmp
+
+Urshift64 U:G, UD:G
+    Tmp*, Tmp
+    Imm, Tmp
+
+Or32 U:G, UD:G
+    Tmp, Tmp
+    Imm, Tmp
+    Tmp, Addr
+    Addr, Tmp
+    Imm, Addr
+
+Or64 U:G, UD:G
+    Tmp, Tmp
+    Imm, Tmp
+
+Xor32 U:G, UD:G
+    Tmp, Tmp
+    Imm, Tmp
+    Tmp, Addr
+    Addr, Tmp
+    Imm, Addr
+
+Xor64 U:G, UD:G
+    Tmp, Tmp
+    Tmp, Addr
+    Imm, Tmp
+
 Mul32 U:G, UD:G
     Tmp, Tmp
     Addr, Tmp
@@ -121,7 +167,7 @@ Mul32 U:G, UD:G
 # means movePtr.
 Move U:G, D:G
     Tmp, Tmp
-    Imm, Tmp
+    Imm, Tmp as signExtend32ToPtr
     Imm64, Tmp
     Addr, Tmp as loadPtr # This means that "Move Addr, Tmp" is code-generated as "load" not "move".
     Index, Tmp as loadPtr
@@ -151,12 +197,68 @@ Move64ToDouble U:G, D:F
 MoveDoubleTo64 U:F, D:G
     Tmp, Tmp
 
+Load8 U:G, D:G
+    Addr, Tmp
+    Index, Tmp
+
+Load8SignedExtendTo32 U:G, D:G
+    Addr, Tmp
+    Index, Tmp
+
+Load16 U:G, D:G
+    Addr, Tmp
+    Index, Tmp
+
+Load16SignedExtendTo32 U:G, D:G
+    Addr, Tmp
+    Index, Tmp
+
+Compare32 U:G, U:G, U:G, D:G
+    RelCond, Tmp, Tmp, Tmp
+    RelCond, Tmp, Imm, Tmp
+
+Compare64 U:G, U:G, U:G, D:G
+    RelCond, Tmp, Imm, Tmp
+    RelCond, Tmp, Tmp, Tmp
+
+Test32 U:G, U:G, U:G, D:G
+    ResCond, Addr, Imm, Tmp
+    ResCond, Tmp, Tmp, Tmp
+
+Test64 U:G, U:G, U:G, D:G
+    ResCond, Tmp, Imm, Tmp
+    ResCond, Tmp, Tmp, Tmp
+
+Branch8 U:G, U:G, U:G /branch
+    RelCond, Addr, Imm
+    RelCond, Index, Imm
+
+Branch32 U:G, U:G, U:G /branch
+    RelCond, Addr, Imm
+    RelCond, Tmp, Tmp
+    RelCond, Tmp, Imm
+    RelCond, Tmp, Addr
+    RelCond, Addr, Tmp
+    RelCond, Index, Imm
+
+Branch64 U:G, U:G, U:G /branch
+    RelCond, Tmp, Tmp
+    RelCond, Tmp, Addr
+    RelCond, Addr, Tmp
+    RelCond, Index, Tmp
+
+BranchTest8 U:G, U:G, U:G /branch
+    ResCond, Addr, Imm
+    ResCond, Index, Imm
+
 BranchTest32 U:G, U:G, U:G /branch
     ResCond, Tmp, Tmp
     ResCond, Tmp, Imm
     ResCond, Addr, Imm
     ResCond, Index, Imm
 
+# Warning: forms that take an immediate will sign-extend their immediate. You probably want
+# BranchTest32 in most cases where you use an immediate.
 BranchTest64 U:G, U:G, U:G /branch
     ResCond, Tmp, Tmp
     ResCond, Tmp, Imm
@@ -192,7 +294,7 @@ Jump /branch
 
 Ret /terminal
 
-Breakpoint /effects
+Oops /terminal
 
 # Air allows for exotic behavior. A Patch's behavior is determined entirely by the Special operand,
 # which must be the first operand.

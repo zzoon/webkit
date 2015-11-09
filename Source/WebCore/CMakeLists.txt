@@ -869,8 +869,11 @@ set(WebCore_SOURCES
 
     Modules/indexeddb/client/IDBAnyImpl.cpp
     Modules/indexeddb/client/IDBConnectionToServer.cpp
+    Modules/indexeddb/client/IDBCursorImpl.cpp
+    Modules/indexeddb/client/IDBCursorWithValueImpl.cpp
     Modules/indexeddb/client/IDBDatabaseImpl.cpp
     Modules/indexeddb/client/IDBFactoryImpl.cpp
+    Modules/indexeddb/client/IDBIndexImpl.cpp
     Modules/indexeddb/client/IDBObjectStoreImpl.cpp
     Modules/indexeddb/client/IDBOpenDBRequestImpl.cpp
     Modules/indexeddb/client/IDBRequestImpl.cpp
@@ -903,6 +906,7 @@ set(WebCore_SOURCES
     Modules/indexeddb/server/IDBServerOperation.cpp
     Modules/indexeddb/server/MemoryBackingStoreTransaction.cpp
     Modules/indexeddb/server/MemoryIDBBackingStore.cpp
+    Modules/indexeddb/server/MemoryIndex.cpp
     Modules/indexeddb/server/MemoryObjectStore.cpp
     Modules/indexeddb/server/UniqueIDBDatabase.cpp
     Modules/indexeddb/server/UniqueIDBDatabaseConnection.cpp
@@ -910,6 +914,7 @@ set(WebCore_SOURCES
 
     Modules/indexeddb/shared/IDBDatabaseInfo.cpp
     Modules/indexeddb/shared/IDBError.cpp
+    Modules/indexeddb/shared/IDBIndexInfo.cpp
     Modules/indexeddb/shared/IDBObjectStoreInfo.cpp
     Modules/indexeddb/shared/IDBRequestData.cpp
     Modules/indexeddb/shared/IDBResourceIdentifier.cpp

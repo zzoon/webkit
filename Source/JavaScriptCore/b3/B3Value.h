@@ -33,6 +33,7 @@
 #include "B3Opcode.h"
 #include "B3Origin.h"
 #include "B3Type.h"
+#include <wtf/CommaPrinter.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/Noncopyable.h>
 
@@ -40,7 +41,6 @@ namespace JSC { namespace B3 {
 
 class BasicBlock;
 class Procedure;
-class Stackmap;
 
 class JS_EXPORT_PRIVATE Value {
     WTF_MAKE_NONCOPYABLE(Value);
@@ -112,8 +112,29 @@ public:
     virtual Value* addConstant(Procedure&, int32_t other) const;
     virtual Value* addConstant(Procedure&, Value* other) const;
     virtual Value* subConstant(Procedure&, Value* other) const;
-    virtual Value* equalConstant(Procedure&, Value* other) const;
-    virtual Value* notEqualConstant(Procedure&, Value* other) const;
+    virtual Value* bitAndConstant(Procedure&, Value* other) const;
+    virtual Value* bitOrConstant(Procedure&, Value* other) const;
+    virtual Value* bitXorConstant(Procedure&, Value* other) const;
+    virtual Value* shlConstant(Procedure&, Value* other) const;
+    virtual Value* sShrConstant(Procedure&, Value* other) const;
+    virtual Value* zShrConstant(Procedure&, Value* other) const;
+    
+    virtual TriState equalConstant(Value* other) const;
+    virtual TriState notEqualConstant(Value* other) const;
+    virtual TriState lessThanConstant(Value* other) const;
+    virtual TriState greaterThanConstant(Value* other) const;
+    virtual TriState lessEqualConstant(Value* other) const;
+    virtual TriState greaterEqualConstant(Value* other) const;
+    virtual TriState aboveConstant(Value* other) const;
+    virtual TriState belowConstant(Value* other) const;
+    virtual TriState aboveEqualConstant(Value* other) const;
+    virtual TriState belowEqualConstant(Value* other) const;
+
+    // If the value is a comparison then this returns the inverted form of that comparison, if
+    // possible. It can be impossible for double comparisons, where for example LessThan and
+    // GreaterEqual behave differently. If this returns a value, it is a new value, which must be
+    // either inserted into some block or deleted.
+    Value* invertedCompare(Procedure&) const;
 
     bool hasInt32() const;
     int32_t asInt32() const;
@@ -149,24 +170,32 @@ public:
     
     Effects effects() const;
 
-    Stackmap* stackmap();
-
     // Makes sure that none of the children are Identity's. If a child points to Identity, this will
     // repoint it at the Identity's child. For simplicity, this will follow arbitrarily long chains
     // of Identity's.
     void performSubstitution();
 
 protected:
-    virtual void dumpMeta(PrintStream&) const;
-    
+    virtual void dumpChildren(CommaPrinter&, PrintStream&) const;
+    virtual void dumpMeta(CommaPrinter&, PrintStream&) const;
+
 private:
     friend class Procedure;
 
+    // Checks that this opcode is valid for use with B3::Value.
+#if ASSERT_DISABLED
+    static void checkOpcode(Opcode) { }
+#else
+    static void checkOpcode(Opcode);
+#endif
+
 protected:
+    enum CheckedOpcodeTag { CheckedOpcode };
+    
     // Instantiate values via Procedure.
     // This form requires specifying the type explicitly:
     template<typename... Arguments>
-    explicit Value(unsigned index, Opcode opcode, Type type, Origin origin, Value* firstChild, Arguments... arguments)
+    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Type type, Origin origin, Value* firstChild, Arguments... arguments)
         : m_index(index)
         , m_opcode(opcode)
         , m_type(type)
@@ -175,7 +204,7 @@ protected:
     {
     }
     // This form is for specifying the type explicitly when the opcode has no children:
-    explicit Value(unsigned index, Opcode opcode, Type type, Origin origin)
+    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Type type, Origin origin)
         : m_index(index)
         , m_opcode(opcode)
         , m_type(type)
@@ -184,7 +213,7 @@ protected:
     }
     // This form is for those opcodes that can infer their type from the opcode and first child:
     template<typename... Arguments>
-    explicit Value(unsigned index, Opcode opcode, Origin origin, Value* firstChild, Arguments... arguments)
+    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Origin origin, Value* firstChild, Arguments... arguments)
         : m_index(index)
         , m_opcode(opcode)
         , m_type(typeFor(opcode, firstChild))
@@ -194,7 +223,7 @@ protected:
     }
     // This form is for those opcodes that can infer their type from the opcode alone, and that don't
     // take any arguments:
-    explicit Value(unsigned index, Opcode opcode, Origin origin)
+    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Origin origin)
         : m_index(index)
         , m_opcode(opcode)
         , m_type(typeFor(opcode, nullptr))
@@ -202,7 +231,7 @@ protected:
     {
     }
     // Use this form for varargs.
-    explicit Value(unsigned index, Opcode opcode, Type type, Origin origin, const AdjacencyList& children)
+    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Type type, Origin origin, const AdjacencyList& children)
         : m_index(index)
         , m_opcode(opcode)
         , m_type(type)
@@ -210,13 +239,22 @@ protected:
         , m_children(children)
     {
     }
-    explicit Value(unsigned index, Opcode opcode, Type type, Origin origin, AdjacencyList&& children)
+    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Type type, Origin origin, AdjacencyList&& children)
         : m_index(index)
         , m_opcode(opcode)
         , m_type(type)
         , m_origin(origin)
         , m_children(WTF::move(children))
     {
+    }
+
+    // This is the constructor you end up actually calling, if you're instantiating Value
+    // directly.
+    template<typename... Arguments>
+    explicit Value(unsigned index, Opcode opcode, Arguments&&... arguments)
+        : Value(index, CheckedOpcode, opcode, std::forward<Arguments>(arguments)...)
+    {
+        checkOpcode(opcode);
     }
 
 private:

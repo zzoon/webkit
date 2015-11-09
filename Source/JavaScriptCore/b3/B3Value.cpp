@@ -28,6 +28,13 @@
 
 #if ENABLE(B3_JIT)
 
+#include "B3ArgumentRegValue.h"
+#include "B3CCallValue.h"
+#include "B3ControlValue.h"
+#include "B3MemoryValue.h"
+#include "B3ProcedureInlines.h"
+#include "B3StackSlotValue.h"
+#include "B3UpsilonValue.h"
 #include "B3ValueInlines.h"
 #include <wtf/CommaPrinter.h>
 #include <wtf/StringPrintStream.h>
@@ -78,25 +85,24 @@ void Value::dump(PrintStream& out) const
     out.print(dumpPrefix, m_index);
 }
 
+void Value::dumpChildren(CommaPrinter& comma, PrintStream& out) const
+{
+    for (Value* child : children())
+        out.print(comma, pointerDump(child));
+}
+
 void Value::deepDump(PrintStream& out) const
 {
     out.print(m_type, " ", *this, " = ", m_opcode);
 
     out.print("(");
     CommaPrinter comma;
-    for (Value* child : children())
-        out.print(comma, pointerDump(child));
+    dumpChildren(comma, out);
 
     if (m_origin)
         out.print(comma, m_origin);
 
-    {
-        StringPrintStream stringOut;
-        dumpMeta(stringOut);
-        CString string = stringOut.toCString();
-        if (string.length())
-            out.print(comma, string);
-    }
+    dumpMeta(comma, out);
 
     {
         CString string = toCString(effects());
@@ -127,13 +133,92 @@ Value* Value::subConstant(Procedure&, Value*) const
     return nullptr;
 }
 
-Value* Value::equalConstant(Procedure&, Value*) const
+Value* Value::bitAndConstant(Procedure&, Value*) const
 {
     return nullptr;
 }
 
-Value* Value::notEqualConstant(Procedure&, Value*) const
+Value* Value::bitOrConstant(Procedure&, Value*) const
 {
+    return nullptr;
+}
+
+Value* Value::bitXorConstant(Procedure&, Value*) const
+{
+    return nullptr;
+}
+
+Value* Value::shlConstant(Procedure&, Value*) const
+{
+    return nullptr;
+}
+
+Value* Value::sShrConstant(Procedure&, Value*) const
+{
+    return nullptr;
+}
+
+Value* Value::zShrConstant(Procedure&, Value*) const
+{
+    return nullptr;
+}
+
+TriState Value::equalConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+TriState Value::notEqualConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+TriState Value::lessThanConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+TriState Value::greaterThanConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+TriState Value::lessEqualConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+TriState Value::greaterEqualConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+TriState Value::aboveConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+TriState Value::belowConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+TriState Value::aboveEqualConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+TriState Value::belowEqualConstant(Value*) const
+{
+    return MixedTriState;
+}
+
+Value* Value::invertedCompare(Procedure& proc) const
+{
+    if (!numChildren())
+        return nullptr;
+    if (Optional<Opcode> invertedOpcode = B3::invertedCompare(opcode(), child(0)->type()))
+        return proc.add<Value>(*invertedOpcode, type(), origin(), children());
     return nullptr;
 }
 
@@ -232,26 +317,21 @@ Effects Value::effects() const
     case Load16S:
     case LoadFloat:
     case Load:
-        // FIXME: MemoryValue should have a HeapRange.
-        // https://bugs.webkit.org/show_bug.cgi?id=150535
-        result.reads = HeapRange::top();
+        result.reads = as<MemoryValue>()->range();
         result.controlDependent = true;
         break;
     case Store8:
     case Store16:
     case StoreFloat:
     case Store:
-        // FIXME: MemoryValue should have a HeapRange.
-        // https://bugs.webkit.org/show_bug.cgi?id=150535
-        result.writes = HeapRange::top();
+        result.writes = as<MemoryValue>()->range();
         result.controlDependent = true;
         break;
     case CCall:
+        result = as<CCallValue>()->effects;
+        break;
     case Patchpoint:
-        result.reads = HeapRange::top();
-        result.writes = HeapRange::top();
-        result.exitsSideways = true;
-        result.controlDependent = true;
+        result = as<PatchpointValue>()->effects;
         break;
     case CheckAdd:
     case CheckSub:
@@ -284,9 +364,26 @@ void Value::performSubstitution()
     }
 }
 
-void Value::dumpMeta(PrintStream&) const
+void Value::dumpMeta(CommaPrinter&, PrintStream&) const
 {
 }
+
+#if !ASSERT_DISABLED
+void Value::checkOpcode(Opcode opcode)
+{
+    ASSERT(!ArgumentRegValue::accepts(opcode));
+    ASSERT(!CCallValue::accepts(opcode));
+    ASSERT(!CheckValue::accepts(opcode));
+    ASSERT(!Const32Value::accepts(opcode));
+    ASSERT(!Const64Value::accepts(opcode));
+    ASSERT(!ConstDoubleValue::accepts(opcode));
+    ASSERT(!ControlValue::accepts(opcode));
+    ASSERT(!MemoryValue::accepts(opcode));
+    ASSERT(!PatchpointValue::accepts(opcode));
+    ASSERT(!StackSlotValue::accepts(opcode));
+    ASSERT(!UpsilonValue::accepts(opcode));
+}
+#endif // !ASSERT_DISABLED
 
 Type Value::typeFor(Opcode opcode, Value* firstChild)
 {

@@ -44,16 +44,31 @@ public:
     Value* addConstant(Procedure&, int32_t other) const override;
     Value* addConstant(Procedure&, Value* other) const override;
     Value* subConstant(Procedure&, Value* other) const override;
-    Value* equalConstant(Procedure&, Value* other) const override;
-    Value* notEqualConstant(Procedure&, Value* other) const override;
+    Value* bitAndConstant(Procedure&, Value* other) const override;
+    Value* bitOrConstant(Procedure&, Value* other) const override;
+    Value* bitXorConstant(Procedure&, Value* other) const override;
+    Value* shlConstant(Procedure&, Value* other) const override;
+    Value* sShrConstant(Procedure&, Value* other) const override;
+    Value* zShrConstant(Procedure&, Value* other) const override;
+
+    TriState equalConstant(Value* other) const override;
+    TriState notEqualConstant(Value* other) const override;
+    TriState lessThanConstant(Value* other) const override;
+    TriState greaterThanConstant(Value* other) const override;
+    TriState lessEqualConstant(Value* other) const override;
+    TriState greaterEqualConstant(Value* other) const override;
+    TriState aboveConstant(Value* other) const override;
+    TriState belowConstant(Value* other) const override;
+    TriState aboveEqualConstant(Value* other) const override;
+    TriState belowEqualConstant(Value* other) const override;
 
 protected:
-    JS_EXPORT_PRIVATE void dumpMeta(PrintStream&) const override;
+    JS_EXPORT_PRIVATE void dumpMeta(CommaPrinter&, PrintStream&) const override;
 
     friend class Procedure;
 
     Const32Value(unsigned index, Origin origin, int32_t value)
-        : Value(index, Const32, Int32, origin)
+        : Value(index, CheckedOpcode, Const32, Int32, origin)
         , m_value(value)
     {
     }

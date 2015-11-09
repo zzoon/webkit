@@ -4563,6 +4563,8 @@ void HTMLMediaElement::mediaPlayerCharacteristicChanged(MediaPlayer*)
     if (isPlaying() && !m_mediaSession->playbackPermitted(*this))
         pauseInternal();
 
+    m_mediaSession->setCanProduceAudio(m_player && m_readyState >= HAVE_METADATA && hasAudio());
+
 #if ENABLE(MEDIA_SESSION)
     document().updateIsPlayingMedia(m_elementID);
 #else
@@ -4940,6 +4942,8 @@ void HTMLMediaElement::clearMediaPlayer(int flags)
     if (m_textTracks)
         configureTextTrackDisplay();
 #endif
+
+    m_mediaSession->setCanProduceAudio(false);
 
     updateSleepDisabling();
 }

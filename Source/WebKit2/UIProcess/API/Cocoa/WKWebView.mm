@@ -31,6 +31,7 @@
 #import "APIFormClient.h"
 #import "APIPageConfiguration.h"
 #import "APISerializedScriptValue.h"
+#import "AppKitSPI.h"
 #import "CompletionHandlerCallChecker.h"
 #import "DiagnosticLoggingClient.h"
 #import "FindClient.h"
@@ -144,6 +145,7 @@ enum class DynamicViewportUpdateMode {
 #endif
 
 #if PLATFORM(MAC)
+#import "WKTextFinderClient.h"
 #import "WKViewInternal.h"
 #import <WebCore/ColorMac.h>
 
@@ -235,6 +237,7 @@ WKWebView* fromWebPageProxy(WebKit::WebPageProxy& page)
 #endif
 #if PLATFORM(MAC)
     std::unique_ptr<WebKit::WebViewImpl> _impl;
+    RetainPtr<WKTextFinderClient> _textFinderClient;
 #endif
 }
 
@@ -419,6 +422,10 @@ static bool shouldAllowPictureInPictureMediaPlayback()
 
 - (void)dealloc
 {
+#if PLATFORM(MAC)
+    [_textFinderClient willDestroyView:self];
+#endif
+
 #if PLATFORM(IOS)
     if (_remoteObjectRegistry)
         _page->process().processPool().removeMessageReceiver(Messages::RemoteObjectRegistry::messageReceiverName(), _page->pageID());
@@ -894,7 +901,7 @@ static WebCore::Color scrollViewBackgroundColor(WKWebView *webView)
 
     _scrollViewBackgroundColor = color;
 
-    auto uiBackgroundColor = adoptNS([[UIColor alloc] initWithCGColor:cachedCGColor(color, WebCore::ColorSpaceDeviceRGB)]);
+    auto uiBackgroundColor = adoptNS([[UIColor alloc] initWithCGColor:cachedCGColor(color)]);
     [_scrollView setBackgroundColor:uiBackgroundColor.get()];
 
     // Update the indicator style based on the lightness/darkness of the background color.
@@ -1146,7 +1153,7 @@ static inline bool areEssentiallyEqualAsFloat(float a, float b)
     CATransform3D transform = CATransform3DMakeScale(deviceScale, deviceScale, 1);
 
 #if USE(IOSURFACE)
-    auto surface = WebCore::IOSurface::create(WebCore::expandedIntSize(snapshotSize), WebCore::ColorSpaceDeviceRGB);
+    auto surface = WebCore::IOSurface::create(WebCore::expandedIntSize(snapshotSize), WebCore::ColorSpaceSRGB);
     CARenderServerRenderLayerWithTransform(MACH_PORT_NULL, self.layer.context.contextId, reinterpret_cast<uint64_t>(self.layer), surface->surface(), 0, 0, &transform);
 
     RefPtr<WebKit::ViewSnapshot> viewSnapshot = WebKit::ViewSnapshot::create(nullptr);
@@ -2061,11 +2068,6 @@ WEBCORE_COMMAND(yankAndSelect)
     _impl->changeFontFromFontPanel();
 }
 
-- (BOOL)validateUserInterfaceItem:(id <NSValidatedUserInterfaceItem>)item
-{
-    return _impl->validateUserInterfaceItem(item);
-}
-
 - (IBAction)startSpeaking:(id)sender
 {
     _impl->startSpeaking();
@@ -2648,6 +2650,33 @@ WEBCORE_COMMAND(yankAndSelect)
     _impl->rotateWithEvent(event);
 }
 #endif
+
+- (WKTextFinderClient *)_ensureTextFinderClient
+{
+    if (!_textFinderClient)
+        _textFinderClient = adoptNS([[WKTextFinderClient alloc] initWithPage:*_page view:self]);
+    return _textFinderClient.get();
+}
+
+- (void)findMatchesForString:(NSString *)targetString relativeToMatch:(id <NSTextFinderAsynchronousDocumentFindMatch>)relativeMatch findOptions:(NSTextFinderAsynchronousDocumentFindOptions)findOptions maxResults:(NSUInteger)maxResults resultCollector:(void (^)(NSArray *matches, BOOL didWrap))resultCollector
+{
+    [[self _ensureTextFinderClient] findMatchesForString:targetString relativeToMatch:relativeMatch findOptions:findOptions maxResults:maxResults resultCollector:resultCollector];
+}
+
+- (NSView *)documentContainerView
+{
+    return self;
+}
+
+- (void)getSelectedText:(void (^)(NSString *selectedTextString))completionHandler
+{
+    [[self _ensureTextFinderClient] getSelectedText:completionHandler];
+}
+
+- (void)selectFindMatch:(id <NSTextFinderAsynchronousDocumentFindMatch>)findMatch completionHandler:(void (^)(void))completionHandler
+{
+    [[self _ensureTextFinderClient] selectFindMatch:findMatch completionHandler:completionHandler];
+}
 
 - (NSTextInputContext *)_web_superInputContext
 {
@@ -3796,7 +3825,7 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
 #if USE(IOSURFACE)
     // If we are parented and thus won't incur a significant penalty from paging in tiles, snapshot the view hierarchy directly.
     if (CADisplay *display = self.window.screen._display) {
-        auto surface = WebCore::IOSurface::create(WebCore::expandedIntSize(WebCore::FloatSize(imageSize)), WebCore::ColorSpaceDeviceRGB);
+        auto surface = WebCore::IOSurface::create(WebCore::expandedIntSize(WebCore::FloatSize(imageSize)), WebCore::ColorSpaceSRGB);
         CGFloat imageScaleInViewCoordinates = imageWidth / rectInViewCoordinates.size.width;
         CATransform3D transform = CATransform3DMakeScale(imageScaleInViewCoordinates, imageScaleInViewCoordinates, 1);
         transform = CATransform3DTranslate(transform, -rectInViewCoordinates.origin.x, -rectInViewCoordinates.origin.y, 0);
@@ -4004,7 +4033,7 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
 
 - (BOOL)_webProcessIsResponsive
 {
-    return _page->process().responsivenessTimer()->isResponsive();
+    return _page->process().responsivenessTimer().isResponsive();
 }
 
 @end
@@ -4073,7 +4102,7 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
         return YES;
     }
 
-    return NO;
+    return _impl->validateUserInterfaceItem(item);
 }
 
 - (IBAction)goBack:(id)sender
@@ -4165,6 +4194,10 @@ static constexpr std::chrono::milliseconds didFinishLoadingTimeout = std::chrono
 }
 
 @end
+#endif
+
+#if PLATFORM(IOS) && USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/WKWebViewAdditions.mm>
 #endif
 
 #endif // WK_API_ENABLED

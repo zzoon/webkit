@@ -1,0 +1,5 @@
+
+PASS Streams implementation is not affected if Promise constructor is replaced 
+PASS Streams implementation is not affected if Promise.resolve is replaced 
+PASS Streams implementation is not affected if Promise.reject is replaced 
+

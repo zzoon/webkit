@@ -149,7 +149,7 @@ void DrawingAreaProxyImpl::didUpdateBackingStoreState(uint64_t backingStoreState
     m_isWaitingForDidUpdateBackingStoreState = false;
 
     // Stop the responsiveness timer that was started in sendUpdateBackingStoreState.
-    m_webPageProxy.process().responsivenessTimer()->stop();
+    m_webPageProxy.process().responsivenessTimer().stop();
 
     if (layerTreeContext != m_layerTreeContext) {
         if (!m_layerTreeContext.isEmpty()) {
@@ -210,10 +210,10 @@ void DrawingAreaProxyImpl::updateAcceleratedCompositingMode(uint64_t backingStor
 
 void DrawingAreaProxyImpl::willEnterAcceleratedCompositingMode(uint64_t backingStoreStateID)
 {
-    ASSERT_ARG(backingStoreStateID, backingStoreStateID <= m_currentBackingStoreStateID);
-    if (backingStoreStateID < m_currentBackingStoreStateID)
-        return;
-
+    // WillEnterAcceleratedCompositingMode message is sent when the LayerTreeHost is created in the Web Process.
+    // This can happen while there's still a DidUpdateBackingStoreState pending, in which case we are receiving
+    // here the new backingStoreStateID, but m_currentBackingStoreStateID hasn't been updated yet.
+    ASSERT_ARG(backingStoreStateID, backingStoreStateID <= m_nextBackingStoreStateID);
     m_webPageProxy.willEnterAcceleratedCompositingMode();
 }
 
@@ -272,7 +272,7 @@ void DrawingAreaProxyImpl::sendUpdateBackingStoreState(RespondImmediatelyOrNot r
     if (m_isWaitingForDidUpdateBackingStoreState) {
         // Start the responsiveness timer. We will stop it when we hear back from the WebProcess
         // in didUpdateBackingStoreState.
-        m_webPageProxy.process().responsivenessTimer()->start();
+        m_webPageProxy.process().responsivenessTimer().start();
     }
 
     if (m_isWaitingForDidUpdateBackingStoreState && !m_layerTreeContext.isEmpty()) {

@@ -44,17 +44,22 @@ public:
     Value* addConstant(Procedure& proc, int32_t other) const override;
     Value* addConstant(Procedure& proc, Value* other) const override;
     Value* subConstant(Procedure& proc, Value* other) const override;
-    Value* equalConstant(Procedure& proc, Value* other) const override;
-    Value* notEqualConstant(Procedure& proc, Value* other) const override;
+
+    TriState equalConstant(Value* other) const override;
+    TriState notEqualConstant(Value* other) const override;
+    TriState lessThanConstant(Value* other) const override;
+    TriState greaterThanConstant(Value* other) const override;
+    TriState lessEqualConstant(Value* other) const override;
+    TriState greaterEqualConstant(Value* other) const override;
 
 protected:
-    void dumpMeta(PrintStream&) const override;
+    void dumpMeta(CommaPrinter&, PrintStream&) const override;
 
 private:
     friend class Procedure;
 
     ConstDoubleValue(unsigned index, Origin origin, double value)
-        : Value(index, ConstDouble, Double, origin)
+        : Value(index, CheckedOpcode, ConstDouble, Double, origin)
         , m_value(value)
     {
     }

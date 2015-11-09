@@ -51,7 +51,6 @@ class Event;
 class FloatQuad;
 class Frame;
 class InspectorPageAgent;
-class PageScriptDebugServer;
 class RenderObject;
 class RunLoopObserver;
 
@@ -66,8 +65,6 @@ enum class TimelineRecordType {
     Paint,
     Composite,
     RenderingFrame,
-
-    ParseHTML,
 
     TimerInstall,
     TimerRemove,
@@ -108,8 +105,6 @@ public:
 
     int id() const { return m_id; }
 
-    void setPageScriptDebugServer(PageScriptDebugServer*);
-
     void didCommitLoad();
 
     // Methods called from WebCore.
@@ -137,8 +132,6 @@ public:
     void willRecalculateStyle(Frame*);
     void didRecalculateStyle();
     void didScheduleStyleRecalculation(Frame*);
-    void willWriteHTML(unsigned startLine, Frame*);
-    void didWriteHTML(unsigned endLine);
     void didTimeStamp(Frame&, const String&);
     void didRequestAnimationFrame(int callbackId, Frame*);
     void didCancelAnimationFrame(int callbackId, Frame*);
@@ -202,8 +195,6 @@ private:
     std::unique_ptr<Inspector::TimelineFrontendDispatcher> m_frontendDispatcher;
     RefPtr<Inspector::TimelineBackendDispatcher> m_backendDispatcher;
     InspectorPageAgent* m_pageAgent;
-
-    PageScriptDebugServer* m_scriptDebugServer { nullptr };
 
     Vector<TimelineRecordEntry> m_recordStack;
     int m_id { 1 };
