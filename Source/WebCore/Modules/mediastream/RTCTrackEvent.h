@@ -34,7 +34,6 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "Event.h"
-// #include "MediaStreamTrack.h"
 #include <wtf/text/AtomicString.h>
 
 namespace WebCore {

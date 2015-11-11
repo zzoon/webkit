@@ -35,4 +35,3 @@
    [InitializedByEventConstructor] readonly attribute RTCRtpReceiver receiver;
    [InitializedByEventConstructor] readonly attribute MediaStreamTrack track;
 };
-

@@ -85,4 +85,3 @@ RTCTrackEvent::~RTCTrackEvent()
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
-
