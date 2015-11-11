@@ -38,7 +38,7 @@
 #include "ActiveDOMObject.h"
 #include "Dictionary.h"
 #include "EventTarget.h"
-// FIXME: Workaround for bindings generator bug (bindings for variadic types are not included properly)
+// FIXME: Workaround for bindings bug http://webkit.org/b/150121
 #include "JSMediaStream.h"
 #include "PeerConnectionBackend.h"
 #include "ScriptWrappable.h"
@@ -64,28 +64,28 @@ public:
     static RefPtr<RTCPeerConnection> create(ScriptExecutionContext&, const Dictionary& rtcConfiguration, ExceptionCode&);
     ~RTCPeerConnection();
 
-    Vector<RefPtr<RTCRtpSender>> getSenders() const;
+    Vector<RefPtr<RTCRtpSender>> getSenders() const override;
     Vector<RefPtr<RTCRtpReceiver>> getReceivers() const;
 
     RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, Vector<MediaStream*>, ExceptionCode&);
     void removeTrack(RTCRtpSender*, ExceptionCode&);
 
-    void createOffer(const Dictionary& offerOptions, PeerConnection::SessionDescriptionPromise&&);
-    void createAnswer(const Dictionary& answerOptions, PeerConnection::SessionDescriptionPromise&&);
+    void queuedCreateOffer(const Dictionary& offerOptions, PeerConnection::SessionDescriptionPromise&&);
+    void queuedCreateAnswer(const Dictionary& answerOptions, PeerConnection::SessionDescriptionPromise&&);
 
-    void setLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&);
+    void queuedSetLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&);
     RefPtr<RTCSessionDescription> localDescription() const;
     RefPtr<RTCSessionDescription> currentLocalDescription() const;
     RefPtr<RTCSessionDescription> pendingLocalDescription() const;
 
-    void setRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&);
+    void queuedSetRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&);
     RefPtr<RTCSessionDescription> remoteDescription() const;
     RefPtr<RTCSessionDescription> currentRemoteDescription() const;
     RefPtr<RTCSessionDescription> pendingRemoteDescription() const;
 
     String signalingState() const;
 
-    void addIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&&);
+    void queuedAddIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&&);
 
     String iceGatheringState() const;
     String iceConnectionState() const;
@@ -93,9 +93,10 @@ public:
     RTCConfiguration* getConfiguration() const;
     void setConfiguration(const Dictionary& configuration, ExceptionCode&);
 
-    void getStats(PassRefPtr<RTCStatsCallback> successCallback, PassRefPtr<RTCPeerConnectionErrorCallback>, PassRefPtr<MediaStreamTrack> selector);
+    void privateGetStats(MediaStreamTrack*, PeerConnection::StatsPromise&&);
+    void privateGetStats(PeerConnection::StatsPromise&&);
 
-    PassRefPtr<RTCDataChannel> createDataChannel(String label, const Dictionary& dataChannelDict, ExceptionCode&);
+    RefPtr<RTCDataChannel> createDataChannel(String label, const Dictionary& dataChannelDict, ExceptionCode&);
 
     void close();
 
@@ -107,7 +108,7 @@ public:
     using RefCounted<RTCPeerConnection>::deref;
 
 private:
-    RTCPeerConnection(ScriptExecutionContext&, PassRefPtr<RTCConfiguration>, ExceptionCode&);
+    RTCPeerConnection(ScriptExecutionContext&, RefPtr<RTCConfiguration>&&, ExceptionCode&);
 
     // EventTarget implementation.
     virtual void refEventTarget() override { ref(); }
@@ -119,17 +120,17 @@ private:
     bool canSuspendForPageCache() const override;
 
     // PeerConnectionBackendClient
-    void setSignalingState(PeerConnectionStates::SignalingState);
-    void updateIceGatheringState(PeerConnectionStates::IceGatheringState);
-    void updateIceConnectionState(PeerConnectionStates::IceConnectionState);
+    void setSignalingState(PeerConnectionStates::SignalingState) override;
+    void updateIceGatheringState(PeerConnectionStates::IceGatheringState) override;
+    void updateIceConnectionState(PeerConnectionStates::IceConnectionState) override;
 
-    void scheduleNegotiationNeededEvent() const;
+    void scheduleNegotiationNeededEvent() override;
 
     ScriptExecutionContext* context() const override { return scriptExecutionContext(); };
-    void fireEvent(PassRefPtr<Event>) override;
-    PeerConnectionStates::SignalingState internalSignalingState() const { return m_signalingState; }
-    PeerConnectionStates::IceGatheringState internalIceGatheringState() const { return m_iceGatheringState; }
-    PeerConnectionStates::IceConnectionState internalIceConnectionState() const { return m_iceConnectionState; }
+    void fireEvent(RefPtr<Event>&&) override;
+    PeerConnectionStates::SignalingState internalSignalingState() const override { return m_signalingState; }
+    PeerConnectionStates::IceGatheringState internalIceGatheringState() const override { return m_iceGatheringState; }
+    PeerConnectionStates::IceConnectionState internalIceConnectionState() const override { return m_iceConnectionState; }
 
     PeerConnectionStates::SignalingState m_signalingState;
     PeerConnectionStates::IceGatheringState m_iceGatheringState;

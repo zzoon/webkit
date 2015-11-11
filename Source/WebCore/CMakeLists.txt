@@ -3594,6 +3594,8 @@ GENERATE_BINDINGS(WebCoreTestSupport_SOURCES
 set(WebCore_BUILTINS_SOURCES
     ${WEBCORE_DIR}/Modules/mediastream/MediaDevices.js
     ${WEBCORE_DIR}/Modules/mediastream/NavigatorUserMedia.js
+    ${WEBCORE_DIR}/Modules/mediastream/RTCPeerConnection.js
+    ${WEBCORE_DIR}/Modules/mediastream/RTCPeerConnectionInternals.js
     ${WEBCORE_DIR}/Modules/streams/ByteLengthQueuingStrategy.js
     ${WEBCORE_DIR}/Modules/streams/CountQueuingStrategy.js
     ${WEBCORE_DIR}/Modules/streams/ReadableStream.js

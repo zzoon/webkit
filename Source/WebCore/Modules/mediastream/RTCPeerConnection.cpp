@@ -63,33 +63,26 @@ using namespace PeerConnectionStates;
 
 RefPtr<RTCPeerConnection> RTCPeerConnection::create(ScriptExecutionContext& context, const Dictionary& rtcConfiguration, ExceptionCode& ec)
 {
-    printf("-> RTCConfiguration::create\n");
-
     RefPtr<RTCConfiguration> configuration = RTCConfiguration::create(rtcConfiguration, ec);
     if (ec)
         return nullptr;
 
-    printf("RTCPeerConnection: config was ok\n");
-
-    RefPtr<RTCPeerConnection> peerConnection = adoptRef(new RTCPeerConnection(context, configuration.release(), ec));
+    RefPtr<RTCPeerConnection> peerConnection = adoptRef(new RTCPeerConnection(context, WTF::move(configuration), ec));
     peerConnection->suspendIfNeeded();
     if (ec)
         return nullptr;
 
-    printf("RTCPeerConnection: before release\n");
     return peerConnection;
 }
 
-RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, PassRefPtr<RTCConfiguration> configuration, ExceptionCode& ec)
+RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, RefPtr<RTCConfiguration>&& configuration, ExceptionCode& ec)
     : ActiveDOMObject(&context)
     , m_signalingState(SignalingState::Stable)
     , m_iceGatheringState(IceGatheringState::New)
     , m_iceConnectionState(IceConnectionState::New)
-    , m_configuration(configuration)
+    , m_configuration(WTF::move(configuration))
     , m_stopped(false)
 {
-    printf("-> RTCConfiguration::RTCConfiguration\n");
-
     Document& document = downcast<Document>(context);
 
     if (!document.frame()) {
@@ -114,8 +107,8 @@ RTCPeerConnection::~RTCPeerConnection()
 Vector<RefPtr<RTCRtpSender>> RTCPeerConnection::getSenders() const
 {
     Vector<RefPtr<RTCRtpSender>> senders;
-    for (auto& sender : m_senderSet.values())
-        senders.append(sender);
+    senders.reserveCapacity(m_senderSet.size());
+    copyValuesToVector(m_senderSet, senders);
 
     return senders;
 }
@@ -123,14 +116,19 @@ Vector<RefPtr<RTCRtpSender>> RTCPeerConnection::getSenders() const
 Vector<RefPtr<RTCRtpReceiver>> RTCPeerConnection::getReceivers() const
 {
     Vector<RefPtr<RTCRtpReceiver>> receivers;
-    for (auto& receiver : m_receiverSet.values())
-        receivers.append(receiver);
+    receivers.reserveCapacity(m_receiverSet.size());
+    copyValuesToVector(m_receiverSet, receivers);
 
     return receivers;
 }
 
 RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, Vector<MediaStream*> streams, ExceptionCode& ec)
 {
+    if (!track) {
+        ec = TypeError;
+        return nullptr;
+    }
+
     if (m_signalingState == SignalingState::Closed) {
         ec = INVALID_STATE_ERR;
         return nullptr;
@@ -159,6 +157,11 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
 
 void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
 {
+    if (!sender) {
+        ec = TypeError;
+        return;
+    }
+
     if (m_signalingState == SignalingState::Closed) {
         ec = INVALID_STATE_ERR;
         return;
@@ -170,8 +173,13 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
     m_backend->markAsNeedingNegotiation();
 }
 
-void RTCPeerConnection::createOffer(const Dictionary& offerOptions, SessionDescriptionPromise&& promise)
+void RTCPeerConnection::queuedCreateOffer(const Dictionary& offerOptions, SessionDescriptionPromise&& promise)
 {
+    if (m_signalingState == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        return;
+    }
+
     ExceptionCode ec = 0;
     RefPtr<RTCOfferOptions> options = RTCOfferOptions::create(offerOptions, ec);
     if (ec) {
@@ -183,8 +191,13 @@ void RTCPeerConnection::createOffer(const Dictionary& offerOptions, SessionDescr
     m_backend->createOffer(*options, WTF::move(promise));
 }
 
-void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, SessionDescriptionPromise&& promise)
+void RTCPeerConnection::queuedCreateAnswer(const Dictionary& answerOptions, SessionDescriptionPromise&& promise)
 {
+    if (m_signalingState == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        return;
+    }
+
     ExceptionCode ec = 0;
     RefPtr<RTCAnswerOptions> options = RTCAnswerOptions::create(answerOptions, ec);
     if (ec) {
@@ -195,8 +208,13 @@ void RTCPeerConnection::createAnswer(const Dictionary& answerOptions, SessionDes
     m_backend->createAnswer(*options, WTF::move(promise));
 }
 
-void RTCPeerConnection::setLocalDescription(RTCSessionDescription* description, PeerConnection::VoidPromise&& promise)
+void RTCPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, PeerConnection::VoidPromise&& promise)
 {
+    if (m_signalingState == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        return;
+    }
+
     m_backend->setLocalDescription(description, WTF::move(promise));
 }
 
@@ -215,8 +233,13 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::pendingLocalDescription() const
     return m_backend->pendingLocalDescription();
 }
 
-void RTCPeerConnection::setRemoteDescription(RTCSessionDescription* description, PeerConnection::VoidPromise&& promise)
+void RTCPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* description, PeerConnection::VoidPromise&& promise)
 {
+    if (m_signalingState == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        return;
+    }
+
     m_backend->setRemoteDescription(description, WTF::move(promise));
 }
 
@@ -235,8 +258,13 @@ RefPtr<RTCSessionDescription> RTCPeerConnection::pendingRemoteDescription() cons
     return m_backend->pendingRemoteDescription();
 }
 
-void RTCPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, VoidPromise&& promise)
+void RTCPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, VoidPromise&& promise)
 {
+    if (m_signalingState == SignalingState::Closed) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        return;
+    }
+
     m_backend->addIceCandidate(rtcCandidate, WTF::move(promise));
 }
 
@@ -306,6 +334,11 @@ RTCConfiguration* RTCPeerConnection::getConfiguration() const
 
 void RTCPeerConnection::setConfiguration(const Dictionary& configuration, ExceptionCode& ec)
 {
+    if (configuration.isUndefinedOrNull()) {
+        ec = TypeError;
+        return;
+    }
+
     if (m_signalingState == SignalingState::Closed) {
         ec = INVALID_STATE_ERR;
         return;
@@ -319,11 +352,17 @@ void RTCPeerConnection::setConfiguration(const Dictionary& configuration, Except
     m_backend->setConfiguration(*m_configuration);
 }
 
-void RTCPeerConnection::getStats(PassRefPtr<RTCStatsCallback>, PassRefPtr<RTCPeerConnectionErrorCallback>, PassRefPtr<MediaStreamTrack>)
+void RTCPeerConnection::privateGetStats(MediaStreamTrack* selector, PeerConnection::StatsPromise&& promise)
 {
+    m_backend->getStats(selector, WTF::move(promise));
 }
 
-PassRefPtr<RTCDataChannel> RTCPeerConnection::createDataChannel(String, const Dictionary&, ExceptionCode& ec)
+void RTCPeerConnection::privateGetStats(PeerConnection::StatsPromise&& promise)
+{
+    privateGetStats(nullptr, WTF::move(promise));
+}
+
+RefPtr<RTCDataChannel> RTCPeerConnection::createDataChannel(String, const Dictionary&, ExceptionCode& ec)
 {
     if (m_signalingState == SignalingState::Closed) {
         ec = INVALID_STATE_ERR;
@@ -385,7 +424,7 @@ void RTCPeerConnection::updateIceConnectionState(IceConnectionState newState)
     });
 }
 
-void RTCPeerConnection::scheduleNegotiationNeededEvent() const
+void RTCPeerConnection::scheduleNegotiationNeededEvent()
 {
     scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
         if (m_backend->isNegotiationNeeded()) {
@@ -395,9 +434,9 @@ void RTCPeerConnection::scheduleNegotiationNeededEvent() const
     });
 }
 
-void RTCPeerConnection::fireEvent(PassRefPtr<Event> event)
+void RTCPeerConnection::fireEvent(RefPtr<Event>&& event)
 {
-    dispatchEvent(event);
+    dispatchEvent(event.release());
 }
 
 } // namespace WebCore

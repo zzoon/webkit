@@ -232,12 +232,6 @@ void MediaEndpointPeerConnection::queuedCreateOffer(RTCOfferOptions& options, Se
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
-    if (m_client->internalSignalingState() == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        completeQueuedOperation();
-        return;
-    }
-
     RefPtr<MediaEndpointConfiguration> configurationSnapshot = internalLocalDescription() ?
         internalLocalDescription()->configuration()->clone() : MediaEndpointConfiguration::create();
 
@@ -310,12 +304,6 @@ void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, Sessio
 void MediaEndpointPeerConnection::queuedCreateAnswer(RTCAnswerOptions&, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
-
-    if (m_client->internalSignalingState() == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        completeQueuedOperation();
-        return;
-    }
 
     if (!remoteDescription()) {
         // FIXME: Error type?
@@ -415,12 +403,6 @@ static bool allSendersRepresented(const RtpSenderVector& senders, const MediaDes
 
 void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, VoidPromise& promise)
 {
-    if (m_client->internalSignalingState() == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        completeQueuedOperation();
-        return;
-    }
-
     SessionDescription::Type descriptionType = parseDescriptionType(description->type());
 
     if (!localDescriptionTypeValidForState(descriptionType)) {
@@ -580,12 +562,6 @@ void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* de
 
 void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* description, VoidPromise& promise)
 {
-    if (m_client->internalSignalingState() == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        completeQueuedOperation();
-        return;
-    }
-
     SessionDescription::Type descriptionType = parseDescriptionType(description->type());
 
     if (!remoteDescriptionTypeValidForState(descriptionType)) {
@@ -701,12 +677,6 @@ void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate,
 
 void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, PeerConnection::VoidPromise& promise)
 {
-    if (m_client->internalSignalingState() == SignalingState::Closed) {
-        promise.reject(DOMError::create("InvalidStateError"));
-        completeQueuedOperation();
-        return;
-    }
-
     if (!remoteDescription()) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidStateError (no remote description)"));
@@ -740,6 +710,11 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
 
     promise.resolve(nullptr);
     completeQueuedOperation();
+}
+
+void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::StatsPromise&& promise)
+{
+    promise.reject(DOMError::create("Not implemented"));
 }
 
 void MediaEndpointPeerConnection::stop()

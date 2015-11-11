@@ -40,6 +40,7 @@ namespace WebCore {
 
 class DOMError;
 class Event;
+class MediaStreamTrack;
 class PeerConnectionBackend;
 class RTCAnswerOptions;
 class RTCConfiguration;
@@ -47,23 +48,25 @@ class RTCIceCandidate;
 class RTCOfferOptions;
 class RTCRtpSender;
 class RTCSessionDescription;
+class RTCStatsResponse;
 class ScriptExecutionContext;
 
 namespace PeerConnection {
-typedef DOMPromiseWithCallback<RefPtr<RTCSessionDescription>, RefPtr<DOMError>> SessionDescriptionPromise;
-typedef DOMPromiseWithCallback<std::nullptr_t, RefPtr<DOMError>> VoidPromise;
+typedef DOMPromise<RefPtr<RTCSessionDescription>, RefPtr<DOMError>> SessionDescriptionPromise;
+typedef DOMPromise<std::nullptr_t, RefPtr<DOMError>> VoidPromise;
+typedef DOMPromise<RefPtr<RTCStatsResponse>, RefPtr<DOMError>> StatsPromise;
 }
 
 class PeerConnectionBackendClient {
 public:
     virtual Vector<RefPtr<RTCRtpSender>> getSenders() const = 0;
-    virtual void fireEvent(PassRefPtr<Event>) = 0;
+    virtual void fireEvent(RefPtr<Event>&&) = 0;
 
     virtual void setSignalingState(PeerConnectionStates::SignalingState) = 0;
     virtual void updateIceGatheringState(PeerConnectionStates::IceGatheringState) = 0;
     virtual void updateIceConnectionState(PeerConnectionStates::IceConnectionState) = 0;
 
-    virtual void scheduleNegotiationNeededEvent() const = 0;
+    virtual void scheduleNegotiationNeededEvent() = 0;
 
     virtual ScriptExecutionContext* context() const = 0;
     virtual PeerConnectionStates::SignalingState internalSignalingState() const = 0;
@@ -95,6 +98,8 @@ public:
 
     virtual void setConfiguration(RTCConfiguration&) = 0;
     virtual void addIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&&) = 0;
+
+    virtual void getStats(MediaStreamTrack*, PeerConnection::StatsPromise&&) = 0;
 
     virtual void stop() = 0;
 
