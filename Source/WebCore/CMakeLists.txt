@@ -249,12 +249,9 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/mediastream/RTCIceCandidateEvent.idl
     Modules/mediastream/RTCIceServer.idl
     Modules/mediastream/RTCPeerConnection.idl
-    Modules/mediastream/RTCPeerConnectionErrorCallback.idl
     Modules/mediastream/RTCRtpReceiver.idl
     Modules/mediastream/RTCRtpSender.idl
     Modules/mediastream/RTCSessionDescription.idl
-    Modules/mediastream/RTCSessionDescriptionCallback.idl
-    Modules/mediastream/RTCStatsCallback.idl
     Modules/mediastream/RTCStatsReport.idl
     Modules/mediastream/RTCStatsResponse.idl
     Modules/mediastream/RTCTrackEvent.idl
@@ -969,12 +966,9 @@ set(WebCore_SOURCES
     Modules/mediastream/RTCRtpSender.cpp
     Modules/mediastream/RTCRtpSenderReceiverBase.cpp
     Modules/mediastream/RTCSessionDescription.cpp
-    # Modules/mediastream/RTCSessionDescriptionRequestImpl.cpp
     Modules/mediastream/RTCStatsReport.cpp
-    Modules/mediastream/RTCStatsRequestImpl.cpp
     Modules/mediastream/RTCStatsResponse.cpp
     Modules/mediastream/RTCTrackEvent.cpp
-    Modules/mediastream/RTCVoidRequestImpl.cpp
     Modules/mediastream/SourceInfo.cpp
     Modules/mediastream/UserMediaController.cpp
     Modules/mediastream/UserMediaRequest.cpp
