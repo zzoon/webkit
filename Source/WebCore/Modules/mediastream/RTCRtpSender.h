@@ -40,8 +40,10 @@ namespace WebCore {
 
 class RTCRtpSender : public RTCRtpSenderReceiverBase {
 public:
-    static Ref<RTCRtpSender> create(RefPtr<MediaStreamTrack>&&, const String& mediaStreamId);
-    virtual ~RTCRtpSender();
+    static Ref<RTCRtpSender> create(RefPtr<MediaStreamTrack>&& track, const String& mediaStreamId)
+    {
+        return adoptRef(*new RTCRtpSender(WTF::move(track), mediaStreamId));
+    }
 
     const String& mediaStreamId() const { return m_mediaStreamId; }
 

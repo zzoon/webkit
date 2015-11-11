@@ -35,17 +35,8 @@
 
 namespace WebCore {
 
-Ref<RTCRtpReceiver> RTCRtpReceiver::create(RefPtr<MediaStreamTrack>&& track)
-{
-    return adoptRef(*new RTCRtpReceiver(WTF::move(track)));
-}
-
 RTCRtpReceiver::RTCRtpReceiver(RefPtr<MediaStreamTrack>&& track)
     : RTCRtpSenderReceiverBase(WTF::move(track))
-{
-}
-
-RTCRtpReceiver::~RTCRtpReceiver()
 {
 }
 
