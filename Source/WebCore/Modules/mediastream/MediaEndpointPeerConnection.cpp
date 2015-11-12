@@ -929,7 +929,7 @@ void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<Re
     // FIXME: MediaStream handling not implemented
 
     RefPtr<MediaStreamTrackPrivate> trackPrivate = MediaStreamTrackPrivate::create(WTF::move(source), trackId);
-    RefPtr<MediaStreamTrack> track = MediaStreamTrack::create(*m_client->context(), *trackPrivate);
+    RefPtr<MediaStreamTrack> track = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *trackPrivate);
     RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create(track.copyRef());
 
     m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false, WTF::move(receiver), WTF::move(track)));
@@ -957,7 +957,7 @@ String MediaEndpointPeerConnection::iceCandidateFromSDP(const String& sdpFragmen
 
 String MediaEndpointPeerConnection::sdpConversion(const String& functionName, const String& argument) const
 {
-    Document* document = downcast<Document>(m_client->context());
+    Document* document = downcast<Document>(m_client->scriptExecutionContext());
 
     if (!m_isolatedWorld)
         m_isolatedWorld = DOMWrapperWorld::create(JSDOMWindow::commonVM());

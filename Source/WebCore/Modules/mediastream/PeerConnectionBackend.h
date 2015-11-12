@@ -68,7 +68,7 @@ public:
 
     virtual void scheduleNegotiationNeededEvent() = 0;
 
-    virtual ScriptExecutionContext* context() const = 0;
+    virtual ScriptExecutionContext* scriptExecutionContext() const = 0;
     virtual PeerConnectionStates::SignalingState internalSignalingState() const = 0;
     virtual PeerConnectionStates::IceGatheringState internalIceGatheringState() const = 0;
     virtual PeerConnectionStates::IceConnectionState internalIceConnectionState() const = 0;

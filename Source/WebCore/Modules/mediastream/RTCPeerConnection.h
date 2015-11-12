@@ -126,7 +126,6 @@ private:
 
     void scheduleNegotiationNeededEvent() override;
 
-    ScriptExecutionContext* context() const override { return scriptExecutionContext(); };
     void fireEvent(RefPtr<Event>&&) override;
     PeerConnectionStates::SignalingState internalSignalingState() const override { return m_signalingState; }
     PeerConnectionStates::IceGatheringState internalIceGatheringState() const override { return m_iceGatheringState; }
