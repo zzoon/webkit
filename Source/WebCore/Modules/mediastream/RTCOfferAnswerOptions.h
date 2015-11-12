@@ -54,7 +54,6 @@ protected:
 class RTCOfferOptions : public RTCOfferAnswerOptions {
 public:
     static RefPtr<RTCOfferOptions> create(const Dictionary&, ExceptionCode&);
-    virtual ~RTCOfferOptions() { }
 
     int64_t offerToReceiveVideo() const { return m_offerToReceiveVideo; }
     int64_t offerToReceiveAudio() const { return m_offerToReceiveAudio; }
@@ -72,7 +71,6 @@ private:
 class RTCAnswerOptions : public RTCOfferAnswerOptions {
 public:
     static RefPtr<RTCAnswerOptions> create(const Dictionary&, ExceptionCode&);
-    virtual ~RTCAnswerOptions() { }
 
 private:
     virtual bool initialize(const Dictionary&) override;
