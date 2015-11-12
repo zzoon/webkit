@@ -360,13 +360,13 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(RTCAnswerOptions&, SessionD
     completeQueuedOperation();
 }
 
-void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription* description, VoidPromise&& promise)
+void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& description, VoidPromise&& promise)
 {
-    RefPtr<RTCSessionDescription> protectedDescription = description;
+    RefPtr<RTCSessionDescription> protectedDescription = &description;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
 
     enqueueOperation([this, protectedDescription, wrappedPromise]() {
-        queuedSetLocalDescription(protectedDescription.get(), wrappedPromise->promise());
+        queuedSetLocalDescription(*protectedDescription, wrappedPromise->promise());
     });
 }
 
@@ -401,9 +401,9 @@ static bool allSendersRepresented(const RtpSenderVector& senders, const MediaDes
     return true;
 }
 
-void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, VoidPromise& promise)
+void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription& description, VoidPromise& promise)
 {
-    SessionDescription::Type descriptionType = parseDescriptionType(description->type());
+    SessionDescription::Type descriptionType = parseDescriptionType(description.type());
 
     if (!localDescriptionTypeValidForState(descriptionType)) {
         // FIXME: Error type?
@@ -412,7 +412,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         return;
     }
 
-    String json = fromSDP(description->sdp());
+    String json = fromSDP(description.sdp());
     RefPtr<MediaEndpointConfiguration> parsedConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
 
     if (!parsedConfiguration) {
@@ -550,19 +550,19 @@ static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayl
     return filteredPayloads;
 }
 
-void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription* description, VoidPromise&& promise)
+void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription& description, VoidPromise&& promise)
 {
-    RefPtr<RTCSessionDescription> protectedDescription = description;
+    RefPtr<RTCSessionDescription> protectedDescription = &description;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
 
     enqueueOperation([this, protectedDescription, wrappedPromise]() {
-        queuedSetRemoteDescription(protectedDescription.get(), wrappedPromise->promise());
+        queuedSetRemoteDescription(*protectedDescription, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* description, VoidPromise& promise)
+void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription& description, VoidPromise& promise)
 {
-    SessionDescription::Type descriptionType = parseDescriptionType(description->type());
+    SessionDescription::Type descriptionType = parseDescriptionType(description.type());
 
     if (!remoteDescriptionTypeValidForState(descriptionType)) {
         // FIXME: Error type?
@@ -570,7 +570,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
         return;
     }
 
-    String json = fromSDP(description->sdp());
+    String json = fromSDP(description.sdp());
     RefPtr<MediaEndpointConfiguration> parsedConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
 
     if (!parsedConfiguration) {
@@ -665,17 +665,17 @@ void MediaEndpointPeerConnection::setConfiguration(RTCConfiguration& configurati
     m_mediaEndpoint->setConfiguration(createMediaEndpointInit(configuration));
 }
 
-void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate* rtcCandidate, PeerConnection::VoidPromise&& promise)
+void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate& rtcCandidate, PeerConnection::VoidPromise&& promise)
 {
-    RefPtr<RTCIceCandidate> protectedCandidate = rtcCandidate;
+    RefPtr<RTCIceCandidate> protectedCandidate = &rtcCandidate;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
 
     enqueueOperation([this, protectedCandidate, wrappedPromise]() {
-        queuedAddIceCandidate(protectedCandidate.get(), wrappedPromise->promise());
+        queuedAddIceCandidate(*protectedCandidate, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, PeerConnection::VoidPromise& promise)
+void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate& rtcCandidate, PeerConnection::VoidPromise& promise)
 {
     if (!remoteDescription()) {
         // FIXME: Error type?
@@ -684,7 +684,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
         return;
     }
 
-    String json = iceCandidateFromSDP(rtcCandidate->candidate());
+    String json = iceCandidateFromSDP(rtcCandidate.candidate());
     RefPtr<IceCandidate> candidate = MediaEndpointConfigurationConversions::iceCandidateFromJSON(json);
     if (!candidate) {
         // FIXME: Error type?
@@ -694,7 +694,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
     }
 
     const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
-    unsigned mdescIndex = rtcCandidate->sdpMLineIndex();
+    unsigned mdescIndex = rtcCandidate.sdpMLineIndex();
 
     if (mdescIndex >= remoteMediaDescriptions.size()) {
         // FIXME: Error type?
@@ -712,7 +712,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCand
     completeQueuedOperation();
 }
 
-void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::StatsPromise&& promise)
+void MediaEndpointPeerConnection::getStats(MediaStreamTrack&, PeerConnection::StatsPromise&& promise)
 {
     promise.reject(DOMError::create("Not implemented"));
 }

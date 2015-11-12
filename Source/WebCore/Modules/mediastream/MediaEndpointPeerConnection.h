@@ -56,20 +56,20 @@ public:
     void createOffer(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&&) override;
     void createAnswer(RTCAnswerOptions&, PeerConnection::SessionDescriptionPromise&&) override;
 
-    void setLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) override;
+    void setLocalDescription(RTCSessionDescription&, PeerConnection::VoidPromise&&) override;
     RefPtr<RTCSessionDescription> localDescription() const override;
     RefPtr<RTCSessionDescription> currentLocalDescription() const override;
     RefPtr<RTCSessionDescription> pendingLocalDescription() const override;
 
-    void setRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) override;
+    void setRemoteDescription(RTCSessionDescription&, PeerConnection::VoidPromise&&) override;
     RefPtr<RTCSessionDescription> remoteDescription() const override;
     RefPtr<RTCSessionDescription> currentRemoteDescription() const override;
     RefPtr<RTCSessionDescription> pendingRemoteDescription() const override;
 
     void setConfiguration(RTCConfiguration&) override;
-    void addIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&&) override;
+    void addIceCandidate(RTCIceCandidate&, PeerConnection::VoidPromise&&) override;
 
-    void getStats(MediaStreamTrack*, PeerConnection::StatsPromise&&) override;
+    void getStats(MediaStreamTrack&, PeerConnection::StatsPromise&&) override;
 
     void stop() override;
 
@@ -85,10 +85,10 @@ private:
     void queuedCreateOffer(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&);
     void queuedCreateAnswer(RTCAnswerOptions&, PeerConnection::SessionDescriptionPromise&);
 
-    void queuedSetLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&);
-    void queuedSetRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&);
+    void queuedSetLocalDescription(RTCSessionDescription&, PeerConnection::VoidPromise&);
+    void queuedSetRemoteDescription(RTCSessionDescription&, PeerConnection::VoidPromise&);
 
-    void queuedAddIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&);
+    void queuedAddIceCandidate(RTCIceCandidate&, PeerConnection::VoidPromise&);
 
     bool localDescriptionTypeValidForState(SessionDescription::Type) const;
     bool remoteDescriptionTypeValidForState(SessionDescription::Type) const;

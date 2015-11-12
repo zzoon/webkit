@@ -86,20 +86,20 @@ public:
     virtual void createOffer(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&&) = 0;
     virtual void createAnswer(RTCAnswerOptions&, PeerConnection::SessionDescriptionPromise&&) = 0;
 
-    virtual void setLocalDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) = 0;
+    virtual void setLocalDescription(RTCSessionDescription&, PeerConnection::VoidPromise&&) = 0;
     virtual RefPtr<RTCSessionDescription> localDescription() const = 0;
     virtual RefPtr<RTCSessionDescription> currentLocalDescription() const = 0;
     virtual RefPtr<RTCSessionDescription> pendingLocalDescription() const = 0;
 
-    virtual void setRemoteDescription(RTCSessionDescription*, PeerConnection::VoidPromise&&) = 0;
+    virtual void setRemoteDescription(RTCSessionDescription&, PeerConnection::VoidPromise&&) = 0;
     virtual RefPtr<RTCSessionDescription> remoteDescription() const = 0;
     virtual RefPtr<RTCSessionDescription> currentRemoteDescription() const = 0;
     virtual RefPtr<RTCSessionDescription> pendingRemoteDescription() const = 0;
 
     virtual void setConfiguration(RTCConfiguration&) = 0;
-    virtual void addIceCandidate(RTCIceCandidate*, PeerConnection::VoidPromise&&) = 0;
+    virtual void addIceCandidate(RTCIceCandidate&, PeerConnection::VoidPromise&&) = 0;
 
-    virtual void getStats(MediaStreamTrack*, PeerConnection::StatsPromise&&) = 0;
+    virtual void getStats(MediaStreamTrack&, PeerConnection::StatsPromise&&) = 0;
 
     virtual void stop() = 0;
 

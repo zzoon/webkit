@@ -215,7 +215,8 @@ void RTCPeerConnection::queuedSetLocalDescription(RTCSessionDescription* descrip
         return;
     }
 
-    m_backend->setLocalDescription(description, WTF::move(promise));
+    ASSERT(description);
+    m_backend->setLocalDescription(*description, WTF::move(promise));
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
@@ -240,7 +241,8 @@ void RTCPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* descri
         return;
     }
 
-    m_backend->setRemoteDescription(description, WTF::move(promise));
+    ASSERT(description);
+    m_backend->setRemoteDescription(*description, WTF::move(promise));
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::remoteDescription() const
@@ -265,7 +267,8 @@ void RTCPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, Voi
         return;
     }
 
-    m_backend->addIceCandidate(rtcCandidate, WTF::move(promise));
+    ASSERT(rtcCandidate);
+    m_backend->addIceCandidate(*rtcCandidate, WTF::move(promise));
 }
 
 String RTCPeerConnection::signalingState() const
@@ -354,7 +357,8 @@ void RTCPeerConnection::setConfiguration(const Dictionary& configuration, Except
 
 void RTCPeerConnection::privateGetStats(MediaStreamTrack* selector, PeerConnection::StatsPromise&& promise)
 {
-    m_backend->getStats(selector, WTF::move(promise));
+    ASSERT(selector);
+    m_backend->getStats(*selector, WTF::move(promise));
 }
 
 void RTCPeerConnection::privateGetStats(PeerConnection::StatsPromise&& promise)
