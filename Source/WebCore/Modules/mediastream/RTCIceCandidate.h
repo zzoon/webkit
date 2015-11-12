@@ -48,16 +48,16 @@ class RTCIceCandidate : public RefCounted<RTCIceCandidate>, public ScriptWrappab
 public:
     static RefPtr<RTCIceCandidate> create(const Dictionary&, ExceptionCode&);
     static Ref<RTCIceCandidate> create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
-    virtual ~RTCIceCandidate();
+    virtual ~RTCIceCandidate() { }
 
-    const String& candidate() const;
-    void setCandidate(const String&);
+    const String& candidate() const { return m_candidate; }
+    void setCandidate(const String& candidate) { m_candidate = candidate; }
 
-    const String& sdpMid() const;
-    void setSdpMid(const String&);
+    const String& sdpMid() const { return m_sdpMid; }
+    void setSdpMid(const String& sdpMid) { m_sdpMid = sdpMid; }
 
-    unsigned short sdpMLineIndex() const;
-    void setSdpMLineIndex(unsigned short);
+    unsigned short sdpMLineIndex() const { return m_sdpMLineIndex; }
+    void setSdpMLineIndex(unsigned short sdpMLineIndex) { m_sdpMLineIndex = sdpMLineIndex; }
 
 private:
     explicit RTCIceCandidate(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
