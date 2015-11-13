@@ -47,7 +47,7 @@ function enqueueOperation(peerConnection, operation)
             operations[0]();
     };
 
-    return new Promise(function (resolve, reject) {
+    return new @Promise(function (resolve, reject) {
         operations.push(function() {
             operation().then(resolve, reject).then(runNext, runNext);
         });
@@ -69,7 +69,7 @@ function createOfferOrAnswer(peerConnection, targetFunction, functionName, args)
             options = args[0]
 
         return @enqueueOperation(peerConnection, function () {
-            return targetFunction.@apply(peerConnection, [options]);
+            return targetFunction.@call(peerConnection, options);
         });
     }
 
@@ -81,7 +81,7 @@ function createOfferOrAnswer(peerConnection, targetFunction, functionName, args)
         options = args[2];
 
     @enqueueOperation(peerConnection, function () {
-        return targetFunction.@apply(peerConnection, [options]).then(successCallback, errorCallback);
+        return targetFunction.@call(peerConnection, options).then(successCallback, errorCallback);
     });
 }
 
@@ -99,7 +99,7 @@ function setLocalOrRemoteDescription(peerConnection, targetFunction, functionNam
     if (args.length == 1) {
         // Promise mode
         return @enqueueOperation(peerConnection, function () {
-            return targetFunction.@apply(peerConnection, [description]);
+            return targetFunction.@call(peerConnection, description);
         });
     }
 
@@ -111,7 +111,7 @@ function setLocalOrRemoteDescription(peerConnection, targetFunction, functionNam
     var errorCallback = @extractCallbackArg(args, 2, "errorCallback", functionName);
 
     @enqueueOperation(peerConnection, function () {
-        return targetFunction.@apply(peerConnection, [description]).then(successCallback, errorCallback);
+        return targetFunction.@call(peerConnection, description).then(successCallback, errorCallback);
     });
 }
 
