@@ -32,10 +32,10 @@
 #include "config.h"
 
 #if ENABLE(MEDIA_STREAM)
+
 #include "RTCSessionDescription.h"
 
 #include "Dictionary.h"
-#include "ExceptionCode.h"
 
 namespace WebCore {
 
@@ -79,31 +79,12 @@ RTCSessionDescription::RTCSessionDescription(const String& type, const String& s
 {
 }
 
-RTCSessionDescription::~RTCSessionDescription()
-{
-}
-
-const String& RTCSessionDescription::type() const
-{
-    return m_type;
-}
-
 void RTCSessionDescription::setType(const String& type, ExceptionCode& ec)
 {
     if (verifyType(type))
         m_type = type;
     else
         ec = TYPE_MISMATCH_ERR;
-}
-
-const String& RTCSessionDescription::sdp() const
-{
-    return m_sdp;
-}
-
-void RTCSessionDescription::setSdp(const String& sdp)
-{
-    m_sdp = sdp;
 }
 
 } // namespace WebCore
