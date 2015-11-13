@@ -117,14 +117,11 @@ function setLocalOrRemoteDescription(peerConnection, targetFunction, functionNam
 
 function extractCallbackArg(args, index, name, parentFunctionName)
 {
+    "use strict";
+
     var callback = args[index];
     if (typeof callback !== "function")
         throw new @TypeError("Argument " + (index + 1) + " ('" + name + "') to RTCPeerConnection." + parentFunctionName + " must be a Function");
 
     return callback;
-}
-
-function isDictionary(object)
-{
-    return typeof object === "undefined" || object == null || (typeof object === "object");
 }
