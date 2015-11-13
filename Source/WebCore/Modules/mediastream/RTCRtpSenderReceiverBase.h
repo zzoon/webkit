@@ -33,6 +33,7 @@
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "MediaStreamTrack.h"
 #include "ScriptWrappable.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -43,12 +44,14 @@ class MediaStreamTrack;
 
 class RTCRtpSenderReceiverBase : public RefCounted<RTCRtpSenderReceiverBase>, public ScriptWrappable {
 public:
-    virtual ~RTCRtpSenderReceiverBase();
+    virtual ~RTCRtpSenderReceiverBase() { }
 
-    MediaStreamTrack* track() const;
+    MediaStreamTrack* track() const {  return m_track.get(); }
 
 protected:
-    RTCRtpSenderReceiverBase(RefPtr<MediaStreamTrack>&&);
+    RTCRtpSenderReceiverBase(RefPtr<MediaStreamTrack>&& track)
+        : m_track(track)
+    { }
 
     RefPtr<MediaStreamTrack> m_track;
 };
