@@ -78,10 +78,6 @@ RTCTrackEvent::RTCTrackEvent(const AtomicString& type, const RTCTrackEventInit& 
 {
 }
 
-RTCTrackEvent::~RTCTrackEvent()
-{
-}
-
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
