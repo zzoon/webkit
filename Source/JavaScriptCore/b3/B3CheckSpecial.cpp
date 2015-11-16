@@ -45,8 +45,7 @@ unsigned numB3Args(Inst& inst)
     case CheckAdd:
     case CheckSub:
     case CheckMul:
-        // ResCond, Tmp, Tmp
-        return 3;
+        return 2;
     case Check:
         return 1;
     default:
@@ -93,9 +92,19 @@ Inst CheckSpecial::hiddenBranch(const Inst& inst) const
     return hiddenBranch;
 }
 
+void CheckSpecial::commitHiddenBranch(Inst& original, Inst& hiddenBranch)
+{
+    ASSERT(hiddenBranch.args.size() == m_numCheckArgs);
+    ASSERT(hiddenBranch.opcode = m_checkOpcode);
+    for (unsigned i = 0; i < m_numCheckArgs; ++i)
+        original.args[i + 1] = hiddenBranch.args[i];
+}
+
 void CheckSpecial::forEachArg(Inst& inst, const ScopedLambda<Inst::EachArgCallback>& callback)
 {
-    hiddenBranch(inst).forEachArg(callback);
+    Inst hidden = hiddenBranch(inst);
+    hidden.forEachArg(callback);
+    commitHiddenBranch(inst, hidden);
     forEachArgImpl(numB3Args(inst), m_numCheckArgs + 1, inst, callback);
 }
 
@@ -122,13 +131,16 @@ CCallHelpers::Jump CheckSpecial::generate(Inst& inst, CCallHelpers& jit, Generat
 
     Vector<ValueRep> reps;
     if (isCheckMath(value->opcode())) {
-        if (value->opcode() == CheckMul)
-            reps.append(ValueRep());
-        else if (value->opcode() == CheckSub && value->child(0)->isInt(0))
-            reps.append(ValueRep::constant(0));
-        else
+        if (value->opcode() == CheckMul) {
+            reps.append(repForArg(*context.code, inst.args[2]));
             reps.append(repForArg(*context.code, inst.args[3]));
-        reps.append(repForArg(*context.code, inst.args[2]));
+        } else {
+            if (value->opcode() == CheckSub && value->child(0)->isInt(0))
+                reps.append(ValueRep::constant(0));
+            else
+                reps.append(repForArg(*context.code, inst.args[3]));
+            reps.append(repForArg(*context.code, inst.args[2]));
+        }
     } else {
         ASSERT(value->opcode() == Check);
         reps.append(ValueRep::constant(1));

@@ -175,6 +175,24 @@ static bool isDocumentSandboxed(Frame& frame, SandboxFlags mask)
     return frame.document() && frame.document()->isSandboxed(mask);
 }
 
+struct ForbidPromptsScope {
+    ForbidPromptsScope(Page* page) : m_page(page)
+    {
+        if (!m_page)
+            return;
+        m_page->forbidPrompts();
+    }
+
+    ~ForbidPromptsScope()
+    {
+        if (!m_page)
+            return;
+        m_page->allowPrompts();
+    }
+
+    Page* m_page;
+};
+
 class FrameLoader::FrameProgressTracker {
 public:
     explicit FrameProgressTracker(Frame& frame)
@@ -392,7 +410,7 @@ void FrameLoader::submitForm(PassRefPtr<FormSubmission> submission)
 
     // We do not want to submit more than one form from the same page, nor do we want to submit a single
     // form more than once. This flag prevents these from happening; not sure how other browsers prevent this.
-    // The flag is reset in each time we start handle a new mouse or key down event, and
+    // The flag is reset in each time we start dispatching a new mouse or key down event, and
     // also in setView since this part may get reused for a page from the back/forward cache.
     // The form multi-submit logic here is only needed when we are submitting a form that affects this frame.
 
@@ -418,54 +436,8 @@ void FrameLoader::stopLoading(UnloadEventPolicy unloadEventPolicy)
     if (m_frame.document() && m_frame.document()->parser())
         m_frame.document()->parser()->stopParsing();
 
-    if (unloadEventPolicy != UnloadEventPolicyNone) {
-        if (m_frame.document()) {
-            if (m_didCallImplicitClose && !m_wasUnloadEventEmitted) {
-                auto* currentFocusedElement = m_frame.document()->focusedElement();
-                if (is<HTMLInputElement>(currentFocusedElement))
-                    downcast<HTMLInputElement>(*currentFocusedElement).endEditing();
-                if (m_pageDismissalEventBeingDispatched == PageDismissalType::None) {
-                    if (unloadEventPolicy == UnloadEventPolicyUnloadAndPageHide) {
-                        m_pageDismissalEventBeingDispatched = PageDismissalType::PageHide;
-                        m_frame.document()->domWindow()->dispatchEvent(PageTransitionEvent::create(eventNames().pagehideEvent, m_frame.document()->inPageCache()), m_frame.document());
-                    }
-
-                    // FIXME: update Page Visibility state here.
-                    // https://bugs.webkit.org/show_bug.cgi?id=116770
-
-                    if (!m_frame.document()->inPageCache()) {
-                        RefPtr<Event> unloadEvent(Event::create(eventNames().unloadEvent, false, false));
-                        // The DocumentLoader (and thus its DocumentLoadTiming) might get destroyed
-                        // while dispatching the event, so protect it to prevent writing the end
-                        // time into freed memory.
-                        RefPtr<DocumentLoader> documentLoader = m_provisionalDocumentLoader;
-                        m_pageDismissalEventBeingDispatched = PageDismissalType::Unload;
-                        if (documentLoader && documentLoader->timing().navigationStart() && !documentLoader->timing().unloadEventStart() && !documentLoader->timing().unloadEventEnd()) {
-                            auto& timing = documentLoader->timing();
-                            timing.markUnloadEventStart();
-                            m_frame.document()->domWindow()->dispatchEvent(unloadEvent, m_frame.document());
-                            timing.markUnloadEventEnd();
-                        } else
-                            m_frame.document()->domWindow()->dispatchEvent(unloadEvent, m_frame.document());
-                    }
-                }
-                m_pageDismissalEventBeingDispatched = PageDismissalType::None;
-                if (m_frame.document())
-                    m_frame.document()->updateStyleIfNeeded();
-                m_wasUnloadEventEmitted = true;
-            }
-        }
-
-        // Dispatching the unload event could have made m_frame.document() null.
-        if (m_frame.document() && !m_frame.document()->inPageCache()) {
-            // Don't remove event listeners from a transitional empty document (see bug 28716 for more information).
-            bool keepEventListeners = m_stateMachine.isDisplayingInitialEmptyDocument() && m_provisionalDocumentLoader
-                && m_frame.document()->isSecureTransitionTo(m_provisionalDocumentLoader->url());
-
-            if (!keepEventListeners)
-                m_frame.document()->removeAllEventListeners();
-        }
-    }
+    if (unloadEventPolicy != UnloadEventPolicyNone)
+        dispatchUnloadEvents(unloadEventPolicy);
 
     m_isComplete = true; // to avoid calling completed() in finishedParsing()
     m_didCallImplicitClose = true; // don't want that one either
@@ -2479,12 +2451,12 @@ String FrameLoader::userAgent(const URL& url) const
     return m_client.userAgent(url);
 }
 
-void FrameLoader::handledOnloadEvents()
+void FrameLoader::dispatchOnloadEvents()
 {
-    m_client.dispatchDidHandleOnloadEvents();
+    m_client.dispatchDidDispatchOnloadEvents();
 
     if (documentLoader())
-        documentLoader()->handledOnloadEvents();
+        documentLoader()->dispatchOnloadEvents();
 }
 
 void FrameLoader::frameDetached()
@@ -2850,7 +2822,7 @@ bool FrameLoader::shouldClose()
         for (i = 0; i < targetFrames.size(); i++) {
             if (!targetFrames[i]->tree().isDescendantOf(&m_frame))
                 continue;
-            if (!targetFrames[i]->loader().handleBeforeUnloadEvent(page->chrome(), this))
+            if (!targetFrames[i]->loader().dispatchBeforeUnloadEvent(page->chrome(), this))
                 break;
         }
 
@@ -2865,7 +2837,65 @@ bool FrameLoader::shouldClose()
     return shouldClose;
 }
 
-bool FrameLoader::handleBeforeUnloadEvent(Chrome& chrome, FrameLoader* frameLoaderBeingNavigated)
+void FrameLoader::dispatchUnloadEvents(UnloadEventPolicy unloadEventPolicy)
+{
+    if (!m_frame.document())
+        return;
+
+    // We store the frame's page in a local variable because the frame might get detached inside dispatchEvent.
+    ForbidPromptsScope forbidPrompts(m_frame.page());
+
+    if (m_didCallImplicitClose && !m_wasUnloadEventEmitted) {
+        auto* currentFocusedElement = m_frame.document()->focusedElement();
+        if (is<HTMLInputElement>(currentFocusedElement))
+            downcast<HTMLInputElement>(*currentFocusedElement).endEditing();
+        if (m_pageDismissalEventBeingDispatched == PageDismissalType::None) {
+            if (unloadEventPolicy == UnloadEventPolicyUnloadAndPageHide) {
+                m_pageDismissalEventBeingDispatched = PageDismissalType::PageHide;
+                m_frame.document()->domWindow()->dispatchEvent(PageTransitionEvent::create(eventNames().pagehideEvent, m_frame.document()->inPageCache()), m_frame.document());
+            }
+
+            // FIXME: update Page Visibility state here.
+            // https://bugs.webkit.org/show_bug.cgi?id=116770
+
+            if (!m_frame.document()->inPageCache()) {
+                Ref<Event> unloadEvent(Event::create(eventNames().unloadEvent, false, false));
+                // The DocumentLoader (and thus its DocumentLoadTiming) might get destroyed
+                // while dispatching the event, so protect it to prevent writing the end
+                // time into freed memory.
+                RefPtr<DocumentLoader> documentLoader = m_provisionalDocumentLoader;
+                m_pageDismissalEventBeingDispatched = PageDismissalType::Unload;
+                if (documentLoader && documentLoader->timing().navigationStart() && !documentLoader->timing().unloadEventStart() && !documentLoader->timing().unloadEventEnd()) {
+                    auto& timing = documentLoader->timing();
+                    timing.markUnloadEventStart();
+                    m_frame.document()->domWindow()->dispatchEvent(unloadEvent, m_frame.document());
+                    timing.markUnloadEventEnd();
+                } else
+                    m_frame.document()->domWindow()->dispatchEvent(unloadEvent, m_frame.document());
+            }
+        }
+        m_pageDismissalEventBeingDispatched = PageDismissalType::None;
+        if (m_frame.document())
+            m_frame.document()->updateStyleIfNeeded();
+        m_wasUnloadEventEmitted = true;
+    }
+
+    // Dispatching the unload event could have made m_frame.document() null.
+    if (!m_frame.document())
+        return;
+
+    if (m_frame.document()->inPageCache())
+        return;
+
+    // Don't remove event listeners from a transitional empty document (see bug 28716 for more information).
+    bool keepEventListeners = m_stateMachine.isDisplayingInitialEmptyDocument() && m_provisionalDocumentLoader
+        && m_frame.document()->isSecureTransitionTo(m_provisionalDocumentLoader->url());
+
+    if (!keepEventListeners)
+        m_frame.document()->removeAllEventListeners();
+}
+
+bool FrameLoader::dispatchBeforeUnloadEvent(Chrome& chrome, FrameLoader* frameLoaderBeingNavigated)
 {
     DOMWindow* domWindow = m_frame.document()->domWindow();
     if (!domWindow)
@@ -2875,19 +2905,18 @@ bool FrameLoader::handleBeforeUnloadEvent(Chrome& chrome, FrameLoader* frameLoad
     if (!document->bodyOrFrameset())
         return true;
     
-    RefPtr<BeforeUnloadEvent> beforeUnloadEvent = BeforeUnloadEvent::create();
+    Ref<BeforeUnloadEvent> beforeUnloadEvent = BeforeUnloadEvent::create();
     m_pageDismissalEventBeingDispatched = PageDismissalType::BeforeUnload;
 
-    // We store the frame's page in a local variable because the frame might get detached inside dispatchEvent.
-    Page* page = m_frame.page();
-    page->incrementFrameHandlingBeforeUnloadEventCount();
-    domWindow->dispatchEvent(beforeUnloadEvent.get(), domWindow->document());
-    page->decrementFrameHandlingBeforeUnloadEventCount();
+    {
+        ForbidPromptsScope forbidPrompts(m_frame.page());
+        domWindow->dispatchEvent(beforeUnloadEvent, domWindow->document());
+    }
 
     m_pageDismissalEventBeingDispatched = PageDismissalType::None;
 
     if (!beforeUnloadEvent->defaultPrevented())
-        document->defaultEventHandler(beforeUnloadEvent.get());
+        document->defaultEventHandler(beforeUnloadEvent.ptr());
     if (beforeUnloadEvent->returnValue().isNull())
         return true;
 

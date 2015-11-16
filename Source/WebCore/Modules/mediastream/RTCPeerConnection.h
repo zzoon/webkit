@@ -126,7 +126,7 @@ private:
 
     void scheduleNegotiationNeededEvent() override;
 
-    void fireEvent(RefPtr<Event>&&) override;
+    void fireEvent(Event&) override;
     PeerConnectionStates::SignalingState internalSignalingState() const override { return m_signalingState; }
     PeerConnectionStates::IceGatheringState internalIceGatheringState() const override { return m_iceGatheringState; }
     PeerConnectionStates::IceConnectionState internalIceConnectionState() const override { return m_iceConnectionState; }

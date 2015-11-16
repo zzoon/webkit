@@ -55,46 +55,57 @@ void UIScriptController::doAsyncTask(JSValueRef)
 
 void UIScriptController::setWillBeginZoomingCallback(JSValueRef callback)
 {
-    m_willBeginZoomingCallback = m_context.registerCallback(callback);
+    m_context.registerCallback(callback, CallbackTypeWillBeginZooming);
     platformSetWillBeginZoomingCallback();
 }
 
 JSValueRef UIScriptController::willBeginZoomingCallback() const
 {
-    return m_context.callbackWithID(m_willBeginZoomingCallback);
+    return m_context.callbackWithID(CallbackTypeWillBeginZooming);
 }
 
 void UIScriptController::setDidEndZoomingCallback(JSValueRef callback)
 {
-    m_didEndZoomingCallback = m_context.registerCallback(callback);
+    m_context.registerCallback(callback, CallbackTypeDidEndZooming);
     platformSetDidEndZoomingCallback();
 }
 
 JSValueRef UIScriptController::didEndZoomingCallback() const
 {
-    return m_context.callbackWithID(m_didEndZoomingCallback);
+    return m_context.callbackWithID(CallbackTypeDidEndZooming);
+}
+
+void UIScriptController::setDidEndScrollingCallback(JSValueRef callback)
+{
+    m_context.registerCallback(callback, CallbackTypeDidEndScrolling);
+    platformSetDidEndScrollingCallback();
+}
+
+JSValueRef UIScriptController::didEndScrollingCallback() const
+{
+    return m_context.callbackWithID(CallbackTypeDidEndScrolling);
 }
 
 void UIScriptController::setDidShowKeyboardCallback(JSValueRef callback)
 {
-    m_didShowKeyboardCallback = m_context.registerCallback(callback);
+    m_context.registerCallback(callback, CallbackTypeDidShowKeyboard);
     platformSetDidShowKeyboardCallback();
 }
 
 JSValueRef UIScriptController::didShowKeyboardCallback() const
 {
-    return m_context.callbackWithID(m_didShowKeyboardCallback);
+    return m_context.callbackWithID(CallbackTypeDidShowKeyboard);
 }
 
 void UIScriptController::setDidHideKeyboardCallback(JSValueRef callback)
 {
-    m_didHideKeyboardCallback = m_context.registerCallback(callback);
+    m_context.registerCallback(callback, CallbackTypeDidHideKeyboard);
     platformSetDidHideKeyboardCallback();
 }
 
 JSValueRef UIScriptController::didHideKeyboardCallback() const
 {
-    return m_context.callbackWithID(m_didHideKeyboardCallback);
+    return m_context.callbackWithID(CallbackTypeDidHideKeyboard);
 }
 
 #if !PLATFORM(IOS)
@@ -142,6 +153,10 @@ void UIScriptController::platformSetDidEndZoomingCallback()
 {
 }
 
+void UIScriptController::platformSetDidEndScrollingCallback()
+{
+}
+
 void UIScriptController::platformSetDidShowKeyboardCallback()
 {
 }
@@ -157,7 +172,7 @@ void UIScriptController::platformClearAllCallbacks()
 
 void UIScriptController::uiScriptComplete(JSStringRef result)
 {
-    m_context.uiScriptComplete(result);
+    m_context.requestUIScriptCompletion(result);
     platformClearAllCallbacks();
 }
 

@@ -697,6 +697,8 @@ webkit.org/b/129050 fast/sub-pixel/compositing-layers-on-subpixel-position.html 
 
 webkit.org/b/144771 editing/selection/selection-invalid-offset.html [ Crash ]
 
+webkit.org/b/151260 imported/blink/editing/execCommand/indent-button-crash.html [ Crash ]
+
 #////////////////////////////////////////////////////////////////////////////////////////
 # End of Crashing tests
 #////////////////////////////////////////////////////////////////////////////////////////
@@ -1198,18 +1200,6 @@ Bug(GTK) jquery/traversing.html [ Pass Slow ]
 Bug(GTK) sputnik/ [ Pass Slow ]
 Bug(GTK) tables/mozilla/other/slashlogo.html [ Pass Slow ]
 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-aborted.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-abortedonmain.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-overridesexpires.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-simple.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-synconmain.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-twice.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-aborted.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-overridesexpires.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-simple.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-synconworker.html [ Pass Slow ] 
-Bug(GTK) http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-twice.html [ Pass Slow ] 
-
 Bug(GTK) http/tests/media/video-preload.html [ Pass Slow ]
 webkit.org/b/143989  http/tests/media/hls/video-controls-live-stream.html [ Pass Slow Failure ]
 
@@ -1265,7 +1255,7 @@ webkit.org/b/116958 http/tests/navigation/scrollstate-after-location-reload.html
 
 webkit.org/b/120682 inspector/page/archive.html [ Timeout ]
 
-webkit.org/b/122571 http/tests/inspector/console/access-inspected-object.html [ Timeout Pass ]
+webkit.org/b/122571 http/tests/inspector/console/cross-domain-inspected-node-access.html [ Timeout Pass ]
 webkit.org/b/122571 inspector/debugger/setBreakpoint.html [ Timeout Pass ]
 webkit.org/b/122571 inspector/debugger/call-frame-function-name.html [ Timeout Pass ]
 webkit.org/b/122571 inspector/debugger/setBreakpoint-options-exception.html [ Timeout Pass ]
@@ -2530,7 +2520,6 @@ imported/w3c/web-platform-tests/XMLHttpRequest/status-async.htm [ Failure ]
 imported/w3c/web-platform-tests/XMLHttpRequest/status-basic.htm [ Failure ]
 imported/w3c/web-platform-tests/XMLHttpRequest/status-error.htm [ Failure ]
 imported/w3c/web-platform-tests/XMLHttpRequest/event-readystatechange-loaded.htm [ Timeout ]
-imported/w3c/web-platform-tests/XMLHttpRequest/interfaces.html [ Timeout ]
 
 webkit.org/b/148938 accessibility/aria-table-hierarchy.html [ Failure ]
 webkit.org/b/148938 accessibility/aria-table-with-presentational-elements.html [ Failure ]
@@ -2546,6 +2535,39 @@ webkit.org/b/148938 accessibility/table-fallback-roles-expose-element-attributes
 webkit.org/b/148938 accessibility/table-sections.html [ Failure ]
 webkit.org/b/148938 accessibility/table-with-footer-section-above-body.html [ Failure ]
 webkit.org/b/148938 accessibility/table-with-missing-aria-role-rows.html [ Failure ]
+
+webkit.org/b/151267 imported/blink/compositing/squashing/squashing-reflection-disallowed.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/compositing/squashing/squash-overflow-hidden-contents.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/compositing/squashing/squash-overflow-hidden-scrolltop.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/compositing/squashing/subpixel-rounding.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/compositing/squashing/transform-squashed-owner.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/compositing/will-change/stacking-context-creation.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/css3/blending/mix-blend-mode-background-size.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/css3/blending/mix-blend-mode-with-opacity-change-js.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/css3/blending/mix-blend-mode-with-squashing-layer.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/css3/blending/svg-blend-overlapping-elements.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/css3/blending/svg-isolation-foreign-no-isolation.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/css3/blending/svg-isolation-nested-svg-no-isolation.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/editing/selection/deleteFromDocument-crash.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/css/tab-size-complex-path.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/css/text-overflow-ellipsis-button.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/events/click-focus-keydown-no-ring.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/gradients/large-horizontal-gradient.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/gradients/large-vertical-gradient.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/multicol/composited-relpos-2nd-column.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/multicol/composited-relpos-simple.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/text/international/complex-text-space-in-second-font.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/text/international/vertical-positioning-with-combining-marks.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/text/tab-renders-as-space.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/fast/text/word-spacing-nbsp.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/svg/animations/no-attr-radialgradient-spreadmethod.svg [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/svg/canvas/canvas-draw-pattern-size.html [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/svg/custom/feDisplacementMap-invalid-selector.svg [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/svg/filters/big-viewbox.svg [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/svg/filters/feDropShadow-linearrgb-flood-color.svg [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/svg/filters/feOffset-nonuniform-scale.svg [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/svg/filters/filter-huge-clamping.svg [ ImageOnlyFailure ]
+webkit.org/b/151267 imported/blink/webexposed/webkit-focus-ring-exposed-to-quirks-mode.html [ ImageOnlyFailure ]
 
 
 #////////////////////////////////////////////////////////////////////////////////////////
@@ -2572,6 +2594,7 @@ fast/text/hangul-generic-font-families.html [ WontFix ]
 
 # This test hardcodes the result of a platform-dependent font lookup algorithm.
 fast/text/fallback-language-han.html [ Skip ]
+fast/text/fallback-language-han-2.html [ Skip ]
 
 # This test uses an MPEG-4 video
 media/video-seek-to-current-time.html [ Skip ]
@@ -2584,5 +2607,8 @@ media/controls [ Skip ]
 
 # Mocking the system language is not implemented in GTK.
 fast/text/international/system-language [ Failure ]
+
+# HTMLMediaElement can not use a MediaStream as source.
+fast/mediastream/MediaStream-video-element.html [ Skip ]
 
 webkit.org/b/149128 fast/text/control-characters [ ImageOnlyFailure ]

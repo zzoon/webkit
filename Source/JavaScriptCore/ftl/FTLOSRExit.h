@@ -32,12 +32,15 @@
 #include "DFGExitProfile.h"
 #include "DFGOSRExitBase.h"
 #include "FTLAbbreviations.h"
-#include "FTLExitArgumentList.h"
 #include "FTLExitTimeObjectMaterialization.h"
 #include "FTLExitValue.h"
 #include "FTLFormattedValue.h"
+#include "FTLStackMaps.h"
+#include "FTLStackmapArgumentList.h"
+#include "HandlerInfo.h"
 #include "MethodOfGettingAValueProfile.h"
 #include "Operands.h"
+#include "Reg.h"
 #include "ValueProfile.h"
 #include "VirtualRegister.h"
 
@@ -133,15 +136,33 @@ namespace FTL {
 //   intrinsics (or meta-data, or something) to inform the backend that it's safe to
 //   make the predicate passed to 'exitIf()' more truthy.
 
+enum class ExceptionType {
+    None,
+    CCallException,
+    JSCall,
+    GetById,
+    PutById,
+    LazySlowPath,
+    SubGenerator
+};
+
 struct OSRExitDescriptor {
     OSRExitDescriptor(
-        ExitKind, DataFormat profileDataFormat, MethodOfGettingAValueProfile,
+        ExitKind, ExceptionType, DataFormat profileDataFormat, MethodOfGettingAValueProfile,
         CodeOrigin, CodeOrigin originForProfile,
         unsigned numberOfArguments, unsigned numberOfLocals);
 
+    bool willArriveAtExitFromIndirectExceptionCheck() const;
+    bool mightArriveAtOSRExitFromGenericUnwind() const;
+    bool mightArriveAtOSRExitFromCallOperation() const;
+    bool needsRegisterRecoveryOnGenericUnwindOSRExitPath() const;
+    bool isExceptionHandler() const;
+
     ExitKind m_kind;
+    ExceptionType m_exceptionType;
     CodeOrigin m_codeOrigin;
     CodeOrigin m_codeOriginForExitProfile;
+    CodeOrigin m_semanticCodeOriginForCallFrameHeader;
     
     // The first argument to the exit call may be a value we wish to profile.
     // If that's the case, the format will be not Invalid and we'll have a
@@ -155,7 +176,8 @@ struct OSRExitDescriptor {
     Bag<ExitTimeObjectMaterialization> m_materializations;
     
     uint32_t m_stackmapID;
-    bool m_isInvalidationPoint;
+    HandlerInfo m_baselineExceptionHandler;
+    bool m_isInvalidationPoint : 1;
     
     void validateReferences(const TrackedReferences&);
 };
@@ -170,11 +192,17 @@ struct OSRExit : public DFG::OSRExitBase {
     // Offset within Stackmap::records
     uint32_t m_stackmapRecordIndex;
 
+    RegisterSet registersToPreserveForCallThatMightThrow;
+
     CodeLocationJump codeLocationForRepatch(CodeBlock* ftlCodeBlock) const;
     void considerAddingAsFrequentExitSite(CodeBlock* profiledCodeBlock)
     {
         OSRExitBase::considerAddingAsFrequentExitSite(profiledCodeBlock, ExitFromFTL);
     }
+
+    void gatherRegistersToSpillForCallIfException(StackMaps&, StackMaps::Record&);
+    void spillRegistersToSpillSlot(CCallHelpers&, int32_t stackSpillSlot);
+    void recoverRegistersFromSpillSlot(CCallHelpers& jit, int32_t stackSpillSlot);
 };
 
 } } // namespace JSC::FTL

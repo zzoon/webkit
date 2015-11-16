@@ -310,6 +310,8 @@ public:
 #if ENABLE(REMOTE_INSPECTOR)
     bool allowsRemoteInspection() const { return m_allowsRemoteInspection; }
     void setAllowsRemoteInspection(bool);
+    String remoteInspectionNameOverride() const { return m_remoteInspectionNameOverride; }
+    void setRemoteInspectionNameOverride(const String&);
 #endif
 
 #if ENABLE(VIBRATION)
@@ -384,9 +386,6 @@ public:
 
     bool drawsBackground() const { return m_drawsBackground; }
     void setDrawsBackground(bool);
-
-    bool drawsTransparentBackground() const { return m_drawsTransparentBackground; }
-    void setDrawsTransparentBackground(bool);
 
     float topContentInset() const { return m_topContentInset; }
     void setTopContentInset(float);
@@ -1068,6 +1067,8 @@ public:
     void removePlaybackTargetPickerClient(uint64_t);
     void showPlaybackTargetPicker(uint64_t, const WebCore::FloatRect&, bool hasVideo);
     void playbackTargetPickerClientStateDidChange(uint64_t, WebCore::MediaProducer::MediaStateFlags);
+    void setMockMediaPlaybackTargetPickerEnabled(bool);
+    void setMockMediaPlaybackTargetPickerState(const String&, WebCore::MediaPlaybackTargetContext::State);
 
     // WebMediaSessionManagerClient
     virtual void setPlaybackTarget(uint64_t, Ref<WebCore::MediaPlaybackTarget>&&) override;
@@ -1599,7 +1600,6 @@ private:
     LayerHostingMode m_layerHostingMode;
 
     bool m_drawsBackground;
-    bool m_drawsTransparentBackground;
 
     WebCore::Color m_underlayColor;
     WebCore::Color m_pageExtendedBackgroundColor;
@@ -1668,6 +1668,7 @@ private:
 
 #if ENABLE(REMOTE_INSPECTOR)
     bool m_allowsRemoteInspection;
+    String m_remoteInspectionNameOverride;
 #endif
 
 #if PLATFORM(COCOA)

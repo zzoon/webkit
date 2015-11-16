@@ -5122,10 +5122,9 @@ void HTMLMediaElement::mediaPlayerCurrentPlaybackTargetIsWirelessChanged(MediaPl
     updateMediaState(UpdateMediaState::Asynchronously);
 }
 
-bool HTMLMediaElement::dispatchEvent(PassRefPtr<Event> prpEvent)
+bool HTMLMediaElement::dispatchEvent(Event& event)
 {
-    RefPtr<Event> event = prpEvent;
-    if (event->type() == eventNames().webkitcurrentplaybacktargetiswirelesschangedEvent)
+    if (event.type() == eventNames().webkitcurrentplaybacktargetiswirelesschangedEvent)
         scheduleDelayedAction(CheckPlaybackTargetCompatablity);
     return HTMLElement::dispatchEvent(event);
 }

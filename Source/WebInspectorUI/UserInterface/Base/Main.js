@@ -355,6 +355,7 @@ WebInspector.contentLoaded = function()
 
     this._updateDockNavigationItems();
     this._updateToolbarHeight();
+    this._setupViewHierarchy();
 
     this._pendingOpenTabs = [];
 
@@ -402,7 +403,8 @@ WebInspector.contentLoaded = function()
 
     this._contentLoaded = true;
 
-    this.runBootstrapOperations();
+    if (this.runBootstrapOperations)
+        this.runBootstrapOperations();
 };
 
 WebInspector.isTabTypeAllowed = function(tabType)
@@ -1371,6 +1373,20 @@ WebInspector._updateToolbarHeight = function()
 {
     if (WebInspector.Platform.name === "mac" && WebInspector.Platform.version.release < 10)
         InspectorFrontendHost.setToolbarHeight(this.toolbar.element.offsetHeight);
+};
+
+WebInspector._setupViewHierarchy = function()
+{
+    let rootView = new WebInspector.View(document.body);
+    rootView.addSubview(this.toolbar);
+    rootView.addSubview(this.tabBar);
+    rootView.addSubview(this.navigationSidebar);
+    rootView.addSubview(this.tabBrowser);
+    rootView.addSubview(this.splitContentBrowser);
+    rootView.addSubview(this.quickConsole);
+    rootView.addSubview(this.detailsSidebar);
+
+    rootView.makeRootView();
 };
 
 WebInspector._tabBrowserSelectedTabContentViewDidChange = function(event)

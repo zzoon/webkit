@@ -31,8 +31,8 @@
 
 #include "Dictionary.h"
 #include "ExceptionCode.h"
-#include <wtf/RefPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 
 namespace WebCore {
 

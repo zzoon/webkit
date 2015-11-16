@@ -29,8 +29,8 @@
 #if ENABLE(MEDIA_STREAM)
 #include "MediaDevicesBuiltins.cpp"
 #include "NavigatorUserMediaBuiltins.cpp"
-#include "RTCPeerConnectionInternalsBuiltins.cpp"
 #include "RTCPeerConnectionBuiltins.cpp"
+#include "RTCPeerConnectionInternalsBuiltins.cpp"
 #endif
 
 #if ENABLE(STREAMS_API)

@@ -1269,6 +1269,7 @@ webkit.org/b/147763 [ Mavericks Yosemite ] accessibility/mac/loaded-notification
 
 # Language-specific font fallback is disabled on certain versions of OS X
 webkit.org/b/147390 [ Mavericks Yosemite ElCapitan ] fast/text/fallback-language-han.html [ ImageOnlyFailure ]
+webkit.org/b/147390 [ Mavericks Yosemite ElCapitan ] fast/text/fallback-language-han-2.html [ ImageOnlyFailure ]
 
 # This test relies on iOS-specific font fallback.
 [ Mavericks Yosemite ElCapitan ] fast/text/international/system-language/arabic-glyph-cache-fill-combine.html [ Pass ImageOnlyFailure ]
@@ -1361,5 +1362,8 @@ webkit.org/b/150823 imported/w3c/web-platform-tests/XMLHttpRequest/getresponsehe
 
 # WOFF2 is only supported on certain Operating Systems.
 webkit.org/b/150830 [ Mavericks Yosemite ElCapitan ] fast/text/woff2.html [ ImageOnlyFailure ]
+
+# AppleTV not supported on Mavericks or Yosemite
+[ Mavericks Yosemite ] media/controls/airplay-picker.html
 
 webkit.org/b/150956 imported/w3c/web-platform-tests/html/semantics/embedded-content/media-elements/event_loadeddata.html [ Pass Timeout ]

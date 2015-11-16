@@ -438,9 +438,9 @@ void RTCPeerConnection::scheduleNegotiationNeededEvent()
     });
 }
 
-void RTCPeerConnection::fireEvent(RefPtr<Event>&& event)
+void RTCPeerConnection::fireEvent(Event& event)
 {
-    dispatchEvent(event.release());
+    dispatchEvent(event);
 }
 
 } // namespace WebCore

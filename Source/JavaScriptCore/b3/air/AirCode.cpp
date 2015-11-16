@@ -34,8 +34,9 @@
 
 namespace JSC { namespace B3 { namespace Air {
 
-Code::Code()
-    : m_lastPhaseName("initial")
+Code::Code(Procedure& proc)
+    : m_proc(proc)
+    , m_lastPhaseName("initial")
 {
 }
 
@@ -67,6 +68,7 @@ StackSlot* Code::addStackSlot(StackSlotValue* value)
 Special* Code::addSpecial(std::unique_ptr<Special> special)
 {
     Special* result = special.get();
+    result->m_code = this;
     m_specials.append(WTF::move(special));
     return result;
 }

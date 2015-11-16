@@ -169,6 +169,22 @@ public:
     } Condition;
 
 private:
+    // OneByteOpcodeID defines the bytecode for 1 byte instruction. It also contains the prefixes
+    // for two bytes instructions.
+    // TwoByteOpcodeID, ThreeByteOpcodeID define the opcodes for the multibytes instructions.
+    //
+    // The encoding for each instruction can be found in the Intel Architecture Manual in the appendix
+    // "Opcode Map."
+    //
+    // Each opcode can have a suffix describing the type of argument. The full list of suffixes is
+    // in the "Key to Abbreviations" section of the "Opcode Map".
+    // The most common argument types are:
+    //     -E: The argument is either a GPR or a memory address.
+    //     -G: The argument is a GPR.
+    //     -I: The argument is an immediate.
+    // The most common sizes are:
+    //     -v: 32 or 64bit depending on the operand-size attribute.
+    //     -z: 32bit in both 32bit and 64bit mode. Common for immediate values.
     typedef enum {
         OP_ADD_EvGv                     = 0x01,
         OP_ADD_GvEv                     = 0x03,
@@ -962,6 +978,13 @@ public:
         m_formatter.oneByteOp(OP_GROUP3_Ev, GROUP3_OP_IDIV, dst);
     }
 
+#if CPU(X86_64)
+    void idivq_r(RegisterID dst)
+    {
+        m_formatter.oneByteOp64(OP_GROUP3_Ev, GROUP3_OP_IDIV, dst);
+    }
+#endif // CPU(X86_64)
+
     // Comparisons:
 
     void cmpl_rr(RegisterID src, RegisterID dst)
@@ -1277,12 +1300,29 @@ public:
         setne_r(dst);
     }
 
+    void setnp_r(RegisterID dst)
+    {
+        m_formatter.twoByteOp8(setccOpcode(ConditionNP), (GroupOpcodeID)0, dst);
+    }
+
+    void setp_r(RegisterID dst)
+    {
+        m_formatter.twoByteOp8(setccOpcode(ConditionP), (GroupOpcodeID)0, dst);
+    }
+
     // Various move ops:
 
     void cdq()
     {
         m_formatter.oneByteOp(OP_CDQ);
     }
+
+#if CPU(X86_64)
+    void cqo()
+    {
+        m_formatter.oneByteOp64(OP_CDQ);
+    }
+#endif
 
     void fstps(int offset, RegisterID base)
     {

@@ -107,6 +107,7 @@ list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/opengl"
     "${WEBCORE_DIR}/platform/graphics/mac"
     "${WEBCORE_DIR}/platform/mac"
+    "${WEBCORE_DIR}/platform/mediastream/mac"
     "${WEBCORE_DIR}/platform/network/cocoa"
     "${WEBCORE_DIR}/platform/network/cf"
     "${WEBCORE_DIR}/platform/network/mac"
@@ -446,8 +447,6 @@ list(APPEND WebCore_SOURCES
     platform/graphics/opentype/OpenTypeMathData.cpp
 
     platform/mac/BlockExceptions.mm
-    platform/mac/ContextMenuItemMac.mm
-    platform/mac/ContextMenuMac.mm
     platform/mac/CursorMac.mm
     platform/mac/DragDataMac.mm
     platform/mac/DragImageMac.mm
@@ -496,6 +495,8 @@ list(APPEND WebCore_SOURCES
     platform/mac/WebVideoFullscreenHUDWindowController.mm
     platform/mac/WebWindowAnimation.mm
     platform/mac/WidgetMac.mm
+
+    platform/mediastream/mac/MockRealtimeVideoSourceMac.mm
 
     platform/network/cf/AuthenticationCF.cpp
     platform/network/cf/CookieJarCFNet.cpp

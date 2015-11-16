@@ -100,7 +100,7 @@ private:
     WritableStreamInternalsBuiltinFunctions m_writableStreamInternalsFunctions;
 #endif
 #if ENABLE(MEDIA_STREAM)
-     RTCPeerConnectionInternalsBuiltinFunctions m_rTCPeerConnectionInternalsFunctions;
+    RTCPeerConnectionInternalsBuiltinFunctions m_rTCPeerConnectionInternalsFunctions;
 #endif
 
 };

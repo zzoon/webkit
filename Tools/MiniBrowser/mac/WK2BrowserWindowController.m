@@ -345,11 +345,12 @@ static CGFloat viewScaleForMenuItemTag(NSInteger tag)
     preferences._resourceUsageOverlayVisible = settings.resourceUsageOverlayVisible;
 
     BOOL useTransparentWindows = settings.useTransparentWindows;
-    if (useTransparentWindows != _webView._drawsTransparentBackground) {
+    if (useTransparentWindows != !_webView._drawsBackground) {
         [self.window setOpaque:!useTransparentWindows];
+        [self.window setBackgroundColor:[NSColor clearColor]];
         [self.window setHasShadow:!useTransparentWindows];
 
-        _webView._drawsTransparentBackground = useTransparentWindows;
+        _webView._drawsBackground = !useTransparentWindows;
 
         [self.window display];
     }
@@ -498,6 +499,11 @@ static NSSet *dataTypes()
     [_configuration.websiteDataStore removeDataOfTypes:dataTypes() modifiedSince:[NSDate distantPast] completionHandler:^{
         NSLog(@"Did clear website data.");
     }];
+}
+
+- (IBAction)printWebView:(id)sender
+{
+    [[_webView _printOperationWithPrintInfo:[NSPrintInfo sharedPrintInfo] forFrame:nil] runOperationModalForWindow:self.window delegate:nil didRunSelector:nil contextInfo:nil];
 }
 
 #pragma mark WKNavigationDelegate

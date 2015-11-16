@@ -31,12 +31,15 @@
 #include "B3BasicBlockInlines.h"
 #include "B3BasicBlockUtils.h"
 #include "B3BlockWorklist.h"
+#include "B3DataSection.h"
+#include "B3OpaqueByproducts.h"
 #include "B3ValueInlines.h"
 
 namespace JSC { namespace B3 {
 
 Procedure::Procedure()
     : m_lastPhaseName("initial")
+    , m_byproducts(std::make_unique<OpaqueByproducts>())
 {
 }
 
@@ -52,22 +55,27 @@ BasicBlock* Procedure::addBlock(double frequency)
     return result;
 }
 
-Value* Procedure::addIntConstant(Type type, int64_t value)
+Value* Procedure::addIntConstant(Origin origin, Type type, int64_t value)
 {
     switch (type) {
     case Int32:
-        return add<Const32Value>(Origin(), static_cast<int32_t>(value));
+        return add<Const32Value>(origin, static_cast<int32_t>(value));
     case Int64:
-        return add<Const64Value>(Origin(), value);
+        return add<Const64Value>(origin, value);
     case Double:
-        return add<ConstDoubleValue>(Origin(), static_cast<double>(value));
+        return add<ConstDoubleValue>(origin, static_cast<double>(value));
     default:
         RELEASE_ASSERT_NOT_REACHED();
         return nullptr;
     }
 }
 
-Value* Procedure::addBoolConstant(TriState triState)
+Value* Procedure::addIntConstant(Value* likeValue, int64_t value)
+{
+    return addIntConstant(likeValue->origin(), likeValue->type(), value);
+}
+
+Value* Procedure::addBoolConstant(Origin origin, TriState triState)
 {
     int32_t value = 0;
     switch (triState) {
@@ -81,7 +89,7 @@ Value* Procedure::addBoolConstant(TriState triState)
         return nullptr;
     }
 
-    return addIntConstant(Int32, value);
+    return addIntConstant(origin, Int32, value);
 }
 
 void Procedure::resetValueOwners()
@@ -107,6 +115,8 @@ void Procedure::dump(PrintStream& out) const
 {
     for (BasicBlock* block : *this)
         out.print(deepDump(block));
+    if (m_byproducts->count())
+        out.print(*m_byproducts);
 }
 
 Vector<BasicBlock*> Procedure::blocksInPreOrder()
@@ -124,6 +134,16 @@ void Procedure::deleteValue(Value* value)
     ASSERT(m_values[value->index()].get() == value);
     m_valueIndexFreeList.append(value->index());
     m_values[value->index()] = nullptr;
+}
+
+void* Procedure::addDataSection(size_t size)
+{
+    if (!size)
+        return nullptr;
+    std::unique_ptr<DataSection> dataSection = std::make_unique<DataSection>(size);
+    void* result = dataSection->data();
+    m_byproducts->add(WTF::move(dataSection));
+    return result;
 }
 
 size_t Procedure::addValueIndex()

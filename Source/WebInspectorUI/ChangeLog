@@ -1,3 +1,363 @@
+2015-11-12  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Deleting a probe should remove probe breakpoint actions only.
+        https://bugs.webkit.org/show_bug.cgi?id=151245
+
+        Reviewed by Brian Burg.
+
+        Fixed breakpoint action filter.
+
+        * UserInterface/Models/Breakpoint.js:
+        (WebInspector.Breakpoint.prototype.clearActions):
+        Missing return in named function expression.
+
+2015-11-12  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Auto-log inspect node selected elements to the console
+        https://bugs.webkit.org/show_bug.cgi?id=151178
+
+        Reviewed by Brian Burg.
+
+        Auto-logging user selected elements to the console helps with
+        quick use in the console. $0 is not very discoverable, and $n
+        values are expendable. This also makes it convenient to use the
+        inspect node toolbar search option to select a few different
+        nodes and use each of them in the console without extra work.
+
+        * UserInterface/Controllers/DOMTreeManager.js:
+        (WebInspector.DOMTreeManager.prototype.inspectNodeObject.nodeAvailable):
+        (WebInspector.DOMTreeManager.prototype.inspectNodeObject):
+        Log selected nodes to the console. Treat this as a synthetic log that
+        will not immediately open the console like normal evaluation results.
+
+        * UserInterface/Controllers/JavaScriptLogViewController.js:
+        (WebInspector.JavaScriptLogViewController.prototype.appendImmediateExecutionWithResult.saveResultCallback):
+        (WebInspector.JavaScriptLogViewController.prototype.appendImmediateExecutionWithResult):
+        (WebInspector.JavaScriptLogViewController.prototype.consolePromptTextCommitted.printResult):
+        (WebInspector.JavaScriptLogViewController.prototype.consolePromptTextCommitted):
+        Initialize ConsoleCommandResultMessage's synthetic properties.
+
+        * UserInterface/Views/DOMTreeOutline.js:
+        (WebInspector.DOMTreeOutline.prototype._populateContextMenu.logElement):
+        (WebInspector.DOMTreeOutline.prototype._populateContextMenu):
+        * UserInterface/Controllers/RuntimeManager.js:
+        Create a global for the special "console" object group used in multiple places.
+
+        * UserInterface/Models/ConsoleCommandResultMessage.js:
+        (WebInspector.ConsoleCommandResultMessage):
+        (WebInspector.ConsoleCommandResultMessage.prototype.get synthetic):
+        Add a synthetic property.
+
+        * UserInterface/Views/LogContentView.js:
+        (WebInspector.LogContentView.prototype.didAppendConsoleMessageView):
+        When the ConsoleResult is a synthetic result, do not auto-open the console.
+
+2015-11-12  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: timeline event markers are added to overview even when not capturing a timeline recording
+        https://bugs.webkit.org/show_bug.cgi?id=151166
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Models/TimelineRecording.js:
+        (WebInspector.TimelineRecording.prototype.addEventMarker):
+        Do not add event markers when not capturing. This would have resulted in more
+        and more markers showing in the Timeline for page loads when the Timeline was
+        not active. For example reloading when a non-Timeline tab was active.
+
+2015-11-11  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Add Debug toolbar button to toggle InspectorBackend.dumpInspectorProtocolMessages
+        https://bugs.webkit.org/show_bug.cgi?id=151175
+
+        Reviewed by Brian Burg.
+
+        Add debug UI and a way to toggle it on and off in non-production builds.
+        To enable the debug UI use a keyboard shortcut in Inspector:
+        Option+Shift+Command+D (Mac) or Option+Shift+Ctrl+D (Windows / Linux)
+
+        The debug UI setting is a persistent setting, so those of use developing
+        Web Inspector will turn it on and leave it on.
+
+        Currently the only debug UI is a new toolbar button to toggle
+        the frontend logging on or off.
+
+        * Scripts/combine-resources.pl:
+        (concatenateFiles):
+        Exclude "Debug" files when combining resources for minification.
+
+        * UserInterface/Main.html:
+        Rename "Base/Bootstrap.js" to "Debug/Bootstrap" so that we can easily exclude it.
+
+        * UserInterface/Base/Main.js:
+        (WebInspector.contentLoaded):
+        Only evaluate bootstrap functions if they exist.
+
+        * UserInterface/Debug/Bootstrap.js: Renamed from Source/WebInspectorUI/UserInterface/Base/Bootstrap.js.
+        (WebInspector.runBootstrapOperations):
+        Add a debug setting, toolbar button, and keyboard shortcut.
+
+2015-11-11  Brian Burg  <bburg@apple.com>
+
+        Web Inspector: blank debugger tab when opening inspector on unvisited website
+        https://bugs.webkit.org/show_bug.cgi?id=151149
+
+        Reviewed by Joseph Pecoraro.
+
+        When Inspector tries to show default content when initially showing a tab upon opening,
+        there may not be any tree elements added to the navigation bar yet. In the case of an
+        unvisited website, there will be no state restoration cookie to trigger deferred selection.
+        So, showDefaultContentView finds no tree elements it can show, and the main view is blank.
+
+        We can fix this by speculatively showing the first script/resource that's added to the tree
+        if no content view is being shown. If a state restoration cookie exists, it will take priority
+        over the default-displayed content view.
+
+        * UserInterface/Views/DebuggerSidebarPanel.js:
+        (WebInspector.DebuggerSidebarPanel.prototype._addResource):
+        (WebInspector.DebuggerSidebarPanel.prototype._addScript):
+
+2015-11-11  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Convert sidebars to use View base class
+        https://bugs.webkit.org/show_bug.cgi?id=151057
+
+        Reviewed by Timothy Hatcher.
+
+        This patch makes Sidebar a subclass of View. Mostly mechanical changes and cleanup,
+        such as adding navigation bars and panels as subviews, removing element getters,
+        and replacing external properties with symbols.
+
+        * UserInterface/Base/Main.js:
+        Added sidebars to view hierarchy.
+
+        * UserInterface/Views/DebuggerSidebarPanel.js:
+        Add navigation bar as a subview.
+
+        * UserInterface/Views/NetworkSidebarPanel.js:
+        Add navigation bar as a subview.
+        (WebInspector.NetworkSidebarPanel):
+        (WebInspector.NetworkSidebarPanel.prototype.matchTreeElementAgainstCustomFilters.match):
+        (WebInspector.NetworkSidebarPanel.prototype.matchTreeElementAgainstCustomFilters):
+        (WebInspector.NetworkSidebarPanel.prototype.treeElementAddedOrChanged):
+        (WebInspector.NetworkSidebarPanel.prototype._treeElementGoToArrowWasClicked):
+        External properties replaced with symbols.
+
+        * UserInterface/Views/ResourceSidebarPanel.js:
+        Add navigation bar as a subview.
+        (WebInspector.ResourceSidebarPanel):
+        (WebInspector.ResourceSidebarPanel.prototype.matchTreeElementAgainstCustomFilters.match):
+        (WebInspector.ResourceSidebarPanel.prototype.matchTreeElementAgainstCustomFilters):
+        External properties replaced with symbols.
+
+        * UserInterface/Views/Sidebar.js:
+        (WebInspector.Sidebar):
+        (WebInspector.Sidebar.prototype.addSidebarPanel):
+        (WebInspector.Sidebar.prototype.removeSidebarPanel):
+        Panels are now added and removed as subviews.
+        (WebInspector.Sidebar.prototype.get width):
+        (WebInspector.Sidebar.prototype.set width):
+        (WebInspector.Sidebar.prototype.get collapsed):
+        (WebInspector.Sidebar.prototype.set collapsed):
+        "collapsed" property now backed by private class variable, not DOM state.
+        (WebInspector.Sidebar.prototype.get element): Deleted.
+
+        * UserInterface/Views/SidebarPanel.js:
+        (WebInspector.SidebarPanel):
+        (WebInspector.SidebarPanel.prototype.get visible):
+        (WebInspector.SidebarPanel.prototype.get selected):
+        (WebInspector.SidebarPanel.prototype.set selected):
+        "selected" property now backed by private class variable, not DOM state.
+        (WebInspector.SidebarPanel.prototype.get parentSidebar):
+        No longer stored as separate property. Wrapper around View.prototype.parentView.
+        Original getter retained for clarity.
+        (WebInspector.SidebarPanel.prototype.show):
+        (WebInspector.SidebarPanel.prototype.hide):
+        (WebInspector.SidebarPanel.prototype.added):
+        (WebInspector.SidebarPanel.prototype.removed):
+        (WebInspector.SidebarPanel.prototype.get element): Deleted.
+
+        * UserInterface/Views/StorageSidebarPanel.js:
+        (WebInspector.StorageSidebarPanel):
+        Add navigation bar as a subview.
+
+2015-11-10  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Enable/disable All Breakpoints not usable when "No Filter Results" displayed
+        https://bugs.webkit.org/show_bug.cgi?id=151062
+
+        Reviewed by Timothy Hatcher.
+
+        Position the placeholder element below the navigation bar. This was already being done
+        for the other navigation sidebars.
+
+        * UserInterface/Views/DebuggerSidebarPanel.css:
+        (.sidebar > .panel.navigation.debugger > :matches(.content, .empty-content-placeholder)):
+        (.sidebar > .panel.navigation.debugger > .content): Deleted.
+
+2015-11-10  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Batch all scheduled layouts and update the view tree in a single animation frame
+        https://bugs.webkit.org/show_bug.cgi?id=150993
+
+        Reviewed by Brian Burg.
+
+        Shifts responsibility for scheduling asynchronous layouts from view objects to a controller
+        layer, implemented as private static methods and properties in the View class. A single animation
+        frame callback performs a breadth-first traversal of the view tree starting at the root view,
+        updating views marked as needing a layout.
+
+        * UserInterface/Base/Main.js:
+        (WebInspector.contentLoaded):
+        Setup root view.
+
+        * UserInterface/Views/View.js:
+        Added private class properties for root view reference and rAF identifier.
+        (WebInspector.View):
+        (WebInspector.View.prototype.get layoutPending):
+        (WebInspector.View.prototype.get parentView):
+        (WebInspector.View.prototype.makeRootView):
+        Set current view to be the root of the view hierarchy.
+        Can only be called once.
+        (WebInspector.View.prototype.insertSubviewBefore):
+        No longer appends subview element to parent element, if subview already in the DOM.
+        Checks that view being inserted isn't the root view.
+        (WebInspector.View.prototype.removeSubview):
+        (WebInspector.View.prototype.updateLayout):
+        Cancels any scheduled layouts for the view, then does a synchronous layout.
+        (WebInspector.View.prototype.updateLayoutIfNeeded):
+        (WebInspector.View.prototype.needsLayout):
+        Schedules view for the next asynchronous layout, if not already scheduled.
+        (WebInspector.View.prototype.didAttach):
+        (WebInspector.View.prototype.didDetach):
+        Inform view of changing parent view.
+        (WebInspector.View.prototype._layoutSubtree):
+        (WebInspector.View._scheduleLayoutForView):
+        Increments dirty counts on ancestor views, schedules a layout if needed.
+        (WebInspector.View._cancelScheduledLayoutForView):
+        Decrements dirty counts on ancestor views, cancels a pending layout if needed.
+        (WebInspector.View._visitViewTreeForLayout):
+        Animation frame callback. Does a breadth-first traversal of the view tree,
+        and updates the layout of views marked as dirty.
+
+2015-11-10  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: Code coverage profiler: incorrect "in-viewport" detection algorithm
+        https://bugs.webkit.org/show_bug.cgi?id=151116
+
+        Reviewed by Brian Burg.
+
+        * UserInterface/Controllers/BasicBlockAnnotator.js:
+        (WebInspector.BasicBlockAnnotator.prototype._annotateBasicBlockExecutionRanges):
+
+2015-11-09  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Support Gesture Events to zoom in / out of the Timeline
+        https://bugs.webkit.org/show_bug.cgi?id=151071
+
+        Reviewed by Timothy Hatcher.
+
+        Adjust the Timeline's secondsPerPixel value by the gesture event's scale factor.
+
+        * UserInterface/Views/TimelineOverview.js:
+        (WebInspector.TimelineOverview):
+        (WebInspector.TimelineOverview.prototype._handleWheelEvent):
+        (WebInspector.TimelineOverview._handleGestureStart):
+        (WebInspector.TimelineOverview.prototype._handleGestureChange):
+        (WebInspector.TimelineOverview.prototype._handleGestureEnd):
+
+2015-11-09  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Uncaught exception creating TimelineRecord alternate subtitles
+        https://bugs.webkit.org/show_bug.cgi?id=151046
+
+        Reviewed by Brian Burg.
+
+        * UserInterface/Views/TimelineRecordTreeElement.js:
+        (WebInspector.TimelineRecordTreeElement):
+        We just need to create an element, it does not need to be
+        a child of subtitle, as it gets appended to the right
+        place later on.
+
+2015-11-09  Nikita Vasilyev  <nvasilyev@apple.com>
+
+        Web Inspector: [Regression] [Mavericks] Top border of selected tab matches the background when Web Inspector is undocked
+        https://bugs.webkit.org/show_bug.cgi?id=150981
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Views/TabBar.css:
+        (body.mavericks .tab-bar > .item:not(.disabled).selected): Added.
+
+2015-11-09  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Convert DatabaseContentView to use View base class
+        https://bugs.webkit.org/show_bug.cgi?id=150959
+
+        Reviewed by Timothy Hatcher.
+
+        Update DatabaseContentView to inherit from View. This required that query results be
+        promoted to a first-class view object, and that ConsolePrompt's DOM element not be wrapped
+        inside a container element.
+
+        Two new query result view classes (and their base class) wrap up DOM element creation
+        which was being performed by DatabaseContentView.
+
+        * Localizations/en.lproj/localizedStrings.js:
+
+        * UserInterface/Main.html:
+        New files.
+
+        * UserInterface/Views/ConsolePrompt.js:
+        (WebInspector.ConsolePrompt):
+        Removed unused parameter.
+
+        * UserInterface/Views/DatabaseContentView.css:
+        (.storage-view):
+        (.storage-view > .console-prompt):
+        (.storage-view > .console-prompt::before):
+        (:matches(.database-user-query, .database-query-result)::before):
+        (.database-query-result.no-results):
+        (.database-query-prompt): Deleted.
+        (:matches(.database-user-query, .database-query-prompt, .database-query-result)::before): Deleted.
+        (.database-query-prompt::before): Deleted.
+        Modified styles to create prompt without needing a wrapper element.
+
+        * UserInterface/Views/DatabaseContentView.js:
+        (WebInspector.DatabaseContentView):
+        (WebInspector.DatabaseContentView.prototype.shown):
+        (WebInspector.DatabaseContentView.prototype.consolePromptCompletionsNeeded.accumulateMatches):
+        (WebInspector.DatabaseContentView.prototype.consolePromptCompletionsNeeded.tableNamesCallback):
+        (WebInspector.DatabaseContentView.prototype.consolePromptCompletionsNeeded):
+        (WebInspector.DatabaseContentView.prototype._messagesClicked):
+        (WebInspector.DatabaseContentView.prototype._queryFinished):
+        (WebInspector.DatabaseContentView.prototype._queryError):
+        (WebInspector.DatabaseContentView.prototype.updateLayout): Deleted.
+        No longer needed.
+        (WebInspector.DatabaseContentView.prototype._appendViewQueryResult): Deleted.
+        (WebInspector.DatabaseContentView.prototype._appendErrorQueryResult): Deleted.
+        (WebInspector.DatabaseContentView.prototype._appendQueryResult): Deleted.
+        Removed methods subsumed under DatabaseUserQueryView.
+
+        * UserInterface/Views/DatabaseUserQueryErrorView.js: Added.
+        (WebInspector.DatabaseUserQueryErrorView):
+        Displays supplied error message.
+
+        * UserInterface/Views/DatabaseUserQuerySuccessView.js: Added.
+        (WebInspector.DatabaseUserQuerySuccessView):
+        Creates data grid if results exist, otherwise displays "no results" message.
+        (WebInspector.DatabaseUserQuerySuccessView.prototype.get dataGrid):
+        External access to view's data grid for autosizing columns, etc.
+        (WebInspector.DatabaseUserQuerySuccessView.prototype.layout):
+        Update grid layout manually, since the grid's parent in the DOM isn't the view's root element.
+
+        * UserInterface/Views/DatabaseUserQueryViewBase.js: Added.
+        Base class for success and error message views.
+        (WebInspector.DatabaseUserQueryViewBase):
+        Creates DOM common to subclasses.
+        (WebInspector.DatabaseUserQueryViewBase.prototype.get resultElement):
+        Protected getter exposing the content root for both subclasses.
+
 2015-11-07  Nikita Vasilyev  <nvasilyev@apple.com>
 
         Web Inspector: [Regression] [Mavericks] Toolbar is too dark while docked

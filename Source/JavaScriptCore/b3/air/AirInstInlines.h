@@ -59,8 +59,15 @@ template<> struct ForEach<StackSlot*> {
                 if (!arg.isStack())
                     return;
                 StackSlot* stackSlot = arg.stackSlot();
+
+                // FIXME: This is way too optimistic about the meaning of "Def". It gets lucky for
+                // now because our only use of "Anonymous" stack slots happens to want the optimistic
+                // semantics. We could fix this by just changing the comments that describe the
+                // semantics of "Anonymous".
+                // https://bugs.webkit.org/show_bug.cgi?id=151128
+                
                 functor(stackSlot, role, type);
-                arg = Arg::stack(stackSlot);
+                arg = Arg::stack(stackSlot, arg.offset());
             });
     }
 };
@@ -126,6 +133,36 @@ inline bool isUrshift32Valid(const Inst& inst)
 inline bool isUrshift64Valid(const Inst& inst)
 {
     return isShiftValid(inst);
+}
+
+inline bool isX86DivHelperValid(const Inst& inst)
+{
+#if CPU(X86) || CPU(X86_64)
+    return inst.args[0] == Tmp(X86Registers::eax)
+        && inst.args[1] == Tmp(X86Registers::edx);
+#else
+    return false;
+#endif
+}
+
+inline bool isX86ConvertToDoubleWord32Valid(const Inst& inst)
+{
+    return isX86DivHelperValid(inst);
+}
+
+inline bool isX86ConvertToQuadWord64Valid(const Inst& inst)
+{
+    return isX86DivHelperValid(inst);
+}
+
+inline bool isX86Div32Valid(const Inst& inst)
+{
+    return isX86DivHelperValid(inst);
+}
+
+inline bool isX86Div64Valid(const Inst& inst)
+{
+    return isX86DivHelperValid(inst);
 }
 
 } } } // namespace JSC::B3::Air

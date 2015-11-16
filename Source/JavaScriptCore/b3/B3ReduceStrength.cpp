@@ -156,9 +156,26 @@ private:
                 break;
             }
 
+            // Turn this: Integer Add(value, value)
+            // Into this: Shl(value, 1)
+            // This is a useful canonicalization. It's not meant to be a strength reduction.
+            if (m_value->isInteger() && m_value->child(0) == m_value->child(1)) {
+                replaceWithNewValue(
+                    m_proc.add<Value>(
+                        Shl, m_value->origin(), m_value->child(0),
+                        m_insertionSet.insert<Const32Value>(m_index, m_value->origin(), 1)));
+                break;
+            }
+
             // Turn this: Add(value, zero)
             // Into an Identity.
-            if (m_value->child(1)->isInt(0)) {
+            //
+            // Addition is subtle with doubles. Zero is not the neutral value, negative zero is:
+            //    0 + 0 = 0
+            //    0 + -0 = 0
+            //    -0 + 0 = 0
+            //    -0 + -0 = -0
+            if (m_value->child(1)->isInt(0) || m_value->child(1)->isNegativeZero()) {
                 m_value->replaceWithIdentity(m_value->child(0));
                 m_changed = true;
                 break;
@@ -184,6 +201,82 @@ private:
                 }
             }
 
+            break;
+
+        case Mul:
+            handleCommutativity();
+
+            // Turn this: Mul(constant1, constant2)
+            // Into this: constant1 * constant2
+            if (Value* value = m_value->child(0)->mulConstant(m_proc, m_value->child(1))) {
+                replaceWithNewValue(value);
+                break;
+            }
+
+            if (m_value->child(1)->hasInt()) {
+                int64_t factor = m_value->child(1)->asInt();
+
+                // Turn this: Mul(value, 0)
+                // Into this: 0
+                // Note that we don't do this for doubles because that's wrong. For example, -1 * 0
+                // and 1 * 0 yield different results.
+                if (!factor) {
+                    m_value->replaceWithIdentity(m_value->child(1));
+                    m_changed = true;
+                    break;
+                }
+
+                // Turn this: Mul(value, 1)
+                // Into this: value
+                if (factor == 1) {
+                    m_value->replaceWithIdentity(m_value->child(0));
+                    m_changed = true;
+                    break;
+                }
+
+                // Turn this: Mul(value, -1)
+                // Into this: Sub(0, value)
+                if (factor == -1) {
+                    replaceWithNewValue(
+                        m_proc.add<Value>(
+                            Sub, m_value->origin(),
+                            m_insertionSet.insertIntConstant(m_index, m_value, 0),
+                            m_value->child(0)));
+                    break;
+                }
+                
+                // Turn this: Mul(value, constant)
+                // Into this: Shl(value, log2(constant))
+                if (hasOneBitSet(factor)) {
+                    unsigned shiftAmount = WTF::fastLog2(static_cast<uint64_t>(factor));
+                    replaceWithNewValue(
+                        m_proc.add<Value>(
+                            Shl, m_value->origin(), m_value->child(0),
+                            m_insertionSet.insert<Const32Value>(
+                                m_index, m_value->origin(), shiftAmount)));
+                    break;
+                }
+            } else if (m_value->child(1)->hasDouble()) {
+                double factor = m_value->child(1)->asDouble();
+
+                // Turn this: Mul(value, 1)
+                // Into this: value
+                if (factor == 1) {
+                    m_value->replaceWithIdentity(m_value->child(0));
+                    break;
+                }
+            }
+
+            break;
+
+        case Div:
+        case ChillDiv:
+            // Turn this: Div(constant1, constant2)
+            // Into this: constant1 / constant2
+            // Note that this uses ChillDiv semantics. That's fine, because the rules for Div
+            // are strictly weaker: it has corner cases where it's allowed to do anything it
+            // likes.
+            replaceWithNewValue(m_value->child(0)->divConstant(m_proc, m_value->child(1)));
             break;
 
         case BitAnd:
@@ -318,7 +411,7 @@ private:
             // Turn this: BitXor(valueX, valueX)
             // Into this: zero-constant.
             if (m_value->child(0) == m_value->child(1)) {
-                replaceWithNewValue(m_proc.addIntConstant(m_value->type(), 0));
+                replaceWithNewValue(m_proc.addIntConstant(m_value, 0));
                 break;
             }
 
@@ -446,7 +539,9 @@ private:
             // Turn this: Equal(const1, const2)
             // Into this: const1 == const2
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->equalConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->equalConstant(m_value->child(1))));
             break;
             
         case NotEqual:
@@ -473,7 +568,9 @@ private:
             // Turn this: NotEqual(const1, const2)
             // Into this: const1 != const2
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->notEqualConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->notEqualConstant(m_value->child(1))));
             break;
 
         case LessThan:
@@ -481,42 +578,122 @@ private:
             // https://bugs.webkit.org/show_bug.cgi?id=150958
 
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->lessThanConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->lessThanConstant(m_value->child(1))));
             break;
 
         case GreaterThan:
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->greaterThanConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->greaterThanConstant(m_value->child(1))));
             break;
 
         case LessEqual:
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->lessEqualConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->lessEqualConstant(m_value->child(1))));
             break;
 
         case GreaterEqual:
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->greaterEqualConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->greaterEqualConstant(m_value->child(1))));
             break;
 
         case Above:
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->aboveConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->aboveConstant(m_value->child(1))));
             break;
 
         case Below:
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->belowConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->belowConstant(m_value->child(1))));
             break;
 
         case AboveEqual:
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->aboveEqualConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->aboveEqualConstant(m_value->child(1))));
             break;
 
         case BelowEqual:
             replaceWithNewValue(
-                m_proc.addBoolConstant(m_value->child(0)->belowEqualConstant(m_value->child(1))));
+                m_proc.addBoolConstant(
+                    m_value->origin(),
+                    m_value->child(0)->belowEqualConstant(m_value->child(1))));
+            break;
+
+        case CheckAdd:
+            // FIXME: Handle commutativity.
+            // https://bugs.webkit.org/show_bug.cgi?id=151214
+            
+            if (replaceWithNewValue(m_value->child(0)->checkAddConstant(m_proc, m_value->child(1))))
+                break;
+            
+            if (m_value->child(0)->isInt(0)) {
+                m_value->replaceWithIdentity(m_value->child(1));
+                m_changed = true;
+                break;
+            }
+            
+            if (m_value->child(1)->isInt(0)) {
+                m_value->replaceWithIdentity(m_value->child(0));
+                m_changed = true;
+                break;
+            }
+            break;
+
+        case CheckSub:
+            if (replaceWithNewValue(m_value->child(0)->checkSubConstant(m_proc, m_value->child(1))))
+                break;
+
+            if (m_value->child(1)->isInt(0)) {
+                m_value->replaceWithIdentity(m_value->child(0));
+                m_changed = true;
+                break;
+            }
+            break;
+
+        case CheckMul:
+            // FIXME: Handle commutativity.
+            // https://bugs.webkit.org/show_bug.cgi?id=151214
+            
+            if (replaceWithNewValue(m_value->child(0)->checkMulConstant(m_proc, m_value->child(1))))
+                break;
+
+            if (m_value->child(0)->isInt(1)) {
+                m_value->replaceWithIdentity(m_value->child(1));
+                m_changed = true;
+                break;
+            }
+            
+            if (m_value->child(1)->isInt(1)) {
+                m_value->replaceWithIdentity(m_value->child(0));
+                m_changed = true;
+                break;
+            }
+
+            if (m_value->child(0)->isInt(0) || m_value->child(1)->isInt(0)) {
+                replaceWithNewValue(m_proc.addIntConstant(m_value, 0));
+                break;
+            }
+            break;
+
+        case Check:
+            if (m_value->child(0)->isLikeZero()) {
+                m_value->replaceWithNop();
+                m_changed = true;
+                break;
+            }
             break;
 
         case Branch: {
@@ -553,7 +730,7 @@ private:
             // Into this: Jump(else)
             if (triState == FalseTriState) {
                 branch->taken().block()->removePredecessor(m_block);
-                branch->convertToJump(branch->notTaken());
+                branch->convertToJump(branch->notTaken().block());
                 m_changedCFG = true;
                 break;
             }
@@ -562,7 +739,7 @@ private:
             // Into this: Jump(then)
             if (triState == TrueTriState) {
                 branch->notTaken().block()->removePredecessor(m_block);
-                branch->convertToJump(branch->taken());
+                branch->convertToJump(branch->taken().block());
                 m_changedCFG = true;
                 break;
             }
@@ -609,13 +786,14 @@ private:
         replaceWithNewValue(m_proc.add<ValueType>(arguments...));
     }
 
-    void replaceWithNewValue(Value* newValue)
+    bool replaceWithNewValue(Value* newValue)
     {
         if (!newValue)
-            return;
+            return false;
         m_insertionSet.insertValue(m_index, newValue);
         m_value->replaceWithIdentity(newValue);
         m_changed = true;
+        return true;
     }
 
     bool handleShiftByZero()
@@ -631,6 +809,11 @@ private:
 
     void simplifyCFG()
     {
+        if (verbose) {
+            dataLog("Before simplifyCFG:\n");
+            dataLog(m_proc);
+        }
+        
         // We have three easy simplification rules:
         //
         // 1) If a successor is a block that just jumps to another block, then jump directly to
@@ -651,6 +834,9 @@ private:
         // iterations needed to kill a lot of code.
 
         for (BasicBlock* block : m_proc) {
+            if (verbose)
+                dataLog("Considering block ", *block, ":\n");
+
             checkPredecessorValidity();
 
             // We don't care about blocks that don't have successors.
@@ -664,7 +850,15 @@ private:
                     && successor->last()->opcode() == Jump) {
                     BasicBlock* newSuccessor = successor->successorBlock(0);
                     if (newSuccessor != successor) {
-                        newSuccessor->replacePredecessor(successor, block);
+                        if (verbose) {
+                            dataLog(
+                                "Replacing ", pointerDump(block), "->", pointerDump(successor),
+                                " with ", pointerDump(block), "->", pointerDump(newSuccessor),
+                                "\n");
+                        }
+                        // Note that we do not do replacePredecessor() because the block we're
+                        // skipping will still have newSuccessor as its successor.
+                        newSuccessor->addPredecessor(block);
                         successor = newSuccessor;
                         m_changedCFG = true;
                     }
@@ -679,14 +873,18 @@ private:
                 if (!effects.mustExecute()) {
                     // All of the successors must be the same.
                     bool allSame = true;
-                    FrequentedBlock firstSuccessor = block->successor(0);
+                    BasicBlock* firstSuccessor = block->successorBlock(0);
                     for (unsigned i = 1; i < block->numSuccessors(); ++i) {
-                        if (block->successorBlock(i) != firstSuccessor.block()) {
+                        if (block->successorBlock(i) != firstSuccessor) {
                             allSame = false;
                             break;
                         }
                     }
                     if (allSame) {
+                        if (verbose) {
+                            dataLog(
+                                "Changing ", pointerDump(block), "'s terminal to a Jump.\n");
+                        }
                         block->last()->as<ControlValue>()->convertToJump(firstSuccessor);
                         m_changedCFG = true;
                     }
@@ -719,6 +917,12 @@ private:
                     // Ensure that predecessors of block's new successors know what's up.
                     for (BasicBlock* newSuccessor : block->successorBlocks())
                         newSuccessor->replacePredecessor(successor, block);
+
+                    if (verbose) {
+                        dataLog(
+                            "Merged ", pointerDump(block), "->", pointerDump(successor), "\n");
+                    }
+                    
                     m_changedCFG = true;
                 }
             }

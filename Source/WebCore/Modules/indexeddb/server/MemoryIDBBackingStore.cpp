@@ -244,9 +244,9 @@ IDBError MemoryIDBBackingStore::deleteRange(const IDBResourceIdentifier& transac
     return IDBError();
 }
 
-IDBError MemoryIDBBackingStore::putRecord(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyData& keyData, const ThreadSafeDataBuffer& value)
+IDBError MemoryIDBBackingStore::addRecord(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyData& keyData, const ThreadSafeDataBuffer& value)
 {
-    LOG(IndexedDB, "MemoryIDBBackingStore::putRecord");
+    LOG(IndexedDB, "MemoryIDBBackingStore::addRecord");
 
     ASSERT(objectStoreIdentifier);
 
@@ -258,8 +258,7 @@ IDBError MemoryIDBBackingStore::putRecord(const IDBResourceIdentifier& transacti
     if (!objectStore)
         return IDBError(IDBExceptionCode::Unknown, WTF::ASCIILiteral("No backing store object store found to put record"));
 
-    objectStore->putRecord(*transaction, keyData, value);
-    return IDBError();
+    return objectStore->addRecord(*transaction, keyData, value);
 }
 
 IDBError MemoryIDBBackingStore::getRecord(const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyRangeData& range, ThreadSafeDataBuffer& outValue)
@@ -328,6 +327,24 @@ IDBError MemoryIDBBackingStore::generateKeyNumber(const IDBResourceIdentifier& t
     objectStore->setKeyGeneratorValue(keyNumber + 1);
 
     return IDBError();
+}
+
+IDBError MemoryIDBBackingStore::openCursor(const IDBResourceIdentifier&, const IDBCursorInfo&, IDBGetResult&)
+{
+    LOG(IndexedDB, "MemoryIDBBackingStore::openCursor");
+
+    // FIXME: Implement.
+
+    return { IDBExceptionCode::Unknown };
+}
+
+IDBError MemoryIDBBackingStore::iterateCursor(const IDBResourceIdentifier&, const IDBKeyData&, unsigned long, IDBGetResult&)
+{
+    LOG(IndexedDB, "MemoryIDBBackingStore::iterateCursor");
+
+    // FIXME: Implement.
+
+    return { IDBExceptionCode::Unknown };
 }
 
 void MemoryIDBBackingStore::registerObjectStore(std::unique_ptr<MemoryObjectStore>&& objectStore)

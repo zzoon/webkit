@@ -40,7 +40,6 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << pageGroupData;
     encoder << drawsBackground;
     encoder << isEditable;
-    encoder << drawsTransparentBackground;
     encoder << underlayColor;
     encoder << useFixedLayout;
     encoder << fixedLayoutSize;
@@ -73,6 +72,7 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
 
 #if ENABLE(REMOTE_INSPECTOR)
     encoder << allowsRemoteInspection;
+    encoder << remoteInspectionNameOverride;
 #endif
 #if PLATFORM(MAC)
     encoder << colorSpace;
@@ -101,8 +101,6 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
     if (!decoder.decode(parameters.drawsBackground))
         return false;
     if (!decoder.decode(parameters.isEditable))
-        return false;
-    if (!decoder.decode(parameters.drawsTransparentBackground))
         return false;
     if (!decoder.decode(parameters.underlayColor))
         return false;
@@ -165,6 +163,8 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
 
 #if ENABLE(REMOTE_INSPECTOR)
     if (!decoder.decode(parameters.allowsRemoteInspection))
+        return false;
+    if (!decoder.decode(parameters.remoteInspectionNameOverride))
         return false;
 #endif
 

@@ -53,11 +53,12 @@ function initializeWritableStream(underlyingSink, strategy)
 
     @syncWritableStreamStateWithQueue(this);
 
-    var error = @errorWritableStream.bind(this);
-    var startResult = @invokeOrNoop(underlyingSink, "start", [error]);
-    this.@startedPromise = @Promise.@resolve(startResult);
-    var _this = this;
-    this.@startedPromise.then(function() {
+    const _this = this;
+    function error(e) {
+        @errorWritableStream.@call(_this, e);
+    };
+    this.@startedPromise = @Promise.@resolve(@invokeOrNoop(underlyingSink, "start", [error]));
+    @Promise.prototype.@then.@call(this.@startedPromise, function() {
         _this.@started = true;
         _this.@startedPromise = undefined;
     }, error);
@@ -78,11 +79,11 @@ function abort(reason)
     if (this.@state === @streamErrored)
         return @Promise.@reject(this.@storedError);
 
-    @errorWritableStream.@apply(this, [reason]);
+    @errorWritableStream.@call(this, reason);
 
     const sinkAbortPromise = @promiseInvokeOrFallbackOrNoop(this.@underlyingSink, "abort", [reason], "close", []);
 
-    return sinkAbortPromise.then(function() { return undefined; });
+    return @Promise.prototype.@then.@call(sinkAbortPromise, function() { });
 }
 
 function close()
@@ -99,7 +100,7 @@ function close()
         return @Promise.@reject(this.@storedError);
 
     if (this.@state === @streamWaiting)
-        this.@readyPromiseCapability.@resolve.@call(undefined, undefined);
+        this.@readyPromiseCapability.@resolve.@call();
 
     this.@state = @streamClosing;
     @enqueueValueWithSize(this.@queue, "close", 0);
@@ -121,8 +122,7 @@ function write(chunk)
     if (this.@state === @streamErrored)
         return @Promise.@reject(this.@storedError);
 
-    // FIXME
-    // assert(this.@state === @streamWritable || this.@state === @streamWaiting);
+    @assert(this.@state === @streamWritable || this.@state === @streamWaiting);
 
     let chunkSize = 1;
     if (this.@strategy.size !== undefined) {
@@ -188,8 +188,5 @@ function state()
         return "writable";
     }
 
-    // FIXME
-    // assert_not_reached();
-
-    return undefined;
+    @assert(false);
 }

@@ -179,7 +179,8 @@ set(NetworkProcess_COMMON_SOURCES
     NetworkProcess/cache/NetworkCacheEntry.cpp
     NetworkProcess/cache/NetworkCacheFileSystem.cpp
     NetworkProcess/cache/NetworkCacheKey.cpp
-    NetworkProcess/cache/NetworkCacheSpeculativeLoader.cpp
+    NetworkProcess/cache/NetworkCacheSpeculativeLoad.cpp
+    NetworkProcess/cache/NetworkCacheSpeculativeLoadManager.cpp
     NetworkProcess/cache/NetworkCacheSubresourcesEntry.cpp
     NetworkProcess/cache/NetworkCacheStatistics.cpp
     NetworkProcess/cache/NetworkCacheStorage.cpp

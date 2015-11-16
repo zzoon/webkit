@@ -1,3 +1,536 @@
+2015-11-15  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r192462.
+        https://bugs.webkit.org/show_bug.cgi?id=151295
+
+        failing python tests (Requested by youenn on #webkit).
+
+        Reverted changeset:
+
+        "WPT server should use its own testharness.js file and
+        generate a warning when it does not match WebKit version"
+        https://bugs.webkit.org/show_bug.cgi?id=150332
+        http://trac.webkit.org/changeset/192462
+
+2015-11-15  Youenn Fablet  <youenn.fablet@crf.canon.fr>
+
+        WPT server should use its own testharness.js file and generate a warning when it does not match WebKit version
+        https://bugs.webkit.org/show_bug.cgi?id=150332
+
+        Reviewed by Darin Adler.
+
+        * Scripts/webkitpy/layout_tests/servers/web_platform_test_server.py:
+        (WebPlatformTestServer.__init__): Removed testharness.js as file to copy from WK to WPT.
+        (WebPlatformTestServer._copy_webkit_test_files): Added warning generation when WK testharness.js is not matching WPT version.
+
+2015-11-14  Nan Wang  <n_wang@apple.com>
+
+        AX: add a new trait for elements in fieldset on iOS
+        https://bugs.webkit.org/show_bug.cgi?id=151281
+
+        Reviewed by Chris Fleizach.
+
+        * DumpRenderTree/AccessibilityUIElement.cpp:
+        (assistiveTechnologySimulatedFocusCallback):
+        (fieldsetAncestorElementCallback):
+        (childAtIndexCallback):
+        (getElementTextLengthCallback):
+        (hasContainedByFieldsetTraitCallback):
+        (AccessibilityUIElement::getJSClass):
+        * DumpRenderTree/AccessibilityUIElement.h:
+        * DumpRenderTree/ios/AccessibilityUIElementIOS.mm:
+        (AccessibilityUIElement::elementTextLength):
+        (AccessibilityUIElement::hasContainedByFieldsetTrait):
+        (AccessibilityUIElement::fieldsetAncestorElement):
+        (AccessibilityUIElement::url):
+        * WebKitTestRunner/InjectedBundle/AccessibilityUIElement.cpp:
+        (WTR::AccessibilityUIElement::scrollPageDown):
+        (WTR::AccessibilityUIElement::scrollPageLeft):
+        (WTR::AccessibilityUIElement::scrollPageRight):
+        (WTR::AccessibilityUIElement::hasContainedByFieldsetTrait):
+        (WTR::AccessibilityUIElement::fieldsetAncestorElement):
+        * WebKitTestRunner/InjectedBundle/AccessibilityUIElement.h:
+        * WebKitTestRunner/InjectedBundle/Bindings/AccessibilityUIElement.idl:
+        * WebKitTestRunner/InjectedBundle/ios/AccessibilityUIElementIOS.mm:
+        (WTR::AccessibilityUIElement::identifier):
+        (WTR::AccessibilityUIElement::hasContainedByFieldsetTrait):
+        (WTR::AccessibilityUIElement::fieldsetAncestorElement):
+        (WTR::AccessibilityUIElement::rowCount):
+
+2015-11-13  Keith Miller  <keith_miller@apple.com>
+
+        Unreviewed, change JavaScriptCore watchlist to exclude inspector things.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2015-11-13  Tim Horton  <timothy_horton@apple.com>
+
+        Support printing in WKWebView
+        https://bugs.webkit.org/show_bug.cgi?id=151276
+        <rdar://problem/23525715>
+
+        Reviewed by Beth Dakin.
+
+        * MiniBrowser/mac/MainMenu.xib:
+        * MiniBrowser/mac/WK1BrowserWindowController.m:
+        (-[WK1BrowserWindowController printWebView:]):
+        * MiniBrowser/mac/WK2BrowserWindowController.m:
+        (-[WK2BrowserWindowController printWebView:]):
+        Hook up printing to Minibrowser!
+
+2015-11-13  Tim Horton  <timothy_horton@apple.com>
+
+        Hardware keyboard spacebar scrolls too far on iOS
+        https://bugs.webkit.org/show_bug.cgi?id=151227
+        <rdar://problem/23500681>
+
+        Reviewed by Simon Fraser.
+
+        * WebKitTestRunner/UIScriptContext/Bindings/UIScriptController.idl:
+        * WebKitTestRunner/UIScriptContext/UIScriptContext.h:
+        * WebKitTestRunner/UIScriptContext/UIScriptController.cpp:
+        (WTR::UIScriptController::setDidEndScrollingCallback):
+        (WTR::UIScriptController::didEndScrollingCallback):
+        (WTR::UIScriptController::platformSetDidEndScrollingCallback):
+        * WebKitTestRunner/UIScriptContext/UIScriptController.h:
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.h:
+        * WebKitTestRunner/cocoa/TestRunnerWKWebView.mm:
+        (-[TestRunnerWKWebView dealloc]):
+        (-[TestRunnerWKWebView _didFinishScrolling]):
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::platformSetDidEndScrollingCallback):
+        (WTR::UIScriptController::platformClearAllCallbacks):
+        Expose _didFinishScrolling on WKWebView to the UIScriptController.
+
+2015-11-13  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Unreviewed test fix.
+
+        * Scripts/webkitpy/port/win.py:
+        (WinPort.results_directory): Our 'results_directory' should be an absolute path (even when not
+        using Cygwin), but should be in DOS format for non-Cygwin clients.
+
+2015-11-12  Daniel Bates  <dabates@apple.com>
+
+        Add my apple.com email address to contributors.json
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2015-11-12  Daniel Bates  <dabates@apple.com>
+
+        webkitpy: Remove extraneous word "the" from the description of command attach-to-bug
+
+        * Scripts/webkitpy/tool/commands/upload.py:
+        (AttachToBug):
+
+2015-11-12  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] webkitpy is applying abspath to DOS paths, yielding invalid paths
+        https://bugs.webkit.org/show_bug.cgi?id=151156
+
+        Reviewed by Anders Carlsson.
+
+        My earlier patch was incomplete. There are some Python libraries that want
+        to receive UNIX style paths, even though all of our applications and tools
+        use DOS paths. To handle this special case, we need to track a UNIX-style
+        absolute path that can be given to things like the Python socket server.
+        
+        When we cut over to all-native Windows Python we can get rid of this
+        special case code.
+        
+        * Scripts/webkitpy/common/system/filesystem.py:
+        (FileSystem.abspath): Add special code for Cygwin to convert a DOS-style
+        path into something Cygwin can use internally.
+        * Scripts/webkitpy/port/base.py:
+        (Port.results_directory): Remove custom Windows code. Instead, override
+        the method in the windows port object.
+        (Port.abs_results_directory): Add stub.
+        (Port.to.start_websocket_server): For Cygwin, use special cygwin absolute
+        path.
+        * Scripts/webkitpy/port/win.py:
+        (WinPort.__init__): Added to initialze new _abs_results_directory value.
+        (WinPort.abs_results_directory): Added,
+        (WinPort.results_directory): Modified to also create a value for
+        _abs_results_directory
+
+2015-11-12  Keith Miller  <keith_miller@apple.com>
+
+        Unreviewed, add Michael Saboff to the JavaScriptCore watchlist, per request.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2015-11-12  Keith Miller  <keith_miller@apple.com>
+
+        Unreviewed, add watchlist for Source/JavaScriptCore and add myself, Saam, and Mark.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2015-11-12  Daniel Bates  <dabates@apple.com>
+
+        Support building configuration Production of DumpRenderTree and WebKitTestRunner for iOS
+        https://bugs.webkit.org/show_bug.cgi?id=151191
+
+        Reviewed by Andy Estes.
+
+        * DumpRenderTree/DumpRenderTree.xcodeproj/project.pbxproj: Remove hardcoded SKIP_INTALL.
+        Will override this setting in DumpRenderTree.xcconfig.
+        * DumpRenderTree/mac/Configurations/DumpRenderTree.xcconfig: When building for iOS we now
+        compile source file DumpRenderTreeMain.mm to produce a built product and make the Apple
+        Internal build system happy. Do not waste time coping OpenType font files (*.otf files)
+        and skip installation when building for iOS since we are not interested in the build product
+        and are only building this target to make the Apple Internal build system happy.
+        * DumpRenderTree/mac/DumpRenderTreeMain.mm:
+        (main): Added dummy implementation for iOS so that we build an actual command line tool to
+        make the Apple Internal build system happy.
+        * WebKitTestRunner/Configurations/Base.xcconfig: Add iOS-specific definition for WEBKIT_UMBRELLA_FRAMEWORKS_DIR.
+        * WebKitTestRunner/Configurations/DebugRelease.xcconfig: Remove variable WEBKIT_UMBRELLA_FRAMEWORKS_DIR.
+        * WebKitTestRunner/Configurations/WebKitTestRunner.xcconfig: Build file WebKitTestRunner/mac/main.mm
+        on iOS Only to produce a built product and make the Apple Internal build system happy. No need
+        to define OTHER_LDFLAGS when building this target for iOS as the default linker flags are sufficient.
+        * WebKitTestRunner/mac/main.mm:
+        (main): Added dummy implementation for iOS so that we build an actual command line tool to
+        make the Apple Internal build system happy.
+
+2015-11-12  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, add watchlist for history/ and add myself.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2015-11-12  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, update my watchlists.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2015-11-12  Daniel Bates  <dabates@apple.com>
+
+        Rename webkitdirs::willUseIOS{Device, Simulator}SDKWhenBuilding() to willUseIOS{Device, Simulator}SDK()
+        https://bugs.webkit.org/show_bug.cgi?id=151207
+
+        Rubber-stamped by Alexey Proskuryakov.
+
+        The functions webkitdirs::willUseIOS{Device, Simulator}SDKWhenBuilding() are not specific to building
+        iOS software. We should rename these functions to webkitdirs::willUseIOS{Device, Simulator}SDK() to
+        convey their general-purpose nature of determining whether we are using the iphoneos or iphonesimulator SDK.
+
+        * Scripts/build-jsc:
+        * Scripts/build-layouttestrelay:
+        * Scripts/build-webkit:
+        * Scripts/copy-webkitlibraries-to-product-directory:
+        * Scripts/run-api-tests:
+        (runTest):
+        (prepareEnvironmentForRunningTestTool):
+        * Scripts/run-javascriptcore-tests:
+        * Scripts/webkitdirs.pm:
+        (XcodeOptions):
+        (willUseIOSDeviceSDK): Formerly named willUseIOSDeviceSDKWhenBuilding.
+        (willUseIOSSimulatorSDK): Formerly name willUseIOSSimulatorSDKWhenBuilding.
+        (isIOSWebKit):
+        (runIOSWebKitApp):
+        (willUseIOSDeviceSDKWhenBuilding): Deleted.
+        (willUseIOSSimulatorSDKWhenBuilding): Deleted.
+
+2015-11-12  Daniel Bates  <dabates@apple.com>
+
+        run-api-tests fails to run with public iOS SDK
+        https://bugs.webkit.org/show_bug.cgi?id=151076
+
+        Reviewed by Alexey Proskuryakov.
+
+        Use the command line tool simctl as the sim tool was removed from the public iOS 9 SDK.
+
+        A side benefit of this change it is sufficient to run the tests without launching Simulator.app
+        to boot the simulator device beforehand because simctl will boot the device for us.
+
+        Additionally, use Perl pragma sigtrap to install signal handlers to catch SIG{HUP, INT, PIPE, TERM}
+        signals and ultimately run our END block so that we shutdown the simulator device (if applicable).
+        This makes Control-C terminate the app gracefully.
+
+        * Scripts/run-api-tests:
+        (runTest):
+        (listAllTests):
+        (prepareEnvironmentForRunningTestTool): When running for iOS Simulator use setupIOSWebKitEnvironment()
+        to setup the environment variables for iOS instead of using setupMacWebKitEnvironment(). We also
+        prefix the name of these environment variables with "SIMCTL_CHILD_" so that simctl sets these environment
+        variables in the simulator environment.
+        * Scripts/webkitdirs.pm:
+        (shutDownIOSSimulatorDevice): Added.
+        (restartIOSSimulatorDevice): Added.
+
+2015-11-12  KwangHyuk Kim  <hyuki.kim@samsung.com>
+
+        [EFL] fix EvasGL configuration error
+        https://bugs.webkit.org/show_bug.cgi?id=151180
+
+        Reviewed by Csaba Osztrogonác.
+
+        EvasGL backend and depth, stencil buffer size should be specified before elm_win_add to let EvasGL keep quiet.
+        Additionally, duplicated elm_config_accel_preference_set() call is eleminated.  
+
+        * MiniBrowser/efl/main.c:
+        (window_create):
+        (elm_main):
+
+2015-11-12  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [EFL] Fix EFL 1.16 with enabled NEON support
+        https://bugs.webkit.org/show_bug.cgi?id=151188
+
+        Unreviewed buildfix, disable NEON temporarily after r192358.
+
+        * efl/jhbuild.modules:
+
+2015-11-12  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [EFL] Bump EFL version to 1.16.0
+        https://bugs.webkit.org/show_bug.cgi?id=150228
+
+        Reviewed by Gyuyoung Kim.
+
+        * efl/jhbuild.modules:
+        * efl/patches/efl-remove-XPrint.patch: Removed.
+
+2015-11-12  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove ENABLE(SATURATED_LAYOUT_ARITHMETIC) guards
+        https://bugs.webkit.org/show_bug.cgi?id=150972
+
+        Reviewed by Darin Adler.
+
+        * TestWebKitAPI/Tests/WebCore/LayoutUnit.cpp:
+
+2015-11-12  KwangHyuk Kim  <hyuki.kim@samsung.com>
+
+        [EFL] fix EvasGL configuration error
+        https://bugs.webkit.org/show_bug.cgi?id=151180
+
+        Reviewed by Gyuyoung Kim.
+
+        EvasGL backend and depth, stencil buffer size should be specified before elm_win_add to let EvasGL keep quiet
+
+        * MiniBrowser/efl/main.c:
+        (window_create):
+
+2015-11-11  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] webkitpy is applying abspath to DOS paths, yielding invalid paths
+        https://bugs.webkit.org/show_bug.cgi?id=151156
+
+        Reviewed by Anders Carlsson.
+
+        * Scripts/webkitpy/port/base.py:
+        (Port.results_directory): Don't pass paths through 'abspath'
+        (Port._build_path): Ditto.
+        * Scripts/webkitpy/port/win.py:
+        (WinPort._build_path): Ditto.
+
+2015-11-11  Akos Kiss  <akiss@inf.u-szeged.hu>
+
+        Unreviewed, add myself to the committers list.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2015-11-11  Anders Carlsson  <andersca@apple.com>
+
+        _WKRemoteObjectInterface should handle specifying allowed classes for reply block arguments
+        https://bugs.webkit.org/show_bug.cgi?id=151144
+
+        Reviewed by Tim Horton.
+
+        * TestWebKitAPI/Tests/WebKit2Cocoa/RemoteObjectRegistry.h:
+        (remoteObjectInterface):
+        * TestWebKitAPI/Tests/WebKit2Cocoa/RemoteObjectRegistry.mm:
+        (TEST):
+        * TestWebKitAPI/Tests/WebKit2Cocoa/RemoteObjectRegistryPlugIn.mm:
+        (-[RemoteObjectRegistryPlugIn webProcessPlugIn:didCreateBrowserContextController:]):
+        (-[RemoteObjectRegistryPlugIn selectionAndClickInformationForClickAtPoint:completionHandler:]):
+
+2015-11-10  Wenson Hsieh  <wenson_hsieh@apple.com>
+
+        UI-side scripts in WebKitTestRunner should wait until event handling completes before finishing
+        https://bugs.webkit.org/show_bug.cgi?id=151101
+        <rdar://problem/23428601>
+
+        Reviewed by Simon Fraser.
+
+        WebKitTestRunner may still crash in the scenario where a marker event is dequeued and handled
+        after uiScriptComplete has been called. This patch teaches the UI script execution context to
+        defer script completion until all non-persistent tasks (currently tap, double tap and hardware
+        keyboard) have been handled, so marker events will no longer bleed through tests.
+
+        We accomplish this by changing the behavior of uiScriptComplete. When calling uiScriptComplete,
+        we store that a request to complete the UI-side script for the current parent callback has been
+        made. Subsequently, when a callback (either persistent or non-persistent) finishes invoking and
+        a request has been made to complete the UI script (this request may have been made when running
+        a previous callback) we check if all the non-persistent callbacks that have the same parent
+        callback as the current one have finished. If so, we complete the callback immediately;
+        otherwise, we wait until the in-flight non-persistent callbacks finish execution to complete the
+        UI script.
+
+        This patch also refactors some logic in UIScriptContext. It introduces a new convention for
+        assigning IDs to callbacks: IDs 1000 and above are treated as non-persistent callbacks, whereas
+        IDs between 0 and 999 are persistent task callbacks. This is similar to the existing convention
+        for assigning IDs in the 100s range to parent callbacks, and allows us to easily differentiate
+        between callbacks that are persistent and non-persistent, as well as determine when an existing
+        persistent callback must be unregistered before a new callback function can be set.
+
+        * WebKitTestRunner/UIScriptContext/UIScriptContext.cpp:
+        (isPersistentCallbackID):
+        (UIScriptContext::runUIScript):
+        (UIScriptContext::nextTaskCallbackID):
+        (UIScriptContext::prepareForAsyncTask):
+        (UIScriptContext::asyncTaskComplete):
+        (UIScriptContext::registerCallback):
+        (UIScriptContext::fireCallback):
+        (UIScriptContext::requestUIScriptCompletion):
+        (UIScriptContext::tryToCompleteUIScriptForCurrentParentCallback):
+        (UIScriptContext::currentParentCallbackHasOutstandingAsyncTasks):
+        (UIScriptContext::uiScriptComplete): Deleted.
+        * WebKitTestRunner/UIScriptContext/UIScriptContext.h:
+        (WTR::UIScriptContext::currentParentCallbackIsPendingCompletion):
+        * WebKitTestRunner/UIScriptContext/UIScriptController.cpp:
+        (WTR::UIScriptController::setWillBeginZoomingCallback):
+        (WTR::UIScriptController::willBeginZoomingCallback):
+        (WTR::UIScriptController::setDidEndZoomingCallback):
+        (WTR::UIScriptController::didEndZoomingCallback):
+        (WTR::UIScriptController::setDidShowKeyboardCallback):
+        (WTR::UIScriptController::didShowKeyboardCallback):
+        (WTR::UIScriptController::setDidHideKeyboardCallback):
+        (WTR::UIScriptController::didHideKeyboardCallback):
+        (WTR::UIScriptController::uiScriptComplete):
+        * WebKitTestRunner/UIScriptContext/UIScriptController.h:
+        * WebKitTestRunner/ios/UIScriptControllerIOS.mm:
+        (WTR::UIScriptController::doAsyncTask):
+        (WTR::UIScriptController::zoomToScale):
+        (WTR::UIScriptController::singleTapAtPoint):
+        (WTR::UIScriptController::doubleTapAtPoint):
+        (WTR::UIScriptController::typeCharacterUsingHardwareKeyboard):
+        (WTR::UIScriptController::platformSetWillBeginZoomingCallback):
+        (WTR::UIScriptController::platformSetDidEndZoomingCallback):
+        (WTR::UIScriptController::platformSetDidShowKeyboardCallback):
+        (WTR::UIScriptController::platformSetDidHideKeyboardCallback):
+        (WTR::UIScriptController::platformClearAllCallbacks): Deleted.
+        * WebKitTestRunner/mac/UIScriptControllerMac.mm:
+        (WTR::UIScriptController::doAsyncTask):
+
+2015-11-10  Daniel Bates  <dabates@apple.com>
+
+        Teach Makefile to build LayoutTestRelay when building for iOS Simulator
+        https://bugs.webkit.org/show_bug.cgi?id=150849
+
+        Reviewed by Alexey Proskuryakov.
+
+        Unless variable DO_NOT_BUILD_LAYOUT_TEST_RELAY is non-empty, build LayoutTestRelay when
+        building WebKit tools.
+
+        * Makefile:
+
+2015-11-10  David Kilzer  <ddkilzer@apple.com>
+
+        [check-webkit-style] False positive (readability/enum_casing) on CF-styled enum members
+        <http://webkit.org/b/104417>
+
+        Reviewed by Brent Fulgham.
+
+        * Scripts/webkitpy/style/checkers/cpp.py:
+        (_EnumState.process_clean_line): Allow 'k' to start enums.
+        (check_enum_casing): Update error message to discuss 'k'.
+        * Scripts/webkitpy/style/checkers/cpp_unittest.py:
+        (NoNonVirtualDestructorsTest.test_enum_casing): Update error
+        messages, and add new tests for enums that start with lowercase
+        letters.
+
+2015-11-10  Geoffrey Garen  <ggaren@apple.com>
+
+        run-jsc-benchmarks doesn't work with internal benchmarks
+        https://bugs.webkit.org/show_bug.cgi?id=151047
+
+        Reviewed by Filip Pizlo.
+
+        * Scripts/run-jsc-benchmarks: Use Pathname so we get a "/" inserted when
+        we concatenate.
+
+2015-11-10  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Use CROSS_PLATFORM_CONTEXT_MENUS
+        https://bugs.webkit.org/show_bug.cgi?id=150642
+
+        Reviewed by Martin Robinson.
+
+        Remove test for input methods submenu.
+
+        * TestWebKitAPI/Tests/WebKit2Gtk/TestContextMenu.cpp:
+
+2015-11-09  Joonghun Park  <jh718.park@samsung.com>
+
+        Unreviewed, add myself to the committers list.
+
+        * Scripts/webkitpy/common/config/contributors.json:
+
+2015-11-09  Ryuan Choi  <ryuan.choi@navercorp.com>
+
+        [EFL] Crash while opening child webview with EWK_PROCESS_MODEL_MULTIPLE_SECONDARY
+        https://bugs.webkit.org/show_bug.cgi?id=145924
+
+        Reviewed by Gyuyoung Kim.
+
+        * MiniBrowser/efl/main.c:
+        (on_window_create):
+        (window_create):
+        * TestWebKitAPI/Tests/WebKit2/CoordinatedGraphics/WKViewUserViewportToContents.cpp:
+        (TestWebKitAPI::TEST):
+        * TestWebKitAPI/efl/PlatformWebView.cpp:
+        (TestWebKitAPI::PlatformWebView::PlatformWebView):
+        * WebKitTestRunner/efl/PlatformWebViewEfl.cpp:
+        (WTR::PlatformWebView::PlatformWebView):
+
+2015-11-09  Anders Carlsson  <andersca@apple.com>
+
+        Add reply blocks to _WKRemoteObjectInterface similar to NSXPCConnection
+        https://bugs.webkit.org/show_bug.cgi?id=151056
+        rdar://problem/23222609
+
+        Reviewed by Tim Horton.
+
+        Update test.
+
+        * TestWebKitAPI/Tests/WebKit2Cocoa/RemoteObjectRegistry.mm:
+        (TEST):
+        * TestWebKitAPI/Tests/WebKit2Cocoa/RemoteObjectRegistryPlugIn.mm:
+        (-[RemoteObjectRegistryPlugIn sayHello:completionHandler:]):
+
+2015-11-09  Tim Horton  <timothy_horton@apple.com>
+
+        Add drawsBackground SPI to WKWebView, and get rid of drawsTransparentBackground from WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=151054
+        <rdar://problem/22907994>
+
+        Reviewed by Simon Fraser.
+
+        * MiniBrowser/mac/WK1BrowserWindowController.m:
+        (-[WK1BrowserWindowController didChangeSettings]):
+        * MiniBrowser/mac/WK2BrowserWindowController.m:
+        (-[WK2BrowserWindowController didChangeSettings]):
+        Use drawsBackground instead, and make sure to set the window background color,
+        otherwise it might end up being gray anyway!
+
+        WebKit1 still doesn't work unless you turn off toolbar blurring, but at least
+        WebKit2 is working now!
+
+2015-11-09  Isaac Devine  <isaac@devinesystems.co.nz>
+
+        Fresh checkout fails to build on windows, DumpRenderTree can't find cairo_win.h
+        https://bugs.webkit.org/show_bug.cgi?id=151013
+
+        Use the variable defined in the CMake scripts to determine the cairo include location, rather
+        than relying on a environment variable to be set correctly. Otherwise the DumpRenderTreeLib.vcxproj will
+        contain "\include\cairo" rather than the fully qualified path to the cairo include location.
+
+        Reviewed by Darin Adler.
+
+        * DumpRenderTree/PlatformWin.cmake:
+
 2015-11-09  Csaba Osztrogonác  <ossy@webkit.org>
 
         [EFL] Fix the gst-plugins-bad jhbuild module build on Ubuntu 15.10
@@ -79,7 +612,7 @@
         Override the user-specified arguments SDKROOT and ARCHS to use the default SDK
         and default ARCHS since LayoutTestRelay is a Mac command line tool.
 
-        * LayoutTestRelay/Makefile: Define OVERWRITE_SDKROOT and OVERWRITE_ARCHS.
+        * LayoutTestRelay/Makefile: Define OVERRIDE_SDKROOT and OVERRIDE_ARCHS.
 
 2015-11-05  Nikos Andronikos  <nikos.andronikos-webkit@cisra.canon.com.au>
 

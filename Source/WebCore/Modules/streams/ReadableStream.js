@@ -54,9 +54,9 @@ function initializeReadableStream(underlyingSource, strategy)
     this.@controller = new @ReadableStreamController(this);
     this.@strategy = @validateAndNormalizeQueuingStrategy(strategy.size, strategy.highWaterMark);
 
-    var result = @invokeOrNoop(underlyingSource, "start", [this.@controller]);
-    var _this = this;
-    @Promise.@resolve(result).then(function() {
+    const result = @invokeOrNoop(underlyingSource, "start", [this.@controller]);
+    const _this = this;
+    @Promise.prototype.@then.@call(@Promise.@resolve(result), function() {
         _this.@started = true;
         @requestReadableStreamPull(_this);
     }, function(error) {
@@ -86,9 +86,6 @@ function getReader()
 
     if (!@isReadableStream(this))
         throw new @TypeError("Function should be called on a ReadableStream");
-
-    if (@isReadableStreamLocked(this))
-        throw new @TypeError("ReadableStream is locked");
 
     return new @ReadableStreamReader(this);
 }

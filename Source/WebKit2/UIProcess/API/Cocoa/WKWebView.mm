@@ -31,7 +31,6 @@
 #import "APIFormClient.h"
 #import "APIPageConfiguration.h"
 #import "APISerializedScriptValue.h"
-#import "AppKitSPI.h"
 #import "CompletionHandlerCallChecker.h"
 #import "DiagnosticLoggingClient.h"
 #import "FindClient.h"
@@ -77,6 +76,7 @@
 #import "_WKDiagnosticLoggingDelegate.h"
 #import "_WKFindDelegate.h"
 #import "_WKFormDelegate.h"
+#import "_WKFrameHandleInternal.h"
 #import "_WKHitTestResultInternal.h"
 #import "_WKInputDelegate.h"
 #import "_WKRemoteObjectRegistryInternal.h"
@@ -84,6 +84,7 @@
 #import "_WKVisitedLinkStoreInternal.h"
 #import <WebCore/IOSurface.h>
 #import <WebCore/JSDOMBinding.h>
+#import <WebCore/NSTextFinderSPI.h>
 #import <wtf/HashMap.h>
 #import <wtf/MathExtras.h>
 #import <wtf/NeverDestroyed.h>
@@ -92,7 +93,6 @@
 #import <wtf/TemporaryChange.h>
 
 #if PLATFORM(IOS)
-#import "_WKFrameHandleInternal.h"
 #import "_WKWebViewPrintFormatter.h"
 #import "PrintInfo.h"
 #import "ProcessThrottler.h"
@@ -339,6 +339,19 @@ static bool shouldAllowPictureInPictureMediaPlayback()
     }
 
     pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::suppressesIncrementalRenderingKey(), WebKit::WebPreferencesStore::Value(!![_configuration suppressesIncrementalRendering]));
+
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::shouldRespectImageOrientationKey(), WebKit::WebPreferencesStore::Value(!![_configuration _respectsImageOrientation]));
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::shouldPrintBackgroundsKey(), WebKit::WebPreferencesStore::Value(!![_configuration _printsBackgrounds]));
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::incrementalRenderingSuppressionTimeoutKey(), WebKit::WebPreferencesStore::Value([_configuration _incrementalRenderingSuppressionTimeout]));
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::javaScriptMarkupEnabledKey(), WebKit::WebPreferencesStore::Value(!![_configuration _allowsJavaScriptMarkup]));
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::shouldConvertPositionStyleOnCopyKey(), WebKit::WebPreferencesStore::Value(!![_configuration _convertsPositionStyleOnCopy]));
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::httpEquivEnabledKey(), WebKit::WebPreferencesStore::Value(!![_configuration _allowsMetaRefresh]));
+
+#if PLATFORM(MAC)
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::showsURLsInToolTipsEnabledKey(), WebKit::WebPreferencesStore::Value(!![_configuration _showsURLsInToolTips]));
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::serviceControlsEnabledKey(), WebKit::WebPreferencesStore::Value(!![_configuration _serviceControlsEnabled]));
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::imageControlsEnabledKey(), WebKit::WebPreferencesStore::Value(!![_configuration _imageControlsEnabled]));
+#endif
 
 #if PLATFORM(IOS)
     pageConfiguration->setAlwaysRunsAtForegroundPriority([_configuration _alwaysRunsAtForegroundPriority]);
@@ -1296,12 +1309,15 @@ static WebCore::FloatPoint constrainContentOffset(WebCore::FloatPoint contentOff
     return true;
 }
 
-- (void)_scrollByOffset:(WebCore::FloatPoint)offset
+- (void)_scrollByContentOffset:(WebCore::FloatPoint)contentOffsetDelta
 {
-    CGPoint currentOffset = ([_scrollView _isAnimatingScroll]) ? [_scrollView _animatedTargetOffset] : [_scrollView contentOffset];
+    WebCore::FloatPoint scaledOffsetDelta = contentOffsetDelta;
+    CGFloat zoomScale = contentZoomScale(self);
+    scaledOffsetDelta.scale(zoomScale, zoomScale);
 
-    CGPoint boundedOffset = contentOffsetBoundedInValidRange(_scrollView.get(), currentOffset + offset);
-    
+    CGPoint currentOffset = [_scrollView _isAnimatingScroll] ? [_scrollView _animatedTargetOffset] : [_scrollView contentOffset];
+    CGPoint boundedOffset = contentOffsetBoundedInValidRange(_scrollView.get(), currentOffset + scaledOffsetDelta);
+
     if (CGPointEqualToPoint(boundedOffset, currentOffset))
         return;
     [_contentView willStartZoomOrScroll];
@@ -3050,6 +3066,22 @@ static int32_t activeOrientation(WKWebView *webView)
 #endif
 }
 
+- (NSString *)_remoteInspectionNameOverride
+{
+#if ENABLE(REMOTE_INSPECTOR)
+    return _page->remoteInspectionNameOverride();
+#else
+    return nil;
+#endif
+}
+
+- (void)_setRemoteInspectionNameOverride:(NSString *)name
+{
+#if ENABLE(REMOTE_INSPECTOR)
+    _page->setRemoteInspectionNameOverride(name);
+#endif
+}
+
 - (BOOL)_addsVisitedLinks
 {
     return _page->addsVisitedLinks();
@@ -3522,6 +3554,11 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
 #endif
 }
 
+- (BOOL)_webProcessIsResponsive
+{
+    return _page->process().responsivenessTimer().isResponsive();
+}
+
 #pragma mark iOS-specific methods
 
 #if PLATFORM(IOS)
@@ -3940,14 +3977,14 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
 
 #pragma mark - OS X-specific methods
 
-- (BOOL)_drawsTransparentBackground
+- (BOOL)_drawsBackground
 {
-    return _impl->drawsTransparentBackground();
+    return _impl->drawsBackground();
 }
 
-- (void)_setDrawsTransparentBackground:(BOOL)drawsTransparentBackground
+- (void)_setDrawsBackground:(BOOL)drawsBackground
 {
-    _impl->setDrawsTransparentBackground(drawsTransparentBackground);
+    _impl->setDrawsBackground(drawsBackground);
 }
 
 #if WK_API_ENABLED
@@ -4029,12 +4066,21 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
     _impl->setClipsToVisibleRect(expandsToFit);
 }
 
-#endif
-
-- (BOOL)_webProcessIsResponsive
+- (NSPrintOperation *)_printOperationWithPrintInfo:(NSPrintInfo *)printInfo
 {
-    return _page->process().responsivenessTimer().isResponsive();
+    if (auto webFrameProxy = _page->mainFrame())
+        return _impl->printOperationWithPrintInfo(printInfo, *webFrameProxy);
+    return nil;
 }
+
+- (NSPrintOperation *)_printOperationWithPrintInfo:(NSPrintInfo *)printInfo forFrame:(_WKFrameHandle *)frameHandle
+{
+    if (auto webFrameProxy = _page->process().webFrame(frameHandle._frameID))
+        return _impl->printOperationWithPrintInfo(printInfo, *webFrameProxy);
+    return nil;
+}
+
+#endif
 
 @end
 

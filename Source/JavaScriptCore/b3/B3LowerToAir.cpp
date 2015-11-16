@@ -28,12 +28,14 @@
 
 #if ENABLE(B3_JIT)
 
+#include "AirCCallSpecial.h"
 #include "AirCode.h"
 #include "AirInsertionSet.h"
 #include "AirInstInlines.h"
 #include "AirStackSlot.h"
 #include "B3ArgumentRegValue.h"
 #include "B3BasicBlockInlines.h"
+#include "B3CCallValue.h"
 #include "B3CheckSpecial.h"
 #include "B3Commutativity.h"
 #include "B3IndexMap.h"
@@ -440,22 +442,14 @@ private:
 
     Arg imm(Value* value)
     {
-        if (value->representableAs<int32_t>())
+        if (value->hasInt() && value->representableAs<int32_t>())
             return Arg::imm(value->asNumber<int32_t>());
         return Arg();
     }
 
-    Arg immForMove(Value* value) {
-        if (Arg result = imm(value))
-            return result;
-        if (value->hasInt64())
-            return Arg::imm64(value->asInt64());
-        return Arg();
-    }
-
-    Arg immOrTmpForMove(Value* value)
+    Arg immOrTmp(Value* value)
     {
-        if (Arg result = immForMove(value))
+        if (Arg result = imm(value))
             return result;
         return tmp(value);
     }
@@ -503,11 +497,18 @@ private:
         // mean something like:
         //     b = Op a
 
+        ArgPromise addr = loadPromise(value);
+        if (isValidForm(opcode, addr.kind(), Arg::Tmp)) {
+            append(opcode, addr.consume(*this), result);
+            return;
+        }
+
         if (isValidForm(opcode, Arg::Tmp, Arg::Tmp)) {
             append(opcode, tmp(value), result);
             return;
         }
 
+        ASSERT(value->type() == m_value->type());
         append(relaxedMoveForType(m_value->type()), tmp(value), result);
         append(opcode, result);
     }
@@ -546,7 +547,7 @@ private:
             return;
         }
 
-        // Note that no known architecture has a three-operand form of binary operations that also
+        // Note that no extant architecture has a three-operand form of binary operations that also
         // load from memory. If such an abomination did exist, we would handle it somewhere around
         // here.
 
@@ -667,16 +668,19 @@ private:
         return true;
     }
 
-    void appendStore(Value* value, const Arg& dest)
+    Inst createStore(Value* value, const Arg& dest)
     {
         Air::Opcode move = moveForType(value->type());
 
-        if (imm(value) && isValidForm(move, Arg::Imm, dest.kind())) {
-            append(move, imm(value), dest);
-            return;
-        }
+        if (imm(value) && isValidForm(move, Arg::Imm, dest.kind()))
+            return Inst(move, m_value, imm(value), dest);
 
-        append(move, tmp(value), dest);
+        return Inst(move, m_value, tmp(value), dest);
+    }
+
+    void appendStore(Value* value, const Arg& dest)
+    {
+        m_insts.last().append(createStore(value, dest));
     }
 
     Air::Opcode moveForType(Type type)
@@ -723,6 +727,14 @@ private:
         return field;
     }
 
+    template<typename... Arguments>
+    CheckSpecial* ensureCheckSpecial(Arguments&&... arguments)
+    {
+        CheckSpecial::Key key(std::forward<Arguments>(arguments)...);
+        auto result = m_checkSpecials.add(key, nullptr);
+        return ensureSpecial(result.iterator->value, key);
+    }
+
     void fillStackmap(Inst& inst, StackmapValue* stackmap, unsigned numSkipped)
     {
         for (unsigned i = numSkipped; i < stackmap->numChildren(); ++i) {
@@ -731,14 +743,22 @@ private:
             Arg arg;
             switch (value.rep().kind()) {
             case ValueRep::Any:
-                arg = immOrTmpForMove(value.value());
+                if (imm(value.value()))
+                    arg = imm(value.value());
+                else if (value.value()->hasInt64())
+                    arg = Arg::imm64(value.value()->asInt64());
+                else if (value.value()->hasDouble() && canBeInternal(value.value())) {
+                    commitInternal(value.value());
+                    arg = Arg::imm64(bitwise_cast<int64_t>(value.value()->asDouble()));
+                } else
+                    arg = tmp(value.value());
                 break;
             case ValueRep::SomeRegister:
                 arg = tmp(value.value());
                 break;
             case ValueRep::Register:
                 arg = Tmp(value.rep().reg());
-                append(Move, immOrTmpForMove(value.value()), arg);
+                append(Move, immOrTmp(value.value()), arg);
                 break;
             case ValueRep::StackArgument:
                 arg = Arg::callArg(value.rep().offsetFromSP());
@@ -879,7 +899,7 @@ private:
                 }
 
                 // Finally, handle comparison between tmps.
-                return tryCompare(width, tmpPromise(left), tmpPromise(right));
+                return compare(width, relCond, tmpPromise(left), tmpPromise(right));
             }
 
             // Double comparisons can't really do anything smart.
@@ -1149,10 +1169,44 @@ private:
             inverted);
     }
 
+    template<typename BankInfo>
+    Arg marshallCCallArgument(unsigned& argumentCount, unsigned& stackCount, Value* child)
+    {
+        unsigned argumentIndex = argumentCount++;
+        if (argumentIndex < BankInfo::numberOfArgumentRegisters) {
+            Tmp result = Tmp(BankInfo::toArgumentRegister(argumentIndex));
+            append(relaxedMoveForType(child->type()), immOrTmp(child), result);
+            return result;
+        }
+
+        // Compute the place that this goes onto the stack. On X86_64 and probably other calling
+        // conventions that don't involve obsolete computers and operating systems, sub-pointer-size
+        // arguments are still given a full pointer-sized stack slot. Hence we don't have to consider
+        // the type of the argument when deducing the stack index.
+        unsigned stackIndex = stackCount++;
+
+        Arg result = Arg::callArg(stackIndex * sizeof(void*));
+        
+        // Put the code for storing the argument before anything else. This significantly eases the
+        // burden on the register allocator. If we could, we'd hoist these stores as far as
+        // possible.
+        // FIXME: Add a phase to hoist stores as high as possible to relieve register pressure.
+        // https://bugs.webkit.org/show_bug.cgi?id=151063
+        m_insts.last().insert(0, createStore(child, result));
+        
+        return result;
+    }
+
     void lower()
     {
         switch (m_value->opcode()) {
-        case Load:{
+        case B3::Nop: {
+            // Yes, we will totally see Nop's because some phases will replaceWithNop() instead of
+            // properly removing things.
+            return;
+        }
+            
+        case Load: {
             append(
                 moveForType(m_value->type()),
                 addr(m_value), tmp(m_value));
@@ -1180,9 +1234,7 @@ private:
         }
 
         case Add: {
-            // FIXME: Need a story for doubles.
-            // https://bugs.webkit.org/show_bug.cgi?id=150991
-            appendBinOp<Add32, Add64, Air::Oops, Commutative>(
+            appendBinOp<Add32, Add64, AddDouble, Commutative>(
                 m_value->child(0), m_value->child(1));
             return;
         }
@@ -1192,6 +1244,46 @@ private:
                 appendUnOp<Neg32, Neg64, Air::Oops>(m_value->child(1));
             else
                 appendBinOp<Sub32, Sub64, Air::Oops>(m_value->child(0), m_value->child(1));
+            return;
+        }
+
+        case Mul: {
+            appendBinOp<Mul32, Mul64, Air::Oops, Commutative>(
+                m_value->child(0), m_value->child(1));
+            return;
+        }
+
+        case Div: {
+            if (isInt(m_value->type())) {
+                Tmp eax = Tmp(X86Registers::eax);
+                Tmp edx = Tmp(X86Registers::edx);
+
+                Air::Opcode convertToDoubleWord;
+                Air::Opcode div;
+                switch (m_value->type()) {
+                case Int32:
+                    convertToDoubleWord = X86ConvertToDoubleWord32;
+                    div = X86Div32;
+                    break;
+                case Int64:
+                    convertToDoubleWord = X86ConvertToQuadWord64;
+                    div = X86Div64;
+                    break;
+                default:
+                    RELEASE_ASSERT_NOT_REACHED();
+                    return;
+                }
+                
+                append(Move, tmp(m_value->child(0)), eax);
+                append(convertToDoubleWord, eax, edx);
+                append(div, eax, edx, tmp(m_value->child(1)));
+                append(Move, eax, tmp(m_value));
+                return;
+            }
+
+            // FIXME: Support doubles.
+            // https://bugs.webkit.org/show_bug.cgi?id=150991
+            RELEASE_ASSERT_NOT_REACHED();
             return;
         }
 
@@ -1214,6 +1306,15 @@ private:
         }
 
         case Shl: {
+            if (m_value->child(1)->isInt32(1)) {
+                // This optimization makes sense on X86. I don't know if it makes sense anywhere else.
+                append(Move, tmp(m_value->child(0)), tmp(m_value));
+                append(
+                    opcodeForType(Add32, Add64, Air::Oops, m_value->child(0)->type()),
+                    tmp(m_value), tmp(m_value));
+                return;
+            }
+            
             appendShift<Lshift32, Lshift64>(m_value->child(0), m_value->child(1));
             return;
         }
@@ -1285,9 +1386,23 @@ private:
             return;
         }
 
-        case Const32:
+        case Const32: {
+            append(Move, imm(m_value), tmp(m_value));
+            return;
+        }
         case Const64: {
-            append(Move, immForMove(m_value), tmp(m_value));
+            if (imm(m_value))
+                append(Move, imm(m_value), tmp(m_value));
+            else
+                append(Move, Arg::imm64(m_value->asInt64()), tmp(m_value));
+            return;
+        }
+
+        case ConstDouble: {
+            // We expect that the moveConstants() phase has run, and any doubles referenced from
+            // stackmaps get fused.
+            RELEASE_ASSERT(isIdentical(m_value->asDouble(), 0.0));
+            append(MoveZeroToDouble, tmp(m_value));
             return;
         }
 
@@ -1318,6 +1433,75 @@ private:
             return;
         }
 
+        case IToD: {
+            appendUnOp<ConvertInt32ToDouble, ConvertInt64ToDouble, Air::Oops>(m_value->child(0));
+            return;
+        }
+
+        case CCall: {
+            CCallValue* cCall = m_value->as<CCallValue>();
+            Inst inst(Patch, cCall, Arg::special(m_code.cCallSpecial()));
+
+            // This is a bit weird - we have a super intense contract with Arg::CCallSpecial. It might
+            // be better if we factored Air::CCallSpecial out of the Air namespace and made it a B3
+            // thing.
+            // FIXME: https://bugs.webkit.org/show_bug.cgi?id=151045
+
+            // We have a ton of flexibility regarding the callee argument, but currently, we don't
+            // use it yet. It gets weird for reasons:
+            // 1) We probably will never take advantage of this. We don't have C calls to locations
+            //    loaded from addresses. We have JS calls like that, but those use Patchpoints.
+            // 2) On X86_64 we still don't support call with BaseIndex.
+            // 3) On non-X86, we don't natively support any kind of loading from address.
+            // 4) We don't have an isValidForm() for the CCallSpecial so we have no smart way to
+            //    decide.
+            // FIXME: https://bugs.webkit.org/show_bug.cgi?id=151052
+            inst.args.append(tmp(cCall->child(0)));
+
+            // We need to tell Air what registers this defines.
+            inst.args.append(Tmp(GPRInfo::returnValueGPR));
+            inst.args.append(Tmp(GPRInfo::returnValueGPR2));
+            inst.args.append(Tmp(FPRInfo::returnValueFPR));
+
+            // Now marshall the arguments. This is where we implement the C calling convention. After
+            // this, Air does not know what the convention is; it just takes our word for it.
+            unsigned gpArgumentCount = 0;
+            unsigned fpArgumentCount = 0;
+            unsigned stackCount = 0;
+            for (unsigned i = 1; i < cCall->numChildren(); ++i) {
+                Value* argChild = cCall->child(i);
+                Arg arg;
+                
+                switch (Arg::typeForB3Type(argChild->type())) {
+                case Arg::GP:
+                    arg = marshallCCallArgument<GPRInfo>(gpArgumentCount, stackCount, argChild);
+                    break;
+
+                case Arg::FP:
+                    arg = marshallCCallArgument<FPRInfo>(fpArgumentCount, stackCount, argChild);
+                    break;
+                }
+
+                if (arg.isTmp())
+                    inst.args.append(arg);
+            }
+            
+            m_insts.last().append(WTF::move(inst));
+
+            switch (cCall->type()) {
+            case Void:
+                break;
+            case Int32:
+            case Int64:
+                append(Move, Tmp(GPRInfo::returnValueGPR), tmp(cCall));
+                break;
+            case Double:
+                append(MoveDouble, Tmp(FPRInfo::returnValueFPR), tmp(cCall));
+                break;
+            }
+            return;
+        }
+
         case Patchpoint: {
             PatchpointValue* patchpointValue = m_value->as<PatchpointValue>();
             ensureSpecial(m_patchpointSpecial);
@@ -1333,12 +1517,111 @@ private:
             return;
         }
 
+        case CheckAdd:
+        case CheckSub: {
+            // FIXME: Make this support commutativity. That will let us leverage more instruction forms
+            // and it let us commute to maximize coalescing.
+            // https://bugs.webkit.org/show_bug.cgi?id=151214
+
+            CheckValue* checkValue = m_value->as<CheckValue>();
+
+            Value* left = checkValue->child(0);
+            Value* right = checkValue->child(1);
+
+            Tmp result = tmp(m_value);
+
+            // Handle checked negation.
+            if (checkValue->opcode() == CheckSub && left->isInt(0)) {
+                append(relaxedMoveForType(checkValue->type()), tmp(right), result);
+
+                Air::Opcode opcode =
+                    opcodeForType(BranchNeg32, BranchNeg64, Air::Oops, checkValue->type());
+                CheckSpecial* special = ensureCheckSpecial(opcode, 2);
+
+                Inst inst(Patch, checkValue, Arg::special(special));
+                inst.args.append(Arg::resCond(MacroAssembler::Overflow));
+                inst.args.append(result);
+
+                fillStackmap(inst, checkValue, 2);
+
+                m_insts.last().append(WTF::move(inst));
+                return;
+            }
+
+            append(relaxedMoveForType(m_value->type()), tmp(left), result);
+            
+            Air::Opcode opcode = Air::Oops;
+            CheckSpecial* special = nullptr;
+            switch (m_value->opcode()) {
+            case CheckAdd:
+                opcode = opcodeForType(BranchAdd32, BranchAdd64, Air::Oops, m_value->type());
+                special = ensureCheckSpecial(opcode, 3);
+                break;
+            case CheckSub:
+                opcode = opcodeForType(BranchSub32, BranchSub64, Air::Oops, m_value->type());
+                special = ensureCheckSpecial(opcode, 3);
+                break;
+            default:
+                RELEASE_ASSERT_NOT_REACHED();
+                break;
+            }
+
+            Inst inst(Patch, checkValue, Arg::special(special));
+
+            inst.args.append(Arg::resCond(MacroAssembler::Overflow));
+
+            // FIXME: It would be great to fuse Loads into these. We currently don't do it because the
+            // rule for stackmaps is that all addresses are just stack addresses. Maybe we could relax
+            // this rule here.
+            // https://bugs.webkit.org/show_bug.cgi?id=151228
+            
+            if (imm(right) && isValidForm(opcode, Arg::ResCond, Arg::Imm, Arg::Tmp))
+                inst.args.append(imm(right));
+            else
+                inst.args.append(tmp(right));
+            inst.args.append(result);
+            
+            fillStackmap(inst, checkValue, 2);
+
+            m_insts.last().append(WTF::move(inst));
+            return;
+        }
+
+        case CheckMul: {
+            // Handle multiplication separately. Multiplication is hard because we have to preserve
+            // both inputs. This requires using three-operand multiplication, even on platforms where
+            // this requires an additional Move.
+
+            CheckValue* checkValue = m_value->as<CheckValue>();
+
+            Value* left = checkValue->child(0);
+            Value* right = checkValue->child(1);
+
+            Tmp result = tmp(m_value);
+
+            Air::Opcode opcode =
+                opcodeForType(BranchMul32, BranchMul64, Air::Oops, checkValue->type());
+            CheckSpecial* special = ensureCheckSpecial(opcode, 4);
+
+            // FIXME: Handle immediates.
+            // https://bugs.webkit.org/show_bug.cgi?id=151230
+
+            Inst inst(Patch, checkValue, Arg::special(special));
+            inst.args.append(Arg::resCond(MacroAssembler::Overflow));
+            inst.args.append(tmp(left));
+            inst.args.append(tmp(right));
+            inst.args.append(result);
+
+            fillStackmap(inst, checkValue, 2);
+            
+            m_insts.last().append(WTF::move(inst));
+            return;
+        }
+
         case Check: {
             Inst branch = createBranch(m_value->child(0));
-            
-            CheckSpecial::Key key(branch);
-            auto result = m_checkSpecials.add(key, nullptr);
-            Special* special = ensureSpecial(result.iterator->value, key);
+
+            CheckSpecial* special = ensureCheckSpecial(branch);
             
             CheckValue* checkValue = m_value->as<CheckValue>();
             
@@ -1354,7 +1637,7 @@ private:
         case Upsilon: {
             Value* value = m_value->child(0);
             append(
-                relaxedMoveForType(value->type()), immOrTmpForMove(value),
+                relaxedMoveForType(value->type()), immOrTmp(value),
                 tmp(m_value->as<UpsilonValue>()->phi()));
             return;
         }
@@ -1381,9 +1664,16 @@ private:
 
         case Return: {
             Value* value = m_value->child(0);
-            append(
-                relaxedMoveForType(value->type()), immOrTmpForMove(value),
-                Tmp(GPRInfo::returnValueGPR));
+            Air::Opcode move;
+            Tmp dest;
+            if (isInt(value->type())) {
+                move = Move;
+                dest = Tmp(GPRInfo::returnValueGPR);
+            } else {
+                move = MoveDouble;
+                dest = Tmp(FPRInfo::returnValueFPR);
+            }
+            append(move, immOrTmp(value), dest);
             append(Ret);
             return;
         }

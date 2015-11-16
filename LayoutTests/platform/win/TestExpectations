@@ -555,18 +555,6 @@ transitions/blendmode-transitions.html [ Skip ]
 # Backdrop Filters do not work on Windows
 fast/css/will-change/will-change-creates-stacking-context-inline.html [ ImageOnlyFailure ] 
 
-# TODO Not supported in CFNetwork yet. https://bugs.webkit.org/show_bug.cgi?id=100349
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-aborted.html [ Skip ]
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-overridesexpires.html [ Skip ]
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-simple.html [ Skip ]
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-synconmain.html [ Skip ]
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-twice.html [ Skip ]
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-aborted.html [ Skip ]
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-overridesexpires.html [ Skip ]
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-simple.html [ Skip ]
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-synconworker.html [ Skip ]
-webkit.org/b/100349 http/tests/xmlhttprequest/timeout/xmlhttprequest-timeout-worker-twice.html [ Skip ]
-
 # TODO CSS3_TEXT is disabled on Windows
 fast/css3-text/ [ Skip ]
 
@@ -2401,7 +2389,7 @@ http/tests/xmlhttprequest/workers/methods.html [ Pass Crash ]
 # Seems that all inspector tests are timing out on Windows. Skip them all.
 # Comment out detailed expectations until the harness is supported on Windows.
 webkit.org/b/137157 inspector [ Skip ]
-webkit.org/b/137157 http/tests/inspector/dom/disconnect-dom-tree-after-main-frame-navigation.html [ Skip ]
+webkit.org/b/137157 http/tests/inspector [ Skip ]
 
 # webkit.org/b/143548 inspector/console [ Skip ]
 # webkit.org/b/137157 inspector/css [ Skip ]
@@ -2457,6 +2445,8 @@ webkit.org/b/140947 js/slow-stress/Int32Array-alloc-large-long-lived.html [ Skip
 
 # The following fails due to DOM exception 18.
 js/dom/callback-function-with-handle-event.html [ Skip ] #  [ Timeout ]
+
+webkit.org/b/151027 jquery/manipulation.html [ Pass Timeout ]
 ################################################################################
 #################        End JavaScript Issues           #######################
 ################################################################################
@@ -3198,6 +3188,7 @@ fast/inline/padding-ellipsis-right.html [ ImageOnlyFailure ]
 
 # This test hardcodes the result of a platform-dependent font lookup algorithm.
 fast/text/fallback-language-han.html [ Skip ]
+fast/text/fallback-language-han-2.html [ Skip ]
 
 # Changing system language is not supported.
 fast/text/international/system-language [ Skip ]
@@ -3311,5 +3302,8 @@ webkit.org/b/147933 streams/reference-implementation/writable-stream-abort.html 
 webkit.org/b/147933 streams/reference-implementation/count-queuing-strategy.html [ Pass Failure ]
 
 webkit.org/b/150946 [ Debug ] scrollbars/custom-scrollbar-appearance-property.html [ Crash ]
+
+# HTMLMediaElement can not use a MediaStream as source.
+fast/mediastream/MediaStream-video-element.html [ Skip ]
 
 webkit.org/b/150948 [ Debug ] imported/blink/transitions/unprefixed-transform.html [ Pass Failure ]

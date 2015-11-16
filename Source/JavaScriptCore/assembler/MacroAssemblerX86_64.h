@@ -57,6 +57,9 @@ public:
 
     void add32(TrustedImm32 imm, AbsoluteAddress address)
     {
+        if (!imm.m_value)
+            return;
+
         move(TrustedImmPtr(address.m_ptr), scratchRegister);
         add32(imm, Address(scratchRegister));
     }
@@ -268,29 +271,33 @@ public:
 
     void add64(TrustedImm32 imm, RegisterID srcDest)
     {
-        if (imm.m_value == 1)
-            m_assembler.incq_r(srcDest);
-        else
-            m_assembler.addq_ir(imm.m_value, srcDest);
+        if (!imm.m_value)
+            return;
+        add64AndSetFlags(imm, srcDest);
     }
 
-    void add64(TrustedImm64 imm, RegisterID dest)
+    void add64(TrustedImm64 imm, RegisterID srcDest)
     {
-        if (imm.m_value == 1)
-            m_assembler.incq_r(dest);
-        else {
-            move(imm, scratchRegister);
-            add64(scratchRegister, dest);
-        }
+        if (!imm.m_value)
+            return;
+        add64AndSetFlags(imm, srcDest);
     }
 
     void add64(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
+        if (!imm.m_value) {
+            move(src, dest);
+            return;
+        }
+
         m_assembler.leaq_mr(imm.m_value, src, dest);
     }
 
     void add64(TrustedImm32 imm, Address address)
     {
+        if (!imm.m_value)
+            return;
+
         if (imm.m_value == 1)
             m_assembler.incq_m(address.offset, address.base);
         else
@@ -299,6 +306,9 @@ public:
 
     void add64(TrustedImm32 imm, AbsoluteAddress address)
     {
+        if (!imm.m_value)
+            return;
+
         move(TrustedImmPtr(address.m_ptr), scratchRegister);
         add64(imm, Address(scratchRegister));
     }
@@ -386,6 +396,30 @@ public:
         m_assembler.imulq_rr(src, dest);
     }
     
+    void x86ConvertToQuadWord64()
+    {
+        m_assembler.cqo();
+    }
+
+    void x86ConvertToQuadWord64(RegisterID rax, RegisterID rdx)
+    {
+        ASSERT_UNUSED(rax, rax == X86Registers::eax);
+        ASSERT_UNUSED(rdx, rdx == X86Registers::edx);
+        x86ConvertToQuadWord64();
+    }
+
+    void x86Div64(RegisterID denominator)
+    {
+        m_assembler.idivq_r(denominator);
+    }
+
+    void x86Div64(RegisterID rax, RegisterID rdx, RegisterID denominator)
+    {
+        ASSERT_UNUSED(rax, rax == X86Registers::eax);
+        ASSERT_UNUSED(rdx, rdx == X86Registers::edx);
+        x86Div64(denominator);
+    }
+
     void neg64(RegisterID dest)
     {
         m_assembler.negq_r(dest);
@@ -577,7 +611,41 @@ public:
         m_assembler.setCC_r(x86Condition(cond), dest);
         m_assembler.movzbl_rr(dest, dest);
     }
-    
+
+    void compareDouble(DoubleCondition cond, FPRegisterID left, FPRegisterID right, RegisterID dest)
+    {
+        if (cond & DoubleConditionBitInvert)
+            m_assembler.ucomisd_rr(left, right);
+        else
+            m_assembler.ucomisd_rr(right, left);
+
+        if (cond == DoubleEqual) {
+            if (left == right) {
+                m_assembler.setnp_r(dest);
+                return;
+            }
+
+            Jump isUnordered(m_assembler.jp());
+            m_assembler.sete_r(dest);
+            isUnordered.link(this);
+            return;
+        }
+
+        if (cond == DoubleNotEqualOrUnordered) {
+            if (left == right) {
+                m_assembler.setp_r(dest);
+                return;
+            }
+
+            m_assembler.setp_r(dest);
+            m_assembler.setne_r(dest);
+            return;
+        }
+
+        ASSERT(!(cond & DoubleConditionBitSpecial));
+        m_assembler.setCC_r(static_cast<X86Assembler::Condition>(cond & ~DoubleConditionBits), dest);
+    }
+
     Jump branch64(RelationalCondition cond, RegisterID left, RegisterID right)
     {
         m_assembler.cmpq_rr(right, left);
@@ -709,7 +777,7 @@ public:
 
     Jump branchAdd64(ResultCondition cond, TrustedImm32 imm, RegisterID dest)
     {
-        add64(imm, dest);
+        add64AndSetFlags(imm, dest);
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 
@@ -725,6 +793,14 @@ public:
         if (cond != Overflow)
             m_assembler.testq_rr(dest, dest);
         return Jump(m_assembler.jCC(x86Condition(cond)));
+    }
+
+    Jump branchMul64(ResultCondition cond, RegisterID src1, RegisterID src2, RegisterID dest)
+    {
+        if (src1 == dest)
+            return branchMul64(cond, src2, dest);
+        move(src2, dest);
+        return branchMul64(cond, src1, dest);
     }
 
     Jump branchSub64(ResultCondition cond, TrustedImm32 imm, RegisterID dest)
@@ -919,6 +995,24 @@ public:
     }
 
 private:
+    void add64AndSetFlags(TrustedImm32 imm, RegisterID srcDest)
+    {
+        if (imm.m_value == 1)
+            m_assembler.incq_r(srcDest);
+        else
+            m_assembler.addq_ir(imm.m_value, srcDest);
+    }
+
+    void add64AndSetFlags(TrustedImm64 imm, RegisterID dest)
+    {
+        if (imm.m_value == 1)
+            m_assembler.incq_r(dest);
+        else {
+            move(imm, scratchRegister);
+            add64(scratchRegister, dest);
+        }
+    }
+
     friend class LinkBuffer;
 
     static void linkCall(void* code, Call call, FunctionPtr function)

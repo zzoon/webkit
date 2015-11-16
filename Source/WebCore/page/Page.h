@@ -58,6 +58,10 @@
 #include "MediaSessionEvents.h"
 #endif
 
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+#include "MediaPlaybackTargetContext.h"
+#endif
+
 namespace JSC {
 class Debugger;
 }
@@ -178,6 +182,8 @@ public:
 #if ENABLE(REMOTE_INSPECTOR)
     WEBCORE_EXPORT bool remoteInspectionAllowed() const;
     WEBCORE_EXPORT void setRemoteInspectionAllowed(bool);
+    WEBCORE_EXPORT String remoteInspectionNameOverride() const;
+    WEBCORE_EXPORT void setRemoteInspectionNameOverride(const String&);
     void remoteInspectorInformationDidChange() const;
 #endif
 
@@ -419,9 +425,10 @@ public:
     void captionPreferencesChanged();
 #endif
 
-    void incrementFrameHandlingBeforeUnloadEventCount();
-    void decrementFrameHandlingBeforeUnloadEventCount();
-    bool isAnyFrameHandlingBeforeUnloadEvent();
+    void forbidPrompts();
+    void allowPrompts();
+    bool arePromptsAllowed();
+
     void setLastSpatialNavigationCandidateCount(unsigned count) { m_lastSpatialNavigationCandidatesCount = count; }
     unsigned lastSpatialNavigationCandidateCount() const { return m_lastSpatialNavigationCandidatesCount; }
 
@@ -455,8 +462,10 @@ public:
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     void addPlaybackTargetPickerClient(uint64_t);
     void removePlaybackTargetPickerClient(uint64_t);
-    void showPlaybackTargetPicker(uint64_t, const WebCore::IntPoint&, bool);
+    void showPlaybackTargetPicker(uint64_t, const IntPoint&, bool);
     void playbackTargetPickerClientStateDidChange(uint64_t, MediaProducer::MediaStateFlags);
+    WEBCORE_EXPORT void setMockMediaPlaybackTargetPickerEnabled(bool);
+    WEBCORE_EXPORT void setMockMediaPlaybackTargetPickerState(const String&, MediaPlaybackTargetContext::State);
 
     WEBCORE_EXPORT void setPlaybackTarget(uint64_t, Ref<MediaPlaybackTarget>&&);
     WEBCORE_EXPORT void playbackTargetAvailabilityDidChange(uint64_t, bool);
@@ -554,7 +563,7 @@ private:
 
     float m_pageScaleFactor;
     float m_zoomedOutPageScaleFactor;
-    float m_deviceScaleFactor;
+    float m_deviceScaleFactor { 1 };
     float m_viewScaleFactor { 1 };
 
     float m_topContentInset;
@@ -625,7 +634,7 @@ private:
     HashSet<String> m_seenMediaEngines;
 
     unsigned m_lastSpatialNavigationCandidatesCount;
-    unsigned m_framesHandlingBeforeUnloadEvent;
+    unsigned m_forbidPromptsDepth;
 
     Ref<ApplicationCacheStorage> m_applicationCacheStorage;
     Ref<DatabaseProvider> m_databaseProvider;

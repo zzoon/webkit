@@ -65,7 +65,6 @@ struct WebPageCreationParameters {
     WebPageGroupData pageGroupData;
 
     bool drawsBackground;
-    bool drawsTransparentBackground;
     bool isEditable;
 
     WebCore::Color underlayColor;
@@ -118,6 +117,7 @@ struct WebPageCreationParameters {
 
 #if ENABLE(REMOTE_INSPECTOR)
     bool allowsRemoteInspection;
+    String remoteInspectionNameOverride;
 #endif
 
 #if PLATFORM(MAC)

@@ -49,6 +49,7 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 } WK_AVAILABLE(WK_MAC_TBA, NA);
 
 @class WKBrowsingContextHandle;
+@class _WKFrameHandle;
 @class _WKHitTestResult;
 @class _WKRemoteObjectRegistry;
 @class _WKSessionState;
@@ -97,6 +98,7 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 - (WKNavigation *)_restoreSessionState:(_WKSessionState *)sessionState andNavigate:(BOOL)navigate;
 
 @property (nonatomic, setter=_setAllowsRemoteInspection:) BOOL _allowsRemoteInspection;
+@property (nonatomic, copy, setter=_setRemoteInspectionNameOverride:) NSString *_remoteInspectionNameOverride WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 @property (nonatomic, setter=_setAddsVisitedLinks:) BOOL _addsVisitedLinks;
 
@@ -169,7 +171,7 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 
 #else
 @property (readonly) NSColor *_pageExtendedBackgroundColor;
-@property (nonatomic, setter=_setDrawsTransparentBackground:) BOOL _drawsTransparentBackground;
+@property (nonatomic, setter=_setDrawsBackground:) BOOL _drawsBackground;
 @property (nonatomic, setter=_setTopContentInset:) CGFloat _topContentInset;
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
@@ -186,6 +188,9 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 - (id)_immediateActionAnimationControllerForHitTestResult:(_WKHitTestResult *)hitTestResult withType:(_WKImmediateActionType)type userData:(id<NSSecureCoding>)userData;
 
 @property (nonatomic, setter=_setMinimumLayoutWidth:) CGFloat _minimumLayoutWidth WK_AVAILABLE(WK_MAC_TBA, NA);
+
+- (NSPrintOperation *)_printOperationWithPrintInfo:(NSPrintInfo *)printInfo;
+- (NSPrintOperation *)_printOperationWithPrintInfo:(NSPrintInfo *)printInfo forFrame:(_WKFrameHandle *)frameHandle WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 #endif
 

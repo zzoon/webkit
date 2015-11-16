@@ -1190,12 +1190,6 @@
     <ClCompile Include="..\platform\win\ClipboardUtilitiesWin.cpp">
       <Filter>platform\win</Filter>
     </ClCompile>
-    <ClCompile Include="..\platform\win\ContextMenuItemWin.cpp">
-      <Filter>platform\win</Filter>
-    </ClCompile>
-    <ClCompile Include="..\platform\win\ContextMenuWin.cpp">
-      <Filter>platform\win</Filter>
-    </ClCompile>
     <ClCompile Include="..\platform\win\CursorWin.cpp">
       <Filter>platform\win</Filter>
     </ClCompile>
@@ -8227,9 +8221,6 @@
     <ClInclude Include="..\platform\PlatformKeyboardEvent.h">
       <Filter>platform</Filter>
     </ClInclude>
-    <ClInclude Include="..\platform\PlatformMenuDescription.h">
-      <Filter>platform</Filter>
-    </ClInclude>
     <ClInclude Include="..\platform\PlatformMouseEvent.h">
       <Filter>platform</Filter>
     </ClInclude>
@@ -11780,6 +11771,9 @@
       <Filter>ForwardingHeaders\inspector</Filter>
     </ClInclude>
     <ClInclude Include="..\ForwardingHeaders\inspector\InspectorValues.h">
+      <Filter>ForwardingHeaders\inspector</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ForwardingHeaders\inspector\PerGlobalObjectWrapperWorld.h">
       <Filter>ForwardingHeaders\inspector</Filter>
     </ClInclude>
     <ClInclude Include="..\ForwardingHeaders\inspector\ScriptArguments.h">

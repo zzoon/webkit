@@ -156,7 +156,7 @@ public:
     {
     }
 
-    PassRefPtr<MessageEvent> event(ScriptExecutionContext* context)
+    Ref<MessageEvent> event(ScriptExecutionContext* context)
     {
         std::unique_ptr<MessagePortArray> messagePorts = MessagePort::entanglePorts(*context, WTF::move(m_channels));
         return MessageEvent::create(WTF::move(messagePorts), m_message, m_origin, String(), m_source);
@@ -928,7 +928,7 @@ void DOMWindow::postMessageTimerFired(PostMessageTimer& timer)
     dispatchMessageEventWithOriginCheck(timer.targetOrigin(), timer.event(document()), timer.stackTrace());
 }
 
-void DOMWindow::dispatchMessageEventWithOriginCheck(SecurityOrigin* intendedTargetOrigin, PassRefPtr<Event> event, PassRefPtr<ScriptCallStack> stackTrace)
+void DOMWindow::dispatchMessageEventWithOriginCheck(SecurityOrigin* intendedTargetOrigin, Event& event, PassRefPtr<ScriptCallStack> stackTrace)
 {
     if (intendedTargetOrigin) {
         // Check target origin now since the target document may have changed since the timer was scheduled.
@@ -1047,13 +1047,12 @@ void DOMWindow::print()
     if (!m_frame)
         return;
 
-    Page* page = m_frame->page();
+    auto* page = m_frame->page();
     if (!page)
         return;
 
-    // Pages are not allowed to bring up a modal print dialog during BeforeUnload dispatch.
-    if (page->isAnyFrameHandlingBeforeUnloadEvent()) {
-        printErrorMessage("Use of window.print is not allowed during beforeunload event dispatch.");
+    if (!page->arePromptsAllowed()) {
+        printErrorMessage("Use of window.print is not allowed while unloading a page.");
         return;
     }
 
@@ -1080,17 +1079,16 @@ void DOMWindow::alert(const String& message)
     if (!m_frame)
         return;
 
-    // Pages are not allowed to cause modal alerts during BeforeUnload dispatch.
-    if (page() && page()->isAnyFrameHandlingBeforeUnloadEvent()) {
-        printErrorMessage("Use of window.alert is not allowed during beforeunload event dispatch.");
+    auto* page = m_frame->page();
+    if (!page)
+        return;
+
+    if (!page->arePromptsAllowed()) {
+        printErrorMessage("Use of window.alert is not allowed while unloading a page.");
         return;
     }
 
     m_frame->document()->updateStyleIfNeeded();
-
-    Page* page = m_frame->page();
-    if (!page)
-        return;
 
     page->chrome().runJavaScriptAlert(m_frame, message);
 }
@@ -1100,17 +1098,16 @@ bool DOMWindow::confirm(const String& message)
     if (!m_frame)
         return false;
     
-    // Pages are not allowed to cause modal alerts during BeforeUnload dispatch.
-    if (page() && page()->isAnyFrameHandlingBeforeUnloadEvent()) {
-        printErrorMessage("Use of window.confirm is not allowed during beforeunload event dispatch.");
+    auto* page = m_frame->page();
+    if (!page)
+        return false;
+
+    if (!page->arePromptsAllowed()) {
+        printErrorMessage("Use of window.confirm is not allowed while unloading a page.");
         return false;
     }
 
     m_frame->document()->updateStyleIfNeeded();
-
-    Page* page = m_frame->page();
-    if (!page)
-        return false;
 
     return page->chrome().runJavaScriptConfirm(m_frame, message);
 }
@@ -1120,17 +1117,16 @@ String DOMWindow::prompt(const String& message, const String& defaultValue)
     if (!m_frame)
         return String();
 
-    // Pages are not allowed to cause modal alerts during BeforeUnload dispatch.
-    if (page() && page()->isAnyFrameHandlingBeforeUnloadEvent()) {
-        printErrorMessage("Use of window.prompt is not allowed during beforeunload event dispatch.");
+    auto* page = m_frame->page();
+    if (!page)
+        return String();
+
+    if (!page->arePromptsAllowed()) {
+        printErrorMessage("Use of window.prompt is not allowed while unloading a page.");
         return String();
     }
 
     m_frame->document()->updateStyleIfNeeded();
-
-    Page* page = m_frame->page();
-    if (!page)
-        return String();
 
     String returnValue;
     if (page->chrome().runJavaScriptPrompt(m_frame, message, defaultValue, returnValue))
@@ -1874,7 +1870,7 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
 
 void DOMWindow::dispatchLoadEvent()
 {
-    RefPtr<Event> loadEvent(Event::create(eventNames().loadEvent, false, false));
+    Ref<Event> loadEvent = Event::create(eventNames().loadEvent, false, false);
     if (m_frame && m_frame->loader().documentLoader() && !m_frame->loader().documentLoader()->timing().loadEventStart()) {
         // The DocumentLoader (and thus its DocumentLoadTiming) might get destroyed while dispatching
         // the event, so protect it to prevent writing the end time into freed memory.
@@ -1896,34 +1892,33 @@ void DOMWindow::dispatchLoadEvent()
     InspectorInstrumentation::loadEventFired(frame());
 }
 
-bool DOMWindow::dispatchEvent(PassRefPtr<Event> prpEvent, PassRefPtr<EventTarget> prpTarget)
+bool DOMWindow::dispatchEvent(Event& event, EventTarget* target)
 {
     Ref<EventTarget> protect(*this);
-    RefPtr<Event> event = prpEvent;
 
     // Pausing a page may trigger pagehide and pageshow events. WebCore also implicitly fires these
     // events when closing a WebView. Here we keep track of the state of the page to prevent duplicate,
     // unbalanced events per the definition of the pageshow event:
     // <http://www.whatwg.org/specs/web-apps/current-work/multipage/history.html#event-pageshow>.
-    if (event->eventInterface() == PageTransitionEventInterfaceType) {
-        if (event->type() == eventNames().pageshowEvent) {
+    if (event.eventInterface() == PageTransitionEventInterfaceType) {
+        if (event.type() == eventNames().pageshowEvent) {
             if (m_lastPageStatus == PageStatusShown)
                 return true; // Event was previously dispatched; do not fire a duplicate event.
             m_lastPageStatus = PageStatusShown;
-        } else if (event->type() == eventNames().pagehideEvent) {
+        } else if (event.type() == eventNames().pagehideEvent) {
             if (m_lastPageStatus == PageStatusHidden)
                 return true; // Event was previously dispatched; do not fire a duplicate event.
             m_lastPageStatus = PageStatusHidden;
         }
     }
 
-    event->setTarget(prpTarget ? prpTarget : this);
-    event->setCurrentTarget(this);
-    event->setEventPhase(Event::AT_TARGET);
+    event.setTarget(target ? target : this);
+    event.setCurrentTarget(this);
+    event.setEventPhase(Event::AT_TARGET);
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchEventOnWindow(frame(), *event, *this);
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchEventOnWindow(frame(), event, *this);
 
-    bool result = fireEventListeners(event.get());
+    bool result = fireEventListeners(event);
 
     InspectorInstrumentation::didDispatchEventOnWindow(cookie);
 
@@ -2237,9 +2232,12 @@ void DOMWindow::showModalDialog(const String& urlString, const String& dialogFea
     if (!firstFrame)
         return;
 
-    // Pages are not allowed to cause modal alerts during BeforeUnload dispatch.
-    if (page() && page()->isAnyFrameHandlingBeforeUnloadEvent()) {
-        printErrorMessage("Use of window.showModalDialog is not allowed during beforeunload event dispatch.");
+    auto* page = m_frame->page();
+    if (!page)
+        return;
+
+    if (!page->arePromptsAllowed()) {
+        printErrorMessage("Use of window.showModalDialog is not allowed while unloading a page.");
         return;
     }
 

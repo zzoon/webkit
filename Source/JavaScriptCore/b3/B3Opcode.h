@@ -69,7 +69,7 @@ enum Opcode : int16_t {
     Add,
     Sub,
     Mul,
-    Div,
+    Div, // All bets are off as to what will happen when you execute this for -2^31/-1 and x/0.
 
     // Integer math.
     ChillDiv, // doesn't trap ever, behaves like JS (x/y)|0.
@@ -133,7 +133,7 @@ enum Opcode : int16_t {
     Store,
 
     // This is a regular ordinary C function call, using the system C calling convention. Make sure
-    // that the arguments are passed using the right types.
+    // that the arguments are passed using the right types. The first argument is the callee.
     CCall,
 
     // This is a patchpoint. Use the PatchpointValue class. This is viewed as behaving like a call,
@@ -208,6 +208,13 @@ inline bool isCheckMath(Opcode opcode)
 }
 
 Optional<Opcode> invertedCompare(Opcode, Type);
+
+inline Opcode constPtrOpcode()
+{
+    if (is64Bit())
+        return Const64;
+    return Const32;
+}
 
 } } // namespace JSC::B3
 

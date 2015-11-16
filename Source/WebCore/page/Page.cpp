@@ -180,7 +180,6 @@ Page::Page(PageConfiguration& pageConfiguration)
     , m_muted(false)
     , m_pageScaleFactor(1)
     , m_zoomedOutPageScaleFactor(0)
-    , m_deviceScaleFactor(1)
     , m_topContentInset(0)
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     , m_textAutosizingWidth(0)
@@ -215,7 +214,7 @@ Page::Page(PageConfiguration& pageConfiguration)
     , m_inspectorDebuggable(std::make_unique<PageDebuggable>(*this))
 #endif
     , m_lastSpatialNavigationCandidatesCount(0) // NOTE: Only called from Internals for Spatial Navigation testing.
-    , m_framesHandlingBeforeUnloadEvent(0)
+    , m_forbidPromptsDepth(0)
     , m_applicationCacheStorage(pageConfiguration.applicationCacheStorage ? *WTF::move(pageConfiguration.applicationCacheStorage) : ApplicationCacheStorage::singleton())
     , m_databaseProvider(*WTF::move(pageConfiguration.databaseProvider))
     , m_storageNamespaceProvider(*WTF::move(pageConfiguration.storageNamespaceProvider))
@@ -1394,6 +1393,16 @@ void Page::setRemoteInspectionAllowed(bool allowed)
     m_inspectorDebuggable->setRemoteDebuggingAllowed(allowed);
 }
 
+String Page::remoteInspectionNameOverride() const
+{
+    return m_inspectorDebuggable->nameOverride();
+}
+
+void Page::setRemoteInspectionNameOverride(const String& name)
+{
+    m_inspectorDebuggable->setNameOverride(name);
+}
+
 void Page::remoteInspectorInformationDidChange() const
 {
     m_inspectorDebuggable->update();
@@ -1613,20 +1622,20 @@ void Page::captionPreferencesChanged()
 }
 #endif
 
-void Page::incrementFrameHandlingBeforeUnloadEventCount()
+void Page::forbidPrompts()
 {
-    ++m_framesHandlingBeforeUnloadEvent;
+    ++m_forbidPromptsDepth;
 }
 
-void Page::decrementFrameHandlingBeforeUnloadEventCount()
+void Page::allowPrompts()
 {
-    ASSERT(m_framesHandlingBeforeUnloadEvent);
-    --m_framesHandlingBeforeUnloadEvent;
+    ASSERT(m_forbidPromptsDepth);
+    --m_forbidPromptsDepth;
 }
 
-bool Page::isAnyFrameHandlingBeforeUnloadEvent()
+bool Page::arePromptsAllowed()
 {
-    return m_framesHandlingBeforeUnloadEvent;
+    return !m_forbidPromptsDepth;
 }
 
 void Page::setUserContentController(UserContentController* userContentController)
@@ -1723,6 +1732,16 @@ void Page::showPlaybackTargetPicker(uint64_t contextId, const WebCore::IntPoint&
 void Page::playbackTargetPickerClientStateDidChange(uint64_t contextId, MediaProducer::MediaStateFlags state)
 {
     chrome().client().playbackTargetPickerClientStateDidChange(contextId, state);
+}
+
+void Page::setMockMediaPlaybackTargetPickerEnabled(bool enabled)
+{
+    chrome().client().setMockMediaPlaybackTargetPickerEnabled(enabled);
+}
+
+void Page::setMockMediaPlaybackTargetPickerState(const String& name, MediaPlaybackTargetContext::State state)
+{
+    chrome().client().setMockMediaPlaybackTargetPickerState(name, state);
 }
 
 void Page::setPlaybackTarget(uint64_t contextId, Ref<MediaPlaybackTarget>&& target)
