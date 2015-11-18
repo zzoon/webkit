@@ -56,10 +56,10 @@
 #include "Document.h"
 #include "Frame.h"
 #include "JSDOMWindow.h"
+#include "SDPProcessorScriptResource.h"
 #include "ScriptController.h"
 #include "ScriptGlobalObject.h"
 #include "ScriptSourceCode.h"
-#include "SDPScriptResource.h"
 #include <bindings/ScriptObject.h>
 
 namespace WebCore {
@@ -970,7 +970,7 @@ String MediaEndpointPeerConnection::sdpConversion(const String& functionName, co
     JSC::JSValue probeFunctionValue = globalObject->get(exec, JSC::Identifier::fromString(exec, "toSDP"));
     if (!probeFunctionValue.isFunction()) {
         URL scriptURL;
-        scriptController.evaluateInWorld(ScriptSourceCode(SDPScriptResource::getString(), scriptURL), *m_isolatedWorld);
+        scriptController.evaluateInWorld(ScriptSourceCode(SDPProcessorScriptResource::scriptString(), scriptURL), *m_isolatedWorld);
         if (exec->hadException()) {
             exec->clearException();
             return emptyString();
