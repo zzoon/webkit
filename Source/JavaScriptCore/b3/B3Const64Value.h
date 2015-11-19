@@ -48,6 +48,7 @@ public:
     Value* checkAddConstant(Procedure&, const Value* other) const override;
     Value* checkSubConstant(Procedure&, const Value* other) const override;
     Value* checkMulConstant(Procedure&, const Value* other) const override;
+    Value* checkNegConstant(Procedure&) const override;
     Value* divConstant(Procedure&, const Value* other) const override;
     Value* bitAndConstant(Procedure&, const Value* other) const override;
     Value* bitOrConstant(Procedure&, const Value* other) const override;
@@ -55,6 +56,7 @@ public:
     Value* shlConstant(Procedure&, const Value* other) const override;
     Value* sShrConstant(Procedure&, const Value* other) const override;
     Value* zShrConstant(Procedure&, const Value* other) const override;
+    Value* bitwiseCastConstant(Procedure&) const override;
 
     TriState equalConstant(const Value* other) const override;
     TriState notEqualConstant(const Value* other) const override;

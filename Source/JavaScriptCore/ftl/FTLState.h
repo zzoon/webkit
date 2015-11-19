@@ -28,9 +28,10 @@
 
 #if ENABLE(FTL_JIT)
 
+#include "B3Procedure.h"
 #include "DFGCommon.h"
 #include "DFGGraph.h"
-#include "FTLAbbreviations.h"
+#include "FTLAbbreviatedTypes.h"
 #include "FTLGeneratedFunction.h"
 #include "FTLInlineCacheDescriptor.h"
 #include "FTLJITCode.h"
@@ -64,6 +65,9 @@ public:
     // None of these things is owned by State. It is the responsibility of
     // FTL phases to properly manage the lifecycle of the module and function.
     DFG::Graph& graph;
+#if FTL_USES_B3
+    std::unique_ptr<B3::Procedure> proc;
+#endif
     LContext context;
     LModule module;
     LValue function;
@@ -71,11 +75,19 @@ public:
     RefPtr<JITCode> jitCode;
     GeneratedFunction generatedFunction;
     JITFinalizer* finalizer;
-    unsigned handleStackOverflowExceptionStackmapID;
-    unsigned handleExceptionStackmapID;
-    unsigned capturedStackmapID;
-    unsigned varargsSpillSlotsStackmapID;
-    unsigned exceptionHandlingSpillSlotStackmapID;
+#if FTL_USES_B3
+    LValue handleStackOverflowExceptionValue { nullptr };
+    LValue handleExceptionValue { nullptr };
+    LValue capturedValue { nullptr };
+    LValue varargsSpillSlotsValue { nullptr };
+    LValue exceptionHandlingSpillSlotValue { nullptr };
+#else // FTL_USES_B3
+    unsigned handleStackOverflowExceptionStackmapID { UINT_MAX };
+    unsigned handleExceptionStackmapID { UINT_MAX };
+    unsigned capturedStackmapID { UINT_MAX };
+    unsigned varargsSpillSlotsStackmapID { UINT_MAX };
+    unsigned exceptionHandlingSpillSlotStackmapID { UINT_MAX };
+#endif // FTL_USE_B3
     SegmentedVector<GetByIdDescriptor> getByIds;
     SegmentedVector<PutByIdDescriptor> putByIds;
     SegmentedVector<CheckInDescriptor> checkIns;

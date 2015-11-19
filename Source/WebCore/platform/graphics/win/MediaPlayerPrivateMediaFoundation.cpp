@@ -90,6 +90,8 @@ static const GUID MFSamplePresenterSampleCounter =
 static const GUID MFSamplePresenterSampleSwapChain =
 { 0x24a2e076, 0x3673, 0x433d, { 0x87, 0x4, 0x55, 0x2b, 0x1f, 0x5c, 0x16, 0x8c } };
 
+static const double tenMegahertz = 10000000;
+
 namespace WebCore {
 
 MediaPlayerPrivateMediaFoundation::MediaPlayerPrivateMediaFoundation(MediaPlayer* player) 
@@ -207,7 +209,6 @@ bool MediaPlayerPrivateMediaFoundation::seeking() const
 
 void MediaPlayerPrivateMediaFoundation::seekDouble(double time)
 {
-    const double tenMegahertz = 10000000;
     PROPVARIANT propVariant;
     PropVariantInit(&propVariant);
     propVariant.vt = VT_I8;
@@ -220,7 +221,6 @@ void MediaPlayerPrivateMediaFoundation::seekDouble(double time)
 
 double MediaPlayerPrivateMediaFoundation::durationDouble() const
 {
-    const double tenMegahertz = 10000000;
     if (!m_mediaSource)
         return 0;
 
@@ -234,6 +234,14 @@ double MediaPlayerPrivateMediaFoundation::durationDouble() const
     descriptor->Release();
     
     return static_cast<double>(duration) / tenMegahertz;
+}
+
+float MediaPlayerPrivateMediaFoundation::currentTime() const
+{
+    if (!m_presenter)
+        return 0.0f;
+
+    return m_presenter->currentTime();
 }
 
 bool MediaPlayerPrivateMediaFoundation::paused() const
@@ -1258,6 +1266,22 @@ void MediaPlayerPrivateMediaFoundation::CustomVideoPresenter::paintCurrentFrame(
         m_presenterEngine->paintCurrentFrame(context, r);
 }
 
+float MediaPlayerPrivateMediaFoundation::CustomVideoPresenter::currentTime()
+{
+    if (!m_clock)
+        return 0.0f;
+
+    LONGLONG clockTime;
+    MFTIME systemTime;
+    HRESULT hr = m_clock->GetCorrelatedTime(0, &clockTime, &systemTime);
+
+    if (FAILED(hr))
+        return 0.0f;
+
+    // clockTime is in 100 nanoseconds, we need to convert to seconds.
+    return clockTime / tenMegahertz;
+}
+
 bool MediaPlayerPrivateMediaFoundation::CustomVideoPresenter::isActive() const
 {
     return ((m_renderState == RenderStateStarted) || (m_renderState == RenderStatePaused));
@@ -2164,6 +2188,13 @@ HRESULT MediaPlayerPrivateMediaFoundation::VideoScheduler::stopScheduler()
     if (!m_schedulerThread.isValid())
         return S_OK;
 
+    {
+        // Clearing the sample queue before we post the thread terminate message will make sure
+        // the thread exits quickly, and we will not be stuck waiting for it to finish.
+        LockHolder locker(m_lock);
+        m_scheduledSamples.clear();
+    }
+
     // Terminate the scheduler thread
     ::PostThreadMessage(m_threadID, EventTerminate, 0, 0);
 
@@ -2174,9 +2205,6 @@ HRESULT MediaPlayerPrivateMediaFoundation::VideoScheduler::stopScheduler()
 
     m_schedulerThread.clear();
     m_flushEvent.clear();
-
-    // Throw away samples
-    m_scheduledSamples.clear();
 
     // Clear previously set timer resolution.
     timeEndPeriod(1);

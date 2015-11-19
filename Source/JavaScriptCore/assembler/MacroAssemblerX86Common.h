@@ -1458,7 +1458,7 @@ public:
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
     
-    Jump branchMul32(ResultCondition cond, TrustedImm32 imm, RegisterID src, RegisterID dest)
+    Jump branchMul32(ResultCondition cond, RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
         mul32(imm, src, dest);
         if (cond != Overflow)
@@ -1609,6 +1609,11 @@ public:
     {
         m_assembler.testl_rr(reg, mask);
         set32(x86Condition(cond), dest);
+    }
+
+    void setCarry(RegisterID dest)
+    {
+        set32(X86Assembler::ConditionC, dest);
     }
 
     // Invert a relational condition, e.g. == becomes !=, < becomes >=, etc.

@@ -78,6 +78,10 @@ Add64 U:G, UD:G
 Add64 U:G, U:G, D:G
     Imm, Tmp, Tmp
 
+AddDouble U:F, UD:F
+    Tmp, Tmp
+    Addr, Tmp
+
 Sub32 U:G, UD:G
     Tmp, Tmp
     Imm, Addr
@@ -88,6 +92,10 @@ Sub32 U:G, UD:G
 Sub64 U:G, UD:G
     Tmp, Tmp
     Imm, Tmp
+
+SubDouble U:F, UD:F
+    Tmp, Tmp
+    Addr, Tmp
 
 Neg32 UD:G
     Tmp
@@ -105,6 +113,14 @@ Mul32 U:G, U:G, D:G
 
 Mul64 U:G, UD:G
     Tmp, Tmp
+
+MulDouble U:F, UD:F
+    Tmp, Tmp
+    Addr, Tmp
+
+DivDouble U:F, UD:F
+    Tmp, Tmp
+    Addr, Tmp
 
 X86ConvertToDoubleWord32 U:G, D:G
     Tmp*, Tmp*
@@ -131,10 +147,6 @@ And32 U:G, UD:G
 And64 U:G, UD:G
     Tmp, Tmp
     Imm, Tmp
-
-AddDouble U:F, UD:F
-    Tmp, Tmp
-    Addr, Tmp
 
 Lshift32 U:G, UD:G
     Tmp*, Tmp
@@ -225,9 +237,11 @@ MoveZeroToDouble D:F
 
 Move64ToDouble U:G, D:F
     Tmp, Tmp
+    Addr, Tmp as loadDouble
 
 MoveDoubleTo64 U:F, D:G
     Tmp, Tmp
+    Addr, Tmp as load64
 
 Load8 U:G, D:G
     Addr, Tmp
@@ -260,6 +274,9 @@ Test32 U:G, U:G, U:G, D:G
 Test64 U:G, U:G, U:G, D:G
     ResCond, Tmp, Imm, Tmp
     ResCond, Tmp, Tmp, Tmp
+
+# Note that branches have some logic in AirOptimizeBlockOrder.cpp. If you add new branches, please make sure
+# you opt them into the block order optimizations.
 
 Branch8 U:G, U:G, U:G /branch
     RelCond, Addr, Imm
@@ -316,14 +333,8 @@ BranchMul32 U:G, U:G, UD:G /branch
     ResCond, Tmp, Tmp
     ResCond, Addr, Tmp
 
-BranchMul32 U:G, U:G, U:G, D:G /branch
-    ResCond, Tmp, Tmp, Tmp
-
 BranchMul64 U:G, U:G, UD:G /branch
     ResCond, Tmp, Tmp
-
-BranchMul64 U:G, U:G, U:G, D:G /branch
-    ResCond, Tmp, Tmp, Tmp
 
 BranchSub32 U:G, U:G, UD:G /branch
     ResCond, Tmp, Tmp

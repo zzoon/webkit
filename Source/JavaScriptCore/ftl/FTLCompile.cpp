@@ -28,7 +28,7 @@
 #include "config.h"
 #include "FTLCompile.h"
 
-#if ENABLE(FTL_JIT)
+#if ENABLE(FTL_JIT) && !FTL_USES_B3
 
 #include "CodeBlockWithJITType.h"
 #include "CCallHelpers.h"
@@ -462,6 +462,7 @@ static void generateArithSubICFastPath(
         context.initializeRegisters(fastPathJIT);
         gen.generateFastPath(fastPathJIT);
 
+        ASSERT(gen.didEmitFastPath());
         gen.endJumpList().link(&fastPathJIT);
         context.restoreRegisters(fastPathJIT);
         allocator.restoreReusedRegistersByPopping(fastPathJIT, numberOfBytesUsedToPreserveReusedRegisters,
@@ -922,10 +923,6 @@ static void fixFunctionBasedOnStackMaps(
             for (unsigned i = 0; i < iter->value.size(); ++i) {
                 StackMaps::Record& record = iter->value[i].record;
                 RegisterSet usedRegisters = usedRegistersFor(record);
-                Vector<Location> locations;
-                for (auto location : record.locations)
-                    locations.append(Location::forStackmaps(&stackmaps, location));
-
                 char* startOfIC =
                     bitwise_cast<char*>(generatedFunction) + record.instructionOffset;
                 CodeLocationLabel patchpoint((MacroAssemblerCodePtr(startOfIC)));
@@ -933,9 +930,28 @@ static void fixFunctionBasedOnStackMaps(
                 if (!exceptionTarget)
                     exceptionTarget = state.finalizer->handleExceptionsLinkBuffer->entrypoint();
 
+                ScratchRegisterAllocator scratchAllocator(usedRegisters);
+                GPRReg newZero = InvalidGPRReg;
+                Vector<Location> locations;
+                for (auto stackmapLocation : record.locations) {
+                    FTL::Location location = Location::forStackmaps(&stackmaps, stackmapLocation);
+                    if (isARM64()) {
+                        // If LLVM proves that something is zero, it may pass us the zero register (aka, the stack pointer). Our assembler
+                        // isn't prepared to handle this well. We need to move it into a different register if such a case arises.
+                        if (location.isGPR() && location.gpr() == MacroAssembler::stackPointerRegister) {
+                            if (newZero == InvalidGPRReg) {
+                                newZero = scratchAllocator.allocateScratchGPR();
+                                usedRegisters.set(newZero);
+                            }
+                            location = FTL::Location::forRegister(DWARFRegister(static_cast<uint16_t>(newZero)), 0); // DWARF GPRs for arm64 are sensibly numbered.
+                        }
+                    }
+                    locations.append(location);
+                }
+
                 std::unique_ptr<LazySlowPath> lazySlowPath = std::make_unique<LazySlowPath>(
                     patchpoint, exceptionTarget, usedRegisters, exceptionHandlerManager.procureCallSiteIndex(iter->value[i].index, codeOrigin),
-                    descriptor.m_linker->run(locations));
+                    descriptor.m_linker->run(locations), newZero, scratchAllocator);
 
                 CCallHelpers::Label begin = slowPathJIT.label();
 
@@ -1303,5 +1319,5 @@ void compile(State& state, Safepoint::Result& safepointResult)
 
 } } // namespace JSC::FTL
 
-#endif // ENABLE(FTL_JIT)
+#endif // ENABLE(FTL_JIT) && FTL_USES_B3
 

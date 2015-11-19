@@ -1,3 +1,313 @@
+2015-11-19  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Convert remaining timeline views to use View base class
+        https://bugs.webkit.org/show_bug.cgi?id=151410
+
+        Reviewed by Timothy Hatcher.
+
+        Converted timeline views to use View base class. Mostly mechanical
+        changes (override View.prototype.layout, use let in more places).
+
+        * UserInterface/Views/LayoutTimelineOverviewGraph.js:
+        (WebInspector.LayoutTimelineOverviewGraph.prototype.layout):
+        (WebInspector.LayoutTimelineOverviewGraph.prototype.updateLayout): Deleted.
+
+        * UserInterface/Views/NetworkTimelineOverviewGraph.js:
+        (WebInspector.NetworkTimelineOverviewGraph.prototype.layout.createBar):
+        (WebInspector.NetworkTimelineOverviewGraph.prototype.layout):
+        (WebInspector.NetworkTimelineOverviewGraph.prototype.updateLayout.createBar): Deleted.
+        (WebInspector.NetworkTimelineOverviewGraph.prototype.updateLayout): Deleted.
+
+        * UserInterface/Views/RenderingFrameTimelineOverviewGraph.js:
+        (WebInspector.RenderingFrameTimelineOverviewGraph.prototype.layout):
+        (WebInspector.RenderingFrameTimelineOverviewGraph.prototype.updateLayout): Deleted.
+
+        * UserInterface/Views/ScriptTimelineOverviewGraph.js:
+        (WebInspector.ScriptTimelineOverviewGraph.prototype.layout.createBar):
+        (WebInspector.ScriptTimelineOverviewGraph.prototype.layout):
+        (WebInspector.ScriptTimelineOverviewGraph.prototype.updateLayout.createBar): Deleted.
+        (WebInspector.ScriptTimelineOverviewGraph.prototype.updateLayout): Deleted.
+
+        * UserInterface/Views/TimelineOverview.js:
+        Extend View.
+        (WebInspector.TimelineOverview):
+        Add ruler as a subview.
+        (WebInspector.TimelineOverview.prototype.set startTime):
+        (WebInspector.TimelineOverview.prototype.set currentTime):
+        (WebInspector.TimelineOverview.prototype.set secondsPerPixel):
+        (WebInspector.TimelineOverview.prototype.set endTime):
+        (WebInspector.TimelineOverview.prototype.set scrollStartTime):
+        (WebInspector.TimelineOverview.prototype.updateLayoutIfNeeded):
+        (WebInspector.TimelineOverview.prototype.get timelineRuler):
+        (WebInspector.TimelineOverview.prototype.canShowTimeline):
+        (WebInspector.TimelineOverview.prototype.layout):
+        (WebInspector.TimelineOverview.prototype._handleWheelEvent):
+        (WebInspector.TimelineOverview._handleGestureStart):
+        (WebInspector.TimelineOverview.prototype._handleGestureChange):
+        (WebInspector.TimelineOverview.prototype._timelineAdded):
+        (WebInspector.TimelineOverview.prototype._timelineRemoved):
+        (WebInspector.TimelineOverview.prototype.get element): Deleted.
+        (WebInspector.TimelineOverview.prototype.updateLayout): Deleted.
+
+        * UserInterface/Views/TimelineOverviewGraph.js:
+        Extend view.
+        (WebInspector.TimelineOverviewGraph):
+        (WebInspector.TimelineOverviewGraph.prototype.needsLayout):
+        (WebInspector.TimelineOverviewGraph.prototype._needsSelectedRecordLayout):
+        (WebInspector.TimelineOverviewGraph.prototype.updateLayout): Deleted.
+        (WebInspector.TimelineOverviewGraph.prototype.updateLayoutIfNeeded): Deleted.
+        (WebInspector.TimelineOverviewGraph.prototype._needsSelectedRecordLayout.update): Deleted.
+
+        * UserInterface/Views/TimelineRecordingContentView.js:
+        (WebInspector.TimelineRecordingContentView):
+        Add overview as a subview.
+        (WebInspector.TimelineRecordingContentView.prototype._currentContentViewDidChange):
+        Use View.prototype.replaceSubview to swap overview graphs.
+
+2015-11-18  Brian Burg  <bburg@apple.com>
+
+        Web Inspector: Storage tab shouldn't hide cookies for .example.com when inspected page is foo.bar.example.com
+        https://bugs.webkit.org/show_bug.cgi?id=151408
+
+        Reviewed by Timothy Hatcher.
+
+        The regex should allow multiple subdomains to match a cookie for domain .example.com.
+
+        Test: inspector/page/filter-cookies-for-domain.html
+
+        * UserInterface/Models/CookieStorageObject.js:
+        (WebInspector.CookieStorageObject.cookieDomainMatchesResourceDomain):
+
+            Also make the group non-capturing. We don't use the match.
+
+        (WebInspector.CookieStorageObject.prototype.saveIdentityToCookie):
+        (WebInspector.CookieStorageObject):
+        * UserInterface/Test.html:
+
+2015-11-18  Brian Burg  <bburg@apple.com>
+
+        Web Inspector: move cookie url matching out of CookieStorageContentView and clean up some code
+        https://bugs.webkit.org/show_bug.cgi?id=151424
+
+        Reviewed by Timothy Hatcher.
+
+        Move the code that decides whether a cookie matches a resource URL to a model class.
+        This will make it possible to test this code easily without pulling Views into tests.
+
+        * UserInterface/Models/CookieStorageObject.js:
+        (WebInspector.CookieStorageObject.cookieMatchesResourceURL):
+        (WebInspector.CookieStorageObject.cookieDomainMatchesResourceDomain):
+        (WebInspector.CookieStorageObject.prototype.saveIdentityToCookie):
+        (WebInspector.CookieStorageObject):
+        * UserInterface/Views/CookieStorageContentView.js:
+        (WebInspector.CookieStorageContentView.prototype.update): use Promises.
+        (WebInspector.CookieStorageContentView.prototype._rebuildTable):
+        (WebInspector.CookieStorageContentView.prototype._filterCookies):
+
+            Use Array.filter() and Array.some() to express this logic more directly.
+
+        (WebInspector.CookieStorageContentView.cookieMatchesResourceURL): Deleted.
+        (WebInspector.CookieStorageContentView.cookieDomainMatchesResourceDomain): Deleted.
+        (WebInspector.CookieStorageContentView.prototype.update.callback): Deleted.
+
+2015-11-18  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Clear watch expressions button using wrong icon
+        https://bugs.webkit.org/show_bug.cgi?id=151422
+
+        Reviewed by Timothy Hatcher.
+
+        Updated "clear" button to use trashcan image. This was broken by
+        https://bugs.webkit.org/show_bug.cgi?id=151377.
+
+        * UserInterface/Views/ScopeChainDetailsSidebarPanel.js:
+        (WebInspector.ScopeChainDetailsSidebarPanel):
+
+2015-11-18  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Reduce synchronous view layouts
+        https://bugs.webkit.org/show_bug.cgi?id=151058
+
+        Reviewed by Timothy Hatcher.
+
+        Replace calls to View.updateLayout with needsLayout, when a synchronous layout
+        isn't absolutely necessary.
+
+        * UserInterface/Models/BackForwardEntry.js:
+        (WebInspector.BackForwardEntry.prototype.prepareToShow):
+
+        * UserInterface/Views/ApplicationCacheFrameContentView.js:
+        (WebInspector.ApplicationCacheFrameContentView.prototype.updateLayout): Deleted.
+        View subclasses shouldn't override updateLayout.
+
+        * UserInterface/Views/ButtonNavigationItem.js:
+        (WebInspector.ButtonNavigationItem.prototype.set label):
+
+        * UserInterface/Views/ContentBrowser.js:
+        (WebInspector.ContentBrowser.prototype._contentViewSelectionPathComponentDidChange):
+        (WebInspector.ContentBrowser.prototype._currentContentViewDidChange):
+        (WebInspector.ContentBrowser.prototype._contentViewNavigationItemsDidChange):
+
+        * UserInterface/Views/DatabaseTableContentView.js:
+        (WebInspector.DatabaseTableContentView.prototype._queryFinished):
+        Just update DataGrid's layout, not the whole view. The grid is the only subview
+        so the result is identical, but the intent is cleared this way.
+        (WebInspector.DatabaseTableContentView.prototype.updateLayout): Deleted.
+        View subclasses shouldn't override updateLayout.
+
+        * UserInterface/Views/LogContentView.js:
+        (WebInspector.LogContentView.prototype.didAppendConsoleMessageView):
+        (WebInspector.LogContentView.prototype.promptDidChangeHeight): Deleted.
+        Unused code.
+
+        * UserInterface/Views/Sidebar.js:
+        (WebInspector.Sidebar.prototype.set width):
+        (WebInspector.Sidebar.prototype.set collapsed):
+
+        * UserInterface/Views/TextResourceContentView.js:
+        (WebInspector.TextResourceContentView.prototype._contentWillPopulate):
+        Add TextEditor as a subview.
+        (WebInspector.TextResourceContentView.prototype.updateLayout): Deleted.
+        View subclasses shouldn't override updateLayout.
+
+
+2015-11-18  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Probes sidebar panel sections should use NavigationBar
+        https://bugs.webkit.org/show_bug.cgi?id=151373
+
+        Reviewed by Brian Burg.
+
+        Replaces image elements with a NavigationBar instance. The "Clear samples"
+        button is disabled when no samples exist in the probe set.
+
+        * Localizations/en.lproj/localizedStrings.js:
+        New navigation item labels.
+
+        * UserInterface/Models/ProbeSet.js:
+        (WebInspector.ProbeSet.prototype._sampleCollected):
+        Dispatch new event WebInspector.ProbeSet.Event.SampleAdded.
+
+        * UserInterface/Views/DetailsSection.css:
+        (.details-section > .header > .options > .navigation-bar):
+        (.details-section > .header > .options > .navigation-bar > .item):
+        Define consistent style for showing a NavigationBar inside the section header.
+
+        * UserInterface/Views/DetailsSection.js:
+        (WebInspector.DetailsSection):
+        Add "options" class name in the base class.
+
+        * UserInterface/Views/ProbeDetailsSidebarPanel.css:
+        (.details-section.probe-set .options > :matches(.probe-remove, .probe-clear-samples, .probe-add)): Deleted.
+        (.details-section.probe-set .options > .probe-clear-samples): Deleted.
+        (.details-section.probe-set .options > .probe-remove): Deleted.
+        (.details-section.probe-set .options > .probe-add): Deleted.
+        Remove <img> button styles.
+
+        * UserInterface/Views/ProbeSetDetailsSection.js:
+        (WebInspector.ProbeSetDetailsSection):
+        (WebInspector.ProbeSetDetailsSection.prototype._addProbeButtonClicked.createProbeFromEnteredExpression):
+        (WebInspector.ProbeSetDetailsSection.prototype._addProbeButtonClicked):
+        (WebInspector.ProbeSetDetailsSection.prototype._clearSamplesButtonClicked):
+        (WebInspector.ProbeSetDetailsSection.prototype._probeSetSamplesChanged):
+        Update "Clear samples" enabled state.
+        (WebInspector.ProbeSetDetailsSection.prototype._probeSetHasSamples):
+        Helper function to check if the probe set is empty.
+
+2015-11-18  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Watch Expressions details section should use NavigationBar
+        https://bugs.webkit.org/show_bug.cgi?id=151377
+
+        Reviewed by Timothy Hatcher.
+
+        Replaces image elements with a NavigationBar instance. The refresh and 
+        clear buttons are disabled if no watch expressions exist.
+
+        * Localizations/en.lproj/localizedStrings.js:
+        New navigation item labels.
+
+        * UserInterface/Views/ScopeChainDetailsSidebarPanel.css:
+        (.details-section.watch-expressions .options > *): Deleted.
+        (.details-section.watch-expressions .options > *:active): Deleted.
+        (.details-section.watch-expressions .options > .watch-expression-add): Deleted.
+        (.details-section.watch-expressions .options > .watch-expression-clear): Deleted.
+        (.details-section.watch-expressions .options > .watch-expression-refresh): Deleted.
+        Remove <img> button styles.
+
+        * UserInterface/Views/ScopeChainDetailsSidebarPanel.js:
+        (WebInspector.ScopeChainDetailsSidebarPanel):
+        (WebInspector.ScopeChainDetailsSidebarPanel.prototype._addWatchExpressionButtonClicked.presentPopoverOverTargetElement):
+        Use the navigation item element.
+        (WebInspector.ScopeChainDetailsSidebarPanel.prototype._updateWatchExpressionsNavigationBar):
+        Enable/disable refresh and clear buttons.
+
+2015-11-17  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Move Timeline creation into a recording
+        https://bugs.webkit.org/show_bug.cgi?id=151367
+
+        Reviewed by Timothy Hatcher.
+
+        * UserInterface/Controllers/TimelineManager.js:
+        (WebInspector.TimelineManager.prototype._loadNewRecording): Deleted.
+        * UserInterface/Models/Timeline.js:
+        (WebInspector.Timeline.create):
+        (WebInspector.Timeline.prototype.get type):
+        (WebInspector.Timeline): Deleted.
+        (WebInspector.Timeline.prototype.get recording): Deleted.
+        * UserInterface/Models/TimelineRecording.js:
+        (WebInspector.TimelineRecording):
+        (WebInspector.TimelineRecording.prototype.get readonly):
+        (WebInspector.TimelineRecording.prototype.unloaded):
+        (WebInspector.TimelineRecording.prototype.reset):
+        (WebInspector.TimelineRecording.prototype.isWritable): Deleted.
+        * UserInterface/Views/TimelineOverview.js:
+        (WebInspector.TimelineOverview):
+        * UserInterface/Views/TimelineRecordingContentView.js:
+        (WebInspector.TimelineRecordingContentView.prototype.shown):
+
+2015-11-17  Matt Baker  <mattbaker@apple.com>
+
+        Web Inspector: Breakpoint condition field should use CodeMirror
+        https://bugs.webkit.org/show_bug.cgi?id=151333
+
+        Reviewed by Joseph Pecoraro.
+
+        Updated breakpoint popover's condition field to use CodeMirror.
+
+        * UserInterface/Controllers/BreakpointPopoverController.js:
+        Removed keyboard shortcuts. Now handled by CodeMirror.
+        (WebInspector.BreakpointPopoverController.prototype.completionControllerShouldAllowEscapeCompletion):
+        Prevent handling of escape to allow tabbing to next element.
+        (WebInspector.BreakpointPopoverController.prototype._createPopoverContent):
+        Create CodeMirror instance.
+        (WebInspector.BreakpointPopoverController.prototype._conditionCodeMirrorChanged):
+        (WebInspector.BreakpointPopoverController.prototype._conditionCodeMirrorBeforeChange):
+        Enforce single-line editor.
+        (WebInspector.BreakpointPopoverController.prototype._conditionCodeMirrorEscapeOrEnterKey):
+        (WebInspector.BreakpointPopoverController): Deleted.
+        (WebInspector.BreakpointPopoverController.prototype.appendContextMenuItems.editBreakpoint):
+        Removed condition element select. CodeMirror sets focus when popover content is created.
+        (WebInspector.BreakpointPopoverController.prototype._popoverConditionInputChanged): Deleted.
+        Replaced by BreakpointPopoverController.prototype._conditionCodeMirrorChanged.
+        (WebInspector.BreakpointPopoverController.prototype._popoverConditionInputKeyDown): Deleted.
+        Replaced by BreakpointPopoverController.prototype._conditionCodeMirrorEscapeOrEnterKey.
+
+        * UserInterface/Views/BreakpointPopoverController.css:
+        (.edit-breakpoint-popover-condition):
+        (.edit-breakpoint-popover-condition > .CodeMirror):
+        (#edit-breakpoint-popover-condition): Deleted.
+        Replace selector id with class, styled CodeMirror element to match original input element.
+
+        * UserInterface/Views/CSSStyleDeclarationTextEditor.css:
+        (.css-style-text-editor > .CodeMirror .CodeMirror-placeholder): Deleted.
+        Moved common CodeMirror placeholder text style to CodeMirrorOverrides.css.
+
+        * UserInterface/Views/CodeMirrorOverrides.css:
+        (.CodeMirror .CodeMirror-placeholder):
+        Add placeholder style.
+
 2015-11-12  Matt Baker  <mattbaker@apple.com>
 
         Web Inspector: Deleting a probe should remove probe breakpoint actions only.

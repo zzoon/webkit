@@ -280,6 +280,7 @@ webkit.org/b/150942 animations/multiple-backgrounds.html [ Pass ImageOnlyFailure
 
 webkit.org/b/151053 http/tests/security/cross-frame-access-put.html [ Pass Failure ]
 
+webkit.org/b/151326 [ Yosemite+ ] webarchive/loading/missing-data.html [ Pass Crash ]
 ### END OF (1) Classified failures with bug reports
 ########################################
 
@@ -349,6 +350,9 @@ webkit.org/b/139828 svg/animations/animateMotion-additive-2b.svg [ Pass ImageOnl
 webkit.org/b/142726 [ Yosemite ] fast/images/animated-png.html [ Skip ]
 
 [ Debug ] editing/undo/remove-css-property-and-remove-style.html [ Pass Failure ]
+
+# Test for WK1 only
+fast/dom/Window/property-access-on-cached-window-after-frame-removed.html [ Skip ]
 
 ### END OF (3) Unclassified failures
 ########################################
@@ -549,9 +553,6 @@ webkit.org/b/146400 http/tests/contentextensions/character-set-basic-support.htm
 # WebKit1-only failure.
 webkit.org/b/103857 fast/events/mouse-cursor-change.html [ Pass ]
 
-# HTMLMediaElement can not use a MediaStream as source.
-fast/mediastream/MediaStream-video-element.html [ Skip ]
-
 # Imported Blink tests which have not been investigated. Partially covered with rdar://problem/23023848.
 imported/blink/fast/media/empty-media-rule.html [ Pass ImageOnlyFailure ]
 imported/blink/fast/multicol/basic-rtl.html [ Pass ImageOnlyFailure ]
@@ -564,3 +565,6 @@ imported/blink/fast/transforms/transform-update-frame-overflow.html [ Pass Image
 imported/blink/fast/multicol/vertical-rl/float-big-line.html [ Pass ImageOnlyFailure ]
 imported/blink/fast/multicol/span/adjacent-spanners-with-margin.html [ Pass ImageOnlyFailure ]
 imported/blink/fast/overflow/hidden-html-auto-body.html [ Pass ImageOnlyFailure ]
+
+webkit.org/b/151304 [ Debug ] fast/mediastream/RTCPeerConnection-overloaded-operations-params.html [ Pass Crash ]
+webkit.org/b/151304 [ Debug ] fast/mediastream/RTCPeerConnection-overloaded-operations.html [ Pass Crash ]

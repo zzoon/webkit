@@ -157,6 +157,20 @@ RefPtr<WebCore::IDBObjectStore> IDBTransaction::objectStore(const String& object
     return adoptRef(&objectStore.leakRef());
 }
 
+void IDBTransaction::immediateAbort()
+{
+    LOG(IndexedDB, "IDBTransaction::immediateAbort");
+
+    if (isFinishedOrFinishing())
+        return;
+
+    m_state = IndexedDB::TransactionState::Aborting;
+    m_database->willAbortTransaction(*this);
+
+    auto operation = createTransactionOperation(*this, nullptr, &IDBTransaction::abortOnServer);
+    abortOnServer(*operation);
+}
+
 void IDBTransaction::abort(ExceptionCode& ec)
 {
     LOG(IndexedDB, "IDBTransaction::abort");
@@ -211,7 +225,6 @@ bool IDBTransaction::isFinishedOrFinishing() const
 
 void IDBTransaction::addRequest(IDBRequest& request)
 {
-    ASSERT(!m_openRequests.contains(&request));
     m_openRequests.add(&request);
 }
 
@@ -239,7 +252,7 @@ void IDBTransaction::scheduleOperationTimer()
 
 void IDBTransaction::operationTimerFired()
 {
-    LOG(IndexedDB, "IDBTransaction::operationTimerFired");
+    LOG(IndexedDB, "IDBTransaction::operationTimerFired (%p)", this);
 
     if (!m_startedOnServer)
         return;
@@ -430,7 +443,11 @@ void IDBTransaction::didCreateIndexOnServer(const IDBResultData& resultData)
 {
     LOG(IndexedDB, "IDBTransaction::didCreateIndexOnServer");
 
-    ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::CreateIndexSuccess);
+    if (resultData.type() == IDBResultType::CreateIndexSuccess)
+        return;
+
+    // If index creation failed, the transaction is aborted.
+    immediateAbort();
 }
 
 Ref<IDBRequest> IDBTransaction::requestOpenCursor(ScriptExecutionContext& context, IDBObjectStore& objectStore, const IDBCursorInfo& info)

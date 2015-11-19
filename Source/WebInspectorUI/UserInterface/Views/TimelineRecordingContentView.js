@@ -47,8 +47,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
 
         this._currentTimelineOverview = this._linearTimelineOverview;
 
-        // FIXME: use View.prototype.addSubview once <https://webkit.org/b/149190> is fixed.
-        this.element.appendChild(this._currentTimelineOverview.element);
+        this.addSubview(this._currentTimelineOverview);
 
         this._contentViewContainer = new WebInspector.ContentViewContainer;
         this._contentViewContainer.addEventListener(WebInspector.ContentViewContainer.Event.CurrentContentViewDidChange, this._currentContentViewDidChange, this);
@@ -164,7 +163,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
     {
         this._currentTimelineOverview.shown();
         this._contentViewContainer.shown();
-        this._clearTimelineNavigationItem.enabled = this._recording.isWritable();
+        this._clearTimelineNavigationItem.enabled = !this._recording.readonly;
 
         this._currentContentViewDidChange();
 
@@ -341,9 +340,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         if (newTimelineOverview !== this._currentTimelineOverview) {
             this._currentTimelineOverview.hidden();
 
-            // FIXME: use View.prototype.replaceSubview once <https://webkit.org/b/149190> is fixed.
-            this.element.insertBefore(newTimelineOverview.element, this._currentTimelineOverview.element);
-            this.element.removeChild(this._currentTimelineOverview.element);
+            this.replaceSubview(this._currentTimelineOverview, newTimelineOverview);
 
             this._currentTimelineOverview = newTimelineOverview;
             this._currentTimelineOverview.shown();

@@ -3232,7 +3232,6 @@ webkit.org/b/148888 http/tests/navigation/slowmetaredirect-basic.html [ Pass Fai
 # Imported Blink tests.
 imported/blink/compositing/iframes/ancestor-clipping-layer.html [ Skip ]
 imported/blink/compositing/perspective-origin-overflow-hidden.html [ Skip ]
-imported/blink/editing/execCommand/indent-button-crash.html [ Skip ]
 imported/blink/http/tests/plugins/get-url-notify-on-removal.html [ Skip ]
 imported/blink/plugins/empty-per-context-data.html [ Skip ]
 imported/blink/animations/animation-iteration-event-short-iterations.html [ Failure Pass ]
@@ -3302,8 +3301,5 @@ webkit.org/b/147933 streams/reference-implementation/writable-stream-abort.html 
 webkit.org/b/147933 streams/reference-implementation/count-queuing-strategy.html [ Pass Failure ]
 
 webkit.org/b/150946 [ Debug ] scrollbars/custom-scrollbar-appearance-property.html [ Crash ]
-
-# HTMLMediaElement can not use a MediaStream as source.
-fast/mediastream/MediaStream-video-element.html [ Skip ]
 
 webkit.org/b/150948 [ Debug ] imported/blink/transitions/unprefixed-transform.html [ Pass Failure ]

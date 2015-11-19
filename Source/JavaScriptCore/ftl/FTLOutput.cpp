@@ -24,14 +24,17 @@
  */
 
 #include "config.h"
+
+#include "DFGCommon.h"
 #include "FTLOutput.h"
 
 #if ENABLE(FTL_JIT)
+#if !FTL_USES_B3
 
 namespace JSC { namespace FTL {
 
-Output::Output(LContext context)
-    : IntrinsicRepository(context)
+Output::Output(State& state)
+    : IntrinsicRepository(state.context)
     , m_function(0)
     , m_heaps(0)
     , m_builder(llvm->CreateBuilderInContext(m_context))
@@ -76,6 +79,7 @@ LValue Output::sensibleDoubleToInt(LValue value)
 {
     RELEASE_ASSERT(isX86());
     return call(
+        int32,
         x86SSE2CvtTSD2SIIntrinsic(),
         insertElement(
             insertElement(getUndef(vectorType(doubleType, 2)), value, int32Zero),
@@ -91,6 +95,8 @@ LValue Output::load(TypedPointer pointer, LType refType)
 
 void Output::store(LValue value, TypedPointer pointer, LType refType)
 {
+    if (refType == refFloat)
+        value = buildFPCast(m_builder, value, floatType);
     LValue result = set(value, intToPtr(pointer.value(), refType));
     pointer.heap().decorateInstruction(result, *m_heaps);
 }
@@ -152,5 +158,6 @@ void Output::check(LValue condition, WeightedTarget taken)
 
 } } // namespace JSC::FTL
 
+#endif // !FTL_USES_B3
 #endif // ENABLE(FTL_JIT)
 

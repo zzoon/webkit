@@ -42,8 +42,10 @@
 #include "InitializeThreading.h"
 #include "JSCInlines.h"
 #include "LinkBuffer.h"
+#include "PureNaN.h"
 #include "VM.h"
 #include <cmath>
+#include <string>
 #include <wtf/Lock.h>
 #include <wtf/NumberOfCores.h>
 #include <wtf/Threading.h>
@@ -295,12 +297,58 @@ void testMulArg(int a)
 {
     Procedure proc;
     BasicBlock* root = proc.addBlock();
-    Value* value = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* value = root->appendNew<Value>(
+        proc, Trunc, Origin(), root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
     root->appendNew<ControlValue>(
         proc, Return, Origin(),
         root->appendNew<Value>(proc, Mul, Origin(), value, value));
 
     CHECK(compileAndRun<int>(proc, a) == a * a);
+}
+
+void testMulArgStore(int a)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+
+    int mulSlot;
+    int valueSlot;
+    
+    Value* value = root->appendNew<Value>(
+        proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* mul = root->appendNew<Value>(proc, Mul, Origin(), value, value);
+
+    root->appendNew<MemoryValue>(
+        proc, Store, Origin(), value,
+        root->appendNew<ConstPtrValue>(proc, Origin(), &valueSlot));
+    root->appendNew<MemoryValue>(
+        proc, Store, Origin(), mul,
+        root->appendNew<ConstPtrValue>(proc, Origin(), &mulSlot));
+
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(), root->appendNew<Const32Value>(proc, Origin(), 0));
+
+    CHECK(!compileAndRun<int>(proc, a));
+    CHECK(mulSlot == a * a);
+    CHECK(valueSlot == a);
+}
+
+void testMulAddArg(int a)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* value = root->appendNew<Value>(
+        proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(
+            proc, Add, Origin(),
+            root->appendNew<Value>(proc, Mul, Origin(), value, value),
+            value));
+
+    CHECK(compileAndRun<int>(proc, a) == a * a + a);
 }
 
 void testMulArgs(int a, int b)
@@ -382,6 +430,134 @@ void testMulLoadTwice()
 
     test(0);
     test(1);
+}
+
+void testMulArgDouble(double a)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* value = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Mul, Origin(), value, value));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a), a * a));
+}
+
+void testMulArgsDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* valueB = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR1);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Mul, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a, b), a * b));
+}
+
+void testMulArgImmDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* valueB = root->appendNew<ConstDoubleValue>(proc, Origin(), b);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Mul, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a), a * b));
+}
+
+void testMulImmArgDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ConstDoubleValue>(proc, Origin(), a);
+    Value* valueB = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Mul, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, b), a * b));
+}
+
+void testMulImmsDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ConstDoubleValue>(proc, Origin(), a);
+    Value* valueB = root->appendNew<ConstDoubleValue>(proc, Origin(), b);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Mul, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc), a * b));
+}
+
+void testDivArgDouble(double a)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* value = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Div, Origin(), value, value));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a), a / a));
+}
+
+void testDivArgsDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* valueB = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR1);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Div, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a, b), a / b));
+}
+
+void testDivArgImmDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* valueB = root->appendNew<ConstDoubleValue>(proc, Origin(), b);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Div, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a), a / b));
+}
+
+void testDivImmArgDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ConstDoubleValue>(proc, Origin(), a);
+    Value* valueB = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Div, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, b), a / b));
+}
+
+void testDivImmsDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ConstDoubleValue>(proc, Origin(), a);
+    Value* valueB = root->appendNew<ConstDoubleValue>(proc, Origin(), b);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Div, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc), a / b));
 }
 
 void testSubArg(int a)
@@ -486,6 +662,70 @@ void testSubImmArg32(int a, int b)
                 root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0))));
 
     CHECK(compileAndRun<int>(proc, b) == a - b);
+}
+
+void testSubArgDouble(double a)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* value = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Sub, Origin(), value, value));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a), a - a));
+}
+
+void testSubArgsDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* valueB = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR1);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Sub, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a, b), a - b));
+}
+
+void testSubArgImmDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* valueB = root->appendNew<ConstDoubleValue>(proc, Origin(), b);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Sub, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, a), a - b));
+}
+
+void testSubImmArgDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ConstDoubleValue>(proc, Origin(), a);
+    Value* valueB = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Sub, Origin(), valueA, valueB));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, b), a - b));
+}
+
+void testSubImmsDouble(double a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* valueA = root->appendNew<ConstDoubleValue>(proc, Origin(), a);
+    Value* valueB = root->appendNew<ConstDoubleValue>(proc, Origin(), b);
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, Sub, Origin(), valueA, valueB));
+    
+    CHECK(isIdentical(compileAndRun<double>(proc), a - b));
 }
 
 void testBitAndArgs(int64_t a, int64_t b)
@@ -1489,6 +1729,110 @@ void testZShrArgImm32(uint32_t a, uint32_t b)
     CHECK(compileAndRun<uint32_t>(proc, a) == (a >> b));
 }
 
+void testDoubleArgToInt64BitwiseCast(double value)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(
+            proc, BitwiseCast, Origin(), argument));
+
+    CHECK(isIdentical(compileAndRun<int64_t>(proc, value), bitwise_cast<int64_t>(value)));
+}
+
+void testDoubleImmToInt64BitwiseCast(double value)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument = root->appendNew<ConstDoubleValue>(proc, Origin(), value);
+
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(
+            proc, BitwiseCast, Origin(), argument));
+
+    CHECK(isIdentical(compileAndRun<int64_t>(proc), bitwise_cast<int64_t>(value)));
+}
+
+void testTwoBitwiseCastOnDouble(double value)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* first = root->appendNew<Value>(proc, BitwiseCast, Origin(), argument);
+    Value* second = root->appendNew<Value>(proc, BitwiseCast, Origin(), first);
+    root->appendNew<ControlValue>(proc, Return, Origin(), second);
+
+    CHECK(isIdentical(compileAndRun<double>(proc, value), value));
+}
+
+void testBitwiseCastOnDoubleInMemory(double value)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* address = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    MemoryValue* loadDouble = root->appendNew<MemoryValue>(proc, Load, Double, Origin(), address);
+    Value* cast = root->appendNew<Value>(proc, BitwiseCast, Origin(), loadDouble);
+    root->appendNew<ControlValue>(proc, Return, Origin(), cast);
+
+    CHECK(isIdentical(compileAndRun<int64_t>(proc, &value), bitwise_cast<int64_t>(value)));
+}
+
+void testInt64BArgToDoubleBitwiseCast(int64_t value)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(
+            proc, BitwiseCast, Origin(), argument));
+
+    CHECK(isIdentical(compileAndRun<double>(proc, value), bitwise_cast<double>(value)));
+}
+
+void testInt64BImmToDoubleBitwiseCast(int64_t value)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument = root->appendNew<Const64Value>(proc, Origin(), value);
+
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(
+            proc, BitwiseCast, Origin(), argument));
+
+    CHECK(isIdentical(compileAndRun<double>(proc), bitwise_cast<double>(value)));
+}
+
+void testTwoBitwiseCastOnInt64(int64_t value)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* argument = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* first = root->appendNew<Value>(proc, BitwiseCast, Origin(), argument);
+    Value* second = root->appendNew<Value>(proc, BitwiseCast, Origin(), first);
+    root->appendNew<ControlValue>(proc, Return, Origin(), second);
+
+    CHECK(isIdentical(compileAndRun<int64_t>(proc, value), value));
+}
+
+void testBitwiseCastOnInt64InMemory(int64_t value)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* address = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    MemoryValue* loadDouble = root->appendNew<MemoryValue>(proc, Load, Int64, Origin(), address);
+    Value* cast = root->appendNew<Value>(proc, BitwiseCast, Origin(), loadDouble);
+    root->appendNew<ControlValue>(proc, Return, Origin(), cast);
+
+    CHECK(isIdentical(compileAndRun<double>(proc, &value), bitwise_cast<double>(value)));
+}
+
 void testStore(int value)
 {
     Procedure proc;
@@ -1887,6 +2231,36 @@ void testLoadOffsetUsingAddNotConstant()
                     root->appendNew<ConstPtrValue>(proc, Origin(), sizeof(int))))));
     
     CHECK(compileAndRun<int>(proc, &array[0]) == array[0] + array[1]);
+}
+
+void testLoadAddrShift(unsigned shift)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    int slots[2];
+
+    // Figure out which slot to use while having proper alignment for the shift.
+    int* slot;
+    uintptr_t arg;
+    for (unsigned i = sizeof(slots)/sizeof(slots[0]); i--;) {
+        slot = slots + i;
+        arg = bitwise_cast<uintptr_t>(slot) >> shift;
+        if (bitwise_cast<int*>(arg << shift) == slot)
+            break;
+    }
+
+    *slot = 8675309;
+    
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<MemoryValue>(
+            proc, Load, Int32, Origin(),
+            root->appendNew<Value>(
+                proc, Shl, Origin(),
+                root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0),
+                root->appendNew<Const32Value>(proc, Origin(), shift))));
+
+    CHECK(compileAndRun<int>(proc, arg) == 8675309);
 }
 
 void testFramePointer()
@@ -2530,9 +2904,9 @@ void testComplex(unsigned numVars, unsigned numConstructs)
     for (unsigned i = 0; i < numConstructs; ++i) {
         if (i & 1) {
             // Control flow diamond.
-            unsigned predicateVarIndex = (i >> 1) % numVars;
-            unsigned thenIncVarIndex = ((i >> 1) + 1) % numVars;
-            unsigned elseIncVarIndex = ((i >> 1) + 2) % numVars;
+            unsigned predicateVarIndex = ((i >> 1) + 2) % numVars;
+            unsigned thenIncVarIndex = ((i >> 1) + 0) % numVars;
+            unsigned elseIncVarIndex = ((i >> 1) + 1) % numVars;
 
             BasicBlock* thenBlock = proc.addBlock();
             BasicBlock* elseBlock = proc.addBlock();
@@ -2577,7 +2951,7 @@ void testComplex(unsigned numVars, unsigned numConstructs)
             BasicBlock* loopSkip = proc.addBlock();
             BasicBlock* continuation = proc.addBlock();
             
-            Value* startIndex = vars[(i >> 1) % numVars];
+            Value* startIndex = vars[((i >> 1) + 1) % numVars];
             Value* startSum = current->appendNew<Const32Value>(proc, Origin(), 0);
             current->appendNew<ControlValue>(
                 proc, Branch, Origin(), startIndex,
@@ -2631,7 +3005,7 @@ void testComplex(unsigned numVars, unsigned numConstructs)
             skipSum->setPhi(finalSum);
 
             current = continuation;
-            vars[((i >> 1) + 1) % numVars] = finalSum;
+            vars[((i >> 1) + 0) % numVars] = finalSum;
         }
     }
 
@@ -2664,6 +3038,154 @@ void testSimplePatchpoint()
     root->appendNew<ControlValue>(proc, Return, Origin(), patchpoint);
 
     CHECK(compileAndRun<int>(proc, 1, 2) == 3);
+}
+
+void testSimplePatchpointWithoutOuputClobbersGPArgs()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* arg1 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* arg2 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1);
+    Value* const1 = root->appendNew<Const64Value>(proc, Origin(), 42);
+    Value* const2 = root->appendNew<Const64Value>(proc, Origin(), 13);
+
+    PatchpointValue* patchpoint = root->appendNew<PatchpointValue>(proc, Void, Origin());
+    patchpoint->clobber(RegisterSet(GPRInfo::argumentGPR0, GPRInfo::argumentGPR1));
+    patchpoint->append(ConstrainedValue(const1, ValueRep::SomeRegister));
+    patchpoint->append(ConstrainedValue(const2, ValueRep::SomeRegister));
+    patchpoint->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            CHECK(params.reps.size() == 2);
+            CHECK(params.reps[0].isGPR());
+            CHECK(params.reps[1].isGPR());
+            jit.move(CCallHelpers::TrustedImm32(0x00ff00ff), params.reps[0].gpr());
+            jit.move(CCallHelpers::TrustedImm32(0x00ff00ff), params.reps[1].gpr());
+            jit.move(CCallHelpers::TrustedImm32(0x00ff00ff), GPRInfo::argumentGPR0);
+            jit.move(CCallHelpers::TrustedImm32(0x00ff00ff), GPRInfo::argumentGPR1);
+        });
+
+    Value* result = root->appendNew<Value>(proc, Add, Origin(), arg1, arg2);
+    root->appendNew<ControlValue>(proc, Return, Origin(), result);
+
+    CHECK(compileAndRun<int>(proc, 1, 2) == 3);
+}
+
+void testSimplePatchpointWithOuputClobbersGPArgs()
+{
+    // We can't predict where the output will be but we want to be sure it is not
+    // one of the clobbered registers which is a bit hard to test.
+    //
+    // What we do is force the hand of our register allocator by clobbering absolutely
+    // everything but 1. The only valid allocation is to give it to the result and
+    // spill everything else.
+
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* arg1 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* arg2 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1);
+    Value* const1 = root->appendNew<Const64Value>(proc, Origin(), 42);
+    Value* const2 = root->appendNew<Const64Value>(proc, Origin(), 13);
+
+    PatchpointValue* patchpoint = root->appendNew<PatchpointValue>(proc, Int64, Origin());
+
+    RegisterSet clobberAll = RegisterSet::allGPRs();
+    clobberAll.exclude(RegisterSet::stackRegisters());
+    clobberAll.exclude(RegisterSet::reservedHardwareRegisters());
+    clobberAll.clear(GPRInfo::argumentGPR2);
+    patchpoint->clobber(clobberAll);
+
+    patchpoint->append(ConstrainedValue(const1, ValueRep::SomeRegister));
+    patchpoint->append(ConstrainedValue(const2, ValueRep::SomeRegister));
+
+    patchpoint->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            CHECK(params.reps.size() == 3);
+            CHECK(params.reps[0].isGPR());
+            CHECK(params.reps[1].isGPR());
+            CHECK(params.reps[2].isGPR());
+            jit.move(params.reps[1].gpr(), params.reps[0].gpr());
+            jit.add64(params.reps[2].gpr(), params.reps[0].gpr());
+
+            clobberAll.forEach([&] (Reg reg) {
+                jit.move(CCallHelpers::TrustedImm32(0x00ff00ff), reg.gpr());
+            });
+        });
+
+    Value* result = root->appendNew<Value>(proc, Add, Origin(), patchpoint,
+        root->appendNew<Value>(proc, Add, Origin(), arg1, arg2));
+    root->appendNew<ControlValue>(proc, Return, Origin(), result);
+
+    CHECK(compileAndRun<int>(proc, 1, 2) == 58);
+}
+
+void testSimplePatchpointWithoutOuputClobbersFPArgs()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* arg1 = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* arg2 = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR1);
+    Value* const1 = root->appendNew<ConstDoubleValue>(proc, Origin(), 42.5);
+    Value* const2 = root->appendNew<ConstDoubleValue>(proc, Origin(), 13.1);
+
+    PatchpointValue* patchpoint = root->appendNew<PatchpointValue>(proc, Void, Origin());
+    patchpoint->clobber(RegisterSet(FPRInfo::argumentFPR0, FPRInfo::argumentFPR1));
+    patchpoint->append(ConstrainedValue(const1, ValueRep::SomeRegister));
+    patchpoint->append(ConstrainedValue(const2, ValueRep::SomeRegister));
+    patchpoint->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            CHECK(params.reps.size() == 2);
+            CHECK(params.reps[0].isFPR());
+            CHECK(params.reps[1].isFPR());
+            jit.moveZeroToDouble(params.reps[0].fpr());
+            jit.moveZeroToDouble(params.reps[1].fpr());
+            jit.moveZeroToDouble(FPRInfo::argumentFPR0);
+            jit.moveZeroToDouble(FPRInfo::argumentFPR1);
+        });
+
+    Value* result = root->appendNew<Value>(proc, Add, Origin(), arg1, arg2);
+    root->appendNew<ControlValue>(proc, Return, Origin(), result);
+
+    CHECK(compileAndRun<double>(proc, 1.5, 2.5) == 4);
+}
+
+void testSimplePatchpointWithOuputClobbersFPArgs()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* arg1 = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* arg2 = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR1);
+    Value* const1 = root->appendNew<ConstDoubleValue>(proc, Origin(), 42.5);
+    Value* const2 = root->appendNew<ConstDoubleValue>(proc, Origin(), 13.1);
+
+    PatchpointValue* patchpoint = root->appendNew<PatchpointValue>(proc, Double, Origin());
+
+    RegisterSet clobberAll = RegisterSet::allFPRs();
+    clobberAll.exclude(RegisterSet::stackRegisters());
+    clobberAll.exclude(RegisterSet::reservedHardwareRegisters());
+    clobberAll.clear(FPRInfo::argumentFPR2);
+    patchpoint->clobber(clobberAll);
+
+    patchpoint->append(ConstrainedValue(const1, ValueRep::SomeRegister));
+    patchpoint->append(ConstrainedValue(const2, ValueRep::SomeRegister));
+
+    patchpoint->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            CHECK(params.reps.size() == 3);
+            CHECK(params.reps[0].isFPR());
+            CHECK(params.reps[1].isFPR());
+            CHECK(params.reps[2].isFPR());
+            jit.addDouble(params.reps[1].fpr(), params.reps[2].fpr(), params.reps[0].fpr());
+
+            clobberAll.forEach([&] (Reg reg) {
+                jit.moveZeroToDouble(reg.fpr());
+            });
+        });
+
+    Value* result = root->appendNew<Value>(proc, Add, Origin(), patchpoint,
+        root->appendNew<Value>(proc, Add, Origin(), arg1, arg2));
+    root->appendNew<ControlValue>(proc, Return, Origin(), result);
+
+    CHECK(compileAndRun<double>(proc, 1.5, 2.5) == 59.6);
 }
 
 void testPatchpointCallArg()
@@ -2811,8 +3333,6 @@ void testSimpleCheck()
     check->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
             CHECK(params.reps.size() == 1);
-            CHECK(params.reps[0].isConstant());
-            CHECK(params.reps[0].value() == 1);
 
             // This should always work because a function this simple should never have callee
             // saves.
@@ -2844,8 +3364,6 @@ void testCheckLessThan()
     check->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
             CHECK(params.reps.size() == 1);
-            CHECK(params.reps[0].isConstant());
-            CHECK(params.reps[0].value() == 1);
 
             // This should always work because a function this simple should never have callee
             // saves.
@@ -2891,8 +3409,6 @@ void testCheckMegaCombo()
     check->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
             CHECK(params.reps.size() == 1);
-            CHECK(params.reps[0].isConstant());
-            CHECK(params.reps[0].value() == 1);
 
             // This should always work because a function this simple should never have callee
             // saves.
@@ -2927,15 +3443,85 @@ void testCheckAddImm()
         root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
     Value* arg2 = root->appendNew<Const32Value>(proc, Origin(), 42);
     CheckValue* checkAdd = root->appendNew<CheckValue>(proc, CheckAdd, Origin(), arg1, arg2);
+    checkAdd->append(arg1);
+    checkAdd->append(arg2);
     checkAdd->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0].isGPR());
-            CHECK(params.reps[1].isConstant());
-            CHECK(params.reps[1].value() == 42);
-            jit.sub32(CCallHelpers::TrustedImm32(42), params.reps[0].gpr());
-            jit.convertInt32ToDouble(params.reps[0].gpr(), FPRInfo::fpRegT0);
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isConstant());
+            CHECK(params.reps[3].value() == 42);
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
             jit.convertInt32ToDouble(CCallHelpers::TrustedImm32(42), FPRInfo::fpRegT1);
+            jit.addDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
+            jit.emitFunctionEpilogue();
+            jit.ret();
+        });
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, IToD, Origin(), checkAdd));
+
+    auto code = compile(proc);
+
+    CHECK(invoke<double>(*code, 0) == 42.0);
+    CHECK(invoke<double>(*code, 1) == 43.0);
+    CHECK(invoke<double>(*code, 42) == 84.0);
+    CHECK(invoke<double>(*code, 2147483647) == 2147483689.0);
+}
+
+void testCheckAddImmCommute()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* arg1 = root->appendNew<Value>(
+        proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* arg2 = root->appendNew<Const32Value>(proc, Origin(), 42);
+    CheckValue* checkAdd = root->appendNew<CheckValue>(proc, CheckAdd, Origin(), arg2, arg1);
+    checkAdd->append(arg1);
+    checkAdd->append(arg2);
+    checkAdd->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isConstant());
+            CHECK(params.reps[3].value() == 42);
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt32ToDouble(CCallHelpers::TrustedImm32(42), FPRInfo::fpRegT1);
+            jit.addDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
+            jit.emitFunctionEpilogue();
+            jit.ret();
+        });
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, IToD, Origin(), checkAdd));
+
+    auto code = compile(proc);
+
+    CHECK(invoke<double>(*code, 0) == 42.0);
+    CHECK(invoke<double>(*code, 1) == 43.0);
+    CHECK(invoke<double>(*code, 42) == 84.0);
+    CHECK(invoke<double>(*code, 2147483647) == 2147483689.0);
+}
+
+void testCheckAddImmSomeRegister()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* arg1 = root->appendNew<Value>(
+        proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* arg2 = root->appendNew<Const32Value>(proc, Origin(), 42);
+    CheckValue* checkAdd = root->appendNew<CheckValue>(proc, CheckAdd, Origin(), arg1, arg2);
+    checkAdd->appendSomeRegister(arg1);
+    checkAdd->appendSomeRegister(arg2);
+    checkAdd->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isGPR());
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt32ToDouble(params.reps[3].gpr(), FPRInfo::fpRegT1);
             jit.addDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
             jit.ret();
@@ -2963,14 +3549,15 @@ void testCheckAdd()
         proc, Trunc, Origin(),
         root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
     CheckValue* checkAdd = root->appendNew<CheckValue>(proc, CheckAdd, Origin(), arg1, arg2);
+    checkAdd->appendSomeRegister(arg1);
+    checkAdd->appendSomeRegister(arg2);
     checkAdd->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0].isGPR());
-            CHECK(params.reps[1].isGPR());
-            jit.sub32(params.reps[1].gpr(), params.reps[0].gpr());
-            jit.convertInt32ToDouble(params.reps[0].gpr(), FPRInfo::fpRegT0);
-            jit.convertInt32ToDouble(params.reps[1].gpr(), FPRInfo::fpRegT1);
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isGPR());
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt32ToDouble(params.reps[3].gpr(), FPRInfo::fpRegT1);
             jit.addDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
             jit.ret();
@@ -2994,14 +3581,15 @@ void testCheckAdd64()
     Value* arg1 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
     Value* arg2 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1);
     CheckValue* checkAdd = root->appendNew<CheckValue>(proc, CheckAdd, Origin(), arg1, arg2);
+    checkAdd->appendSomeRegister(arg1);
+    checkAdd->appendSomeRegister(arg2);
     checkAdd->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0].isGPR());
-            CHECK(params.reps[1].isGPR());
-            jit.sub64(params.reps[1].gpr(), params.reps[0].gpr());
-            jit.convertInt64ToDouble(params.reps[0].gpr(), FPRInfo::fpRegT0);
-            jit.convertInt64ToDouble(params.reps[1].gpr(), FPRInfo::fpRegT1);
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isGPR());
+            jit.convertInt64ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt64ToDouble(params.reps[3].gpr(), FPRInfo::fpRegT1);
             jit.addDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
             jit.ret();
@@ -3065,14 +3653,15 @@ void testCheckSubImm()
         root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
     Value* arg2 = root->appendNew<Const32Value>(proc, Origin(), 42);
     CheckValue* checkSub = root->appendNew<CheckValue>(proc, CheckSub, Origin(), arg1, arg2);
+    checkSub->append(arg1);
+    checkSub->append(arg2);
     checkSub->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0].isGPR());
-            CHECK(params.reps[1].isConstant());
-            CHECK(params.reps[1].value() == 42);
-            jit.add32(CCallHelpers::TrustedImm32(42), params.reps[0].gpr());
-            jit.convertInt32ToDouble(params.reps[0].gpr(), FPRInfo::fpRegT0);
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isConstant());
+            CHECK(params.reps[3].value() == 42);
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
             jit.convertInt32ToDouble(CCallHelpers::TrustedImm32(42), FPRInfo::fpRegT1);
             jit.subDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
@@ -3090,6 +3679,42 @@ void testCheckSubImm()
     CHECK(invoke<double>(*code, -2147483647) == -2147483689.0);
 }
 
+void testCheckSubBadImm()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* arg1 = root->appendNew<Value>(
+        proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    int32_t badImm = std::numeric_limits<int>::min();
+    Value* arg2 = root->appendNew<Const32Value>(proc, Origin(), badImm);
+    CheckValue* checkSub = root->appendNew<CheckValue>(proc, CheckSub, Origin(), arg1, arg2);
+    checkSub->append(arg1);
+    checkSub->append(arg2);
+    checkSub->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isConstant());
+            CHECK(params.reps[3].value() == badImm);
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt32ToDouble(CCallHelpers::TrustedImm32(badImm), FPRInfo::fpRegT1);
+            jit.subDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
+            jit.emitFunctionEpilogue();
+            jit.ret();
+        });
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, IToD, Origin(), checkSub));
+
+    auto code = compile(proc);
+
+    CHECK(invoke<double>(*code, 0) == -static_cast<double>(badImm));
+    CHECK(invoke<double>(*code, -1) == -static_cast<double>(badImm) - 1);
+    CHECK(invoke<double>(*code, 1) == -static_cast<double>(badImm) + 1);
+    CHECK(invoke<double>(*code, 42) == -static_cast<double>(badImm) + 42);
+}
+
 void testCheckSub()
 {
     Procedure proc;
@@ -3101,14 +3726,15 @@ void testCheckSub()
         proc, Trunc, Origin(),
         root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
     CheckValue* checkSub = root->appendNew<CheckValue>(proc, CheckSub, Origin(), arg1, arg2);
+    checkSub->append(arg1);
+    checkSub->append(arg2);
     checkSub->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0].isGPR());
-            CHECK(params.reps[1].isGPR());
-            jit.add32(params.reps[1].gpr(), params.reps[0].gpr());
-            jit.convertInt32ToDouble(params.reps[0].gpr(), FPRInfo::fpRegT0);
-            jit.convertInt32ToDouble(params.reps[1].gpr(), FPRInfo::fpRegT1);
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isGPR());
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt32ToDouble(params.reps[3].gpr(), FPRInfo::fpRegT1);
             jit.subDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
             jit.ret();
@@ -3137,14 +3763,15 @@ void testCheckSub64()
     Value* arg1 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
     Value* arg2 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1);
     CheckValue* checkSub = root->appendNew<CheckValue>(proc, CheckSub, Origin(), arg1, arg2);
+    checkSub->append(arg1);
+    checkSub->append(arg2);
     checkSub->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0].isGPR());
-            CHECK(params.reps[1].isGPR());
-            jit.add64(params.reps[1].gpr(), params.reps[0].gpr());
-            jit.convertInt64ToDouble(params.reps[0].gpr(), FPRInfo::fpRegT0);
-            jit.convertInt64ToDouble(params.reps[1].gpr(), FPRInfo::fpRegT1);
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isGPR());
+            jit.convertInt64ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt64ToDouble(params.reps[3].gpr(), FPRInfo::fpRegT1);
             jit.subDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
             jit.ret();
@@ -3208,13 +3835,12 @@ void testCheckNeg()
         proc, Trunc, Origin(),
         root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
     CheckValue* checkNeg = root->appendNew<CheckValue>(proc, CheckSub, Origin(), arg1, arg2);
+    checkNeg->append(arg2);
     checkNeg->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0] == ValueRep::constant(0));
-            CHECK(params.reps[1].isGPR());
-            jit.neg32(params.reps[1].gpr());
-            jit.convertInt32ToDouble(params.reps[1].gpr(), FPRInfo::fpRegT1);
+            CHECK(params.reps.size() == 3);
+            CHECK(params.reps[2].isGPR());
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT1);
             jit.negateDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
             jit.ret();
@@ -3238,13 +3864,12 @@ void testCheckNeg64()
     Value* arg1 = root->appendNew<Const64Value>(proc, Origin(), 0);
     Value* arg2 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
     CheckValue* checkNeg = root->appendNew<CheckValue>(proc, CheckSub, Origin(), arg1, arg2);
+    checkNeg->append(arg2);
     checkNeg->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0] == ValueRep::constant(0));
-            CHECK(params.reps[1].isGPR());
-            jit.neg64(params.reps[1].gpr());
-            jit.convertInt64ToDouble(params.reps[1].gpr(), FPRInfo::fpRegT1);
+            CHECK(params.reps.size() == 3);
+            CHECK(params.reps[2].isGPR());
+            jit.convertInt64ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT1);
             jit.negateDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
             jit.ret();
@@ -3272,13 +3897,15 @@ void testCheckMul()
         proc, Trunc, Origin(),
         root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
     CheckValue* checkMul = root->appendNew<CheckValue>(proc, CheckMul, Origin(), arg1, arg2);
+    checkMul->append(arg1);
+    checkMul->append(arg2);
     checkMul->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0].isGPR());
-            CHECK(params.reps[1].isGPR());
-            jit.convertInt32ToDouble(params.reps[0].gpr(), FPRInfo::fpRegT0);
-            jit.convertInt32ToDouble(params.reps[1].gpr(), FPRInfo::fpRegT1);
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isGPR());
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt32ToDouble(params.reps[3].gpr(), FPRInfo::fpRegT1);
             jit.mulDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
             jit.ret();
@@ -3295,6 +3922,92 @@ void testCheckMul()
     CHECK(invoke<double>(*code, 2147483647, 42) == 2147483647.0 * 42.0);
 }
 
+void testCheckMulMemory()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+
+    int left;
+    int right;
+    
+    Value* arg1 = root->appendNew<MemoryValue>(
+        proc, Load, Int32, Origin(),
+        root->appendNew<ConstPtrValue>(proc, Origin(), &left));
+    Value* arg2 = root->appendNew<MemoryValue>(
+        proc, Load, Int32, Origin(),
+        root->appendNew<ConstPtrValue>(proc, Origin(), &right));
+    CheckValue* checkMul = root->appendNew<CheckValue>(proc, CheckMul, Origin(), arg1, arg2);
+    checkMul->append(arg1);
+    checkMul->append(arg2);
+    checkMul->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isGPR());
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt32ToDouble(params.reps[3].gpr(), FPRInfo::fpRegT1);
+            jit.mulDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
+            jit.emitFunctionEpilogue();
+            jit.ret();
+        });
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, IToD, Origin(), checkMul));
+
+    auto code = compile(proc);
+
+    left = 0;
+    right = 42;
+    CHECK(invoke<double>(*code) == 0.0);
+    
+    left = 1;
+    right = 42;
+    CHECK(invoke<double>(*code) == 42.0);
+
+    left = 42;
+    right = 42;
+    CHECK(invoke<double>(*code) == 42.0 * 42.0);
+
+    left = 2147483647;
+    right = 42;
+    CHECK(invoke<double>(*code) == 2147483647.0 * 42.0);
+}
+
+void testCheckMul2()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* arg1 = root->appendNew<Value>(
+        proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* arg2 = root->appendNew<Const32Value>(proc, Origin(), 2);
+    CheckValue* checkMul = root->appendNew<CheckValue>(proc, CheckMul, Origin(), arg1, arg2);
+    checkMul->append(arg1);
+    checkMul->append(arg2);
+    checkMul->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isConstant());
+            CHECK(params.reps[3].value() == 2);
+            jit.convertInt32ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt32ToDouble(CCallHelpers::TrustedImm32(2), FPRInfo::fpRegT1);
+            jit.mulDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
+            jit.emitFunctionEpilogue();
+            jit.ret();
+        });
+    root->appendNew<ControlValue>(
+        proc, Return, Origin(),
+        root->appendNew<Value>(proc, IToD, Origin(), checkMul));
+
+    auto code = compile(proc);
+
+    CHECK(invoke<double>(*code, 0) == 0.0);
+    CHECK(invoke<double>(*code, 1) == 2.0);
+    CHECK(invoke<double>(*code, 42) == 42.0 * 2.0);
+    CHECK(invoke<double>(*code, 2147483647) == 2147483647.0 * 2.0);
+}
+
 void testCheckMul64()
 {
     Procedure proc;
@@ -3302,13 +4015,15 @@ void testCheckMul64()
     Value* arg1 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
     Value* arg2 = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1);
     CheckValue* checkMul = root->appendNew<CheckValue>(proc, CheckMul, Origin(), arg1, arg2);
+    checkMul->append(arg1);
+    checkMul->append(arg2);
     checkMul->setGenerator(
         [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
-            CHECK(params.reps.size() == 2);
-            CHECK(params.reps[0].isGPR());
-            CHECK(params.reps[1].isGPR());
-            jit.convertInt64ToDouble(params.reps[0].gpr(), FPRInfo::fpRegT0);
-            jit.convertInt64ToDouble(params.reps[1].gpr(), FPRInfo::fpRegT1);
+            CHECK(params.reps.size() == 4);
+            CHECK(params.reps[2].isGPR());
+            CHECK(params.reps[3].isGPR());
+            jit.convertInt64ToDouble(params.reps[2].gpr(), FPRInfo::fpRegT0);
+            jit.convertInt64ToDouble(params.reps[3].gpr(), FPRInfo::fpRegT1);
             jit.mulDouble(FPRInfo::fpRegT1, FPRInfo::fpRegT0);
             jit.emitFunctionEpilogue();
             jit.ret();
@@ -3925,6 +4640,50 @@ double negativeZero()
     return -zero();
 }
 
+// Some convenience functions for brevity of the test output.
+double posInfinity()
+{
+    return std::numeric_limits<double>::infinity();
+}
+
+double negInfinity()
+{
+    return -std::numeric_limits<double>::infinity();
+}
+
+template<typename Type>
+struct Operand {
+    const char* name;
+    Type value;
+};
+
+typedef Operand<double> DoubleOperand;
+typedef Operand<int64_t> Int64Operand;
+
+static const std::array<DoubleOperand, 9>& doubleOperands()
+{
+    static const std::array<DoubleOperand, 9> operands = {{
+        { "M_PI", M_PI },
+        { "-M_PI", -M_PI },
+        { "1", 1 },
+        { "-1", -1 },
+        { "0", 0 },
+        { "negativeZero()", negativeZero() },
+        { "posInfinity()", posInfinity() },
+        { "negInfinity()", negInfinity() },
+        { "PNaN", PNaN },
+    }};
+    return operands;
+};
+
+static Vector<Int64Operand> int64Operands()
+{
+    Vector<Int64Operand> operands;
+    for (DoubleOperand doubleOperand : doubleOperands())
+        operands.append({ doubleOperand.name, bitwise_cast<int64_t>(doubleOperand.value) });
+    return operands;
+}
+
 #define RUN(test) do {                          \
         if (!shouldRun(#test))                  \
             break;                              \
@@ -3936,6 +4695,34 @@ double negativeZero()
                     dataLog(#test ": OK!\n");   \
                 }));                            \
     } while (false);
+
+#define RUN_UNARY(test, values) \
+    for (auto a : values) {                             \
+        CString testStr = toCString(#test, "(", a.name, ")"); \
+        if (!shouldRun(testStr.data()))                 \
+            continue;                                   \
+        tasks.append(createSharedTask<void()>(          \
+            [=] () {                                    \
+                dataLog(testStr, "...\n");              \
+                test(a.value);                          \
+                dataLog(testStr, ": OK!\n");            \
+            }));                                        \
+    }
+
+#define RUN_BINARY(test, valuesA, valuesB) \
+    for (auto a : valuesA) {                                \
+        for (auto b : valuesB) {                            \
+            CString testStr = toCString(#test, "(", a.name, ", ", b.name, ")"); \
+            if (!shouldRun(testStr.data()))                 \
+                continue;                                   \
+            tasks.append(createSharedTask<void()>(          \
+                [=] () {                                    \
+                    dataLog(testStr, "...\n");              \
+                    test(a.value, b.value);                 \
+                    dataLog(testStr, ": OK!\n");            \
+                }));                                        \
+        }                                                   \
+    }
 
 void run(const char* filter)
 {
@@ -3992,6 +4779,10 @@ void run(const char* filter)
     RUN(testAddImmsDouble(negativeZero(), negativeZero()));
 
     RUN(testMulArg(5));
+    RUN(testMulAddArg(5));
+    RUN(testMulAddArg(85));
+    RUN(testMulArgStore(5));
+    RUN(testMulArgStore(85));
     RUN(testMulArgs(1, 1));
     RUN(testMulArgs(1, 2));
     RUN(testMulArgs(3, 3));
@@ -4027,6 +4818,36 @@ void run(const char* filter)
     RUN(testMulArgs32(1, 2));
     RUN(testMulLoadTwice());
 
+    RUN_UNARY(testMulArgDouble, doubleOperands());
+    RUN_BINARY(testMulArgsDouble, doubleOperands(), doubleOperands());
+    RUN_BINARY(testMulArgImmDouble, doubleOperands(), doubleOperands());
+    RUN_BINARY(testMulImmArgDouble, doubleOperands(), doubleOperands());
+    RUN_BINARY(testMulImmsDouble, doubleOperands(), doubleOperands());
+
+    RUN(testDivArgDouble(M_PI));
+    RUN(testDivArgsDouble(M_PI, 1));
+    RUN(testDivArgsDouble(M_PI, -M_PI));
+    RUN(testDivArgImmDouble(M_PI, 1));
+    RUN(testDivArgImmDouble(M_PI, 0));
+    RUN(testDivArgImmDouble(M_PI, negativeZero()));
+    RUN(testDivArgImmDouble(0, 0));
+    RUN(testDivArgImmDouble(0, negativeZero()));
+    RUN(testDivArgImmDouble(negativeZero(), 0));
+    RUN(testDivArgImmDouble(negativeZero(), negativeZero()));
+    RUN(testDivImmArgDouble(M_PI, 1));
+    RUN(testDivImmArgDouble(M_PI, 0));
+    RUN(testDivImmArgDouble(M_PI, negativeZero()));
+    RUN(testDivImmArgDouble(0, 0));
+    RUN(testDivImmArgDouble(0, negativeZero()));
+    RUN(testDivImmArgDouble(negativeZero(), 0));
+    RUN(testDivImmArgDouble(negativeZero(), negativeZero()));
+    RUN(testDivImmsDouble(M_PI, 1));
+    RUN(testDivImmsDouble(M_PI, 0));
+    RUN(testDivImmsDouble(M_PI, negativeZero()));
+    RUN(testDivImmsDouble(0, 0));
+    RUN(testDivImmsDouble(0, negativeZero()));
+    RUN(testDivImmsDouble(negativeZero(), negativeZero()));
+
     RUN(testSubArg(24));
     RUN(testSubArgs(1, 1));
     RUN(testSubArgs(1, 2));
@@ -4054,6 +4875,12 @@ void run(const char* filter)
     RUN(testSubImmArg32(1, 2));
     RUN(testSubImmArg32(13, -42));
     RUN(testSubImmArg32(-13, 42));
+
+    RUN_UNARY(testSubArgDouble, doubleOperands());
+    RUN_BINARY(testSubArgsDouble, doubleOperands(), doubleOperands());
+    RUN_BINARY(testSubArgImmDouble, doubleOperands(), doubleOperands());
+    RUN_BINARY(testSubImmArgDouble, doubleOperands(), doubleOperands());
+    RUN_BINARY(testSubImmsDouble, doubleOperands(), doubleOperands());
 
     RUN(testBitAndArgs(43, 43));
     RUN(testBitAndArgs(43, 0));
@@ -4340,6 +5167,15 @@ void run(const char* filter)
     RUN(testZShrArgImm32(0xffffffff, 1));
     RUN(testZShrArgImm32(0xffffffff, 63));
 
+    RUN_UNARY(testDoubleArgToInt64BitwiseCast, doubleOperands());
+    RUN_UNARY(testDoubleImmToInt64BitwiseCast, doubleOperands());
+    RUN_UNARY(testTwoBitwiseCastOnDouble, doubleOperands());
+    RUN_UNARY(testBitwiseCastOnDoubleInMemory, doubleOperands());
+    RUN_UNARY(testInt64BArgToDoubleBitwiseCast, int64Operands());
+    RUN_UNARY(testInt64BImmToDoubleBitwiseCast, int64Operands());
+    RUN_UNARY(testTwoBitwiseCastOnInt64, int64Operands());
+    RUN_UNARY(testBitwiseCastOnInt64InMemory, int64Operands());
+
     RUN(testStore(44));
     RUN(testStoreConstant(49));
     RUN(testStoreConstantPtr(49));
@@ -4362,6 +5198,10 @@ void run(const char* filter)
     RUN(testLoadOffsetUsingAdd());
     RUN(testLoadOffsetUsingAddInterference());
     RUN(testLoadOffsetUsingAddNotConstant());
+    RUN(testLoadAddrShift(0));
+    RUN(testLoadAddrShift(1));
+    RUN(testLoadAddrShift(2));
+    RUN(testLoadAddrShift(3));
     RUN(testFramePointer());
     RUN(testStackSlot());
     RUN(testLoadFromFramePointer());
@@ -4394,6 +5234,10 @@ void run(const char* filter)
     RUN(testComplex(4, 384));
 
     RUN(testSimplePatchpoint());
+    RUN(testSimplePatchpointWithoutOuputClobbersGPArgs());
+    RUN(testSimplePatchpointWithOuputClobbersGPArgs());
+    RUN(testSimplePatchpointWithoutOuputClobbersFPArgs());
+    RUN(testSimplePatchpointWithOuputClobbersFPArgs());
     RUN(testPatchpointCallArg());
     RUN(testPatchpointFixedRegister());
     RUN(testPatchpointAny());
@@ -4403,11 +5247,14 @@ void run(const char* filter)
     RUN(testCheckLessThan());
     RUN(testCheckMegaCombo());
     RUN(testCheckAddImm());
+    RUN(testCheckAddImmCommute());
+    RUN(testCheckAddImmSomeRegister());
     RUN(testCheckAdd());
     RUN(testCheckAdd64());
     RUN(testCheckAddFold(100, 200));
     RUN(testCheckAddFoldFail(2147483647, 100));
     RUN(testCheckSubImm());
+    RUN(testCheckSubBadImm());
     RUN(testCheckSub());
     RUN(testCheckSub64());
     RUN(testCheckSubFold(100, 200));
@@ -4415,6 +5262,8 @@ void run(const char* filter)
     RUN(testCheckNeg());
     RUN(testCheckNeg64());
     RUN(testCheckMul());
+    RUN(testCheckMulMemory());
+    RUN(testCheckMul2());
     RUN(testCheckMul64());
     RUN(testCheckMulFold(100, 200));
     RUN(testCheckMulFoldFail(2147483647, 100));

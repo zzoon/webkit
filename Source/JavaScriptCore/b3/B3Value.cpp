@@ -154,6 +154,11 @@ Value* Value::checkMulConstant(Procedure&, const Value*) const
     return nullptr;
 }
 
+Value* Value::checkNegConstant(Procedure&) const
+{
+    return nullptr;
+}
+
 Value* Value::divConstant(Procedure&, const Value*) const
 {
     return nullptr;
@@ -185,6 +190,11 @@ Value* Value::sShrConstant(Procedure&, const Value*) const
 }
 
 Value* Value::zShrConstant(Procedure&, const Value*) const
+{
+    return nullptr;
+}
+
+Value* Value::bitwiseCastConstant(Procedure&) const
 {
     return nullptr;
 }
@@ -315,6 +325,7 @@ Effects Value::effects() const
     case Shl:
     case SShr:
     case ZShr:
+    case BitwiseCast:
     case SExt8:
     case SExt16:
     case SExt32:
@@ -509,6 +520,13 @@ Type Value::typeFor(Opcode opcode, Value* firstChild)
     case FRound:
     case IToD:
         return Double;
+    case BitwiseCast:
+        if (firstChild->type() == Int64)
+            return Double;
+        if (firstChild->type() == Double)
+            return Int64;
+        ASSERT_NOT_REACHED();
+        return Void;
     case Nop:
         return Void;
     default:

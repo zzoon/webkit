@@ -61,12 +61,12 @@ const bool verbose = false;
 
 class LowerToAir {
 public:
-    LowerToAir(Procedure& procedure, Code& code)
+    LowerToAir(Procedure& procedure)
         : m_valueToTmp(procedure.values().size())
         , m_blockToBlock(procedure.size())
         , m_useCounts(procedure)
         , m_procedure(procedure)
-        , m_code(code)
+        , m_code(procedure.code())
     {
     }
 
@@ -395,6 +395,18 @@ private:
             return Arg::index(tmp(left), tmp(right));
         }
 
+        case Shl: {
+            Value* left = address->child(0);
+
+            // We'll never see child(1)->isInt32(0), since that would have been reduced. If the shift
+            // amount is greater than 1, then there isn't really anything smart that we could do here.
+            // We avoid using baseless indexes because their encoding isn't particularly efficient.
+            if (m_locked.contains(left) || !address->child(1)->isInt32(1))
+                return Arg::addr(tmp(address));
+
+            return Arg::index(tmp(left), tmp(left));
+        }
+
         case FramePointer:
             return Arg::addr(Tmp(GPRInfo::callFrameRegister));
 
@@ -586,6 +598,10 @@ private:
             return;
         }
 
+        // FIXME: If we're going to use a two-operand instruction, and the operand is commutative, we
+        // should coalesce the result with the operand that is killed.
+        // https://bugs.webkit.org/show_bug.cgi?id=151321
+        
         append(relaxedMoveForType(m_value->type()), tmp(left), result);
         append(opcode, tmp(right), result);
     }
@@ -1243,12 +1259,12 @@ private:
             if (m_value->child(0)->isInt(0))
                 appendUnOp<Neg32, Neg64, Air::Oops>(m_value->child(1));
             else
-                appendBinOp<Sub32, Sub64, Air::Oops>(m_value->child(0), m_value->child(1));
+                appendBinOp<Sub32, Sub64, SubDouble>(m_value->child(0), m_value->child(1));
             return;
         }
 
         case Mul: {
-            appendBinOp<Mul32, Mul64, Air::Oops, Commutative>(
+            appendBinOp<Mul32, Mul64, MulDouble, Commutative>(
                 m_value->child(0), m_value->child(1));
             return;
         }
@@ -1280,10 +1296,9 @@ private:
                 append(Move, eax, tmp(m_value));
                 return;
             }
+            ASSERT(isFloat(m_value->type()));
 
-            // FIXME: Support doubles.
-            // https://bugs.webkit.org/show_bug.cgi?id=150991
-            RELEASE_ASSERT_NOT_REACHED();
+            appendBinOp<Air::Oops, Air::Oops, DivDouble>(m_value->child(0), m_value->child(1));
             return;
         }
 
@@ -1326,6 +1341,11 @@ private:
 
         case ZShr: {
             appendShift<Urshift32, Urshift64>(m_value->child(0), m_value->child(1));
+            return;
+        }
+
+        case BitwiseCast: {
+            appendUnOp<Air::Oops, Move64ToDouble, MoveDoubleTo64>(m_value->child(0));
             return;
         }
 
@@ -1519,10 +1539,6 @@ private:
 
         case CheckAdd:
         case CheckSub: {
-            // FIXME: Make this support commutativity. That will let us leverage more instruction forms
-            // and it let us commute to maximize coalescing.
-            // https://bugs.webkit.org/show_bug.cgi?id=151214
-
             CheckValue* checkValue = m_value->as<CheckValue>();
 
             Value* left = checkValue->child(0);
@@ -1532,7 +1548,7 @@ private:
 
             // Handle checked negation.
             if (checkValue->opcode() == CheckSub && left->isInt(0)) {
-                append(relaxedMoveForType(checkValue->type()), tmp(right), result);
+                append(Move, tmp(right), result);
 
                 Air::Opcode opcode =
                     opcodeForType(BranchNeg32, BranchNeg64, Air::Oops, checkValue->type());
@@ -1548,39 +1564,67 @@ private:
                 return;
             }
 
-            append(relaxedMoveForType(m_value->type()), tmp(left), result);
+            // FIXME: Use commutativity of CheckAdd to increase the likelihood of coalescing.
+            // https://bugs.webkit.org/show_bug.cgi?id=151321
+
+            append(Move, tmp(left), result);
             
             Air::Opcode opcode = Air::Oops;
-            CheckSpecial* special = nullptr;
             switch (m_value->opcode()) {
             case CheckAdd:
                 opcode = opcodeForType(BranchAdd32, BranchAdd64, Air::Oops, m_value->type());
-                special = ensureCheckSpecial(opcode, 3);
                 break;
             case CheckSub:
                 opcode = opcodeForType(BranchSub32, BranchSub64, Air::Oops, m_value->type());
-                special = ensureCheckSpecial(opcode, 3);
                 break;
             default:
                 RELEASE_ASSERT_NOT_REACHED();
                 break;
             }
 
-            Inst inst(Patch, checkValue, Arg::special(special));
-
-            inst.args.append(Arg::resCond(MacroAssembler::Overflow));
-
             // FIXME: It would be great to fuse Loads into these. We currently don't do it because the
             // rule for stackmaps is that all addresses are just stack addresses. Maybe we could relax
             // this rule here.
             // https://bugs.webkit.org/show_bug.cgi?id=151228
-            
+
+            Arg source;
             if (imm(right) && isValidForm(opcode, Arg::ResCond, Arg::Imm, Arg::Tmp))
-                inst.args.append(imm(right));
+                source = imm(right);
             else
-                inst.args.append(tmp(right));
-            inst.args.append(result);
+                source = tmp(right);
+
+            // There is a really hilarious case that arises when we do BranchAdd32(%x, %x). We won't emit
+            // such code, but the coalescing in our register allocator also does copy propagation, so
+            // although we emit:
+            //
+            //     Move %tmp1, %tmp2
+            //     BranchAdd32 %tmp1, %tmp2
+            //
+            // The register allocator may turn this into:
+            //
+            //     BranchAdd32 %rax, %rax
+            //
+            // Currently we handle this by ensuring that even this kind of addition can be undone. We can
+            // undo it by using the carry flag. It's tempting to get rid of that code and just "fix" this
+            // here by forcing LateUse on the stackmap. If we did that unconditionally, we'd lose a lot of
+            // performance. So it's tempting to do it only if left == right. But that creates an awkward
+            // constraint on Air: it means that Air would not be allowed to do any copy propagation.
+            // Notice that the %rax,%rax situation happened after Air copy-propagated the Move we are
+            // emitting. We know that copy-propagating over that Move causes add-to-self. But what if we
+            // emit something like a Move - or even do other kinds of copy-propagation on tmp's -
+            // somewhere else in this code. The add-to-self situation may only emerge after some other Air
+            // optimizations remove other Move's or identity-like operations. That's why we don't use
+            // LateUse here to take care of add-to-self.
             
+            CheckSpecial* special = ensureCheckSpecial(opcode, 3);
+            
+            Inst inst(Patch, checkValue, Arg::special(special));
+
+            inst.args.append(Arg::resCond(MacroAssembler::Overflow));
+
+            inst.args.append(source);
+            inst.args.append(result);
+
             fillStackmap(inst, checkValue, 2);
 
             m_insts.last().append(WTF::move(inst));
@@ -1588,10 +1632,6 @@ private:
         }
 
         case CheckMul: {
-            // Handle multiplication separately. Multiplication is hard because we have to preserve
-            // both inputs. This requires using three-operand multiplication, even on platforms where
-            // this requires an additional Move.
-
             CheckValue* checkValue = m_value->as<CheckValue>();
 
             Value* left = checkValue->child(0);
@@ -1601,14 +1641,15 @@ private:
 
             Air::Opcode opcode =
                 opcodeForType(BranchMul32, BranchMul64, Air::Oops, checkValue->type());
-            CheckSpecial* special = ensureCheckSpecial(opcode, 4);
+            CheckSpecial* special = ensureCheckSpecial(opcode, 3, Arg::LateUse);
 
             // FIXME: Handle immediates.
             // https://bugs.webkit.org/show_bug.cgi?id=151230
 
+            append(Move, tmp(left), result);
+
             Inst inst(Patch, checkValue, Arg::special(special));
             inst.args.append(Arg::resCond(MacroAssembler::Overflow));
-            inst.args.append(tmp(left));
             inst.args.append(tmp(right));
             inst.args.append(result);
 
@@ -1678,6 +1719,11 @@ private:
             return;
         }
 
+        case B3::Oops: {
+            append(Air::Oops);
+            return;
+        }
+
         default:
             break;
         }
@@ -1709,10 +1755,10 @@ private:
 
 } // anonymous namespace
 
-void lowerToAir(Procedure& procedure, Code& code)
+void lowerToAir(Procedure& procedure)
 {
     PhaseScope phaseScope(procedure, "lowerToAir");
-    LowerToAir lowerToAir(procedure, code);
+    LowerToAir lowerToAir(procedure);
     lowerToAir.run();
 }
 

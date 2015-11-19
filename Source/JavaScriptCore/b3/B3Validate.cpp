@@ -172,6 +172,14 @@ public:
                 VALIDATE(value->child(1)->type() == Int32, ("At ", *value));
                 VALIDATE(isInt(value->type()), ("At ", *value));
                 break;
+            case BitwiseCast:
+                VALIDATE(value->numChildren() == 1, ("At ", *value));
+                VALIDATE(value->type() != value->child(0)->type(), ("At ", *value));
+                VALIDATE(
+                    (value->type() == Int64 && value->child(0)->type() == Double)
+                    || (value->type() == Double && value->child(0)->type() == Int64),
+                    ("At ", *value));
+                break;
             case SExt8:
             case SExt16:
                 VALIDATE(value->numChildren() == 1, ("At ", *value));
@@ -278,6 +286,8 @@ public:
                 VALIDATE(value->numChildren() >= 2, ("At ", *value));
                 VALIDATE(isInt(value->child(0)->type()), ("At ", *value));
                 VALIDATE(isInt(value->child(1)->type()), ("At ", *value));
+                VALIDATE(value->as<StackmapValue>()->constrainedChild(0).rep() == ValueRep::Any, ("At ", *value));
+                VALIDATE(value->as<StackmapValue>()->constrainedChild(1).rep() == ValueRep::Any, ("At ", *value));
                 validateStackmap(value);
                 break;
             case Check:
