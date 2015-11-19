@@ -526,23 +526,23 @@ if (typeof(SDP) == "undefined")
 
 })();
 
-function toSDP(json) {
+function generate(json) {
     var object = JSON.parse(json);
     return SDP.generate(object);
 }
 
-function fromSDP(sdp) {
+function parse(sdp) {
     var object = SDP.parse(sdp);
     return JSON.stringify(object);
 }
 
-function iceCandidateToSDP(json) {
+function generateCandidateLine(json) {
     var candidate = JSON.parse(json);
     return SDP.generateCandidateLine(candidate).substr(2);
 }
 
-function iceCandidateFromSDP(sdpFragment) {
-    var iceInfo = SDP.parse("m=application 0 NONE\r\na=" + sdpFragment + "\r\n").mediaDescriptions[0].ice;
+function parseCandidateLine(candidateLine) {
+    var iceInfo = SDP.parse("m=application 0 NONE\r\na=" + candidateLine + "\r\n").mediaDescriptions[0].ice;
     return JSON.stringify(iceInfo.candidates[0]);
 }
 

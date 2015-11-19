@@ -42,8 +42,8 @@
 
 namespace WebCore {
 
-class DOMWrapperWorld;
 class MediaStreamTrack;
+class SDPProcessor;
 
 typedef Vector<RefPtr<PeerMediaDescription>> MediaDescriptionVector;
 typedef Vector<RefPtr<RTCRtpSender>> RtpSenderVector;
@@ -104,18 +104,12 @@ private:
     virtual void doneGatheringCandidates(unsigned mdescIndex) override;
     virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) override;
 
-    String toSDP(const String& json) const;
-    String fromSDP(const String& sdp) const;
-    String iceCandidateToSDP(const String& json) const;
-    String iceCandidateFromSDP(const String& sdpFragment) const;
-    String sdpConversion(const String& functionName, const String& argument) const;
-
     PeerConnectionBackendClient* m_client;
     std::unique_ptr<MediaEndpoint> m_mediaEndpoint;
 
     Vector<std::function<void ()>> m_operationsQueue;
 
-    mutable RefPtr<DOMWrapperWorld> m_isolatedWorld;
+    std::unique_ptr<SDPProcessor> m_sdpProcessor;
 
     Vector<RefPtr<MediaPayload>> m_defaultAudioPayloads;
     Vector<RefPtr<MediaPayload>> m_defaultVideoPayloads;

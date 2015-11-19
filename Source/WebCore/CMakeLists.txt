@@ -976,6 +976,7 @@ set(WebCore_SOURCES
     Modules/mediastream/RTCStatsReport.cpp
     Modules/mediastream/RTCStatsResponse.cpp
     Modules/mediastream/RTCTrackEvent.cpp
+    Modules/mediastream/SDPProcessor.cpp
     Modules/mediastream/SourceInfo.cpp
     Modules/mediastream/UserMediaController.cpp
     Modules/mediastream/UserMediaRequest.cpp
@@ -2298,7 +2299,6 @@ set(WebCore_SOURCES
     platform/graphics/transforms/TransformationMatrix.cpp
     platform/graphics/transforms/TranslateTransformOperation.cpp
 
-    platform/mediastream/MediaEndpointConfigurationConversions.cpp
     platform/mediastream/MediaEndpointInit.cpp
     platform/mediastream/MediaStreamPrivate.cpp
     platform/mediastream/MediaStreamTrackPrivate.cpp

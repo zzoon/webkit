@@ -31,22 +31,31 @@
 #include "config.h"
 
 #if ENABLE(MEDIA_STREAM)
-#include "MediaEndpointConfigurationConversions.h"
+#include "SDPProcessor.h"
 
+#include "Document.h"
+#include "Frame.h"
+#include "SDPProcessorScriptResource.h"
+#include "ScriptController.h"
+#include "ScriptGlobalObject.h"
+#include "ScriptSourceCode.h"
 #include "inspector/InspectorValues.h"
+#include <bindings/ScriptObject.h>
 
-using namespace JSC;
 using namespace Inspector;
 
 namespace WebCore {
 
-namespace MediaEndpointConfigurationConversions {
+SDPProcessor::SDPProcessor(ScriptExecutionContext* context)
+    : ContextDestructionObserver(context)
+{
+}
 
 // Note that MediaEndpointConfiguration is a "flatter" structure that the JSON representation. For
 // example, the JSON representation has an "ice" object which collects a set of properties under a
 // namespace. MediaEndpointConfiguration has "ice"-prefixes on the corresponding properties.
 
-static RefPtr<InspectorObject> createCandidateObject(IceCandidate* candidate)
+static RefPtr<InspectorObject> createCandidateObject(const IceCandidate* candidate)
 {
     RefPtr<InspectorObject> candidateObject = InspectorObject::create();
 
@@ -106,7 +115,7 @@ static RefPtr<IceCandidate> createCandidate(InspectorObject* candidateObject)
     return candidate;
 }
 
-RefPtr<MediaEndpointConfiguration> fromJSON(const String& json)
+static RefPtr<MediaEndpointConfiguration> configurationFromJSON(const String& json)
 {
     RefPtr<InspectorValue> value;
     if (!InspectorValue::parseJSON(json, value))
@@ -263,7 +272,7 @@ RefPtr<MediaEndpointConfiguration> fromJSON(const String& json)
     return configuration;
 }
 
-RefPtr<IceCandidate> iceCandidateFromJSON(const String& json)
+static RefPtr<IceCandidate> iceCandidateFromJSON(const String& json)
 {
     RefPtr<InspectorValue> value;
     if (!InspectorValue::parseJSON(json, value))
@@ -276,7 +285,7 @@ RefPtr<IceCandidate> iceCandidateFromJSON(const String& json)
     return createCandidate(candidateObject.get());
 }
 
-String toJSON(MediaEndpointConfiguration* configuration)
+static String configurationToJSON(const MediaEndpointConfiguration* configuration)
 {
     RefPtr<InspectorObject> object = InspectorObject::create();
 
@@ -363,11 +372,79 @@ String toJSON(MediaEndpointConfiguration* configuration)
     return object->toJSONString();
 }
 
-String iceCandidateToJSON(IceCandidate* candidate)
+static String iceCandidateToJSON(const IceCandidate* candidate)
 {
     return createCandidateObject(candidate)->toJSONString();
 }
 
+String SDPProcessor::generate(const MediaEndpointConfiguration& configuration) const
+{
+    return callScript("generate", configurationToJSON(&configuration));
+}
+
+RefPtr<MediaEndpointConfiguration> SDPProcessor::parse(const String& sdp) const
+{
+    return configurationFromJSON(callScript("parse", sdp));
+}
+
+String SDPProcessor::generateCandidateLine(const IceCandidate& candidate) const
+{
+    return callScript("generateCandidateLine", iceCandidateToJSON(&candidate));
+}
+
+RefPtr<IceCandidate> SDPProcessor::parseCandidateLine(const String& candidateLine) const
+{
+    return iceCandidateFromJSON(callScript("parseCandidateLine", candidateLine));
+}
+
+String SDPProcessor::callScript(const String& functionName, const String& argument) const
+{
+    if (!scriptExecutionContext())
+        return emptyString();
+
+    Document* document = downcast<Document>(scriptExecutionContext());
+    if (!document->frame())
+        return emptyString();
+
+    if (!m_isolatedWorld)
+        m_isolatedWorld = DOMWrapperWorld::create(JSDOMWindow::commonVM());
+
+    ScriptController& scriptController = document->frame()->script();
+    JSDOMGlobalObject* globalObject = JSC::jsCast<JSDOMGlobalObject*>(scriptController.globalObject(*m_isolatedWorld));
+    JSC::ExecState* exec = globalObject->globalExec();
+    JSC::JSLockHolder lock(exec);
+
+    JSC::JSValue probeFunctionValue = globalObject->get(exec, JSC::Identifier::fromString(exec, "generate"));
+    if (!probeFunctionValue.isFunction()) {
+        URL scriptURL;
+        scriptController.evaluateInWorld(ScriptSourceCode(SDPProcessorScriptResource::scriptString(), scriptURL), *m_isolatedWorld);
+        if (exec->hadException()) {
+            exec->clearException();
+            return emptyString();
+        }
+    }
+
+    JSC::JSValue functionValue = globalObject->get(exec, JSC::Identifier::fromString(exec, functionName));
+    if (!functionValue.isFunction())
+        return emptyString();
+
+    JSC::JSObject* function = functionValue.toObject(exec);
+    JSC::CallData callData;
+    JSC::CallType callType = function->methodTable()->getCallData(function, callData);
+    if (callType == JSC::CallTypeNone)
+        return emptyString();
+
+    JSC::MarkedArgumentBuffer argList;
+    argList.append(JSC::jsString(exec, argument));
+
+    JSC::JSValue result = JSC::call(exec, function, callType, callData, globalObject, argList);
+    if (exec->hadException()) {
+        printf("SDPProcessor::callScript(): %s() threw\n", functionName.ascii().data());
+        exec->clearException();
+        return emptyString();
+    }
+
+    return result.isString() ? result.getString(exec) : emptyString();
 }
 
 } // namespace WebCore

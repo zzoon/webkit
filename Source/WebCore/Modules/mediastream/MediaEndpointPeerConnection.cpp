@@ -37,7 +37,6 @@
 #include "DOMError.h"
 #include "JSDOMError.h"
 #include "JSRTCSessionDescription.h"
-#include "MediaEndpointConfigurationConversions.h"
 #include "MediaStreamTrack.h"
 #include "PeerConnectionBackend.h"
 #include "PeerMediaDescription.h"
@@ -49,18 +48,9 @@
 #include "RTCRtpReceiver.h"
 #include "RTCRtpSender.h"
 #include "RTCTrackEvent.h"
+#include "SDPProcessor.h"
 #include "UUID.h"
 #include <wtf/text/Base64.h>
-
-// FIXME: Headers for sdp.js supported SDP conversion is kept on the side for now
-#include "Document.h"
-#include "Frame.h"
-#include "JSDOMWindow.h"
-#include "SDPProcessorScriptResource.h"
-#include "ScriptController.h"
-#include "ScriptGlobalObject.h"
-#include "ScriptSourceCode.h"
-#include <bindings/ScriptObject.h>
 
 namespace WebCore {
 
@@ -127,6 +117,7 @@ static RefPtr<MediaEndpointInit> createMediaEndpointInit(RTCConfiguration& rtcCo
 
 MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendClient* client)
     : m_client(client)
+    , m_sdpProcessor(std::unique_ptr<SDPProcessor>(new SDPProcessor(m_client->scriptExecutionContext())))
     , m_cname(randomString(16))
     , m_iceUfrag(randomString(4))
     , m_icePassword(randomString(22))
@@ -284,8 +275,8 @@ void MediaEndpointPeerConnection::queuedCreateOffer(RTCOfferOptions& options, Se
         configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
     }
 
-    String json = MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get());
-    RefPtr<RTCSessionDescription> offer = RTCSessionDescription::create("offer", toSDP(json));
+    // FIXME: Handle empty string return value from SDPProcessor
+    RefPtr<RTCSessionDescription> offer = RTCSessionDescription::create("offer", m_sdpProcessor->generate(*configurationSnapshot));
 
     promise.resolve(offer);
     completeQueuedOperation();
@@ -353,8 +344,7 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(RTCAnswerOptions&, SessionD
     RtpSenderVector senders = m_client->getSenders();
     updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
 
-    String json = MediaEndpointConfigurationConversions::toJSON(configurationSnapshot.get());
-    RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", toSDP(json));
+    RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", m_sdpProcessor->generate(*configurationSnapshot));
 
     promise.resolve(answer);
     completeQueuedOperation();
@@ -412,9 +402,7 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         return;
     }
 
-    String json = fromSDP(description.sdp());
-    RefPtr<MediaEndpointConfiguration> parsedConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
-
+    RefPtr<MediaEndpointConfiguration> parsedConfiguration = m_sdpProcessor->parse(description.sdp());
     if (!parsedConfiguration) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
@@ -570,9 +558,7 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
         return;
     }
 
-    String json = fromSDP(description.sdp());
-    RefPtr<MediaEndpointConfiguration> parsedConfiguration = MediaEndpointConfigurationConversions::fromJSON(json);
-
+    RefPtr<MediaEndpointConfiguration> parsedConfiguration = m_sdpProcessor->parse(description.sdp());
     if (!parsedConfiguration) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
@@ -684,8 +670,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate& rtcCand
         return;
     }
 
-    String json = iceCandidateFromSDP(rtcCandidate.candidate());
-    RefPtr<IceCandidate> candidate = MediaEndpointConfigurationConversions::iceCandidateFromJSON(json);
+    RefPtr<IceCandidate> candidate = m_sdpProcessor->parseCandidateLine(rtcCandidate.candidate());
     if (!candidate) {
         // FIXME: Error type?
         promise.reject(DOMError::create("SyntaxError (malformed candidate)"));
@@ -814,8 +799,7 @@ RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::createRTCSessionDescr
     if (!description)
         return nullptr;
 
-    String json = MediaEndpointConfigurationConversions::toJSON(description->configuration());
-    return RTCSessionDescription::create(descriptionTypeToString(description->type()), toSDP(json));
+    return RTCSessionDescription::create(descriptionTypeToString(description->type()), m_sdpProcessor->generate(*description->configuration()));
 }
 
 static String generateFingerprint(const String& certificate)
@@ -882,9 +866,9 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
         }
     }
 
-    String candidateString = MediaEndpointConfigurationConversions::iceCandidateToJSON(candidate.get());
-    String sdpFragment = iceCandidateToSDP(candidateString);
-    RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(sdpFragment, "", mdescIndex);
+    String candidateLine = m_sdpProcessor->generateCandidateLine(*candidate);
+    RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateLine, "", mdescIndex);
+
     m_client->fireEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
 }
 
@@ -933,71 +917,6 @@ void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<Re
     RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create(track.copyRef());
 
     m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false, WTF::move(receiver), WTF::move(track)));
-}
-
-String MediaEndpointPeerConnection::toSDP(const String& json) const
-{
-    return sdpConversion("toSDP", json);
-}
-
-String MediaEndpointPeerConnection::fromSDP(const String& sdp) const
-{
-    return sdpConversion("fromSDP", sdp);
-}
-
-String MediaEndpointPeerConnection::iceCandidateToSDP(const String& json) const
-{
-    return sdpConversion("iceCandidateToSDP", json);
-}
-
-String MediaEndpointPeerConnection::iceCandidateFromSDP(const String& sdpFragment) const
-{
-    return sdpConversion("iceCandidateFromSDP", sdpFragment);
-}
-
-String MediaEndpointPeerConnection::sdpConversion(const String& functionName, const String& argument) const
-{
-    Document* document = downcast<Document>(m_client->scriptExecutionContext());
-
-    if (!m_isolatedWorld)
-        m_isolatedWorld = DOMWrapperWorld::create(JSDOMWindow::commonVM());
-
-    ScriptController& scriptController = document->frame()->script();
-    JSDOMGlobalObject* globalObject = JSC::jsCast<JSDOMGlobalObject*>(scriptController.globalObject(*m_isolatedWorld));
-    JSC::ExecState* exec = globalObject->globalExec();
-    JSC::JSLockHolder lock(exec);
-
-    JSC::JSValue probeFunctionValue = globalObject->get(exec, JSC::Identifier::fromString(exec, "toSDP"));
-    if (!probeFunctionValue.isFunction()) {
-        URL scriptURL;
-        scriptController.evaluateInWorld(ScriptSourceCode(SDPProcessorScriptResource::scriptString(), scriptURL), *m_isolatedWorld);
-        if (exec->hadException()) {
-            exec->clearException();
-            return emptyString();
-        }
-    }
-
-    JSC::JSValue functionValue = globalObject->get(exec, JSC::Identifier::fromString(exec, functionName));
-    if (!functionValue.isFunction())
-        return emptyString();
-
-    JSC::JSObject* function = functionValue.toObject(exec);
-    JSC::CallData callData;
-    JSC::CallType callType = function->methodTable()->getCallData(function, callData);
-    if (callType == JSC::CallTypeNone)
-        return emptyString();
-
-    JSC::MarkedArgumentBuffer argList;
-    argList.append(JSC::jsString(exec, argument));
-
-    JSC::JSValue result = JSC::call(exec, function, callType, callData, globalObject, argList);
-    if (exec->hadException()) {
-        printf("sdpConversion: js function (%s) threw\n", functionName.ascii().data());
-        exec->clearException();
-        return emptyString();
-    }
-
-    return result.isString() ? result.getString(exec) : emptyString();
 }
 
 } // namespace WebCore

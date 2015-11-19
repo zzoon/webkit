@@ -28,27 +28,40 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MediaEndpointConfigurationConversions_h
-#define MediaEndpointConfigurationConversions_h
+#ifndef SDPProcessor_h
+#define SDPProcessor_h
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "ContextDestructionObserver.h"
+#include "IceCandidate.h"
 #include "MediaEndpointConfiguration.h"
+#include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
-namespace MediaEndpointConfigurationConversions {
+class DOMWrapperWorld;
+class ScriptExecutionContext;
 
-RefPtr<MediaEndpointConfiguration> fromJSON(const String&);
-String toJSON(MediaEndpointConfiguration*);
+class SDPProcessor : public ContextDestructionObserver {
+public:
+    SDPProcessor(ScriptExecutionContext*);
 
-RefPtr<IceCandidate> iceCandidateFromJSON(const String&);
-String iceCandidateToJSON(IceCandidate*);
+    String generate(const MediaEndpointConfiguration&) const;
+    RefPtr<MediaEndpointConfiguration> parse(const String& sdp) const;
 
-}
+    String generateCandidateLine(const IceCandidate&) const;
+    RefPtr<IceCandidate> parseCandidateLine(const String& candidateLine) const;
+
+private:
+    String callScript(const String& functionName, const String& argument) const;
+
+    mutable RefPtr<DOMWrapperWorld> m_isolatedWorld;
+};
 
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
 
-#endif // MediaEndpointConfigurationConversions_h
+#endif // SDPProcessor_h
