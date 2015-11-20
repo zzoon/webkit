@@ -301,7 +301,7 @@
     </branch>
   </autotools>
 
-  <autotools id="openh264" autogen-sh="pseudo-configure">
+  <autotools id="openh264" supports-non-srcdir-builds="no" autogen-sh="pseudo-configure">
     <branch module="cisco/openh264/archive/v1.4.0.tar.gz" version="1.4.0"
             checkoutdir="openh264-1.4.0"
             repo="github-https">
@@ -406,7 +406,7 @@
     <branch repo="freedesktop-git" module="libnice/libnice.git" tag="0.1.13" checkoutdir="libnice"/>
   </autotools>
 
-  <autotools id="libvpx"
+  <autotools id="libvpx" supports-non-srcdir-builds="no"
 	autogen-template="./configure --prefix=%(prefix)s --libdir=%(libdir)s --enable-shared --enable-pic --as=yasm --disable-unit-tests ">
 	<branch repo="github.com" module="webmproject/libvpx.git" checkoutdir="libvpx" tag="v1.4.0"/>
   </autotools>
