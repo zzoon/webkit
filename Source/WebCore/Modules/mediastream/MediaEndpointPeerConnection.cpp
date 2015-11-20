@@ -712,7 +712,7 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate& rtcCand
     completeQueuedOperation();
 }
 
-void MediaEndpointPeerConnection::getStats(MediaStreamTrack&, PeerConnection::StatsPromise&& promise)
+void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::StatsPromise&& promise)
 {
     promise.reject(DOMError::create("Not implemented"));
 }

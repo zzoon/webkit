@@ -1,3 +1,65 @@
+2015-11-19  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        Unreviewed, install llvm-static on Fedora to fix build now FTL is enabled
+
+        * gtk/install-dependencies:
+
+2015-11-19  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r192667 and r192668.
+        https://bugs.webkit.org/show_bug.cgi?id=151476
+
+        broke api tests (Requested by alexchristensen on #webkit).
+
+        Reverted changesets:
+
+        "Remove the non-NetworkProcess configurations"
+        https://bugs.webkit.org/show_bug.cgi?id=151418
+        http://trac.webkit.org/changeset/192667
+
+        "Fix GTK Build after r192667."
+        http://trac.webkit.org/changeset/192668
+
+2015-11-19  Alex Christensen  <achristensen@webkit.org>
+
+        Remove the non-NetworkProcess configurations
+        https://bugs.webkit.org/show_bug.cgi?id=151418
+
+        Reviewed by Geoffrey Garen.
+
+        * TestWebKitAPI/Tests/WebKit2/mac/GetPIDAfterAbortedProcessLaunch.cpp:
+        (TestWebKitAPI::TEST):
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::generatePageConfiguration):
+
+2015-11-19  Alexey Proskuryakov  <ap@apple.com>
+
+        LayoutTestRelay processes leak on iOS testers
+        https://bugs.webkit.org/show_bug.cgi?id=151447
+
+        Reviewed by Tim Horton.
+
+        * BuildSlaveSupport/kill-old-processes: Added LayoutTestRelay.
+
+2015-11-19  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] webkitpy is applying abspath to DOS paths, yielding invalid paths
+        https://bugs.webkit.org/show_bug.cgi?id=151156
+
+        Unreviewed test fix.
+        
+        I tracked down the cause of the test regression on the Windows builders. Once I fixed that,
+        I realized that the new 'abs_results_directory' value was not needed, so this change reverts
+        that code.
+
+        * Scripts/webkitpy/port/base.py:
+        (Port.to.start_websocket_server): We don't need a special directory variable on Cygwin anymore.
+        (Port.abs_results_directory): Deleted.
+        * Scripts/webkitpy/port/win.py:
+        (WinPort.__init__): Deleted.
+        (WinPort.abs_results_directory): Deleted.
+        (WinPort.results_directory): Deleted.
+
 2015-11-19  Alexey Proskuryakov  <ap@apple.com>
 
         build.webkit.org/dashboard: Move layoutTestResultsDirectoryURLForIteration implementation to base class

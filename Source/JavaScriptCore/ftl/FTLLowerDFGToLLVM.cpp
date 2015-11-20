@@ -967,6 +967,9 @@ private:
         case CheckWatchdogTimer:
             compileCheckWatchdogTimer();
             break;
+        case CopyRest:
+            compileCopyRest();
+            break;
 
         case PhantomLocal:
         case LoopHint:
@@ -1043,8 +1046,29 @@ private:
     void compilePhi()
     {
 #if FTL_USES_B3
-        LValue phiNode = m_phis.get(m_node->phi());
-        m_out.m_block->append(phiNode);
+        LValue phi = m_phis.get(m_node);
+        m_out.m_block->append(phi);
+
+        switch (m_node->flags() & NodeResultMask) {
+        case NodeResultDouble:
+            setDouble(phi);
+            break;
+        case NodeResultInt32:
+            setInt32(phi);
+            break;
+        case NodeResultInt52:
+            setInt52(phi);
+            break;
+        case NodeResultBoolean:
+            setBoolean(phi);
+            break;
+        case NodeResultJS:
+            setJSValue(phi);
+            break;
+        default:
+            DFG_CRASH(m_graph, m_node, "Bad use kind");
+            break;
+        }
 #else
         LValue source = m_phis.get(m_node);
         
@@ -1496,6 +1520,12 @@ private:
                 break;
             }
 
+#if FTL_USES_B3
+            B3::CheckValue* result =
+                isSub ? m_out.speculateSub(left, right) : m_out.speculateAdd(left, right);
+            blessSpeculation(result, Overflow, noValue(), nullptr, m_origin);
+            setInt32(result);
+#else // FTL_USES_B3
             LValue result;
             if (!isSub) {
                 result = m_out.addWithOverflow32(left, right);
@@ -1530,6 +1560,7 @@ private:
 
             speculate(Overflow, noValue(), 0, m_out.extractValue(result, 1));
             setInt32(m_out.extractValue(result, 0));
+#endif // FTL_USES_B3
             break;
         }
             
@@ -1542,9 +1573,15 @@ private:
                 setInt52(isSub ? m_out.sub(left, right) : m_out.add(left, right), kind);
                 break;
             }
-            
+
             LValue left = lowInt52(m_node->child1());
             LValue right = lowInt52(m_node->child2());
+#if FTL_USES_B3
+            B3::CheckValue* result =
+                isSub ? m_out.speculateSub(left, right) : m_out.speculateAdd(left, right);
+            blessSpeculation(result, Overflow, noValue(), nullptr, m_origin);
+            setInt52(result);
+#else // FTL_USES_B3
 
             LValue result;
             if (!isSub) {
@@ -1580,6 +1617,7 @@ private:
 
             speculate(Int52Overflow, noValue(), 0, m_out.extractValue(result, 1));
             setInt52(m_out.extractValue(result, 0));
+#endif // FTL_USES_B3
             break;
         }
             
@@ -1656,9 +1694,15 @@ private:
             if (!shouldCheckOverflow(m_node->arithMode()))
                 result = m_out.mul(left, right);
             else {
+#if FTL_USES_B3
+                B3::CheckValue* speculation = m_out.speculateMul(left, right);
+                blessSpeculation(speculation, Overflow, noValue(), nullptr, m_origin);
+                result = speculation;
+#else // FTL_USES_B3
                 LValue overflowResult = m_out.mulWithOverflow32(left, right);
                 speculate(Overflow, noValue(), 0, m_out.extractValue(overflowResult, 1));
                 result = m_out.extractValue(overflowResult, 0);
+#endif // FTL_USES_B3
             }
             
             if (shouldCheckNegativeZero(m_node->arithMode())) {
@@ -1684,9 +1728,14 @@ private:
             LValue left = lowWhicheverInt52(m_node->child1(), kind);
             LValue right = lowInt52(m_node->child2(), opposite(kind));
 
+#if FTL_USES_B3
+            B3::CheckValue* result = m_out.speculateMul(left, right);
+            blessSpeculation(result, Overflow, noValue(), nullptr, m_origin);
+#else // FTL_USES_B3
             LValue overflowResult = m_out.mulWithOverflow64(left, right);
             speculate(Int52Overflow, noValue(), 0, m_out.extractValue(overflowResult, 1));
             LValue result = m_out.extractValue(overflowResult, 0);
+#endif // FTL_USES_B3
 
             if (shouldCheckNegativeZero(m_node->arithMode())) {
                 LBasicBlock slowCase = FTL_NEW_BLOCK(m_out, ("ArithMul slow case"));
@@ -3590,6 +3639,28 @@ private:
         
         setJSValue(result);
     }
+
+    void compileCopyRest()
+    {            
+        LBasicBlock doCopyRest = FTL_NEW_BLOCK(m_out, ("CopyRest C call"));
+        LBasicBlock continuation = FTL_NEW_BLOCK(m_out, ("FillRestParameter continuation"));
+
+        LValue numberOfArgumentsToSkip = m_out.constInt32(m_node->numberOfArgumentsToSkip());
+        LValue numberOfArguments = getArgumentsLength().value;
+
+        m_out.branch(
+            m_out.above(numberOfArguments, numberOfArgumentsToSkip),
+            unsure(doCopyRest), unsure(continuation));
+            
+        LBasicBlock lastNext = m_out.appendTo(doCopyRest, continuation);
+        // Arguments: 0:exec, 1:JSCell* array, 2:arguments start, 3:number of arguments to skip, 4:number of arguments
+        vmCall(
+            m_out.voidType,m_out.operation(operationCopyRest), m_callFrame, lowCell(m_node->child1()),
+            getArgumentsStart(), numberOfArgumentsToSkip, numberOfArguments);
+        m_out.jump(continuation);
+
+        m_out.appendTo(continuation, lastNext);
+    }
     
     void compileNewObject()
     {
@@ -4476,7 +4547,11 @@ private:
         }
         
         if (m_node->isBinaryUseKind(UntypedUse)) {
-            nonSpeculativeCompare(LLVMIntEQ, operationCompareEq);
+            nonSpeculativeCompare(
+                [&] (LValue left, LValue right) {
+                    return m_out.equal(left, right);
+                },
+                operationCompareEq);
             return;
         }
 
@@ -4621,22 +4696,50 @@ private:
     
     void compileCompareLess()
     {
-        compare(LLVMIntSLT, LLVMRealOLT, operationCompareLess);
+        compare(
+            [&] (LValue left, LValue right) {
+                return m_out.lessThan(left, right);
+            },
+            [&] (LValue left, LValue right) {
+                return m_out.doubleLessThan(left, right);
+            },
+            operationCompareLess);
     }
     
     void compileCompareLessEq()
     {
-        compare(LLVMIntSLE, LLVMRealOLE, operationCompareLessEq);
+        compare(
+            [&] (LValue left, LValue right) {
+                return m_out.lessThanOrEqual(left, right);
+            },
+            [&] (LValue left, LValue right) {
+                return m_out.doubleLessThanOrEqual(left, right);
+            },
+            operationCompareLessEq);
     }
     
     void compileCompareGreater()
     {
-        compare(LLVMIntSGT, LLVMRealOGT, operationCompareGreater);
+        compare(
+            [&] (LValue left, LValue right) {
+                return m_out.greaterThan(left, right);
+            },
+            [&] (LValue left, LValue right) {
+                return m_out.doubleGreaterThan(left, right);
+            },
+            operationCompareGreater);
     }
     
     void compileCompareGreaterEq()
     {
-        compare(LLVMIntSGE, LLVMRealOGE, operationCompareGreaterEq);
+        compare(
+            [&] (LValue left, LValue right) {
+                return m_out.greaterThanOrEqual(left, right);
+            },
+            [&] (LValue left, LValue right) {
+                return m_out.doubleGreaterThanOrEqual(left, right);
+            },
+            operationCompareGreaterEq);
     }
     
     void compileLogicalNot()
@@ -5153,9 +5256,8 @@ private:
         
         OSRExitDescriptor& exitDescriptor = m_ftlState.jitCode->osrExitDescriptors.last();
         
-        StackmapArgumentList arguments;
-        
-        buildExitArguments(exitDescriptor, arguments, FormattedValue(), exitDescriptor.m_codeOrigin);
+        StackmapArgumentList arguments =
+            buildExitArguments(exitDescriptor, FormattedValue(), exitDescriptor.m_codeOrigin);
         callStackmap(exitDescriptor, arguments);
         
         exitDescriptor.m_isInvalidationPoint = true;
@@ -6478,15 +6580,16 @@ private:
         return m_out.baseIndex(
             heap, storage, m_out.zeroExtPtr(index), provenValue(edge), offset);
     }
-    
+
+    template<typename IntFunctor, typename DoubleFunctor>
     void compare(
-        LIntPredicate intCondition, LRealPredicate realCondition,
+        const IntFunctor& intFunctor, const DoubleFunctor& doubleFunctor,
         S_JITOperation_EJJ helperFunction)
     {
         if (m_node->isBinaryUseKind(Int32Use)) {
             LValue left = lowInt32(m_node->child1());
             LValue right = lowInt32(m_node->child2());
-            setBoolean(m_out.icmp(intCondition, left, right));
+            setBoolean(intFunctor(left, right));
             return;
         }
         
@@ -6494,19 +6597,19 @@ private:
             Int52Kind kind;
             LValue left = lowWhicheverInt52(m_node->child1(), kind);
             LValue right = lowInt52(m_node->child2(), kind);
-            setBoolean(m_out.icmp(intCondition, left, right));
+            setBoolean(intFunctor(left, right));
             return;
         }
         
         if (m_node->isBinaryUseKind(DoubleRepUse)) {
             LValue left = lowDouble(m_node->child1());
             LValue right = lowDouble(m_node->child2());
-            setBoolean(m_out.fcmp(realCondition, left, right));
+            setBoolean(doubleFunctor(left, right));
             return;
         }
         
         if (m_node->isBinaryUseKind(UntypedUse)) {
-            nonSpeculativeCompare(intCondition, helperFunction);
+            nonSpeculativeCompare(intFunctor, helperFunction);
             return;
         }
         
@@ -6557,8 +6660,9 @@ private:
                 m_out.load8ZeroExt32(cell, m_heaps.JSCell_typeInfoFlags),
                 m_out.constInt32(MasqueradesAsUndefined)));
     }
-    
-    void nonSpeculativeCompare(LIntPredicate intCondition, S_JITOperation_EJJ helperFunction)
+
+    template<typename IntFunctor>
+    void nonSpeculativeCompare(const IntFunctor& intFunctor, S_JITOperation_EJJ helperFunction)
     {
         LValue left = lowJSValue(m_node->child1());
         LValue right = lowJSValue(m_node->child2());
@@ -6574,8 +6678,7 @@ private:
         m_out.branch(isNotInt32(right), rarely(slowPath), usually(fastPath));
         
         m_out.appendTo(fastPath, slowPath);
-        ValueFromBlock fastResult = m_out.anchor(
-            m_out.icmp(intCondition, unboxInt32(left), unboxInt32(right)));
+        ValueFromBlock fastResult = m_out.anchor(intFunctor(unboxInt32(left), unboxInt32(right)));
         m_out.jump(continuation);
         
         m_out.appendTo(slowPath, continuation);
@@ -7710,11 +7813,15 @@ private:
     {
 #if FTL_USES_B3
         UNUSED_PARAM(functor);
-        UNUSED_PARAM(userArguments);
 
-        if (verboseCompilationEnabled() || !verboseCompilationEnabled())
-            CRASH();
-        return nullptr;
+        B3::PatchpointValue* result = m_out.patchpoint(B3::Int64);
+        for (LValue arg : userArguments)
+            result->append(ConstrainedValue(arg, ValueRep::SomeRegister));
+        result->setGenerator(
+            [&] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
+                jit.oops();
+            });
+        return result;
 #else
         unsigned stackmapID = m_stackmapIDs++;
 
@@ -8981,8 +9088,8 @@ private:
         exitDescriptor.m_baselineExceptionHandler = *exceptionHandler;
         exitDescriptor.m_stackmapID = m_stackmapIDs - 1;
 
-        StackmapArgumentList freshList;
-        buildExitArguments(exitDescriptor, freshList, noValue(), exitDescriptor.m_codeOrigin, offsetOfExitArguments);
+        StackmapArgumentList freshList =
+            buildExitArguments(exitDescriptor, noValue(), exitDescriptor.m_codeOrigin, offsetOfExitArguments);
         arguments.appendVector(freshList);
     }
 
@@ -9046,22 +9153,13 @@ private:
         if (failCondition == m_out.booleanFalse)
             return;
 
+#if FTL_USES_B3
+        blessSpeculation(
+            m_out.speculate(failCondition), kind, lowValue, highValue, origin, isExceptionHandler);
+#else // FTL_USES_B3
         appendOSRExitDescriptor(kind, isExceptionHandler ? ExceptionType::CCallException : ExceptionType::None, lowValue, highValue, origin);
         OSRExitDescriptor& exitDescriptor = m_ftlState.jitCode->osrExitDescriptors.last();
 
-#if FTL_USES_B3
-        StackmapArgumentList arguments;
-
-        CodeOrigin codeOrigin = exitDescriptor.m_codeOrigin;
-
-        buildExitArguments(exitDescriptor, arguments, lowValue, codeOrigin);
-
-        m_out.check(
-            failCondition, arguments,
-            [&] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
-                jit.oops();
-            });
-#else // FTL_USES_B3
         if (failCondition == m_out.booleanTrue) {
             emitOSRExitCall(exitDescriptor, lowValue);
             return;
@@ -9085,6 +9183,22 @@ private:
 #endif // FTL_USES_B3
     }
 
+#if FTL_USES_B3
+    void blessSpeculation(B3::StackmapValue* value, ExitKind kind, FormattedValue lowValue, Node* highValue, NodeOrigin origin, bool isExceptionHandler = false)
+    {
+        appendOSRExitDescriptor(kind, isExceptionHandler ? ExceptionType::CCallException : ExceptionType::None, lowValue, highValue, origin);
+        OSRExitDescriptor& exitDescriptor = m_ftlState.jitCode->osrExitDescriptors.last();
+        CodeOrigin codeOrigin = exitDescriptor.m_codeOrigin;
+        StackmapArgumentList arguments = buildExitArguments(exitDescriptor, lowValue, codeOrigin);
+        for (LValue child : arguments)
+            value->append(child);
+        value->setGenerator(
+            [&] (CCallHelpers& jit, const B3::StackmapGenerationParams&) {
+                jit.oops();
+            });
+    }
+#endif
+
 #if !FTL_USES_B3
     void emitOSRExitCall(OSRExitDescriptor& exitDescriptor, FormattedValue lowValue)
     {
@@ -9097,6 +9211,16 @@ private:
         callStackmap(exitDescriptor, arguments);
     }
 #endif
+
+    StackmapArgumentList buildExitArguments(
+        OSRExitDescriptor& exitDescriptor, FormattedValue lowValue, CodeOrigin codeOrigin,
+        unsigned offsetOfExitArgumentsInStackmapLocations = 0)
+    {
+        StackmapArgumentList result;
+        buildExitArguments(
+            exitDescriptor, result, lowValue, codeOrigin, offsetOfExitArgumentsInStackmapLocations);
+        return result;
+    }
     
     void buildExitArguments(
         OSRExitDescriptor& exitDescriptor, StackmapArgumentList& arguments, FormattedValue lowValue,

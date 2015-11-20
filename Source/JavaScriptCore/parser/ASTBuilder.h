@@ -121,6 +121,7 @@ public:
     typedef ArrayPatternNode* ArrayPattern;
     typedef ObjectPatternNode* ObjectPattern;
     typedef BindingNode* BindingPattern;
+    typedef AssignmentElementNode* AssignmentElement;
     static const bool CreatesAST = true;
     static const bool NeedsFreeVariableInfo = true;
     static const bool CanUseFunctionCache = true;
@@ -524,6 +525,26 @@ public:
         return pattern->isBindingNode();
     }
 
+    bool isAssignmentLocation(const Expression& pattern)
+    {
+        return pattern->isAssignmentLocation();
+    }
+
+    bool isObjectLiteral(const Expression& node)
+    {
+        return node->isObjectLiteral();
+    }
+
+    bool isArrayLiteral(const Expression& node)
+    {
+        return node->isArrayLiteral();
+    }
+
+    bool isObjectOrArrayLiteral(const Expression& node)
+    {
+        return isObjectLiteral(node) || isArrayLiteral(node);
+    }
+
     StatementNode* createEmptyStatement(const JSTokenLocation& location) { return new (m_parserArena) EmptyStatementNode(location); }
 
     StatementNode* createDeclarationStatement(const JSTokenLocation& location, ExpressionNode* expr, int start, int end)
@@ -834,6 +855,16 @@ public:
     BindingPattern createBindingLocation(const JSTokenLocation&, const Identifier& boundProperty, const JSTextPosition& start, const JSTextPosition& end, AssignmentContext context)
     {
         return new (m_parserArena) BindingNode(boundProperty, start, end, context);
+    }
+
+    RestParameterNode* createRestParameter(const Identifier& name, size_t numParametersToSkip, const JSTextPosition& start, const JSTextPosition& end)
+    {
+        return new (m_parserArena) RestParameterNode(name, numParametersToSkip, start, end);
+    }
+
+    AssignmentElement createAssignmentElement(const Expression& assignmentTarget, const JSTextPosition& start, const JSTextPosition& end)
+    {
+        return new (m_parserArena) AssignmentElementNode(assignmentTarget, start, end);
     }
 
     void setEndOffset(Node* node, int offset)

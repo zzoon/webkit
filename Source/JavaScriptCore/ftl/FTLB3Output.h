@@ -142,9 +142,9 @@ public:
     LValue bitAnd(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::BitAnd, origin(), left, right); }
     LValue bitOr(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::BitOr, origin(), left, right); }
     LValue bitXor(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::BitXor, origin(), left, right); }
-    LValue shl(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Shl, origin(), left, right); }
-    LValue aShr(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::SShr, origin(), left, right); }
-    LValue lShr(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::ZShr, origin(), left, right); }
+    LValue shl(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Shl, origin(), left, castToInt32(right)); }
+    LValue aShr(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::SShr, origin(), left, castToInt32(right)); }
+    LValue lShr(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::ZShr, origin(), left, castToInt32(right)); }
     LValue bitNot(LValue value) { CRASH(); }
 
     LValue insertElement(LValue vector, LValue element, LValue index) { CRASH(); }
@@ -174,18 +174,18 @@ public:
     LValue sensibleDoubleToInt(LValue) { CRASH(); }
 
     LValue signExt(LValue value, LType type) { CRASH(); }
-    LValue zeroExt(LValue value, LType type) { CRASH(); }
-    LValue zeroExtPtr(LValue value) { CRASH(); }
+    LValue zeroExt(LValue value, LType type) { return m_block->appendNew<B3::Value>(m_proc, B3::ZExt32, type, origin(), value); }
+    LValue zeroExtPtr(LValue value) { return zeroExt(value, B3::Int64); }
     LValue fpToInt(LValue value, LType type) { CRASH(); }
     LValue fpToUInt(LValue value, LType type) { CRASH(); }
     LValue fpToInt32(LValue value) { CRASH(); }
     LValue fpToUInt32(LValue value) { CRASH(); }
     LValue intToFP(LValue value, LType type) { CRASH(); }
-    LValue intToDouble(LValue value) { CRASH(); }
+    LValue intToDouble(LValue value) { return m_block->appendNew<B3::Value>(m_proc, B3::IToD, origin(), value); }
     LValue unsignedToFP(LValue value, LType type) { CRASH(); }
     LValue unsignedToDouble(LValue value) { CRASH(); }
     LValue intCast(LValue value, LType type) { CRASH(); }
-    LValue castToInt32(LValue value) { CRASH(); }
+    LValue castToInt32(LValue value) { return m_block->appendNew<B3::Value>(m_proc, B3::Trunc, origin(), value); }
     LValue fpCast(LValue value, LType type) { CRASH(); }
     LValue intToPtr(LValue value, LType type) { CRASH(); }
     LValue ptrToInt(LValue value, LType type) { CRASH(); }
@@ -245,58 +245,90 @@ public:
         return address(field, base, offset + field.offset());
     }
 
-    LValue baseIndex(LValue base, LValue index, Scale, ptrdiff_t offset = 0) { CRASH(); }
+    LValue baseIndex(LValue base, LValue index, Scale, ptrdiff_t offset = 0);
 
-    TypedPointer baseIndex(const AbstractHeap& heap, LValue base, LValue index, Scale scale, ptrdiff_t offset = 0) { CRASH(); }
-    TypedPointer baseIndex(IndexedAbstractHeap& heap, LValue base, LValue index, JSValue indexAsConstant = JSValue(), ptrdiff_t offset = 0) { CRASH(); }
+    TypedPointer baseIndex(const AbstractHeap& heap, LValue base, LValue index, Scale scale, ptrdiff_t offset = 0)
+    {
+        return TypedPointer(heap, baseIndex(base, index, scale, offset));
+    }
+    TypedPointer baseIndex(IndexedAbstractHeap& heap, LValue base, LValue index, JSValue indexAsConstant = JSValue(), ptrdiff_t offset = 0)
+    {
+        return heap.baseIndex(*this, base, index, indexAsConstant, offset);
+    }
 
-    TypedPointer absolute(void* address) { CRASH(); }
+    TypedPointer absolute(void* address)
+    {
+        return TypedPointer(m_heaps->absolute[address], constIntPtr(address));
+    }
 
-    LValue load8SignExt32(LValue base, const AbstractField& field) { CRASH(); }
-    LValue load8ZeroExt32(LValue base, const AbstractField& field) { CRASH(); }
-    LValue load16SignExt32(LValue base, const AbstractField& field) { CRASH(); }
-    LValue load16ZeroExt32(LValue base, const AbstractField& field) { CRASH(); }
-    LValue load32(LValue base, const AbstractField& field) { CRASH(); }
-    LValue load64(LValue base, const AbstractField& field) { CRASH(); }
-    LValue loadPtr(LValue base, const AbstractField& field) { CRASH(); }
-    LValue loadDouble(LValue base, const AbstractField& field) { CRASH(); }
-    void store32(LValue value, LValue base, const AbstractField& field) { CRASH(); }
-    void store64(LValue value, LValue base, const AbstractField& field) { CRASH(); }
-    void storePtr(LValue value, LValue base, const AbstractField& field) { CRASH(); }
-    void storeDouble(LValue value, LValue base, const AbstractField& field) { CRASH(); }
+    LValue load8SignExt32(LValue base, const AbstractField& field) { return load8SignExt32(address(base, field)); }
+    LValue load8ZeroExt32(LValue base, const AbstractField& field) { return load8ZeroExt32(address(base, field)); }
+    LValue load16SignExt32(LValue base, const AbstractField& field) { return load16SignExt32(address(base, field)); }
+    LValue load16ZeroExt32(LValue base, const AbstractField& field) { return load16ZeroExt32(address(base, field)); }
+    LValue load32(LValue base, const AbstractField& field) { return load32(address(base, field)); }
+    LValue load64(LValue base, const AbstractField& field) { return load64(address(base, field)); }
+    LValue loadPtr(LValue base, const AbstractField& field) { return loadPtr(address(base, field)); }
+    LValue loadDouble(LValue base, const AbstractField& field) { return loadDouble(address(base, field)); }
+    void store32(LValue value, LValue base, const AbstractField& field) { store32(value, address(base, field)); }
+    void store64(LValue value, LValue base, const AbstractField& field) { store64(value, address(base, field)); }
+    void storePtr(LValue value, LValue base, const AbstractField& field) { storePtr(value, address(base, field)); }
+    void storeDouble(LValue value, LValue base, const AbstractField& field) { storeDouble(value, address(base, field)); }
 
-    void ascribeRange(LValue loadInstruction, const ValueRange& range) { CRASH(); }
+    // FIXME: Explore adding support for value range constraints to B3. Maybe it could be as simple as having
+    // a load instruction that guarantees that its result is non-negative.
+    // https://bugs.webkit.org/show_bug.cgi?id=151458
+    void ascribeRange(LValue, const ValueRange&) { }
+    LValue nonNegative32(LValue loadInstruction) { return loadInstruction; }
+    LValue load32NonNegative(TypedPointer pointer) { return load32(pointer); }
+    LValue load32NonNegative(LValue base, const AbstractField& field) { return load32(base, field); }
 
-    LValue nonNegative32(LValue loadInstruction) { CRASH(); }
-
-    LValue load32NonNegative(TypedPointer pointer) { CRASH(); }
-    LValue load32NonNegative(LValue base, const AbstractField& field) { CRASH(); }
-
-    LValue icmp(LIntPredicate cond, LValue left, LValue right) { CRASH(); }
-    LValue equal(LValue left, LValue right) { CRASH(); }
-    LValue notEqual(LValue left, LValue right) { CRASH(); }
-    LValue above(LValue left, LValue right) { CRASH(); }
-    LValue aboveOrEqual(LValue left, LValue right) { CRASH(); }
+    LValue equal(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Equal, origin(), left, right); }
+    LValue notEqual(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::NotEqual, origin(), left, right); }
+    LValue above(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Above, origin(), left, right); }
+    LValue aboveOrEqual(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::AboveEqual, origin(), left, right); }
     LValue below(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Below, origin(), left, right); }
-    LValue belowOrEqual(LValue left, LValue right) { CRASH(); }
-    LValue greaterThan(LValue left, LValue right) { CRASH(); }
-    LValue greaterThanOrEqual(LValue left, LValue right) { CRASH(); }
-    LValue lessThan(LValue left, LValue right) { CRASH(); }
-    LValue lessThanOrEqual(LValue left, LValue right) { CRASH(); }
+    LValue belowOrEqual(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::BelowEqual, origin(), left, right); }
+    LValue greaterThan(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::GreaterThan, origin(), left, right); }
+    LValue greaterThanOrEqual(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::GreaterEqual, origin(), left, right); }
+    LValue lessThan(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::LessThan, origin(), left, right); }
+    LValue lessThanOrEqual(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::LessEqual, origin(), left, right); }
 
-    LValue fcmp(LRealPredicate cond, LValue left, LValue right) { CRASH(); }
-    LValue doubleEqual(LValue left, LValue right) { CRASH(); }
-    LValue doubleNotEqualOrUnordered(LValue left, LValue right) { CRASH(); }
-    LValue doubleLessThan(LValue left, LValue right) { CRASH(); }
-    LValue doubleLessThanOrEqual(LValue left, LValue right) { CRASH(); }
-    LValue doubleGreaterThan(LValue left, LValue right) { CRASH(); }
-    LValue doubleGreaterThanOrEqual(LValue left, LValue right) { CRASH(); }
+    LValue doubleEqual(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Equal, origin(), left, right); }
+    LValue doubleNotEqualOrUnordered(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::NotEqual, origin(), left, right); }
+    LValue doubleLessThan(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::LessThan, origin(), left, right); }
+    LValue doubleLessThanOrEqual(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::LessEqual, origin(), left, right); }
+    LValue doubleGreaterThan(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::GreaterThan, origin(), left, right); }
+    LValue doubleGreaterThanOrEqual(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::GreaterEqual, origin(), left, right); }
     LValue doubleEqualOrUnordered(LValue left, LValue right) { CRASH(); }
     LValue doubleNotEqual(LValue left, LValue right) { CRASH(); }
-    LValue doubleLessThanOrUnordered(LValue left, LValue right) { CRASH(); }
-    LValue doubleLessThanOrEqualOrUnordered(LValue left, LValue right) { CRASH(); }
-    LValue doubleGreaterThanOrUnordered(LValue left, LValue right) { CRASH(); }
-    LValue doubleGreaterThanOrEqualOrUnordered(LValue left, LValue right) { CRASH(); }
+    LValue doubleLessThanOrUnordered(LValue left, LValue right)
+    {
+        return m_block->appendNew<B3::Value>(
+            m_proc, B3::Equal, origin(),
+            m_block->appendNew<B3::Value>(m_proc, B3::GreaterEqual, origin(), left, right),
+            int32Zero);
+    }
+    LValue doubleLessThanOrEqualOrUnordered(LValue left, LValue right)
+    {
+        return m_block->appendNew<B3::Value>(
+            m_proc, B3::Equal, origin(),
+            m_block->appendNew<B3::Value>(m_proc, B3::GreaterThan, origin(), left, right),
+            int32Zero);
+    }
+    LValue doubleGreaterThanOrUnordered(LValue left, LValue right)
+    {
+        return m_block->appendNew<B3::Value>(
+            m_proc, B3::Equal, origin(),
+            m_block->appendNew<B3::Value>(m_proc, B3::LessEqual, origin(), left, right),
+            int32Zero);
+    }
+    LValue doubleGreaterThanOrEqualOrUnordered(LValue left, LValue right)
+    {
+        return m_block->appendNew<B3::Value>(
+            m_proc, B3::Equal, origin(),
+            m_block->appendNew<B3::Value>(m_proc, B3::LessThan, origin(), left, right),
+            int32Zero);
+    }
 
     LValue isZero32(LValue value) { return m_block->appendNew<B3::Value>(m_proc, B3::Equal, origin(), value, int32Zero); }
     LValue notZero32(LValue value) { return m_block->appendNew<B3::Value>(m_proc, B3::NotEqual, origin(), value, int32Zero); }
@@ -350,12 +382,43 @@ public:
     void unreachable() { m_block->appendNew<B3::ControlValue>(m_proc, B3::Oops, origin()); }
 
     template<typename Functor>
-    void check(LValue value, const StackmapArgumentList& arguments, const Functor& functor)
+    void speculate(LValue value, const StackmapArgumentList& arguments, const Functor& functor)
     {
-        B3::CheckValue* check = m_block->appendNew<B3::CheckValue>(m_proc, B3::Check, origin(), value);
+        B3::CheckValue* check = speculate(value, arguments);
+        check->setGenerator(functor);
+    }
+
+    B3::CheckValue* speculate(LValue value, const StackmapArgumentList& arguments)
+    {
+        B3::CheckValue* check = speculate(value);
         for (LValue value : arguments)
             check->append(B3::ConstrainedValue(value));
-        check->setGenerator(functor);
+        return check;
+    }
+
+    B3::CheckValue* speculate(LValue value)
+    {
+        return m_block->appendNew<B3::CheckValue>(m_proc, B3::Check, origin(), value);
+    }
+
+    B3::CheckValue* speculateAdd(LValue left, LValue right)
+    {
+        return m_block->appendNew<B3::CheckValue>(m_proc, B3::CheckAdd, origin(), left, right);
+    }
+
+    B3::CheckValue* speculateSub(LValue left, LValue right)
+    {
+        return m_block->appendNew<B3::CheckValue>(m_proc, B3::CheckSub, origin(), left, right);
+    }
+
+    B3::CheckValue* speculateMul(LValue left, LValue right)
+    {
+        return m_block->appendNew<B3::CheckValue>(m_proc, B3::CheckMul, origin(), left, right);
+    }
+
+    B3::PatchpointValue* patchpoint(LType type)
+    {
+        return m_block->appendNew<B3::PatchpointValue>(m_proc, type, origin());
     }
 
     void trap() { CRASH(); }

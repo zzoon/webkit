@@ -214,6 +214,10 @@
   cmd: runES6 :normal
 - path: es6/destructuring_with_strings.js
   cmd: runES6 :normal
+- path: es6/destructuring_assignment_non_simple_target.js
+  cmd: runES6 :normal
+- path: es6/destructuring_initializer_scoping.js
+  cmd: runES6 :normal
 - path: es6/for..of_loops_with_arrays.js
   cmd: runES6 :normal
 - path: es6/for..of_loops_with_astral_plane_strings.js
@@ -747,7 +751,7 @@
 - path: es6/destructuring_iterator_closing.js
   cmd: runES6 :fail
 - path: es6/destructuring_nested_rest.js
-  cmd: runES6 :fail
+  cmd: runES6 :normal
 - path: es6/destructuring_with_generator_instances.js
   cmd: runES6 :fail
 - path: es6/destructuring_with_generic_iterables.js
@@ -1085,15 +1089,15 @@
 - path: es6/RegExp_y_and_u_flags_y_flag_lastIndex.js
   cmd: runES6 :fail
 - path: es6/rest_parameters_arguments_object_interaction.js
-  cmd: runES6 :fail
+  cmd: runES6 :normal
 - path: es6/rest_parameters_basic_functionality.js
-  cmd: runES6 :fail
+  cmd: runES6 :normal
 - path: es6/rest_parameters_cant_be_used_in_setters.js
-  cmd: runES6 :fail
+  cmd: runES6 :normal
 - path: es6/rest_parameters_function_length_property.js
-  cmd: runES6 :fail
+  cmd: runES6 :normal
 - path: es6/rest_parameters_new_Function_support.js
-  cmd: runES6 :fail
+  cmd: runES6 :normal
 - path: es6/Set_iterator_closing.js
   cmd: runES6 :fail
 - path: es6/Set_Set[Symbol.species].js

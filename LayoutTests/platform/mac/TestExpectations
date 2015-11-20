@@ -168,6 +168,12 @@ fast/mediastream/MediaStreamConstructor.html
 fast/mediastream/MediaStreamTrack-clone.html
 fast/mediastream/MediaStreamTrack-kind.html
 fast/mediastream/MediaStreamTrack-stop.html
+fast/mediastream/MediaStream-getTracks.html
+fast/mediastream/RTCSessionDescription.html
+fast/mediastream/enabled.html
+fast/mediastream/MediaStreamTrackEvent-constructor.html
+fast/mediastream/argument-types.html
+fast/mediastream/error.html
 
 # WebRTC is not supported yet.
 fast/mediastream/RTCIceCandidate.html
@@ -185,8 +191,6 @@ fast/mediastream/RTCPeerConnection-have-remote-pranswer.html
 fast/mediastream/RTCPeerConnection-ice.html
 fast/mediastream/RTCPeerConnection-localDescription.html
 fast/mediastream/RTCPeerConnection-onnegotiationneeded.html
-fast/mediastream/RTCPeerConnection-overloaded-operations.html
-fast/mediastream/RTCPeerConnection-overloaded-operations-params.html
 fast/mediastream/RTCPeerConnection-remoteDescription.html
 fast/mediastream/RTCPeerConnection-stats.html
 fast/mediastream/RTCPeerConnection-statsSelector.html
@@ -1407,3 +1411,7 @@ webkit.org/b/150830 [ Mavericks Yosemite ElCapitan ] fast/text/woff2.html [ Imag
 [ Mavericks Yosemite ] media/controls/airplay-picker.html
 
 webkit.org/b/150956 imported/w3c/web-platform-tests/html/semantics/embedded-content/media-elements/event_loadeddata.html [ Pass Timeout ]
+
+webkit.org/b/140217 http/tests/navigation/forward-and-cancel.html [ Pass Failure ]
+
+webkit.org/b/151469 imported/w3c/html-templates/parsing-html-templates/creating-an-element-for-the-token/template-owner-document.html [ Pass Crash ]

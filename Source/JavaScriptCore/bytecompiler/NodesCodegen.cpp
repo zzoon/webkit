@@ -3397,7 +3397,94 @@ void BindingNode::collectBoundIdentifiers(Vector<Identifier>& identifiers) const
 {
     identifiers.append(m_boundProperty);
 }
-    
+
+void AssignmentElementNode::collectBoundIdentifiers(Vector<Identifier>&) const
+{
+}
+
+void AssignmentElementNode::bindValue(BytecodeGenerator& generator, RegisterID* value) const
+{
+    if (m_assignmentTarget->isResolveNode()) {
+        ResolveNode* lhs = static_cast<ResolveNode*>(m_assignmentTarget);
+        Variable var = generator.variable(lhs->identifier());
+        bool isReadOnly = var.isReadOnly();
+        if (RegisterID* local = var.local()) {
+            generator.emitTDZCheckIfNecessary(var, local, nullptr);
+
+            if (isReadOnly)
+                generator.emitReadOnlyExceptionIfNeeded(var);
+            else {
+                generator.invalidateForInContextForLocal(local);
+                generator.moveToDestinationIfNeeded(local, value);
+                generator.emitProfileType(local, divotStart(), divotEnd());
+            }
+            return;
+        }
+        if (generator.isStrictMode())
+            generator.emitExpressionInfo(divotEnd(), divotStart(), divotEnd());
+        RefPtr<RegisterID> scope = generator.emitResolveScope(nullptr, var);
+        generator.emitTDZCheckIfNecessary(var, nullptr, scope.get());
+        if (isReadOnly) {
+            bool threwException = generator.emitReadOnlyExceptionIfNeeded(var);
+            if (threwException)
+                return;
+        }
+        generator.emitExpressionInfo(divotEnd(), divotStart(), divotEnd());
+        if (!isReadOnly) {
+            generator.emitPutToScope(scope.get(), var, value, generator.isStrictMode() ? ThrowIfNotFound : DoNotThrowIfNotFound, NotInitialization);
+            generator.emitProfileType(value, var, divotStart(), divotEnd());
+        }
+    } else if (m_assignmentTarget->isDotAccessorNode()) {
+        DotAccessorNode* lhs = static_cast<DotAccessorNode*>(m_assignmentTarget);
+        RefPtr<RegisterID> base = generator.emitNodeForLeftHandSide(lhs->base(), true, false);
+        generator.emitExpressionInfo(divotEnd(), divotStart(), divotEnd());
+        generator.emitPutById(base.get(), lhs->identifier(), value);
+        generator.emitProfileType(value, divotStart(), divotEnd());
+    } else if (m_assignmentTarget->isBracketAccessorNode()) {
+        BracketAccessorNode* lhs = static_cast<BracketAccessorNode*>(m_assignmentTarget);
+        RefPtr<RegisterID> base = generator.emitNodeForLeftHandSide(lhs->base(), true, false);
+        RefPtr<RegisterID> property = generator.emitNodeForLeftHandSide(lhs->subscript(), true, false);
+        generator.emitExpressionInfo(divotEnd(), divotStart(), divotEnd());
+        generator.emitPutByVal(base.get(), property.get(), value);
+        generator.emitProfileType(value, divotStart(), divotEnd());
+    }
+}
+
+void AssignmentElementNode::toString(StringBuilder& builder) const
+{
+    if (m_assignmentTarget->isResolveNode())
+        builder.append(static_cast<ResolveNode*>(m_assignmentTarget)->identifier().string());
+}
+
+void RestParameterNode::collectBoundIdentifiers(Vector<Identifier>& identifiers) const
+{
+    identifiers.append(m_name);
+}
+void RestParameterNode::toString(StringBuilder& builder) const
+{
+    builder.append(m_name.string());
+}
+void RestParameterNode::bindValue(BytecodeGenerator&, RegisterID*) const
+{
+    RELEASE_ASSERT_NOT_REACHED();
+}
+void RestParameterNode::emit(BytecodeGenerator& generator)
+{
+    Variable var = generator.variable(m_name);
+    if (RegisterID* local = var.local()) {
+        generator.emitRestParameter(local, m_numParametersToSkip);
+        generator.emitProfileType(local, var, m_divotStart, m_divotEnd);
+        return;
+    }
+
+    RefPtr<RegisterID> restParameterArray = generator.emitRestParameter(generator.newTemporary(), m_numParametersToSkip);
+    generator.emitProfileType(restParameterArray.get(), var, m_divotStart, m_divotEnd);
+    RefPtr<RegisterID> scope = generator.emitResolveScope(nullptr, var);
+    generator.emitExpressionInfo(m_divotEnd, m_divotStart, m_divotEnd);
+    generator.emitPutToScope(scope.get(), var, restParameterArray.get(), generator.isStrictMode() ? ThrowIfNotFound : DoNotThrowIfNotFound, Initialization);
+}
+
+
 RegisterID* SpreadExpressionNode::emitBytecode(BytecodeGenerator&, RegisterID*)
 {
     RELEASE_ASSERT_NOT_REACHED();
