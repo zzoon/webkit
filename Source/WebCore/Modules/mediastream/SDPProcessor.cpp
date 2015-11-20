@@ -55,61 +55,61 @@ SDPProcessor::SDPProcessor(ScriptExecutionContext* context)
 // example, the JSON representation has an "ice" object which collects a set of properties under a
 // namespace. MediaEndpointConfiguration has "ice"-prefixes on the corresponding properties.
 
-static RefPtr<InspectorObject> createCandidateObject(const IceCandidate* candidate)
+static RefPtr<InspectorObject> createCandidateObject(const IceCandidate& candidate)
 {
     RefPtr<InspectorObject> candidateObject = InspectorObject::create();
 
-    candidateObject->setString(ASCIILiteral("type"), candidate->type());
-    candidateObject->setString(ASCIILiteral("foundation"), candidate->foundation());
-    candidateObject->setInteger(ASCIILiteral("componentId"), candidate->componentId());
-    candidateObject->setString(ASCIILiteral("transport"), candidate->transport());
-    candidateObject->setInteger(ASCIILiteral("priority"), candidate->priority());
-    candidateObject->setString(ASCIILiteral("address"), candidate->address());
-    candidateObject->setInteger(ASCIILiteral("port"), candidate->port());
-    if (!candidate->tcpType().isEmpty())
-        candidateObject->setString(ASCIILiteral("tcpType"), candidate->tcpType());
-    if (candidate->type().upper() != "HOST") {
-        candidateObject->setString(ASCIILiteral("relatedAddress"), candidate->relatedAddress());
-        candidateObject->setInteger(ASCIILiteral("relatedPort"), candidate->relatedPort());
+    candidateObject->setString(ASCIILiteral("type"), candidate.type());
+    candidateObject->setString(ASCIILiteral("foundation"), candidate.foundation());
+    candidateObject->setInteger(ASCIILiteral("componentId"), candidate.componentId());
+    candidateObject->setString(ASCIILiteral("transport"), candidate.transport());
+    candidateObject->setInteger(ASCIILiteral("priority"), candidate.priority());
+    candidateObject->setString(ASCIILiteral("address"), candidate.address());
+    candidateObject->setInteger(ASCIILiteral("port"), candidate.port());
+    if (!candidate.tcpType().isEmpty())
+        candidateObject->setString(ASCIILiteral("tcpType"), candidate.tcpType());
+    if (candidate.type().upper() != "HOST") {
+        candidateObject->setString(ASCIILiteral("relatedAddress"), candidate.relatedAddress());
+        candidateObject->setInteger(ASCIILiteral("relatedPort"), candidate.relatedPort());
     }
 
     return candidateObject;
 }
 
-static RefPtr<IceCandidate> createCandidate(InspectorObject* candidateObject)
+static RefPtr<IceCandidate> createCandidate(const InspectorObject& candidateObject)
 {
     RefPtr<IceCandidate> candidate = IceCandidate::create();
     String stringValue;
     unsigned intValue;
 
-    if (candidateObject->getString(ASCIILiteral("type"), stringValue))
+    if (candidateObject.getString(ASCIILiteral("type"), stringValue))
         candidate->setType(stringValue);
 
-    if (candidateObject->getString(ASCIILiteral("foundation"), stringValue))
+    if (candidateObject.getString(ASCIILiteral("foundation"), stringValue))
         candidate->setFoundation(stringValue);
 
-    if (candidateObject->getInteger(ASCIILiteral("componentId"), intValue))
+    if (candidateObject.getInteger(ASCIILiteral("componentId"), intValue))
         candidate->setComponentId(intValue);
 
-    if (candidateObject->getString(ASCIILiteral("transport"), stringValue))
+    if (candidateObject.getString(ASCIILiteral("transport"), stringValue))
         candidate->setTransport(stringValue);
 
-    if (candidateObject->getInteger(ASCIILiteral("priority"), intValue))
+    if (candidateObject.getInteger(ASCIILiteral("priority"), intValue))
         candidate->setPriority(intValue);
 
-    if (candidateObject->getString(ASCIILiteral("address"), stringValue))
+    if (candidateObject.getString(ASCIILiteral("address"), stringValue))
         candidate->setAddress(stringValue);
 
-    if (candidateObject->getInteger(ASCIILiteral("port"), intValue))
+    if (candidateObject.getInteger(ASCIILiteral("port"), intValue))
         candidate->setPort(intValue);
 
-    if (candidateObject->getString(ASCIILiteral("tcpType"), stringValue))
+    if (candidateObject.getString(ASCIILiteral("tcpType"), stringValue))
         candidate->setTcpType(stringValue);
 
-    if (candidateObject->getString(ASCIILiteral("relatedAddress"), stringValue))
+    if (candidateObject.getString(ASCIILiteral("relatedAddress"), stringValue))
         candidate->setRelatedAddress(stringValue);
 
-    if (candidateObject->getInteger(ASCIILiteral("relatedPort"), intValue))
+    if (candidateObject.getInteger(ASCIILiteral("relatedPort"), intValue))
         candidate->setRelatedPort(intValue);
 
     return candidate;
@@ -262,7 +262,7 @@ static RefPtr<MediaEndpointConfiguration> configurationFromJSON(const String& js
                 RefPtr<InspectorObject> candidateObject = InspectorObject::create();
                 candidatesArray->get(j)->asObject(candidateObject);
 
-                mdesc->addIceCandidate(createCandidate(candidateObject.get()));
+                mdesc->addIceCandidate(createCandidate(*candidateObject));
             }
         }
 
@@ -282,21 +282,21 @@ static RefPtr<IceCandidate> iceCandidateFromJSON(const String& json)
     if (!value->asObject(candidateObject))
         return nullptr;
 
-    return createCandidate(candidateObject.get());
+    return createCandidate(*candidateObject);
 }
 
-static String configurationToJSON(const MediaEndpointConfiguration* configuration)
+static String configurationToJSON(const MediaEndpointConfiguration& configuration)
 {
     RefPtr<InspectorObject> object = InspectorObject::create();
 
     RefPtr<InspectorObject> originatorObject = InspectorObject::create();
-    originatorObject->setDouble(ASCIILiteral("sessionId"), configuration->sessionId());
-    originatorObject->setInteger(ASCIILiteral("sessionVersion"), configuration->sessionVersion());
+    originatorObject->setDouble(ASCIILiteral("sessionId"), configuration.sessionId());
+    originatorObject->setInteger(ASCIILiteral("sessionVersion"), configuration.sessionVersion());
     object->setObject(ASCIILiteral("originator"), originatorObject);
 
     RefPtr<InspectorArray> mediaDescriptionsArray = InspectorArray::create();
 
-    for (const RefPtr<PeerMediaDescription>& mdesc : configuration->mediaDescriptions()) {
+    for (const RefPtr<PeerMediaDescription>& mdesc : configuration.mediaDescriptions()) {
         RefPtr<InspectorObject> mdescObject = InspectorObject::create();
 
         mdescObject->setString(ASCIILiteral("type"), mdesc->type());
@@ -360,7 +360,7 @@ static String configurationToJSON(const MediaEndpointConfiguration* configuratio
         RefPtr<InspectorArray> candidatesArray = InspectorArray::create();
 
         for (RefPtr<IceCandidate> candidate : mdesc->iceCandidates())
-            candidatesArray->pushObject(createCandidateObject(candidate.get()));
+            candidatesArray->pushObject(createCandidateObject(*candidate));
 
         iceObject->setArray(ASCIILiteral("candidates"), candidatesArray);
         mdescObject->setObject(ASCIILiteral("ice"), iceObject);
@@ -372,14 +372,14 @@ static String configurationToJSON(const MediaEndpointConfiguration* configuratio
     return object->toJSONString();
 }
 
-static String iceCandidateToJSON(const IceCandidate* candidate)
+static String iceCandidateToJSON(const IceCandidate& candidate)
 {
     return createCandidateObject(candidate)->toJSONString();
 }
 
 String SDPProcessor::generate(const MediaEndpointConfiguration& configuration) const
 {
-    return callScript("generate", configurationToJSON(&configuration));
+    return callScript("generate", configurationToJSON(configuration));
 }
 
 RefPtr<MediaEndpointConfiguration> SDPProcessor::parse(const String& sdp) const
@@ -389,7 +389,7 @@ RefPtr<MediaEndpointConfiguration> SDPProcessor::parse(const String& sdp) const
 
 String SDPProcessor::generateCandidateLine(const IceCandidate& candidate) const
 {
-    return callScript("generateCandidateLine", iceCandidateToJSON(&candidate));
+    return callScript("generateCandidateLine", iceCandidateToJSON(candidate));
 }
 
 RefPtr<IceCandidate> SDPProcessor::parseCandidateLine(const String& candidateLine) const
