@@ -316,7 +316,7 @@
   </autotools>
 
   <autotools id="gstreamer" autogenargs="--disable-gtk-doc">
-    <branch repo="freedesktop-git" module="gstreamer/gstreamer" version="1.5" checkoutdir="gstreamer" tag="1.5.2"/>
+    <branch repo="freedesktop-git" module="gstreamer/gstreamer" version="1.7" checkoutdir="gstreamer" tag="61a8c946acb077959dfec78fc6393a5bea17a260"/>
   </autotools>
 
   <autotools id="gst-plugins-base"
@@ -326,7 +326,7 @@
       <dep package="gstreamer"/>
       <dep package="orc"/>
     </dependencies>
-    <branch repo="freedesktop-git" module="gstreamer/gst-plugins-base" version="1.5" checkoutdir="gst-plugins-base" tag="1.5.2"/>
+    <branch repo="freedesktop-git" module="gstreamer/gst-plugins-base" version="1.7" checkoutdir="gst-plugins-base" tag="5f79ccb420d6b270d108892f1c7e3dedbd64b57a"/>
   </autotools>
 
   <autotools id="gst-plugins-good" autogenargs="--disable-examples --disable-soup --disable-gtk-doc">
@@ -335,17 +335,17 @@
       <dep package="libvpx"/>
     </dependencies>
 
-    <branch repo="freedesktop-git" module="gstreamer/gst-plugins-good" version="1.5" checkoutdir="gst-plugins-good" tag="1.5.2"/>
+    <branch repo="freedesktop-git" module="gstreamer/gst-plugins-good" version="1.7" checkoutdir="gst-plugins-good" tag="0d4e3847f0c9106ed345f0316e4954f82332e250"/>
   </autotools>
 
-  <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc --enable-openh264 --enable-opus --enable-srtp -- PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$JHBUILD_PREFIX/lib/pkgconfig">
+  <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc --enable-openh264 --enable-opus --enable-srtp -- PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$JHBUILD_PREFIX/lib/pkgconfig CFLAGS=-Wno-error CPPFLAGS=-Wno-error CXXFLAGS=-Wno-error">
     <dependencies>
       <dep package="gst-plugins-base"/>
       <dep package="libsrtp"/>
       <dep package="openh264"/>
     </dependencies>
 
-    <branch repo="freedesktop-git" module="gstreamer/gst-plugins-bad" version="1.5" checkoutdir="gst-plugins-bad" tag="1.5.2"/>
+    <branch repo="freedesktop-git" module="gstreamer/gst-plugins-bad" version="1.7" checkoutdir="gst-plugins-bad" tag="3d5a1ccbf4e5b036164a02c6bd6b0b0ddab19880"/>
   </autotools>
 
   <autotools id="gst-libav" autogenargs="--with-libav-extra-configure='--disable-yasm' --disable-gtk-doc">
@@ -388,7 +388,7 @@
   </autotools>
 
   <autotools id="libusrsctp" supports-non-srcdir-builds="no" autogen-sh="./bootstrap; ./configure --disable-warnings-as-errors">
-    <branch repo="github.com" module="sctplab/usrsctp.git" checkoutdir="usrsctp" tag="078ff3252f73327e0ac11d6fd5eff62011f6646e"/>
+    <branch repo="github.com" module="sctplab/usrsctp.git" checkoutdir="usrsctp" tag="c53d43ee76673ee281806497eb43750c239c145f"/>
    </autotools>
 
    <autotools id="gst-plugins-openwebrtc" supports-parallel-builds="no" supports-non-srcdir-builds="no" autogen-sh="./autogen.sh; ./configure">
@@ -396,7 +396,7 @@
        <dep package="gst-plugins-base"/>
        <dep package="libusrsctp"/>
      </dependencies>
-    <branch repo="github.com" module="EricssonResearch/openwebrtc-gst-plugins.git" checkoutdir="gst-plugins-openwebrtc" tag="8becd45812122ae53ff130d92aade1075082705a"/>
+    <branch repo="github.com" module="EricssonResearch/openwebrtc-gst-plugins.git" checkoutdir="gst-plugins-openwebrtc" tag="5eb92d7e58a5aec82034d1a6d3f5ef66501172b7"/>
    </autotools>
 
    <autotools id="libnice" supports-non-srcdir-builds="no">
@@ -416,7 +416,7 @@
       <dep package="gst-plugins-openwebrtc"/>
       <dep package="libnice"/>
      </dependencies>
-    <branch repo="github.com" module="EricssonResearch/openwebrtc.git" checkoutdir="openwebrtc" tag="3c1a0e667c9962343af3c1ae6eb71c8734e3ce0e"/>
+    <branch repo="github.com" module="EricssonResearch/openwebrtc.git" checkoutdir="openwebrtc" tag="ee027b7c8019eac8fcb31f03d805bf10c77d9df3"/>
   </autotools>
 
   <autotools id="llvm"
