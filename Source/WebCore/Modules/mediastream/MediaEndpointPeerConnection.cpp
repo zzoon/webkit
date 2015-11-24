@@ -287,7 +287,7 @@ void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, Sessio
     const RefPtr<RTCAnswerOptions> protectedOptions = &options;
     RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTF::move(promise));
 
-    enqueueOperation([this, protectedOptions, wrappedPromise]() mutable {
+    enqueueOperation([this, protectedOptions, wrappedPromise]() {
         queuedCreateAnswer(*protectedOptions, wrappedPromise->promise());
     });
 }
