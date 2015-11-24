@@ -99,7 +99,7 @@ private:
     RefPtr<RTCSessionDescription> createRTCSessionDescription(SessionDescription*) const;
 
     // MediaEndpointClient
-    virtual void gotDtlsCertificate(const String& certificate) override;
+    virtual void gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction) override;
     virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) override;
     virtual void doneGatheringCandidates(unsigned mdescIndex) override;
     virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) override;
@@ -118,6 +118,7 @@ private:
     String m_iceUfrag;
     String m_icePassword;
     String m_dtlsFingerprint;
+    String m_dtlsFingerprintFunction;
     unsigned m_sdpSessionVersion;
 
     RefPtr<SessionDescription> m_currentLocalDescription;

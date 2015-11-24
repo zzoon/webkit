@@ -49,7 +49,7 @@ public:
 
     virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) override;
 
-    virtual void getDtlsCertificate() override;
+    virtual void getDtlsFingerprint() override;
     virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;
     virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() override;
 
@@ -64,7 +64,7 @@ public:
 
     void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&);
     void dispatchGatheringDone(unsigned sessionIndex);
-    void dispatchDtlsCertificate(const String& certificate);
+    void dispatchDtlsFingerprint(gchar* privateKey, gchar* certificate, const String& fingerprint, const String& fingerprintFunction);
     void dispatchRemoteSource(unsigned sessionIndex, RefPtr<RealtimeMediaSource>&&);
 
 private:
@@ -90,6 +90,9 @@ private:
 
     unsigned m_numberOfReceivePreparedSessions;
     unsigned m_numberOfSendPreparedSessions;
+
+    gchar* m_dtlsPrivateKey;
+    gchar* m_dtlsCertificate;
 };
 
 } // namespace WebCore

@@ -128,7 +128,7 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     ASSERT(m_mediaEndpoint);
 
     enqueueOperation([this]() {
-        m_mediaEndpoint->getDtlsCertificate();
+        m_mediaEndpoint->getDtlsFingerprint();
     });
 
     m_defaultAudioPayloads = m_mediaEndpoint->getDefaultAudioPayloads();
@@ -245,7 +245,7 @@ void MediaEndpointPeerConnection::queuedCreateOffer(RTCOfferOptions& options, Se
         mediaDescription->setPayloads(track->kind() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads);
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
-        mediaDescription->setDtlsFingerprintHashFunction("sha-256");
+        mediaDescription->setDtlsFingerprintHashFunction(m_dtlsFingerprintFunction);
         mediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
         mediaDescription->setCname(m_cname);
         mediaDescription->addSsrc(cryptographicallyRandomNumber());
@@ -267,7 +267,7 @@ void MediaEndpointPeerConnection::queuedCreateOffer(RTCOfferOptions& options, Se
         mediaDescription->setPayloads(type == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads);
         mediaDescription->setRtcpMux(true);
         mediaDescription->setDtlsSetup("actpass");
-        mediaDescription->setDtlsFingerprintHashFunction("sha-256");
+        mediaDescription->setDtlsFingerprintHashFunction(m_dtlsFingerprintFunction);
         mediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
         mediaDescription->setIceUfrag(m_iceUfrag);
         mediaDescription->setIcePassword(m_icePassword);
@@ -321,7 +321,7 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(RTCAnswerOptions&, SessionD
             localMediaDescription->setPort(9);
             localMediaDescription->setAddress("0.0.0.0");
             localMediaDescription->setDtlsSetup(remoteMediaDescription->dtlsSetup() == "active" ? "passive" : "active");
-            localMediaDescription->setDtlsFingerprintHashFunction("sha-256");
+            localMediaDescription->setDtlsFingerprintHashFunction(m_dtlsFingerprintFunction);
             localMediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
             localMediaDescription->setCname(m_cname);
             localMediaDescription->setIceUfrag(m_iceUfrag);
@@ -802,45 +802,11 @@ RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::createRTCSessionDescr
     return RTCSessionDescription::create(descriptionTypeToString(description->type()), m_sdpProcessor->generate(*description->configuration()));
 }
 
-static String generateFingerprint(const String& certificate)
+void MediaEndpointPeerConnection::gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction)
 {
-    Vector<String> certificateRows;
-    Vector<uint8_t> der;
+    m_dtlsFingerprint = fingerprint;
+    m_dtlsFingerprintFunction = fingerprintFunction;
 
-    der.reserveCapacity(certificate.length() * 3/4 + 2);
-    certificate.split("\n", certificateRows);
-
-    for (auto& row : certificateRows) {
-        if (row.startsWith("-----"))
-            continue;
-
-        Vector<uint8_t> decodedRow;
-        if (!base64Decode(row, decodedRow, Base64FailOnInvalidCharacterOrExcessPadding)) {
-            ASSERT_NOT_REACHED();
-            return emptyString();
-        }
-        der.appendVector(decodedRow);
-    }
-
-    std::unique_ptr<CryptoDigest> digest = CryptoDigest::create(CryptoAlgorithmIdentifier::SHA_256);
-    if (!digest) {
-        ASSERT_NOT_REACHED();
-        return emptyString();
-    }
-
-    digest->addBytes(der.data(), der.size());
-    Vector<uint8_t> fingerprintVector = digest->computeHash();
-
-    StringBuilder fingerprint;
-    for (unsigned i = 0; i < fingerprintVector.size(); ++i)
-        fingerprint.append(String::format(i ? ":%02X" : "%02X", fingerprintVector[i]));
-
-    return fingerprint.toString();
-}
-
-void MediaEndpointPeerConnection::gotDtlsCertificate(const String& certificate)
-{
-    m_dtlsFingerprint = generateFingerprint(certificate);
     completeQueuedOperation();
 }
 
