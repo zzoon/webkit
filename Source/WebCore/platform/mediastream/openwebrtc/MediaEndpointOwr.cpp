@@ -314,10 +314,13 @@ void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMe
     prepareSession(OWR_SESSION(mediaSession), mediaDescription);
 
     bool useRtpMux = !isInitiator && mediaDescription->rtcpMux();
-    g_object_set(mediaSession, "rtcp-mux", useRtpMux,
-        "cname", mediaDescription->cname().ascii().data(),
-        "send-ssrc", mediaDescription->ssrcs()[0],
-        nullptr);
+    g_object_set(mediaSession, "rtcp-mux", useRtpMux, nullptr);
+
+    if (!mediaDescription->cname().isEmpty() && mediaDescription->ssrcs().size()) {
+        g_object_set(mediaSession, "cname", mediaDescription->cname().ascii().data(),
+            "send-ssrc", mediaDescription->ssrcs()[0],
+            nullptr);
+    }
 
     g_signal_connect(mediaSession, "on-incoming-source", G_CALLBACK(gotIncomingSource), this);
 
