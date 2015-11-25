@@ -50,6 +50,7 @@
 #include "RTCTrackEvent.h"
 #include "SDPProcessor.h"
 #include "UUID.h"
+#include <wtf/MainThread.h>
 #include <wtf/text/Base64.h>
 
 namespace WebCore {
@@ -793,6 +794,8 @@ RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::createRTCSessionDescr
 
 void MediaEndpointPeerConnection::gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction)
 {
+    ASSERT(isMainThread());
+
     m_dtlsFingerprint = fingerprint;
     m_dtlsFingerprintFunction = fingerprintFunction;
 
@@ -801,7 +804,7 @@ void MediaEndpointPeerConnection::gotDtlsFingerprint(const String& fingerprint, 
 
 void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate)
 {
-    ASSERT(scriptExecutionContext()->isContextThread());
+    ASSERT(isMainThread());
 
     PeerMediaDescription& mdesc = *internalLocalDescription()->configuration()->mediaDescriptions()[mdescIndex];
     mdesc.addIceCandidate(candidate.copyRef());
@@ -829,7 +832,7 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
 
 void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
 {
-    ASSERT(scriptExecutionContext()->isContextThread());
+    ASSERT(isMainThread());
 
     const MediaDescriptionVector& mediaDescriptions = internalLocalDescription()->configuration()->mediaDescriptions();
     mediaDescriptions[mdescIndex]->setIceCandidateGatheringDone(true);
@@ -844,7 +847,7 @@ void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
 
 void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&& source)
 {
-    ASSERT(scriptExecutionContext()->isContextThread());
+    ASSERT(isMainThread());
 
     if (m_client->internalSignalingState() == SignalingState::Closed)
         return;
