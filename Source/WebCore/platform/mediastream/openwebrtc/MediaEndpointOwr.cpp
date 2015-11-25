@@ -65,6 +65,8 @@ MediaEndpointOwr::MediaEndpointOwr(MediaEndpointClient* client)
     , m_client(client)
     , m_numberOfReceivePreparedSessions(0)
     , m_numberOfSendPreparedSessions(0)
+    , m_dtlsPrivateKey(nullptr)
+    , m_dtlsCertificate(nullptr)
 {
     initializeOpenWebRTC();
 }
@@ -343,6 +345,9 @@ void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMe
 
 void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs)
 {
+    ASSERT(m_dtlsPrivateKey);
+    ASSERT(m_dtlsCertificate);
+
     if (!m_transportAgent) {
         m_transportAgent = owr_transport_agent_new(false);
 
