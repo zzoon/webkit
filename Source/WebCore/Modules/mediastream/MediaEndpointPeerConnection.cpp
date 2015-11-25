@@ -127,12 +127,10 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     m_mediaEndpoint = MediaEndpoint::create(this);
     ASSERT(m_mediaEndpoint);
 
-    enqueueOperation([this]() {
-        m_mediaEndpoint->getDtlsFingerprint();
-    });
-
     m_defaultAudioPayloads = m_mediaEndpoint->getDefaultAudioPayloads();
     m_defaultVideoPayloads = m_mediaEndpoint->getDefaultVideoPayloads();
+
+    m_mediaEndpoint->getDtlsFingerprint();
 }
 
 MediaEndpointPeerConnection::~MediaEndpointPeerConnection()
@@ -194,19 +192,25 @@ static void updateMediaDescriptionsWithSenders(const MediaDescriptionVector& med
     }
 }
 
-void MediaEndpointPeerConnection::enqueueOperation(std::function<void ()> operation)
+void MediaEndpointPeerConnection::runTask(std::function<void ()> task)
 {
-    m_operationsQueue.append(operation);
-    if (m_operationsQueue.size() == 1)
-        callOnMainThread(m_operationsQueue[0]);
+    // Don't run any tasks until the async initialization is done.
+    if (m_dtlsFingerprint.isNull()) {
+        // Only one task needs to be deferred since it will hold off any others until completed.
+        ASSERT(!m_initialDeferredTask);
+        m_initialDeferredTask = task;
+    }
+    else
+        callOnMainThread(task);
 }
 
-void MediaEndpointPeerConnection::completeQueuedOperation()
+void MediaEndpointPeerConnection::startRunningTasks()
 {
-    ASSERT( m_operationsQueue.size());
-    m_operationsQueue.remove(0);
-    if (!m_operationsQueue.isEmpty())
-        callOnMainThread(m_operationsQueue[0]);
+    if (!m_initialDeferredTask)
+        return;
+
+    m_initialDeferredTask();
+    m_initialDeferredTask = nullptr;
 }
 
 void MediaEndpointPeerConnection::createOffer(RTCOfferOptions& options, SessionDescriptionPromise&& promise)
@@ -214,12 +218,12 @@ void MediaEndpointPeerConnection::createOffer(RTCOfferOptions& options, SessionD
     const RefPtr<RTCOfferOptions> protectedOptions = &options;
     RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTF::move(promise));
 
-    enqueueOperation([this, protectedOptions, wrappedPromise]() {
-        queuedCreateOffer(*protectedOptions, wrappedPromise->promise());
+    runTask([this, protectedOptions, wrappedPromise]() {
+        createOfferTask(*protectedOptions, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedCreateOffer(RTCOfferOptions& options, SessionDescriptionPromise& promise)
+void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions& options, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
@@ -279,7 +283,6 @@ void MediaEndpointPeerConnection::queuedCreateOffer(RTCOfferOptions& options, Se
     RefPtr<RTCSessionDescription> offer = RTCSessionDescription::create("offer", m_sdpProcessor->generate(*configurationSnapshot));
 
     promise.resolve(offer);
-    completeQueuedOperation();
 }
 
 void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, SessionDescriptionPromise&& promise)
@@ -287,19 +290,18 @@ void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, Sessio
     const RefPtr<RTCAnswerOptions> protectedOptions = &options;
     RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTF::move(promise));
 
-    enqueueOperation([this, protectedOptions, wrappedPromise]() {
-        queuedCreateAnswer(*protectedOptions, wrappedPromise->promise());
+    runTask([this, protectedOptions, wrappedPromise]() {
+        createAnswerTask(*protectedOptions, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedCreateAnswer(RTCAnswerOptions&, SessionDescriptionPromise& promise)
+void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
     if (!remoteDescription()) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidStateError (no remote description)"));
-        completeQueuedOperation();
         return;
     }
 
@@ -347,7 +349,6 @@ void MediaEndpointPeerConnection::queuedCreateAnswer(RTCAnswerOptions&, SessionD
     RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", m_sdpProcessor->generate(*configurationSnapshot));
 
     promise.resolve(answer);
-    completeQueuedOperation();
 }
 
 void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& description, VoidPromise&& promise)
@@ -355,8 +356,8 @@ void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& des
     RefPtr<RTCSessionDescription> protectedDescription = &description;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
 
-    enqueueOperation([this, protectedDescription, wrappedPromise]() {
-        queuedSetLocalDescription(*protectedDescription, wrappedPromise->promise());
+    runTask([this, protectedDescription, wrappedPromise]() {
+        setLocalDescriptionTask(*protectedDescription, wrappedPromise->promise());
     });
 }
 
@@ -391,14 +392,13 @@ static bool allSendersRepresented(const RtpSenderVector& senders, const MediaDes
     return true;
 }
 
-void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescription& description, VoidPromise& promise)
+void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription& description, VoidPromise& promise)
 {
     SessionDescription::Type descriptionType = parseDescriptionType(description.type());
 
     if (!localDescriptionTypeValidForState(descriptionType)) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidSessionDescriptionError (bad description type for current state)"));
-        completeQueuedOperation();
         return;
     }
 
@@ -406,7 +406,6 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
     if (!parsedConfiguration) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
-        completeQueuedOperation();
         return;
     }
 
@@ -430,7 +429,6 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         } else if (prepareResult == MediaEndpointPrepareResult::Failed) {
             // FIXME: Error type?
             promise.reject(DOMError::create("IncompatibleSessionDescriptionError (receive configuration)"));
-            completeQueuedOperation();
             return;
         }
     }
@@ -441,7 +439,6 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         if (m_mediaEndpoint->prepareToSend(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpointPrepareResult::Failed) {
             // FIXME: Error type?
             promise.reject(DOMError::create("IncompatibleSessionDescriptionError (send configuration)"));
-            completeQueuedOperation();
             return;
         }
     }
@@ -495,7 +492,6 @@ void MediaEndpointPeerConnection::queuedSetLocalDescription(RTCSessionDescriptio
         m_client->scheduleNegotiationNeededEvent();
 
     promise.resolve(nullptr);
-    completeQueuedOperation();
 }
 
 RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::localDescription() const
@@ -543,12 +539,12 @@ void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription& de
     RefPtr<RTCSessionDescription> protectedDescription = &description;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
 
-    enqueueOperation([this, protectedDescription, wrappedPromise]() {
-        queuedSetRemoteDescription(*protectedDescription, wrappedPromise->promise());
+    runTask([this, protectedDescription, wrappedPromise]() {
+        setRemoteDescriptionTask(*protectedDescription, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescription& description, VoidPromise& promise)
+void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription& description, VoidPromise& promise)
 {
     SessionDescription::Type descriptionType = parseDescriptionType(description.type());
 
@@ -562,7 +558,6 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
     if (!parsedConfiguration) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
-        completeQueuedOperation();
         return;
     }
 
@@ -584,7 +579,6 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
     if (m_mediaEndpoint->prepareToSend(parsedConfiguration.get(), isInitiator) == MediaEndpointPrepareResult::Failed) {
         // FIXME: Error type?
         promise.reject(DOMError::create("IncompatibleSessionDescriptionError (send configuration)"));
-        completeQueuedOperation();
         return;
     }
 
@@ -626,7 +620,6 @@ void MediaEndpointPeerConnection::queuedSetRemoteDescription(RTCSessionDescripti
     }
 
     promise.resolve(nullptr);
-    completeQueuedOperation();
 }
 
 RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::remoteDescription() const
@@ -656,17 +649,16 @@ void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate& rtcCandidate,
     RefPtr<RTCIceCandidate> protectedCandidate = &rtcCandidate;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
 
-    enqueueOperation([this, protectedCandidate, wrappedPromise]() {
-        queuedAddIceCandidate(*protectedCandidate, wrappedPromise->promise());
+    runTask([this, protectedCandidate, wrappedPromise]() {
+        addIceCandidateTask(*protectedCandidate, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate& rtcCandidate, PeerConnection::VoidPromise& promise)
+void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandidate, PeerConnection::VoidPromise& promise)
 {
     if (!remoteDescription()) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidStateError (no remote description)"));
-        completeQueuedOperation();
         return;
     }
 
@@ -674,7 +666,6 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate& rtcCand
     if (!candidate) {
         // FIXME: Error type?
         promise.reject(DOMError::create("SyntaxError (malformed candidate)"));
-        completeQueuedOperation();
         return;
     }
 
@@ -684,7 +675,6 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate& rtcCand
     if (mdescIndex >= remoteMediaDescriptions.size()) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidSdpMlineIndex (sdpMLineIndex out of range"));
-        completeQueuedOperation();
         return;
     }
 
@@ -694,7 +684,6 @@ void MediaEndpointPeerConnection::queuedAddIceCandidate(RTCIceCandidate& rtcCand
     m_mediaEndpoint->addRemoteCandidate(*candidate, mdescIndex, mdesc.iceUfrag(), mdesc.icePassword());
 
     promise.resolve(nullptr);
-    completeQueuedOperation();
 }
 
 void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::StatsPromise&& promise)
@@ -807,7 +796,7 @@ void MediaEndpointPeerConnection::gotDtlsFingerprint(const String& fingerprint, 
     m_dtlsFingerprint = fingerprint;
     m_dtlsFingerprintFunction = fingerprintFunction;
 
-    completeQueuedOperation();
+    startRunningTasks();
 }
 
 void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate)

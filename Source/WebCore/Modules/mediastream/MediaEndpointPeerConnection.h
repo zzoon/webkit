@@ -78,17 +78,16 @@ public:
     void clearNegotiationNeededState() override { m_negotiationNeeded = false; };
 
 private:
+    void runTask(std::function<void ()>);
+    void startRunningTasks();
 
-    void enqueueOperation(std::function<void ()>);
-    void completeQueuedOperation();
+    void createOfferTask(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&);
+    void createAnswerTask(RTCAnswerOptions&, PeerConnection::SessionDescriptionPromise&);
 
-    void queuedCreateOffer(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&);
-    void queuedCreateAnswer(RTCAnswerOptions&, PeerConnection::SessionDescriptionPromise&);
+    void setLocalDescriptionTask(RTCSessionDescription&, PeerConnection::VoidPromise&);
+    void setRemoteDescriptionTask(RTCSessionDescription&, PeerConnection::VoidPromise&);
 
-    void queuedSetLocalDescription(RTCSessionDescription&, PeerConnection::VoidPromise&);
-    void queuedSetRemoteDescription(RTCSessionDescription&, PeerConnection::VoidPromise&);
-
-    void queuedAddIceCandidate(RTCIceCandidate&, PeerConnection::VoidPromise&);
+    void addIceCandidateTask(RTCIceCandidate&, PeerConnection::VoidPromise&);
 
     bool localDescriptionTypeValidForState(SessionDescription::Type) const;
     bool remoteDescriptionTypeValidForState(SessionDescription::Type) const;
@@ -107,7 +106,7 @@ private:
     PeerConnectionBackendClient* m_client;
     std::unique_ptr<MediaEndpoint> m_mediaEndpoint;
 
-    Vector<std::function<void ()>> m_operationsQueue;
+    std::function<void ()> m_initialDeferredTask;
 
     std::unique_ptr<SDPProcessor> m_sdpProcessor;
 
