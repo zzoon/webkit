@@ -73,8 +73,7 @@ MediaEndpointOwr::MediaEndpointOwr(MediaEndpointClient* client)
 
 MediaEndpointOwr::~MediaEndpointOwr()
 {
-    if (m_transportAgent)
-        g_object_unref(m_transportAgent);
+    stop();
 
     g_free(m_dtlsPrivateKey);
     g_free(m_dtlsCertificate);
@@ -267,7 +266,14 @@ void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, unsigned mdes
 
 void MediaEndpointOwr::stop()
 {
-    printf("MediaEndpointOwr::stop\n");
+    if (!m_transportAgent)
+        return;
+
+    for (auto session : m_sessions)
+        owr_media_session_set_send_source(OWR_MEDIA_SESSION(session), nullptr);
+
+    g_object_unref(m_transportAgent);
+    m_transportAgent = nullptr;
 }
 
 unsigned MediaEndpointOwr::sessionIndex(OwrSession* session) const

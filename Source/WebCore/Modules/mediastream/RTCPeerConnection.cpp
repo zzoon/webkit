@@ -81,7 +81,6 @@ RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, RefPtr<RTC
     , m_iceGatheringState(IceGatheringState::New)
     , m_iceConnectionState(IceConnectionState::New)
     , m_configuration(WTF::move(configuration))
-    , m_stopped(false)
 {
     Document& document = downcast<Document>(context);
 
@@ -380,17 +379,15 @@ void RTCPeerConnection::close()
     if (m_signalingState == SignalingState::Closed)
         return;
 
+    m_backend->stop();
+
+    m_iceConnectionState = IceConnectionState::Closed;
     m_signalingState = SignalingState::Closed;
 }
 
 void RTCPeerConnection::stop()
 {
-    if (m_stopped)
-        return;
-
-    m_stopped = true;
-    m_iceConnectionState = IceConnectionState::Closed;
-    m_signalingState = SignalingState::Closed;
+    close();
 }
 
 const char* RTCPeerConnection::activeDOMObjectName() const
