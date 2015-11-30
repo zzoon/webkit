@@ -70,8 +70,8 @@ private:
     RealtimeMediaSourceOwrMap m_sourceMap;
     RefPtr<MediaStreamCreationClient> m_client;
 
-    String m_preferredAudioSourceName;
-    String m_preferredVideoSourceName;
+    Vector<String> m_preferredAudioSourceNames;
+    Vector<String> m_preferredVideoSourceNames;
 };
 
 } // namespace WebCore

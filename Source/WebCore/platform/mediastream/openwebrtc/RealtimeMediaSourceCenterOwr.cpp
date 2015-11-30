@@ -74,13 +74,13 @@ RealtimeMediaSourceCenterOwr::RealtimeMediaSourceCenterOwr()
     initializeOpenWebRTC();
 
     // Temporary solution to hint about preferred device names.
-    char* preferredSourceName = getenv("WEBKIT_AUDIO_SOURCE_NAME");
-    if (preferredSourceName)
-        m_preferredAudioSourceName = String(preferredSourceName);
+    char* envString = getenv("WEBKIT_AUDIO_SOURCE_NAMES");
+    if (envString)
+        String(envString).split(',', false, m_preferredAudioSourceNames);
 
-    preferredSourceName = getenv("WEBKIT_VIDEO_SOURCE_NAME");
-    if (preferredSourceName)
-        m_preferredVideoSourceName = String(preferredSourceName);
+    envString = getenv("WEBKIT_VIDEO_SOURCE_NAMES");
+    if (envString)
+        String(envString).split(',', false, m_preferredVideoSourceNames);
 }
 
 RealtimeMediaSourceCenterOwr::~RealtimeMediaSourceCenterOwr()
@@ -224,10 +224,22 @@ void RealtimeMediaSourceCenterOwr::mediaSourcesAvailable(GList* sources)
     m_client->constraintsValidated(audioSources, videoSources);
 }
 
+static String getNextPreferredSourceName(Vector<String>& sourceNames)
+{
+    if (sourceNames.isEmpty())
+        return emptyString();
+
+    String name = sourceNames.first();
+    sourceNames.remove(0);
+    sourceNames.append(name);
+
+    return name;
+}
+
 PassRefPtr<RealtimeMediaSource> RealtimeMediaSourceCenterOwr::selectSource(RealtimeMediaSource::Type type)
 {
     RefPtr<RealtimeMediaSource> selectedSource = nullptr;
-    const String& preferredSourceName = type == RealtimeMediaSource::Audio ? m_preferredAudioSourceName : m_preferredVideoSourceName;
+    const String& preferredSourceName = getNextPreferredSourceName(type == RealtimeMediaSource::Audio ? m_preferredAudioSourceNames : m_preferredVideoSourceNames);
 
     for (auto iter = m_sourceMap.begin(); iter != m_sourceMap.end(); ++iter) {
         RefPtr<RealtimeMediaSource> source = iter->value;
