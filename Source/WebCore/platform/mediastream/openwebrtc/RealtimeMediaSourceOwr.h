@@ -69,8 +69,6 @@ private:
     OwrMediaSource* m_mediaSource;
 };
 
-typedef HashMap<String, RefPtr<RealtimeMediaSourceOwr>> RealtimeMediaSourceOwrMap;
-
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM) && USE(OPENWEBRTC)

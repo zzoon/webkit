@@ -64,6 +64,8 @@ public:
     RefPtr<TrackSourceInfo> sourceWithUID(const String&, RealtimeMediaSource::Type, MediaConstraints*) override;
 
 private:
+    typedef HashMap<String, RefPtr<RealtimeMediaSourceOwr>> RealtimeMediaSourceOwrMap;
+
     PassRefPtr<RealtimeMediaSource> selectSource(RealtimeMediaSource::Type);
     RealtimeMediaSourceOwrMap m_sourceMap;
     RefPtr<MediaStreamCreationClient> m_client;

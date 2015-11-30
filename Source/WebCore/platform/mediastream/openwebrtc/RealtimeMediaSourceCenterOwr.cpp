@@ -43,10 +43,10 @@
 #include "OpenWebRTCUtilities.h"
 #include "RealtimeMediaSource.h"
 #include "RealtimeMediaSourceCapabilities.h"
-#include "UUID.h"
 #include <owr/owr.h>
 #include <owr/owr_local.h>
 #include <owr/owr_media_source.h>
+#include <wtf/SHA1.h>
 #include <wtf/MainThread.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/glib/GUniquePtr.h>
@@ -169,41 +169,56 @@ bool RealtimeMediaSourceCenterOwr::getMediaStreamTrackSources(PassRefPtr<MediaSt
     return false;
 }
 
+static String getSourceId(OwrMediaSource* source)
+{
+    String idData = String::format("%p", source);
+    SHA1 digest;
+    digest.addBytes(idData.ascii());
+    return String(digest.computeHexDigest().data());
+}
+
 void RealtimeMediaSourceCenterOwr::mediaSourcesAvailable(GList* sources)
 {
     Vector<RefPtr<RealtimeMediaSource>> audioSources;
     Vector<RefPtr<RealtimeMediaSource>> videoSources;
 
+    RealtimeMediaSourceOwrMap newSourceMap;
+
     for (auto item = sources; item; item = item->next) {
         OwrMediaSource* source = OWR_MEDIA_SOURCE(item->data);
+        String id(getSourceId(source));
 
-        GUniqueOutPtr<gchar> name;
-        OwrMediaType mediaType;
-        g_object_get(source, "media-type", &mediaType, "name", &name.outPtr(), NULL);
-        String sourceName(name.get());
-        String id(createCanonicalUUIDString());
-
-        RealtimeMediaSource::Type sourceType;
-        if (mediaType & OWR_MEDIA_TYPE_AUDIO)
-            sourceType = RealtimeMediaSource::Audio;
-        else if (mediaType & OWR_MEDIA_TYPE_VIDEO)
-            sourceType = RealtimeMediaSource::Video;
+        if (m_sourceMap.contains(id))
+            newSourceMap.add(id, m_sourceMap.take(id));
         else {
-            sourceType = RealtimeMediaSource::None;
-            ASSERT_NOT_REACHED();
+            GUniqueOutPtr<gchar> name;
+            OwrMediaType mediaType;
+            g_object_get(source, "media-type", &mediaType, "name", &name.outPtr(), NULL);
+            String sourceName(name.get());
+
+            RealtimeMediaSource::Type sourceType;
+            if (mediaType & OWR_MEDIA_TYPE_AUDIO)
+                sourceType = RealtimeMediaSource::Audio;
+            else if (mediaType & OWR_MEDIA_TYPE_VIDEO)
+                sourceType = RealtimeMediaSource::Video;
+            else {
+                sourceType = RealtimeMediaSource::None;
+                ASSERT_NOT_REACHED();
+            }
+
+            newSourceMap.add(id, adoptRef(new RealtimeMediaSourceOwr(source, id, sourceType, sourceName)));
         }
-
-        RefPtr<RealtimeMediaSourceOwr> mediaSource = adoptRef(new RealtimeMediaSourceOwr(source, id, sourceType, sourceName));
-
-        RealtimeMediaSourceOwrMap::iterator sourceIterator = m_sourceMap.find(id);
-        if (sourceIterator == m_sourceMap.end())
-            m_sourceMap.add(id, mediaSource);
-
-        if (mediaType & OWR_MEDIA_TYPE_AUDIO)
-            audioSources.append(mediaSource);
-        else if (mediaType & OWR_MEDIA_TYPE_VIDEO)
-            videoSources.append(mediaSource);
     }
+
+    // Disconnected sources, left in m_sourceMap, will be discarded by swap
+    m_sourceMap.swap(newSourceMap);
+
+    RefPtr<RealtimeMediaSource> audioSource = selectSource(RealtimeMediaSource::Audio);
+    if (audioSource)
+        audioSources.append(WTF::move(audioSource));
+    RefPtr<RealtimeMediaSource> videoSource = selectSource(RealtimeMediaSource::Video);
+    if (videoSource)
+        videoSources.append(WTF::move(videoSource));
 
     // TODO: Make sure contraints are actually validated by checking source types.
     m_client->constraintsValidated(audioSources, videoSources);
