@@ -141,7 +141,16 @@ MediaEndpointPeerConnection::~MediaEndpointPeerConnection()
 static size_t indexOfSenderWithTrackId(const RtpSenderVector& senders, const String& trackId)
 {
     for (size_t i = 0; i < senders.size(); ++i) {
-        if (senders[i]->track()->id() == trackId)
+        if (senders[i]->trackId() == trackId)
+            return i;
+    }
+    return notFound;
+}
+
+static size_t indexOfMediaDescriptionWithTrackId(const MediaDescriptionVector& mediaDescriptions, const String& trackId)
+{
+    for (size_t i = 0; i < mediaDescriptions.size(); ++i) {
+        if (mediaDescriptions[i]->mediaStreamTrackId() == trackId)
             return i;
     }
     return notFound;
@@ -184,8 +193,8 @@ static void updateMediaDescriptionsWithSenders(const MediaDescriptionVector& med
         RefPtr<RTCRtpSender> sender = takeFirstSenderOfType(senders, mdesc->type());
         if (sender) {
             // FIXME: what else needs to be updated to reuse a media description?
-            mdesc->setMediaStreamId(sender->mediaStreamId());
-            mdesc->setMediaStreamTrackId(sender->track()->id());
+            mdesc->setMediaStreamId(sender->mediaStreamIds()[0]);
+            mdesc->setMediaStreamTrackId(sender->trackId());
             mdesc->addSsrc(cryptographicallyRandomNumber());
             mdesc->setMode("sendrecv");
         } else
@@ -241,7 +250,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions& options, Sess
         RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
         MediaStreamTrack* track = sender->track();
 
-        mediaDescription->setMediaStreamId(sender->mediaStreamId());
+        mediaDescription->setMediaStreamId(sender->mediaStreamIds()[0]);
         mediaDescription->setMediaStreamTrackId(track->id());
         mediaDescription->setType(track->kind());
         mediaDescription->setPort(9);
@@ -380,14 +389,7 @@ static void updateSendSources(const MediaDescriptionVector& localMediaDescriptio
 static bool allSendersRepresented(const RtpSenderVector& senders, const MediaDescriptionVector& mediaDescriptions)
 {
     for (auto& sender : senders) {
-        bool senderIsRepresented = false;
-        for (auto& mdesc : mediaDescriptions) {
-            if (mdesc->mediaStreamTrackId() == sender->track()->id()) {
-                senderIsRepresented = true;
-                break;
-            }
-        }
-        if (!senderIsRepresented)
+        if (indexOfMediaDescriptionWithTrackId(mediaDescriptions, sender->trackId()) == notFound)
             return false;
     }
     return true;
@@ -690,6 +692,36 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
 void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::StatsPromise&& promise)
 {
     promise.reject(DOMError::create("Not implemented"));
+}
+
+void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, MediaStreamTrack& withTrack, PeerConnection::VoidPromise&& promise)
+{
+    RefPtr<RTCRtpSender> protectedSender = &sender;
+    RefPtr<MediaStreamTrack> protectedTrack = &withTrack;
+    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
+
+    runTask([this, protectedSender, protectedTrack, wrappedPromise]() {
+        replaceTrackTask(*protectedSender, *protectedTrack, wrappedPromise->promise());
+    });
+}
+
+void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, MediaStreamTrack& withTrack, PeerConnection::VoidPromise& promise)
+{
+    if (!internalRemoteDescription())
+        return;
+
+    SessionDescription* localDescription = internalLocalDescription();
+    if (!localDescription)
+        return;
+
+    const MediaDescriptionVector& mediaDescriptions = localDescription->configuration()->mediaDescriptions();
+    size_t mdescIndex = indexOfMediaDescriptionWithTrackId(mediaDescriptions, sender.trackId());
+    if (mdescIndex == notFound)
+        return;
+
+    m_mediaEndpoint->replaceSendSource(*withTrack.source(), mdescIndex);
+
+    promise.resolve(nullptr);
 }
 
 void MediaEndpointPeerConnection::stop()

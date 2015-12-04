@@ -58,6 +58,8 @@ public:
 
     virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
 
+    virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) override;
+
     virtual void stop() override;
 
     unsigned sessionIndex(OwrSession*) const;

@@ -41,6 +41,7 @@
 // FIXME: Workaround for bindings bug http://webkit.org/b/150121
 #include "JSMediaStream.h"
 #include "PeerConnectionBackend.h"
+#include "RTCRtpSender.h"
 #include "ScriptWrappable.h"
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
@@ -55,11 +56,10 @@ class RTCDataChannel;
 class RTCIceCandidate;
 class RTCPeerConnectionErrorCallback;
 class RTCRtpReceiver;
-class RTCRtpSender;
 class RTCSessionDescription;
 class RTCStatsCallback;
 
-class RTCPeerConnection final : public RefCounted<RTCPeerConnection>, public ScriptWrappable, public PeerConnectionBackendClient, public EventTargetWithInlineData, public ActiveDOMObject {
+class RTCPeerConnection final : public RefCounted<RTCPeerConnection>, public ScriptWrappable, public PeerConnectionBackendClient, public RTCRtpSenderClient, public EventTargetWithInlineData, public ActiveDOMObject {
 public:
     static RefPtr<RTCPeerConnection> create(ScriptExecutionContext&, const Dictionary& rtcConfiguration, ExceptionCode&);
     ~RTCPeerConnection();
@@ -130,6 +130,9 @@ private:
     PeerConnectionStates::SignalingState internalSignalingState() const override { return m_signalingState; }
     PeerConnectionStates::IceGatheringState internalIceGatheringState() const override { return m_iceGatheringState; }
     PeerConnectionStates::IceConnectionState internalIceConnectionState() const override { return m_iceConnectionState; }
+
+    // RTCRtpSenderClient
+    void replaceTrack(RTCRtpSender&, MediaStreamTrack&, PeerConnection::VoidPromise&&) override;
 
     PeerConnectionStates::SignalingState m_signalingState;
     PeerConnectionStates::IceGatheringState m_iceGatheringState;

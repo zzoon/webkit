@@ -71,6 +71,8 @@ public:
 
     void getStats(MediaStreamTrack*, PeerConnection::StatsPromise&&) override;
 
+    void replaceTrack(RTCRtpSender&, MediaStreamTrack&, PeerConnection::VoidPromise&&) override;
+
     void stop() override;
 
     bool isNegotiationNeeded() const override { return m_negotiationNeeded; };
@@ -88,6 +90,8 @@ private:
     void setRemoteDescriptionTask(RTCSessionDescription&, PeerConnection::VoidPromise&);
 
     void addIceCandidateTask(RTCIceCandidate&, PeerConnection::VoidPromise&);
+
+    void replaceTrackTask(RTCRtpSender&, MediaStreamTrack&, PeerConnection::VoidPromise&);
 
     bool localDescriptionTypeValidForState(SessionDescription::Type) const;
     bool remoteDescriptionTypeValidForState(SessionDescription::Type) const;

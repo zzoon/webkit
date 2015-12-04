@@ -264,6 +264,13 @@ void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, unsigned mdes
     internalAddRemoteCandidate(m_sessions[mdescIndex], candidate, ufrag, password);
 }
 
+void MediaEndpointOwr::replaceSendSource(RealtimeMediaSource& newSource, unsigned mdescIndex)
+{
+    RealtimeMediaSourceOwr& owrSource = static_cast<RealtimeMediaSourceOwr&>(newSource);
+    // FIXME: An OWR bug prevents this from succeeding
+    owr_media_session_set_send_source(OWR_MEDIA_SESSION(m_sessions[mdescIndex]), owrSource.mediaSource());
+}
+
 void MediaEndpointOwr::stop()
 {
     if (!m_transportAgent)

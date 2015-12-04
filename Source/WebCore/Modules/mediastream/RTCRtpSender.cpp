@@ -33,13 +33,41 @@
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "ExceptionCode.h"
+#include "DOMError.h"
+#include "JSDOMError.h"
+
 namespace WebCore {
 
-RTCRtpSender::RTCRtpSender(RefPtr<MediaStreamTrack>&& track, const String& mediaStreamId)
+RTCRtpSender::RTCRtpSender(RefPtr<MediaStreamTrack>&& track, Vector<String>&& mediaStreamIds, RTCRtpSenderClient& client)
     : RTCRtpSenderReceiverBase(WTF::move(track))
-    , m_mediaStreamId(mediaStreamId)
+    , m_mediaStreamIds(WTF::move(mediaStreamIds))
+    , m_client(&client)
 {
+    // The original track id is always used in negotiation even if the track is replaced.
+    m_trackId = m_track->id();
 }
+
+void RTCRtpSender::replaceTrack(MediaStreamTrack* withTrack, PeerConnection::VoidPromise&& promise, ExceptionCode& ec)
+{
+    if (!withTrack) {
+        ec = TypeError;
+        return;
+    }
+
+    if (!m_client) {
+        promise.reject(DOMError::create("InvalidStateError"));
+        return;
+    }
+
+    if (m_track->kind() != withTrack->kind()) {
+        promise.reject(DOMError::create("TypeError"));
+        return;
+    }
+
+    m_client->replaceTrack(*this, *withTrack, WTF::move(promise));
+}
+
 
 } // namespace WebCore
 

@@ -80,6 +80,8 @@ public:
 
     virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) = 0;
 
+    virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) = 0;
+
     virtual void stop() = 0;
 };
 

@@ -145,8 +145,12 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
         return nullptr;
     }
 
+    Vector<String> mediaStreamIds;
+    for (auto stream : streams)
+        mediaStreamIds.append(stream->id());
+
     const String& trackId = track->id();
-    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track), streams[0]->id());
+    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track), WTF::move(mediaStreamIds), *this);
     m_senderSet.add(trackId, sender);
 
     m_backend->markAsNeedingNegotiation();
@@ -166,8 +170,10 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
         return;
     }
 
-    if (!m_senderSet.remove(sender->track()->id()))
+    if (!m_senderSet.remove(sender->trackId()))
         return;
+
+    sender->invalidateClient();
 
     m_backend->markAsNeedingNegotiation();
 }
@@ -383,6 +389,9 @@ void RTCPeerConnection::close()
 
     m_iceConnectionState = IceConnectionState::Closed;
     m_signalingState = SignalingState::Closed;
+
+    for (auto& sender : m_senderSet.values())
+        sender->invalidateClient();
 }
 
 void RTCPeerConnection::stop()
@@ -437,6 +446,11 @@ void RTCPeerConnection::scheduleNegotiationNeededEvent()
 void RTCPeerConnection::fireEvent(Event& event)
 {
     dispatchEvent(event);
+}
+
+void RTCPeerConnection::replaceTrack(RTCRtpSender& sender, MediaStreamTrack& withTrack, PeerConnection::VoidPromise&& promise)
+{
+    m_backend->replaceTrack(sender, withTrack, WTF::move(promise));
 }
 
 } // namespace WebCore
