@@ -392,6 +392,11 @@ bool RTCPeerConnection::canSuspendForPageCache() const
     return false;
 }
 
+void RTCPeerConnection::addReceiver(RTCRtpReceiver& receiver)
+{
+    m_receiverSet.append(&receiver);
+}
+
 void RTCPeerConnection::setSignalingState(SignalingState newState)
 {
     m_signalingState = newState;

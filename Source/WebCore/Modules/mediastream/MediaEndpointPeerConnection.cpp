@@ -906,6 +906,7 @@ void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<Re
     RefPtr<MediaStreamTrack> track = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *trackPrivate);
     RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create(track.copyRef());
 
+    m_client->addReceiver(*receiver);
     m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false, WTF::move(receiver), WTF::move(track)));
 }
 

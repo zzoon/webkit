@@ -120,6 +120,7 @@ private:
     bool canSuspendForPageCache() const override;
 
     // PeerConnectionBackendClient
+    void addReceiver(RTCRtpReceiver&) override;
     void setSignalingState(PeerConnectionStates::SignalingState) override;
     void updateIceGatheringState(PeerConnectionStates::IceGatheringState) override;
     void updateIceConnectionState(PeerConnectionStates::IceConnectionState) override;
