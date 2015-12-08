@@ -117,14 +117,14 @@ void MediaPlayerPrivateGStreamerOwr::load(const String &url)
     notImplemented();
 }
 
-void MediaPlayerPrivateGStreamerOwr::load(MediaStreamPrivate* streamPrivate)
+void MediaPlayerPrivateGStreamerOwr::load(MediaStreamPrivate& streamPrivate)
 {
     if (!initializeGStreamer())
         return;
 
-    LOG_MEDIA_MESSAGE("Loading MediaStreamPrivate %p", streamPrivate);
+    LOG_MEDIA_MESSAGE("Loading MediaStreamPrivate %p", &streamPrivate);
 
-    m_streamPrivate = streamPrivate;
+    m_streamPrivate = &streamPrivate;
     if (!m_streamPrivate || !m_streamPrivate->active()) {
         loadingFailed(MediaPlayer::NetworkError);
         return;
@@ -296,6 +296,11 @@ void MediaPlayerPrivateGStreamerOwr::sourceStopped()
 void MediaPlayerPrivateGStreamerOwr::sourceMutedChanged()
 {
     LOG_MEDIA_MESSAGE("Source muted state changed");
+}
+
+void MediaPlayerPrivateGStreamerOwr::sourceStatesChanged()
+{
+    LOG_MEDIA_MESSAGE("Source states changed");
 }
 
 bool MediaPlayerPrivateGStreamerOwr::preventSourceFromStopping()
