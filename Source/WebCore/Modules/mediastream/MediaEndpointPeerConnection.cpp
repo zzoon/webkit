@@ -233,7 +233,7 @@ void MediaEndpointPeerConnection::createOffer(RTCOfferOptions& options, SessionD
     });
 }
 
-void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions& options, SessionDescriptionPromise& promise)
+void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
@@ -263,26 +263,6 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions& options, Sess
         mediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
         mediaDescription->setCname(m_cname);
         mediaDescription->addSsrc(cryptographicallyRandomNumber());
-        mediaDescription->setIceUfrag(m_iceUfrag);
-        mediaDescription->setIcePassword(m_icePassword);
-
-        configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
-    }
-
-    int extraMediaDescriptionCount = options.offerToReceiveAudio() + options.offerToReceiveVideo();
-    for (int i = 0; i < extraMediaDescriptionCount; ++i) {
-        String type = i < options.offerToReceiveAudio() ? "audio" : "video";
-        RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
-
-        mediaDescription->setType(type);
-        mediaDescription->setPort(9);
-        mediaDescription->setAddress("0.0.0.0");
-        mediaDescription->setMode("recvonly");
-        mediaDescription->setPayloads(type == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads);
-        mediaDescription->setRtcpMux(true);
-        mediaDescription->setDtlsSetup("actpass");
-        mediaDescription->setDtlsFingerprintHashFunction(m_dtlsFingerprintFunction);
-        mediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
         mediaDescription->setIceUfrag(m_iceUfrag);
         mediaDescription->setIcePassword(m_icePassword);
 
