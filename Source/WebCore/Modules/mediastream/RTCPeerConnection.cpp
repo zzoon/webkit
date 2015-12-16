@@ -131,7 +131,6 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
     for (auto stream : streams)
         mediaStreamIds.append(stream->id());
 
-    const String& trackId = track->id();
     RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track), WTF::move(mediaStreamIds), *this);
     m_senderSet.append(sender);
 
