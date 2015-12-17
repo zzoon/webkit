@@ -377,34 +377,62 @@ static String iceCandidateToJSON(const IceCandidate& candidate)
     return createCandidateObject(candidate)->toJSONString();
 }
 
-String SDPProcessor::generate(const MediaEndpointConfiguration& configuration) const
+SDPProcessor::Result SDPProcessor::generate(const MediaEndpointConfiguration& configuration, String& outSdpString) const
 {
-    return callScript("generate", configurationToJSON(configuration));
+    String sdpString;
+    if (!callScript("generate", configurationToJSON(configuration), sdpString))
+        return Result::InternalError;
+
+    outSdpString = sdpString;
+    return Result::Success;
 }
 
-RefPtr<MediaEndpointConfiguration> SDPProcessor::parse(const String& sdp) const
+SDPProcessor::Result SDPProcessor::parse(const String& sdp, RefPtr<MediaEndpointConfiguration>& outConfiguration) const
 {
-    return configurationFromJSON(callScript("parse", sdp));
+    String jsonString;
+    if (!callScript("parse", sdp, jsonString))
+        return Result::InternalError;
+
+    RefPtr<MediaEndpointConfiguration> configuration = configurationFromJSON(jsonString);
+    if (!configuration)
+        return Result::InternalError;
+
+    outConfiguration = configuration;
+    return Result::Success;
 }
 
-String SDPProcessor::generateCandidateLine(const IceCandidate& candidate) const
+SDPProcessor::Result SDPProcessor::generateCandidateLine(const IceCandidate& candidate, String& outCandidateLine) const
 {
-    return callScript("generateCandidateLine", iceCandidateToJSON(candidate));
+    String candidateLine;
+    if (!callScript("generateCandidateLine", iceCandidateToJSON(candidate), candidateLine))
+        return Result::InternalError;
+
+    outCandidateLine = candidateLine;
+    return Result::Success;
 }
 
-RefPtr<IceCandidate> SDPProcessor::parseCandidateLine(const String& candidateLine) const
+SDPProcessor::Result SDPProcessor::parseCandidateLine(const String& candidateLine, RefPtr<IceCandidate>& outCandidate) const
 {
-    return iceCandidateFromJSON(callScript("parseCandidateLine", candidateLine));
+    String scriptOutput;
+    if (!callScript("parseCandidateLine", candidateLine, scriptOutput))
+        return Result::InternalError;
+
+    RefPtr<IceCandidate> candidate = iceCandidateFromJSON(scriptOutput);
+    if (!candidate)
+        return Result::InternalError;
+
+    outCandidate = candidate;
+    return Result::Success;
 }
 
-String SDPProcessor::callScript(const String& functionName, const String& argument) const
+bool SDPProcessor::callScript(const String& functionName, const String& argument, String& outResult) const
 {
     if (!scriptExecutionContext())
-        return emptyString();
+        return false;
 
     Document* document = downcast<Document>(scriptExecutionContext());
     if (!document->frame())
-        return emptyString();
+        return false;
 
     if (!m_isolatedWorld)
         m_isolatedWorld = DOMWrapperWorld::create(JSDOMWindow::commonVM());
@@ -420,19 +448,19 @@ String SDPProcessor::callScript(const String& functionName, const String& argume
         scriptController.evaluateInWorld(ScriptSourceCode(SDPProcessorScriptResource::scriptString(), scriptURL), *m_isolatedWorld);
         if (exec->hadException()) {
             exec->clearException();
-            return emptyString();
+            return false;
         }
     }
 
     JSC::JSValue functionValue = globalObject->get(exec, JSC::Identifier::fromString(exec, functionName));
     if (!functionValue.isFunction())
-        return emptyString();
+        return false;
 
     JSC::JSObject* function = functionValue.toObject(exec);
     JSC::CallData callData;
     JSC::CallType callType = function->methodTable()->getCallData(function, callData);
     if (callType == JSC::CallTypeNone)
-        return emptyString();
+        return false;
 
     JSC::MarkedArgumentBuffer argList;
     argList.append(JSC::jsString(exec, argument));
@@ -441,10 +469,14 @@ String SDPProcessor::callScript(const String& functionName, const String& argume
     if (exec->hadException()) {
         printf("SDPProcessor::callScript(): %s() threw\n", functionName.ascii().data());
         exec->clearException();
-        return emptyString();
+        return false;
     }
 
-    return result.isString() ? result.getString(exec) : emptyString();
+    if (!result.isString())
+        return false;
+
+     outResult = result.getString(exec);
+     return true;
 }
 
 } // namespace WebCore

@@ -46,16 +46,22 @@ class ScriptExecutionContext;
 
 class SDPProcessor : public ContextDestructionObserver {
 public:
+    enum class Result {
+        Success = 1,
+        InternalError = 2,
+        ParseError = 3
+    };
+
     SDPProcessor(ScriptExecutionContext*);
 
-    String generate(const MediaEndpointConfiguration&) const;
-    RefPtr<MediaEndpointConfiguration> parse(const String& sdp) const;
+    Result generate(const MediaEndpointConfiguration&, String& outSdpString) const;
+    Result parse(const String& sdp, RefPtr<MediaEndpointConfiguration>&) const;
 
-    String generateCandidateLine(const IceCandidate&) const;
-    RefPtr<IceCandidate> parseCandidateLine(const String& candidateLine) const;
+    Result generateCandidateLine(const IceCandidate&, String& outCandidateLine) const;
+    Result parseCandidateLine(const String& candidateLine, RefPtr<IceCandidate>&) const;
 
 private:
-    String callScript(const String& functionName, const String& argument) const;
+    bool callScript(const String& functionName, const String& argument, String& outResult) const;
 
     mutable RefPtr<DOMWrapperWorld> m_isolatedWorld;
 };

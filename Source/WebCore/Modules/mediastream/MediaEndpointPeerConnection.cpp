@@ -269,10 +269,12 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
     }
 
-    // FIXME: Handle empty string return value from SDPProcessor
-    RefPtr<RTCSessionDescription> offer = RTCSessionDescription::create("offer", m_sdpProcessor->generate(*configurationSnapshot));
+    String sdpString;
+    SDPProcessor::Result result = m_sdpProcessor->generate(*configurationSnapshot, sdpString);
+    if (result != SDPProcessor::Result::Success)
+        return;
 
-    promise.resolve(offer);
+    promise.resolve(RTCSessionDescription::create("offer", sdpString));
 }
 
 void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, SessionDescriptionPromise&& promise)
@@ -336,9 +338,12 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
     RtpSenderVector senders = m_client->getSenders();
     updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
 
-    RefPtr<RTCSessionDescription> answer = RTCSessionDescription::create("answer", m_sdpProcessor->generate(*configurationSnapshot));
+    String sdpString;
+    SDPProcessor::Result result = m_sdpProcessor->generate(*configurationSnapshot, sdpString);
+    if (result != SDPProcessor::Result::Success)
+        return;
 
-    promise.resolve(answer);
+    promise.resolve(RTCSessionDescription::create("answer", sdpString));
 }
 
 void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& description, VoidPromise&& promise)
@@ -385,10 +390,11 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
         return;
     }
 
-    RefPtr<MediaEndpointConfiguration> parsedConfiguration = m_sdpProcessor->parse(description.sdp());
-    if (!parsedConfiguration) {
-        // FIXME: Error type?
-        promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
+    RefPtr<MediaEndpointConfiguration> parsedConfiguration;
+    SDPProcessor::Result result = m_sdpProcessor->parse(description.sdp(), parsedConfiguration);
+    if (result != SDPProcessor::Result::Success) {
+        if (result == SDPProcessor::Result::ParseError)
+            promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
         return;
     }
 
@@ -537,10 +543,11 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
         return;
     }
 
-    RefPtr<MediaEndpointConfiguration> parsedConfiguration = m_sdpProcessor->parse(description.sdp());
-    if (!parsedConfiguration) {
-        // FIXME: Error type?
-        promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
+    RefPtr<MediaEndpointConfiguration> parsedConfiguration;
+    SDPProcessor::Result result = m_sdpProcessor->parse(description.sdp(), parsedConfiguration);
+    if (result != SDPProcessor::Result::Success) {
+        if (result == SDPProcessor::Result::ParseError)
+            promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
         return;
     }
 
@@ -645,10 +652,11 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
         return;
     }
 
-    RefPtr<IceCandidate> candidate = m_sdpProcessor->parseCandidateLine(rtcCandidate.candidate());
-    if (!candidate) {
-        // FIXME: Error type?
-        promise.reject(DOMError::create("SyntaxError (malformed candidate)"));
+    RefPtr<IceCandidate> candidate;
+    SDPProcessor::Result result = m_sdpProcessor->parseCandidateLine(rtcCandidate.candidate(), candidate);
+    if (result != SDPProcessor::Result::Success) {
+        if (result == SDPProcessor::Result::ParseError)
+            promise.reject(DOMError::create("SyntaxError (malformed candidate)"));
         return;
     }
 
@@ -801,7 +809,12 @@ RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::createRTCSessionDescr
     if (!description)
         return nullptr;
 
-    return RTCSessionDescription::create(descriptionTypeToString(description->type()), m_sdpProcessor->generate(*description->configuration()));
+    String sdpString;
+    SDPProcessor::Result result = m_sdpProcessor->generate(*description->configuration(), sdpString);
+    if (result != SDPProcessor::Result::Success)
+        return nullptr;
+
+    return RTCSessionDescription::create(descriptionTypeToString(description->type()), sdpString);
 }
 
 void MediaEndpointPeerConnection::gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction)
@@ -836,7 +849,11 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
         }
     }
 
-    String candidateLine = m_sdpProcessor->generateCandidateLine(*candidate);
+    String candidateLine;
+    SDPProcessor::Result result = m_sdpProcessor->generateCandidateLine(*candidate, candidateLine);
+    if (result != SDPProcessor::Result::Success)
+        return;
+
     RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateLine, "", mdescIndex);
 
     m_client->fireEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
