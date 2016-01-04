@@ -389,11 +389,14 @@ SDPProcessor::Result SDPProcessor::generate(const MediaEndpointConfiguration& co
 
 SDPProcessor::Result SDPProcessor::parse(const String& sdp, RefPtr<MediaEndpointConfiguration>& outConfiguration) const
 {
-    String jsonString;
-    if (!callScript("parse", sdp, jsonString))
+    String scriptOutput;
+    if (!callScript("parse", sdp, scriptOutput))
         return Result::InternalError;
 
-    RefPtr<MediaEndpointConfiguration> configuration = configurationFromJSON(jsonString);
+    if (scriptOutput == "ParseError")
+        return Result::ParseError;
+
+    RefPtr<MediaEndpointConfiguration> configuration = configurationFromJSON(scriptOutput);
     if (!configuration)
         return Result::InternalError;
 
@@ -416,6 +419,9 @@ SDPProcessor::Result SDPProcessor::parseCandidateLine(const String& candidateLin
     String scriptOutput;
     if (!callScript("parseCandidateLine", candidateLine, scriptOutput))
         return Result::InternalError;
+
+    if (scriptOutput == "ParseError")
+        return Result::ParseError;
 
     RefPtr<IceCandidate> candidate = iceCandidateFromJSON(scriptOutput);
     if (!candidate)

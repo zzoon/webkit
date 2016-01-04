@@ -524,6 +524,44 @@ if (typeof(SDP) == "undefined")
         return fillTemplate(templates.candidate, candidateObj);
     };
 
+    var expectedProperties = {
+        "session": [ "version", "originator", "sessionName", "startTime", "stopTime" ],
+        "mline": [ "type", "port", "protocol", "mode", "payloads", "rtcp", "mediaStreamId",
+            "mediaStreamTrackId", "dtls", "ssrcs", "cname", "ice" ],
+        "mlineSubObjects": {
+            "rtcp": [ "mux" ],
+            "ice": [ "ufrag", "password" ],
+            "dtls": [ "setup", "fingerprintHashFunction", "fingerprint" ]
+        }
+    };
+
+    function hasAllProperties(object, properties) {
+        var missing = properties.filter(function (property) {
+            return !object.hasOwnProperty(property);
+        });
+
+        return !missing.length;
+    }
+
+    SDP.verifyObject = function (sdpObj) {
+        if (!hasAllProperties(sdpObj, expectedProperties.session))
+            return false;
+
+        for (var i = 0; i < sdpObj.mediaDescriptions.length; i++) {
+            var mediaDescription = sdpObj.mediaDescriptions[i];
+
+            if (!hasAllProperties(mediaDescription, expectedProperties.mline))
+                return false;
+
+            for (var p in expectedProperties.mlineSubObjects) {
+                if (!hasAllProperties(mediaDescription[p], expectedProperties.mlineSubObjects[p]))
+                    return false;
+            }
+        }
+
+        return true;
+    };
+
 })();
 
 function generate(json) {
@@ -533,6 +571,10 @@ function generate(json) {
 
 function parse(sdp) {
     var object = SDP.parse(sdp);
+
+    if (!SDP.verifyObject(object))
+        return "ParseError";
+
     return JSON.stringify(object);
 }
 
@@ -542,8 +584,11 @@ function generateCandidateLine(json) {
 }
 
 function parseCandidateLine(candidateLine) {
-    var iceInfo = SDP.parse("m=application 0 NONE\r\na=" + candidateLine + "\r\n").mediaDescriptions[0].ice;
-    return JSON.stringify(iceInfo.candidates[0]);
+    var mdesc = SDP.parse("m=application 0 NONE\r\na=" + candidateLine + "\r\n").mediaDescriptions[0];
+    if (!mdesc.ice)
+        return "ParseError";
+
+    return JSON.stringify(mdesc.ice.candidates[0]);
 }
 
 if (typeof(module) != "undefined" && typeof(exports) != "undefined")
