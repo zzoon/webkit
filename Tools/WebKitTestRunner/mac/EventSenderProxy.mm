@@ -46,7 +46,6 @@
 @end
 
 #if defined(__LP64__)
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 struct WKTRCGSEventRecord {
     char offset1[150];
     uint8_t phase;
@@ -55,16 +54,6 @@ struct WKTRCGSEventRecord {
     float deltaY;
     char offset3[76];
 } __attribute__((packed));
-#else
-struct WKTRCGSEventRecord {
-    char offset1[154];
-    uint8_t phase;
-    char offset2[5];
-    float deltaX;
-    float deltaY;
-    char offset3[80];
-} __attribute__((packed));
-#endif
 #endif
 
 @interface EventSenderSyntheticEvent : NSEvent {
@@ -111,6 +100,7 @@ struct WKTRCGSEventRecord {
     _eventSender_eventNumber = eventNumber;
     _eventSender_window = window;
 #if defined(__LP64__) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101003
+    self->_type = NSEventTypePressure;
     _eventSender_type = NSEventTypePressure;
 #endif
 
@@ -132,17 +122,10 @@ struct WKTRCGSEventRecord {
     return _eventSender_type;
 }
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 - (NSEventSubtype)subtype
 {
     return (NSEventSubtype)_eventSender_subtype;
 }
-#else
-- (short)subtype
-{
-    return _eventSender_subtype;
-}
-#endif
 
 - (NSPoint)locationInWindow
 {
@@ -930,7 +913,7 @@ static NSEventPhase nsEventPhaseFromCGEventPhase(int phase)
 
 void EventSenderProxy::swipeGestureWithWheelAndMomentumPhases(int x, int y, int phase, int momentum)
 {
-    EventSenderSyntheticEvent *event = [[EventSenderSyntheticEvent alloc] init];
+    RetainPtr<EventSenderSyntheticEvent> event = adoptNS([[EventSenderSyntheticEvent alloc] init]);
 
     // "mayBegin" a swipe is actually a scroll wheel event.
     event->_eventSender_type = (phase == 128) ? NSScrollWheel : NSEventTypeGesture;
@@ -950,7 +933,7 @@ void EventSenderProxy::swipeGestureWithWheelAndMomentumPhases(int x, int y, int 
     NSLog(@"Synthetic swipe gestures are not implemented for 32-bit WebKitTestRunner.");
 #endif
 
-    [NSApp sendEvent:event];
+    [NSApp sendEvent:event.get()];
 }
 
 } // namespace WTR

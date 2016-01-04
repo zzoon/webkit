@@ -32,14 +32,17 @@
 #include "B3BasicBlockInlines.h"
 #include "B3BasicBlockUtils.h"
 #include "B3BlockWorklist.h"
+#include "B3CFG.h"
 #include "B3DataSection.h"
+#include "B3Dominators.h"
 #include "B3OpaqueByproducts.h"
 #include "B3ValueInlines.h"
 
 namespace JSC { namespace B3 {
 
 Procedure::Procedure()
-    : m_lastPhaseName("initial")
+    : m_cfg(new CFG(*this))
+    , m_lastPhaseName("initial")
     , m_byproducts(std::make_unique<OpaqueByproducts>())
     , m_code(new Air::Code(*this))
 {
@@ -49,11 +52,19 @@ Procedure::~Procedure()
 {
 }
 
+void Procedure::printOrigin(PrintStream& out, Origin origin) const
+{
+    if (m_originPrinter)
+        m_originPrinter->run(out, origin);
+    else
+        out.print(origin);
+}
+
 BasicBlock* Procedure::addBlock(double frequency)
 {
     std::unique_ptr<BasicBlock> block(new BasicBlock(m_blocks.size(), frequency));
     BasicBlock* result = block.get();
-    m_blocks.append(WTF::move(block));
+    m_blocks.append(WTFMove(block));
     return result;
 }
 
@@ -66,6 +77,8 @@ Value* Procedure::addIntConstant(Origin origin, Type type, int64_t value)
         return add<Const64Value>(origin, value);
     case Double:
         return add<ConstDoubleValue>(origin, static_cast<double>(value));
+    case Float:
+        return add<ConstFloatValue>(origin, static_cast<float>(value));
     default:
         RELEASE_ASSERT_NOT_REACHED();
         return nullptr;
@@ -113,10 +126,15 @@ void Procedure::resetReachability()
         });
 }
 
+void Procedure::invalidateCFG()
+{
+    m_dominators = nullptr;
+}
+
 void Procedure::dump(PrintStream& out) const
 {
     for (BasicBlock* block : *this)
-        out.print(deepDump(block));
+        out.print(deepDump(*this, block));
     if (m_byproducts->count())
         out.print(*m_byproducts);
 }
@@ -138,17 +156,52 @@ void Procedure::deleteValue(Value* value)
     m_values[value->index()] = nullptr;
 }
 
+Dominators& Procedure::dominators()
+{
+    if (!m_dominators)
+        m_dominators = std::make_unique<Dominators>(*this);
+    return *m_dominators;
+}
+
+void Procedure::addFastConstant(const ValueKey& constant)
+{
+    RELEASE_ASSERT(constant.isConstant());
+    m_fastConstants.add(constant);
+}
+
+bool Procedure::isFastConstant(const ValueKey& constant)
+{
+    if (!constant)
+        return false;
+    return m_fastConstants.contains(constant);
+}
+
 void* Procedure::addDataSection(size_t size)
 {
     if (!size)
         return nullptr;
     std::unique_ptr<DataSection> dataSection = std::make_unique<DataSection>(size);
     void* result = dataSection->data();
-    m_byproducts->add(WTF::move(dataSection));
+    m_byproducts->add(WTFMove(dataSection));
     return result;
 }
 
-const RegisterAtOffsetList& Procedure::calleeSaveRegisters()
+unsigned Procedure::callArgAreaSize() const
+{
+    return code().callArgAreaSize();
+}
+
+void Procedure::requestCallArgAreaSize(unsigned size)
+{
+    code().requestCallArgAreaSize(size);
+}
+
+unsigned Procedure::frameSize() const
+{
+    return code().frameSize();
+}
+
+const RegisterAtOffsetList& Procedure::calleeSaveRegisters() const
 {
     return code().calleeSaveRegisters();
 }

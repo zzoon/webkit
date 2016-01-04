@@ -38,6 +38,7 @@
 
 namespace JSC { namespace FTL {
 
+using namespace B3;
 using namespace DFG;
 
 State::State(Graph& graph)
@@ -56,7 +57,7 @@ State::State(Graph& graph)
     }
     case FTLForOSREntryMode: {
         RefPtr<ForOSREntryJITCode> code = adoptRef(new ForOSREntryJITCode());
-        code->initializeEntryBuffer(graph.m_vm, graph.m_profiledBlock->m_numCalleeRegisters);
+        code->initializeEntryBuffer(graph.m_vm, graph.m_profiledBlock->m_numCalleeLocals);
         code->setBytecodeIndex(graph.m_plan.osrEntryBytecodeIndex);
         jitCode = code;
         break;
@@ -68,6 +69,15 @@ State::State(Graph& graph)
 
     graph.m_plan.finalizer = std::make_unique<JITFinalizer>(graph.m_plan);
     finalizer = static_cast<JITFinalizer*>(graph.m_plan.finalizer.get());
+
+#if FTL_USES_B3
+    proc = std::make_unique<Procedure>();
+
+    proc->setOriginPrinter(
+        [this] (PrintStream& out, B3::Origin origin) {
+            out.print("DFG:", bitwise_cast<Node*>(origin.data()));
+        });
+#endif // FTL_USES_B3
 }
 
 State::~State()

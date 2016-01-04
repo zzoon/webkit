@@ -74,7 +74,7 @@ RefPtr<HTMLOptionElement> HTMLOptionElement::createForJSConstructor(Document& do
     Ref<Text> text = Text::create(document, data.isNull() ? "" : data);
 
     ec = 0;
-    element->appendChild(WTF::move(text), ec);
+    element->appendChild(WTFMove(text), ec);
     if (ec)
         return nullptr;
 
@@ -265,9 +265,9 @@ HTMLSelectElement* HTMLOptionElement::ownerSelectElement() const
 
 String HTMLOptionElement::label() const
 {
-    const AtomicString& label = fastGetAttribute(labelAttr);
+    String label = fastGetAttribute(labelAttr);
     if (!label.isNull())
-        return label; 
+        return label.stripWhiteSpace(isHTMLSpace);
     return collectOptionInnerText().stripWhiteSpace(isHTMLSpace).simplifyWhiteSpace(isHTMLSpace);
 }
 

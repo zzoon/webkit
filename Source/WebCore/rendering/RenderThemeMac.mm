@@ -175,11 +175,9 @@ const double progressAnimationNumFrames = 256;
 @implementation WebCoreRenderThemeBundle
 @end
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 @interface NSSearchFieldCell()
 @property (getter=isCenteredLook) BOOL centeredLook;
 @end
-#endif
 
 namespace WebCore {
 
@@ -469,12 +467,8 @@ Color RenderThemeMac::systemColor(CSSValueID cssValueID) const
         color = convertNSColorToColor([NSColor keyboardFocusIndicatorColor]);
         break;
     case CSSValueActivebuttontext:
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
         // There is no corresponding NSColor for this so we use a hard coded value.
         color = Color::white;
-#else
-        color = convertNSColorToColor([NSColor controlTextColor]);
-#endif
         break;
     case CSSValueActivecaption:
         color = convertNSColorToColor([NSColor windowFrameTextColor]);
@@ -568,7 +562,6 @@ Color RenderThemeMac::systemColor(CSSValueID cssValueID) const
     case CSSValueWindowtext:
         color = convertNSColorToColor([NSColor windowFrameTextColor]);
         break;
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
     case CSSValueAppleWirelessPlaybackTargetActive:
         color = convertNSColorToColor([NSColor systemBlueColor]);
         break;
@@ -599,7 +592,6 @@ Color RenderThemeMac::systemColor(CSSValueID cssValueID) const
     case CSSValueAppleSystemYellow:
         color = convertNSColorToColor([NSColor systemYellowColor]);
         break;
-#endif
     default:
         break;
     }
@@ -933,11 +925,6 @@ bool RenderThemeMac::paintMenuList(const RenderObject& renderer, const PaintInfo
 
     GraphicsContextStateSaver stateSaver(paintInfo.context());
 
-    // Before Yosemite we did not want the cell to ever draw outside the given rectangle.
-#if __MAC_OS_X_VERSION_MIN_REQUIRED < 101000
-    paintInfo.context().clip(inflatedRect);
-#endif
-
     if (zoomLevel != 1.0f) {
         inflatedRect.setWidth(inflatedRect.width() / zoomLevel);
         inflatedRect.setHeight(inflatedRect.height() / zoomLevel);
@@ -1156,7 +1143,7 @@ bool RenderThemeMac::paintProgressBar(const RenderObject& renderObject, const Pa
         paintInfo.context().scale(FloatSize(-1, 1));
     }
 
-    paintInfo.context().drawImageBuffer(*imageBuffer, inflatedRect.location());
+    paintInfo.context().drawConsumingImageBuffer(WTFMove(imageBuffer), inflatedRect.location());
     return false;
 }
 
@@ -1225,7 +1212,7 @@ void RenderThemeMac::paintMenuListButtonGradients(const RenderObject& o, const P
     FloatRoundedRect border = FloatRoundedRect(o.style().getRoundedBorderFor(r));
     int radius = border.radii().topLeft().width();
 
-    CGColorSpaceRef cspace = deviceRGBColorSpaceRef();
+    CGColorSpaceRef cspace = sRGBColorSpaceRef();
 
     FloatRect topGradient(r.x(), r.y(), r.width(), r.height() / 2.0f);
     struct CGFunctionCallbacks topCallbacks = { 0, TopGradientInterpolate, NULL };
@@ -1500,7 +1487,7 @@ bool RenderThemeMac::paintSliderTrack(const RenderObject& o, const PaintInfo& pa
 
     LocalCurrentGraphicsContext localContext(paintInfo.context());
     CGContextRef context = localContext.cgContext();
-    CGColorSpaceRef cspace = deviceRGBColorSpaceRef();
+    CGColorSpaceRef cspace = sRGBColorSpaceRef();
 
 #if ENABLE(DATALIST_ELEMENT)
     paintSliderTicks(o, paintInfo, r);
@@ -1971,9 +1958,7 @@ NSSearchFieldCell* RenderThemeMac::search() const
         [m_search.get() setBezeled:YES];
         [m_search.get() setEditable:YES];
         [m_search.get() setFocusRingType:NSFocusRingTypeExterior];
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
         [m_search.get() setCenteredLook:NO];
-#endif
     }
 
     return m_search.get();
@@ -2041,15 +2026,6 @@ String RenderThemeMac::fileListNameForWidth(const FileList* fileList, const Font
         return StringTruncator::rightTruncate(multipleFileUploadText(fileList->length()), width, font, StringTruncator::EnableRoundingHacks);
 
     return StringTruncator::centerTruncate(strToTruncate, width, font, StringTruncator::EnableRoundingHacks);
-}
-
-bool RenderThemeMac::defaultButtonHasAnimation() const
-{
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
-    return false;
-#else
-    return true;
-#endif
 }
 
 #if ENABLE(SERVICE_CONTROLS)

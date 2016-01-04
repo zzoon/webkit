@@ -66,31 +66,44 @@ void ViewportConfiguration::setDefaultConfiguration(const ViewportConfiguration:
     updateConfiguration();
 }
 
-void ViewportConfiguration::setContentsSize(const IntSize& contentSize)
+bool ViewportConfiguration::setContentsSize(const IntSize& contentSize)
 {
     if (m_contentSize == contentSize)
-        return;
+        return false;
 
     m_contentSize = contentSize;
     updateConfiguration();
+    return true;
 }
 
-void ViewportConfiguration::setMinimumLayoutSize(const FloatSize& minimumLayoutSize)
+bool ViewportConfiguration::setMinimumLayoutSize(const FloatSize& minimumLayoutSize)
 {
     if (m_minimumLayoutSize == minimumLayoutSize)
-        return;
+        return false;
 
     m_minimumLayoutSize = minimumLayoutSize;
     updateConfiguration();
+    return true;
 }
 
-void ViewportConfiguration::setViewportArguments(const ViewportArguments& viewportArguments)
+bool ViewportConfiguration::setViewportArguments(const ViewportArguments& viewportArguments)
 {
     if (m_viewportArguments == viewportArguments)
-        return;
+        return false;
 
     m_viewportArguments = viewportArguments;
     updateConfiguration();
+    return true;
+}
+
+bool ViewportConfiguration::setCanIgnoreScalingConstraints(bool canIgnoreScalingConstraints)
+{
+    if (canIgnoreScalingConstraints == m_canIgnoreScalingConstraints)
+        return false;
+    
+    m_canIgnoreScalingConstraints = canIgnoreScalingConstraints;
+    updateConfiguration();
+    return true;
 }
 
 IntSize ViewportConfiguration::layoutSize() const
@@ -402,19 +415,17 @@ int ViewportConfiguration::layoutHeight() const
 
 TextStream& operator<<(TextStream& ts, const ViewportConfiguration::Parameters& parameters)
 {
-    ts.increaseIndent();
-    ts << "\n";
-    ts.writeIndent();
-    ts << "(width " << parameters.width << ", set: " << (parameters.widthIsSet ? "true" : "false") << ")";
+    ts.startGroup();
+    ts << "width " << parameters.width << ", set: " << (parameters.widthIsSet ? "true" : "false");
+    ts.endGroup();
 
-    ts << "\n";
-    ts.writeIndent();
-    ts << "(height " << parameters.height << ", set: " << (parameters.heightIsSet ? "true" : "false") << ")";
+    ts.startGroup();
+    ts << "height " << parameters.height << ", set: " << (parameters.heightIsSet ? "true" : "false");
+    ts.endGroup();
 
-    ts << "\n";
-    ts.writeIndent();
-    ts << "(initialScale " << parameters.initialScale << ", set: " << (parameters.initialScaleIsSet ? "true" : "false") << ")";
-    ts.decreaseIndent();
+    ts.startGroup();
+    ts << "initialScale " << parameters.initialScale << ", set: " << (parameters.initialScaleIsSet ? "true" : "false");
+    ts.endGroup();
 
     ts.dumpProperty("minimumScale", parameters.minimumScale);
     ts.dumpProperty("maximumScale", parameters.maximumScale);
@@ -428,49 +439,33 @@ CString ViewportConfiguration::description() const
 {
     TextStream ts;
 
-    ts << "(viewport-configuration " << (void*)this;
-    ts << "\n";
-    ts.increaseIndent();
-    ts.writeIndent();
-    ts << "(viewport arguments";
-    ts << m_viewportArguments;
-    ts << ")";
-    ts.decreaseIndent();
-
-    ts << "\n";
-    ts.increaseIndent();
-    ts.writeIndent();
-    ts << "(configuration";
-    ts << m_configuration;
-    ts << ")";
-    ts.decreaseIndent();
-
-    ts << "\n";
-    ts.increaseIndent();
-    ts.writeIndent();
-    ts << "(default configuration";
-    ts << m_defaultConfiguration;
-    ts << ")";
-    ts.decreaseIndent();
+    ts.startGroup();
+    ts << "viewport-configuration " << (void*)this;
+    {
+        TextStream::GroupScope scope(ts);
+        ts << "viewport arguments";
+        ts << m_viewportArguments;
+    }
+    {
+        TextStream::GroupScope scope(ts);
+        ts << "configuration";
+        ts << m_configuration;
+    }
+    {
+        TextStream::GroupScope scope(ts);
+        ts << "default configuration";
+        ts << m_defaultConfiguration;
+    }
 
     ts.dumpProperty("contentSize", m_contentSize);
     ts.dumpProperty("minimumLayoutSize", m_minimumLayoutSize);
-
-    ts << "\n";
-    ts.increaseIndent();
-    ts.writeIndent();
-    ts << "(computed initial scale " << initialScale() << ")\n";
-    ts.writeIndent();
-    ts << "(computed minimum scale " << minimumScale() << ")\n";
-    ts.writeIndent();
-    ts << "(computed layout size " << layoutSize() << ")\n";
-    ts.writeIndent();
-    ts << "(ignoring horizontal scaling constraints " << (shouldIgnoreHorizontalScalingConstraints() ? "true" : "false") << ")\n";
-    ts.writeIndent();
-    ts << "(ignoring vertical scaling constraints " << (shouldIgnoreVerticalScalingConstraints() ? "true" : "false") << ")";
-    ts.decreaseIndent();
-
-    ts << ")\n";
+    ts.dumpProperty("computed initial scale", initialScale());
+    ts.dumpProperty("computed minimum scale", minimumScale());
+    ts.dumpProperty("computed layout size", layoutSize());
+    ts.dumpProperty("ignoring horizontal scaling constraints", shouldIgnoreHorizontalScalingConstraints() ? "true" : "false");
+    ts.dumpProperty("ignoring vertical scaling constraints", shouldIgnoreVerticalScalingConstraints() ? "true" : "false");
+    
+    ts.endGroup();
 
     return ts.release().utf8();
 }

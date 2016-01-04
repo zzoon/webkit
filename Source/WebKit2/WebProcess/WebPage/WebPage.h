@@ -30,6 +30,7 @@
 #include "APIInjectedBundlePageContextMenuClient.h"
 #include "APIInjectedBundlePageUIClient.h"
 #include "APIObject.h"
+#include "Download.h"
 #include "FindController.h"
 #include "GeolocationPermissionRequestManager.h"
 #include "ImageOptions.h"
@@ -39,7 +40,7 @@
 #include "InjectedBundlePageLoaderClient.h"
 #include "InjectedBundlePagePolicyClient.h"
 #include "InjectedBundlePageResourceLoadClient.h"
-#include "LayerTreeHost.h"
+#include "LayerTreeContext.h"
 #include "MessageReceiver.h"
 #include "MessageSender.h"
 #include "Plugin.h"
@@ -653,19 +654,6 @@ public:
     void insertDictatedTextAsync(const String& text, const EditingRange& replacementRange, const Vector<WebCore::DictationAlternative>& dictationAlternativeLocations, bool registerUndoGroup = false);
     void attributedSubstringForCharacterRangeAsync(const EditingRange&, uint64_t callbackID);
     void fontAtSelection(uint64_t callbackID);
-#if !USE(ASYNC_NSTEXTINPUTCLIENT)
-    void insertText(const String& text, const EditingRange& replacementRange, bool& handled, EditorState& newState);
-    void setComposition(const String& text, Vector<WebCore::CompositionUnderline> underlines, const EditingRange& selectionRange, const EditingRange& replacementRange, EditorState& newState);
-    void confirmComposition(EditorState& newState);
-    void insertDictatedText(const String& text, const EditingRange& replacementRange, const Vector<WebCore::DictationAlternative>& dictationAlternativeLocations, bool& handled, EditorState& newState);
-    void getAttributedSubstringFromRange(const EditingRange&, AttributedString&);
-    void getMarkedRange(EditingRange&);
-    void getSelectedRange(EditingRange&);
-    void characterIndexForPoint(const WebCore::IntPoint point, uint64_t& result);
-    void firstRectForCharacterRange(const EditingRange&, WebCore::IntRect& resultRect);
-    void executeKeypressCommands(const Vector<WebCore::KeypressCommand>&, bool& handled, EditorState& newState);
-    void cancelComposition(EditorState& newState);
-#endif
 #endif
 
     void readSelectionFromPasteboard(const WTF::String& pasteboardName, bool& result);
@@ -893,10 +881,6 @@ public:
 
     void getBytecodeProfile(uint64_t callbackID);
     
-    // Some platforms require accessibility-enabled processes to spin the run loop so that the WebProcess doesn't hang.
-    // While this is not ideal, it does not have to be applied to every platform at the moment.
-    static bool synchronousMessagesShouldSpinRunLoop();
-
 #if ENABLE(SERVICE_CONTROLS) || ENABLE(TELEPHONE_NUMBER_DETECTION)
     void handleTelephoneNumberClick(const String& number, const WebCore::IntPoint&);
     void handleSelectionServiceClick(WebCore::FrameSelection&, const Vector<String>& telephoneNumbers, const WebCore::IntPoint&);
@@ -928,6 +912,8 @@ public:
     void removeAllUserContent();
 
     void dispatchDidLayout(WebCore::LayoutMilestones);
+
+    void didRestoreScrollPosition();
 
 private:
     WebPage(uint64_t pageID, const WebPageCreationParameters&);
@@ -1054,7 +1040,7 @@ private:
     void platformPreferencesDidChange(const WebPreferencesStore&);
     void updatePreferences(const WebPreferencesStore&);
 
-    void didReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t navigationID, uint64_t downloadID);
+    void didReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t navigationID, DownloadID);
     void setUserAgent(const String&);
     void setCustomTextEncodingName(const String&);
     void suspendActiveDOMObjectsAndAnimations();
@@ -1115,7 +1101,8 @@ private:
     void didReceiveNotificationPermissionDecision(uint64_t notificationID, bool allowed);
 
 #if ENABLE(MEDIA_STREAM)
-    WK_EXPORT void didReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed, const String& audioDeviceUID, const String& videoDeviceUID);
+    void didReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed, const String& audioDeviceUID, const String& videoDeviceUID);
+    void didCompleteUserMediaPermissionCheck(uint64_t userMediaID, bool allowed);
 #endif
 
     void advanceToNextMisspelling(bool startBeforeSelection);
@@ -1211,6 +1198,10 @@ private:
     bool m_scrollingPerformanceLoggingEnabled;
 
     bool m_mainFrameIsScrollable;
+
+#if PLATFORM(IOS)
+    bool m_ignoreViewportScalingConstraints { false };
+#endif
 
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
     bool m_readyToFindPrimarySnapshottedPlugin;

@@ -46,7 +46,6 @@
 
 // Supplements
 #include "WebCookieManagerProxy.h"
-#include "WebDatabaseManagerProxy.h"
 #include "WebGeolocationManagerProxy.h"
 #include "WebMediaCacheManagerProxy.h"
 #include "WebNotificationManagerProxy.h"
@@ -329,16 +328,6 @@ WKCacheModel WKContextGetCacheModel(WKContextRef contextRef)
     return toAPI(toImpl(contextRef)->cacheModel());
 }
 
-void WKContextSetProcessModel(WKContextRef contextRef, WKProcessModel processModel)
-{
-    toImpl(contextRef)->setProcessModel(toProcessModel(processModel));
-}
-
-WKProcessModel WKContextGetProcessModel(WKContextRef contextRef)
-{
-    return toAPI(toImpl(contextRef)->processModel());
-}
-
 void WKContextSetMaximumNumberOfProcesses(WKContextRef contextRef, unsigned numberOfProcesses)
 {
     toImpl(contextRef)->setMaximumNumberOfProcesses(numberOfProcesses);
@@ -429,11 +418,6 @@ WKBatteryManagerRef WKContextGetBatteryManager(WKContextRef contextRef)
 #endif
 }
 
-WKDatabaseManagerRef WKContextGetDatabaseManager(WKContextRef contextRef)
-{
-    return toAPI(toImpl(contextRef)->supplement<WebDatabaseManagerProxy>());
-}
-
 WKGeolocationManagerRef WKContextGetGeolocationManager(WKContextRef contextRef)
 {
     return toAPI(toImpl(contextRef)->supplement<WebGeolocationManagerProxy>());
@@ -482,11 +466,6 @@ WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef contex
 WKResourceCacheManagerRef WKContextGetResourceCacheManager(WKContextRef context)
 {
     return reinterpret_cast<WKResourceCacheManagerRef>(WKContextGetWebsiteDataStore(context));
-}
-
-WKOriginDataManagerRef WKContextGetOriginDataManager(WKContextRef context)
-{
-    return reinterpret_cast<WKOriginDataManagerRef>(toAPI(toImpl(context)->websiteDataStore()));
 }
 
 void WKContextStartMemorySampler(WKContextRef contextRef, WKDoubleRef interval)
@@ -552,11 +531,6 @@ void WKContextGarbageCollectJavaScriptObjects(WKContextRef contextRef)
 void WKContextSetJavaScriptGarbageCollectorTimerEnabled(WKContextRef contextRef, bool enable)
 {
     toImpl(contextRef)->setJavaScriptGarbageCollectorTimerEnabled(enable);
-}
-
-void WKContextSetUsesNetworkProcess(WKContextRef contextRef, bool usesNetworkProcess)
-{
-    toImpl(contextRef)->setUsesNetworkProcess(usesNetworkProcess);
 }
 
 void WKContextUseTestingNetworkSession(WKContextRef context)

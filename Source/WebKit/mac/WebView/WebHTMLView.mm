@@ -1015,8 +1015,7 @@ static NSCellStateValue kit(TriState state)
     WTF::initializeMainThreadToProcessMainThread();
     RunLoop::initializeMainRunLoop();
 #endif
-    WebCoreObjCFinalizeOnMainThread(self);
-    
+
 #if !PLATFORM(IOS)
     if (!oldSetCursorForMouseLocationIMP) {
         Method setCursorMethod = class_getInstanceMethod([NSWindow class], @selector(_setCursorForMouseLocation:));
@@ -1065,16 +1064,6 @@ static NSCellStateValue kit(TriState state)
 #endif
 
     [super dealloc];
-}
-
-- (void)finalize
-{
-#if !PLATFORM(IOS)
-    if (promisedDragTIFFDataSource)
-        promisedDragTIFFDataSource->removeClient(promisedDataClient());
-#endif
-
-    [super finalize];
 }
 
 - (void)clear
@@ -1686,7 +1675,7 @@ static NSURL* uniqueURLWithRelativePart(NSString *relativePart)
         if (Frame* coreFrame = core([self _frame])) {
             if (FrameView* coreView = coreFrame->view()) {
                 _private->inScrollPositionChanged = YES;
-                coreView->scrollPositionChangedViaPlatformWidget(IntPoint(_private->lastScrollPosition), IntPoint(origin));
+                coreView->scrollOffsetChangedViaPlatformWidget(IntPoint(_private->lastScrollPosition), IntPoint(origin));
                 _private->inScrollPositionChanged = NO;
             }
         }
@@ -2835,7 +2824,6 @@ static bool mouseEventIsPartOfClickOrDrag(NSEvent *event)
     WTF::initializeMainThreadToProcessMainThread();
     RunLoop::initializeMainRunLoop();
 #endif
-    WebCoreObjCFinalizeOnMainThread(self);
 }
 
 - (id)initWithFrame:(NSRect)frame
@@ -2879,15 +2867,6 @@ static bool mouseEventIsPartOfClickOrDrag(NSEvent *event)
     [_private release];
     _private = nil;
     [super dealloc];
-}
-
-- (void)finalize
-{
-    // We can't assert that close has already been called because
-    // this view can be removed from it's superview, even though
-    // it could be needed later, so close if needed.
-    [self close];
-    [super finalize];
 }
 
 // Returns YES if the delegate returns YES (so we should do no more work).
@@ -4374,7 +4353,7 @@ static RetainPtr<NSArray> customMenuFromDefaultItems(WebView *webView, const Con
         frame->eventHandler().wheelEvent(event);
 #endif
 
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+#if PLATFORM(MAC)
     [[[self _webView] _immediateActionController] webView:[self _webView] didHandleScrollWheel:event];
 #endif
 }
@@ -5460,7 +5439,7 @@ static PassRefPtr<KeyboardEvent> currentKeyboardEvent(Frame* coreFrame)
 - (void)_applyEditingStyleToSelection:(Ref<EditingStyle>&&)editingStyle withUndoAction:(EditAction)undoAction
 {
     if (Frame* coreFrame = core([self _frame]))
-        coreFrame->editor().applyStyleToSelection(WTF::move(editingStyle), undoAction);
+        coreFrame->editor().applyStyleToSelection(WTFMove(editingStyle), undoAction);
 }
 
 #if !PLATFORM(IOS)

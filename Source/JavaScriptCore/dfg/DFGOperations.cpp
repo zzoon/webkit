@@ -165,12 +165,85 @@ JSCell* JIT_OPERATION operationCreateThis(ExecState* exec, JSObject* constructor
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
-#if !ASSERT_DISABLED
-    ConstructData constructData;
-    ASSERT(jsCast<JSFunction*>(constructor)->methodTable(vm)->getConstructData(jsCast<JSFunction*>(constructor), constructData) == ConstructTypeJS);
-#endif
-    
     return constructEmptyObject(exec, jsCast<JSFunction*>(constructor)->rareData(exec, inlineCapacity)->allocationProfile()->structure());
+}
+
+EncodedJSValue JIT_OPERATION operationValueBitAnd(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
+{
+    VM* vm = &exec->vm();
+    NativeCallFrameTracer tracer(vm, exec);
+
+    JSValue op1 = JSValue::decode(encodedOp1);
+    JSValue op2 = JSValue::decode(encodedOp2);
+
+    int32_t a = op1.toInt32(exec);
+    int32_t b = op2.toInt32(exec);
+    return JSValue::encode(jsNumber(a & b));
+}
+
+EncodedJSValue JIT_OPERATION operationValueBitOr(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
+{
+    VM* vm = &exec->vm();
+    NativeCallFrameTracer tracer(vm, exec);
+
+    JSValue op1 = JSValue::decode(encodedOp1);
+    JSValue op2 = JSValue::decode(encodedOp2);
+
+    int32_t a = op1.toInt32(exec);
+    int32_t b = op2.toInt32(exec);
+    return JSValue::encode(jsNumber(a | b));
+}
+
+EncodedJSValue JIT_OPERATION operationValueBitXor(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
+{
+    VM* vm = &exec->vm();
+    NativeCallFrameTracer tracer(vm, exec);
+
+    JSValue op1 = JSValue::decode(encodedOp1);
+    JSValue op2 = JSValue::decode(encodedOp2);
+
+    int32_t a = op1.toInt32(exec);
+    int32_t b = op2.toInt32(exec);
+    return JSValue::encode(jsNumber(a ^ b));
+}
+
+EncodedJSValue JIT_OPERATION operationValueBitLShift(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
+{
+    VM* vm = &exec->vm();
+    NativeCallFrameTracer tracer(vm, exec);
+
+    JSValue op1 = JSValue::decode(encodedOp1);
+    JSValue op2 = JSValue::decode(encodedOp2);
+
+    int32_t a = op1.toInt32(exec);
+    uint32_t b = op2.toUInt32(exec);
+    return JSValue::encode(jsNumber(a << (b & 0x1f)));
+}
+
+EncodedJSValue JIT_OPERATION operationValueBitRShift(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
+{
+    VM* vm = &exec->vm();
+    NativeCallFrameTracer tracer(vm, exec);
+
+    JSValue op1 = JSValue::decode(encodedOp1);
+    JSValue op2 = JSValue::decode(encodedOp2);
+
+    int32_t a = op1.toInt32(exec);
+    uint32_t b = op2.toUInt32(exec);
+    return JSValue::encode(jsNumber(a >> (b & 0x1f)));
+}
+
+EncodedJSValue JIT_OPERATION operationValueBitURShift(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
+{
+    VM* vm = &exec->vm();
+    NativeCallFrameTracer tracer(vm, exec);
+
+    JSValue op1 = JSValue::decode(encodedOp1);
+    JSValue op2 = JSValue::decode(encodedOp2);
+
+    uint32_t a = op1.toUInt32(exec);
+    uint32_t b = op2.toUInt32(exec);
+    return JSValue::encode(jsNumber(static_cast<int32_t>(a >> (b & 0x1f))));
 }
 
 EncodedJSValue JIT_OPERATION operationValueAdd(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
@@ -198,6 +271,32 @@ EncodedJSValue JIT_OPERATION operationValueAddNotNumber(ExecState* exec, Encoded
         return JSValue::encode(jsString(exec, asString(op1), op2.toString(exec)));
 
     return JSValue::encode(jsAddSlowCase(exec, op1, op2));
+}
+
+EncodedJSValue JIT_OPERATION operationValueDiv(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
+{
+    VM* vm = &exec->vm();
+    NativeCallFrameTracer tracer(vm, exec);
+
+    JSValue op1 = JSValue::decode(encodedOp1);
+    JSValue op2 = JSValue::decode(encodedOp2);
+
+    double a = op1.toNumber(exec);
+    double b = op2.toNumber(exec);
+    return JSValue::encode(jsNumber(a / b));
+}
+
+EncodedJSValue JIT_OPERATION operationValueMul(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
+{
+    VM* vm = &exec->vm();
+    NativeCallFrameTracer tracer(vm, exec);
+
+    JSValue op1 = JSValue::decode(encodedOp1);
+    JSValue op2 = JSValue::decode(encodedOp2);
+
+    double a = op1.toNumber(exec);
+    double b = op2.toNumber(exec);
+    return JSValue::encode(jsNumber(a * b));
 }
 
 EncodedJSValue JIT_OPERATION operationValueSub(ExecState* exec, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2)
@@ -818,11 +917,11 @@ JSCell* JIT_OPERATION operationCreateClonedArgumentsDuringExit(ExecState* exec, 
     return result;
 }
 
-void JIT_OPERATION operationCopyRest(ExecState* exec, JSCell* arrayAsCell, Register* argumentStart, unsigned numberOfParamsToSkip, unsigned numberOfArguments)
+void JIT_OPERATION operationCopyRest(ExecState* exec, JSCell* arrayAsCell, Register* argumentStart, unsigned numberOfParamsToSkip, unsigned arraySize)
 {
-    RELEASE_ASSERT(numberOfArguments > numberOfParamsToSkip); // We should only call this from JIT code when this condition is true.
+    ASSERT(arraySize);
     JSArray* array = jsCast<JSArray*>(arrayAsCell);
-    unsigned arraySize = numberOfArguments - numberOfParamsToSkip;
+    ASSERT(arraySize == array->length());
     array->setLength(exec, arraySize);
     for (unsigned i = 0; i < arraySize; i++)
         array->putDirectIndex(exec, i, argumentStart[i + numberOfParamsToSkip].jsValue());
@@ -1148,8 +1247,6 @@ char* JIT_OPERATION operationGetButterfly(ExecState* exec, JSCell* cell)
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
-    dataLog("Ran the barrier.\n");
-
     return bitwise_cast<char*>(jsCast<JSObject*>(cell)->butterfly());
 }
 
@@ -1201,6 +1298,13 @@ double JIT_OPERATION operationFModOnInts(int32_t a, int32_t b)
 {
     return fmod(a, b);
 }
+
+#if USE(JSVALUE32_64)
+double JIT_OPERATION operationRandom(JSGlobalObject* globalObject)
+{
+    return globalObject->weakRandomNumber();
+}
+#endif
 
 JSCell* JIT_OPERATION operationStringFromCharCode(ExecState* exec, int32_t op1)
 {

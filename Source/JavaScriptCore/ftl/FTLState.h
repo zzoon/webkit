@@ -40,10 +40,16 @@
 #include "FTLJSCallVarargs.h"
 #include "FTLJSTailCall.h"
 #include "FTLStackMaps.h"
-#include "FTLState.h"
 #include <wtf/Noncopyable.h>
 
-namespace JSC { namespace FTL {
+namespace JSC {
+
+namespace B3 {
+class PatchpointValue;
+class StackSlotValue;
+} // namespace B3
+
+namespace FTL {
 
 inline bool verboseCompilationEnabled()
 {
@@ -76,11 +82,9 @@ public:
     GeneratedFunction generatedFunction;
     JITFinalizer* finalizer;
 #if FTL_USES_B3
-    LValue handleStackOverflowExceptionValue { nullptr };
-    LValue handleExceptionValue { nullptr };
-    LValue capturedValue { nullptr };
-    LValue varargsSpillSlotsValue { nullptr };
-    LValue exceptionHandlingSpillSlotValue { nullptr };
+    B3::PatchpointValue* handleStackOverflowExceptionValue { nullptr };
+    B3::PatchpointValue* handleExceptionValue { nullptr };
+    B3::StackSlotValue* capturedValue { nullptr };
 #else // FTL_USES_B3
     unsigned handleStackOverflowExceptionStackmapID { UINT_MAX };
     unsigned handleExceptionStackmapID { UINT_MAX };
@@ -91,16 +95,19 @@ public:
     SegmentedVector<GetByIdDescriptor> getByIds;
     SegmentedVector<PutByIdDescriptor> putByIds;
     SegmentedVector<CheckInDescriptor> checkIns;
-    SegmentedVector<ArithSubDescriptor> arithSubs;
+    SegmentedVector<BinaryOpDescriptor> binaryOps;
     SegmentedVector<LazySlowPathDescriptor> lazySlowPaths;
 #if ENABLE(MASM_PROBE)
     SegmentedVector<ProbeDescriptor> probes;
 #endif
+#if !FTL_USES_B3
     Vector<JSCall> jsCalls;
     Vector<JSCallVarargs> jsCallVarargses;
     Vector<JSTailCall> jsTailCalls;
     Vector<CString> codeSectionNames;
     Vector<CString> dataSectionNames;
+    SegmentedVector<OSRExitDescriptorImpl> osrExitDescriptorImpls;
+#endif // !FTL_USES_B3
     void* unwindDataSection;
     size_t unwindDataSectionSize;
     RefPtr<DataSection> stackmapsSection;

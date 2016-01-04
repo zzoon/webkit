@@ -149,35 +149,6 @@ static Optional<FontTraitsMask> computeTraitsMask(const StyleProperties& style)
     } else
         traitsMask |= FontWeight400Mask;
 
-    if (RefPtr<CSSValue> fontVariant = style.getPropertyCSSValue(CSSPropertyFontVariant)) {
-        // font-variant descriptor can be a value list.
-        if (fontVariant->isPrimitiveValue()) {
-            RefPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
-            list->append(fontVariant.releaseNonNull());
-            fontVariant = list.releaseNonNull();
-        } else if (!is<CSSValueList>(*fontVariant))
-            return Nullopt;
-
-        CSSValueList& variantList = downcast<CSSValueList>(*fontVariant);
-        unsigned numVariants = variantList.length();
-        if (!numVariants)
-            return Nullopt;
-
-        for (unsigned i = 0; i < numVariants; ++i) {
-            switch (downcast<CSSPrimitiveValue>(variantList.itemWithoutBoundsCheck(i))->getValueID()) {
-                case CSSValueNormal:
-                    traitsMask |= FontVariantNormalMask;
-                    break;
-                case CSSValueSmallCaps:
-                    traitsMask |= FontVariantSmallCapsMask;
-                    break;
-                default:
-                    break;
-            }
-        }
-    } else
-        traitsMask |= FontVariantMask;
-
     return static_cast<FontTraitsMask>(traitsMask);
 }
 
@@ -191,7 +162,7 @@ static Ref<CSSFontFace> createFontFace(CSSValueList& srcList, FontTraitsMask tra
 #else
     UNUSED_PARAM(fontFaceRule);
 #endif
-    Ref<CSSFontFace> fontFace = CSSFontFace::create(traitsMask, WTF::move(rule));
+    Ref<CSSFontFace> fontFace = CSSFontFace::create(traitsMask, WTFMove(rule));
 
     int srcLength = srcList.length();
 
@@ -226,7 +197,7 @@ static Ref<CSSFontFace> createFontFace(CSSValueList& srcList, FontTraitsMask tra
 #if ENABLE(SVG_FONTS)
             source->setSVGFontFaceElement(item.svgFontFaceElement());
 #endif
-            fontFace->addSource(WTF::move(source));
+            fontFace->addSource(WTFMove(source));
         }
     }
 
@@ -273,9 +244,9 @@ static Vector<Ref<CSSFontFace>> constructFamilyFontFaces(const String& familyNam
             Ref<CSSFontFace> face = CSSFontFace::create(mask, nullptr, true);
             face->addSource(std::make_unique<CSSFontFaceSource>(familyName));
             ASSERT(face->isValid());
-            faces.append(WTF::move(face));
+            faces.append(WTFMove(face));
         }
-        locallyInstalledFontFaces.add(familyName, WTF::move(faces));
+        locallyInstalledFontFaces.add(familyName, WTFMove(faces));
     }
     return result;
 }
@@ -333,16 +304,16 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace& fontFaceRule, boo
     if (variantLigatures)
         applyValueFontVariantLigatures(fontFace.get(), *variantLigatures);
 
-    if (variantPosition)
+    if (variantPosition && is<CSSPrimitiveValue>(*variantPosition))
         fontFace->setVariantPosition(downcast<CSSPrimitiveValue>(*variantPosition));
 
-    if (variantCaps)
+    if (variantCaps && is<CSSPrimitiveValue>(*variantCaps))
         fontFace->setVariantCaps(downcast<CSSPrimitiveValue>(*variantCaps));
 
     if (variantNumeric)
         applyValueFontVariantNumeric(fontFace.get(), *variantNumeric);
 
-    if (variantAlternates)
+    if (variantAlternates && is<CSSPrimitiveValue>(*variantAlternates))
         fontFace->setVariantAlternates(downcast<CSSPrimitiveValue>(*variantAlternates));
 
     if (variantEastAsian)
@@ -426,22 +397,6 @@ static inline bool compareFontFaces(const CSSFontFace& first, const CSSFontFace&
 {
     FontTraitsMask firstTraitsMask = first.traitsMask();
     FontTraitsMask secondTraitsMask = second.traitsMask();
-
-    bool firstHasDesiredVariant = firstTraitsMask & desiredTraitsMaskForComparison & FontVariantMask;
-    bool secondHasDesiredVariant = secondTraitsMask & desiredTraitsMaskForComparison & FontVariantMask;
-
-    if (firstHasDesiredVariant != secondHasDesiredVariant)
-        return firstHasDesiredVariant;
-
-    // We need to check font-variant css property for CSS2.1 compatibility.
-    if ((desiredTraitsMaskForComparison & FontVariantSmallCapsMask) && !first.isLocalFallback() && !second.isLocalFallback()) {
-        // Prefer a font that has indicated that it can only support small-caps to a font that claims to support
-        // all variants.  The specialized font is more likely to be true small-caps and not require synthesis.
-        bool firstRequiresSmallCaps = (firstTraitsMask & FontVariantSmallCapsMask) && !(firstTraitsMask & FontVariantNormalMask);
-        bool secondRequiresSmallCaps = (secondTraitsMask & FontVariantSmallCapsMask) && !(secondTraitsMask & FontVariantNormalMask);
-        if (firstRequiresSmallCaps != secondRequiresSmallCaps)
-            return firstRequiresSmallCaps;
-    }
 
     bool firstHasDesiredStyle = firstTraitsMask & desiredTraitsMaskForComparison & FontStyleMask;
     bool secondHasDesiredStyle = secondTraitsMask & desiredTraitsMaskForComparison & FontStyleMask;
@@ -539,14 +494,6 @@ CSSSegmentedFontFace* CSSFontSelector::getFontFace(const FontDescription& fontDe
             unsigned candidateTraitsMask = candidate.traitsMask();
             if ((traitsMask & FontStyleNormalMask) && !(candidateTraitsMask & FontStyleNormalMask))
                 continue;
-            if ((traitsMask & FontVariantNormalMask) && !(candidateTraitsMask & FontVariantNormalMask))
-                continue;
-#if ENABLE(SVG_FONTS)
-            // For SVG Fonts that specify that they only support the "normal" variant, we will assume they are incapable
-            // of small-caps synthesis and just ignore the font face as a candidate.
-            if (candidate.hasSVGFontFaceSource() && (traitsMask & FontVariantSmallCapsMask) && !(candidateTraitsMask & FontVariantSmallCapsMask))
-                continue;
-#endif
             candidateFontFaces.append(candidate);
         }
 
@@ -555,8 +502,6 @@ CSSSegmentedFontFace* CSSFontSelector::getFontFace(const FontDescription& fontDe
             for (auto& candidate : iterator->value) {
                 unsigned candidateTraitsMask = candidate->traitsMask();
                 if ((traitsMask & FontStyleNormalMask) && !(candidateTraitsMask & FontStyleNormalMask))
-                    continue;
-                if ((traitsMask & FontVariantNormalMask) && !(candidateTraitsMask & FontVariantNormalMask))
                     continue;
                 candidateFontFaces.append(candidate);
             }

@@ -58,11 +58,12 @@ WebInspector.ResourceSidebarPanel = class ResourceSidebarPanel extends WebInspec
         WebInspector.frameResourceManager.addEventListener(WebInspector.FrameResourceManager.Event.MainFrameDidChange, this._mainFrameDidChange, this);
 
         WebInspector.debuggerManager.addEventListener(WebInspector.DebuggerManager.Event.ScriptAdded, this._scriptWasAdded, this);
+        WebInspector.debuggerManager.addEventListener(WebInspector.DebuggerManager.Event.ScriptRemoved, this._scriptWasRemoved, this);
         WebInspector.debuggerManager.addEventListener(WebInspector.DebuggerManager.Event.ScriptsCleared, this._scriptsCleared, this);
 
         WebInspector.notifications.addEventListener(WebInspector.Notification.ExtraDomainsActivated, this._extraDomainsActivated, this);
 
-        this.contentTreeOutline.onselect = this._treeElementSelected.bind(this);
+        this.contentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
         this.contentTreeOutline.includeSourceMapResourceChildren = true;
 
         if (WebInspector.debuggableType === WebInspector.DebuggableType.JavaScript)
@@ -270,10 +271,6 @@ WebInspector.ResourceSidebarPanel = class ResourceSidebarPanel extends WebInspec
         if (!script.url)
             return;
 
-        // Exclude inspector scripts.
-        if (script.url.startsWith("__WebInspector"))
-            return;
-
         // If the script URL matches a resource we can assume it is part of that resource and does not need added.
         if (script.resource)
             return;
@@ -309,6 +306,16 @@ WebInspector.ResourceSidebarPanel = class ResourceSidebarPanel extends WebInspec
         }
     }
 
+    _scriptWasRemoved(event)
+    {
+        let script = event.data.script;
+        let scriptTreeElement = this.contentTreeOutline.getCachedTreeElement(script);
+        if (!scriptTreeElement)
+            return;
+
+        scriptTreeElement.parent.removeChild(scriptTreeElement);
+    }
+
     _scriptsCleared(event)
     {
         const suppressOnDeselect = true;
@@ -333,9 +340,10 @@ WebInspector.ResourceSidebarPanel = class ResourceSidebarPanel extends WebInspec
         }
     }
 
-    _treeElementSelected(treeElement, selectedByUser)
+    _treeSelectionDidChange(event)
     {
-        if (treeElement instanceof WebInspector.FolderTreeElement)
+        let treeElement = event.data.selectedElement;
+        if (!treeElement || treeElement instanceof WebInspector.FolderTreeElement)
             return;
 
         if (treeElement instanceof WebInspector.ResourceTreeElement

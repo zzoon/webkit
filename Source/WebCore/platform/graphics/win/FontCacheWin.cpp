@@ -528,7 +528,6 @@ static int CALLBACK traitsInFamilyEnumProc(CONST LOGFONT* logFont, CONST TEXTMET
 
     unsigned traitsMask = 0;
     traitsMask |= logFont->lfItalic ? FontStyleItalicMask : FontStyleNormalMask;
-    traitsMask |= FontVariantNormalMask;
     LONG weight = adjustedGDIFontWeight(logFont->lfWeight, procData->m_familyName);
     traitsMask |= weight == FW_THIN ? FontWeight100Mask :
         weight == FW_EXTRALIGHT ? FontWeight200Mask :
@@ -591,7 +590,7 @@ std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDe
     bool synthesizeBold = isGDIFontWeightBold(weight) && !isGDIFontWeightBold(logFont.lfWeight);
     bool synthesizeItalic = fontDescription.italic() && !logFont.lfItalic;
 
-    auto result = std::make_unique<FontPlatformData>(WTF::move(hfont), fontDescription.computedPixelSize(), synthesizeBold, synthesizeItalic, useGDI);
+    auto result = std::make_unique<FontPlatformData>(WTFMove(hfont), fontDescription.computedPixelSize(), synthesizeBold, synthesizeItalic, useGDI);
 
 #if USE(CG)
     bool fontCreationFailed = !result->cgFont();

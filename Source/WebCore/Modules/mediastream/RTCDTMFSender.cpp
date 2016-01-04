@@ -47,13 +47,13 @@ static const long defaultInterToneGapMs = 70;
 RefPtr<RTCDTMFSender> RTCDTMFSender::create(ScriptExecutionContext* context, RTCPeerConnectionHandler* peerConnectionHandler, PassRefPtr<MediaStreamTrack> prpTrack, ExceptionCode& ec)
 {
     RefPtr<MediaStreamTrack> track = prpTrack;
-    std::unique_ptr<RTCDTMFSenderHandler> handler = peerConnectionHandler->createDTMFSender(track->source());
+    std::unique_ptr<RTCDTMFSenderHandler> handler = peerConnectionHandler->createDTMFSender(&track->source());
     if (!handler) {
         ec = NOT_SUPPORTED_ERR;
         return nullptr;
     }
 
-    RefPtr<RTCDTMFSender> dtmfSender = adoptRef(new RTCDTMFSender(context, track, WTF::move(handler)));
+    RefPtr<RTCDTMFSender> dtmfSender = adoptRef(new RTCDTMFSender(context, track, WTFMove(handler)));
     dtmfSender->suspendIfNeeded();
     return dtmfSender;
 }
@@ -63,7 +63,7 @@ RTCDTMFSender::RTCDTMFSender(ScriptExecutionContext* context, PassRefPtr<MediaSt
     , m_track(track)
     , m_duration(defaultToneDurationMs)
     , m_interToneGap(defaultInterToneGapMs)
-    , m_handler(WTF::move(handler))
+    , m_handler(WTFMove(handler))
     , m_stopped(false)
     , m_scheduledEventTimer(*this, &RTCDTMFSender::scheduledEventTimerFired)
 {
@@ -139,7 +139,7 @@ const char* RTCDTMFSender::activeDOMObjectName() const
     return "RTCDTMFSender";
 }
 
-bool RTCDTMFSender::canSuspendForPageCache() const
+bool RTCDTMFSender::canSuspendForDocumentSuspension() const
 {
     // FIXME: We should try and do better here.
     return false;
@@ -147,7 +147,7 @@ bool RTCDTMFSender::canSuspendForPageCache() const
 
 void RTCDTMFSender::scheduleDispatchEvent(Ref<Event>&& event)
 {
-    m_scheduledEvents.append(WTF::move(event));
+    m_scheduledEvents.append(WTFMove(event));
 
     if (!m_scheduledEventTimer.isActive())
         m_scheduledEventTimer.startOneShot(0);

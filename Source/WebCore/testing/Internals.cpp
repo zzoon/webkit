@@ -28,6 +28,7 @@
 #include "Internals.h"
 
 #include "AXObjectCache.h"
+#include "ActiveDOMCallbackMicrotask.h"
 #include "AnimationController.h"
 #include "ApplicationCacheStorage.h"
 #include "BackForwardController.h"
@@ -81,8 +82,7 @@
 #include "MediaPlayer.h"
 #include "MemoryCache.h"
 #include "MemoryInfo.h"
-#include "MicroTask.h"
-#include "MicroTaskTest.h"
+#include "MockPageOverlay.h"
 #include "MockPageOverlayClient.h"
 #include "Page.h"
 #include "PageCache.h"
@@ -173,7 +173,6 @@
 #include "MockRealtimeMediaSourceCenter.h"
 #include "RTCPeerConnection.h"
 #include "RTCPeerConnectionHandlerMock.h"
-#include "UserMediaClientMock.h"
 #endif
 
 #if ENABLE(MEDIA_SOURCE)
@@ -236,7 +235,6 @@ public:
 protected:
     virtual void setAttachedWindowHeight(unsigned) override { }
     virtual void setAttachedWindowWidth(unsigned) override { }
-    virtual void setToolbarHeight(unsigned) override { }
 
 public:
     // Inspector::FrontendChannel API
@@ -410,7 +408,7 @@ Internals::Internals(Document* document)
 #endif
 
 #if ENABLE(MEDIA_STREAM)
-    MockRealtimeMediaSourceCenter::registerMockRealtimeMediaSourceCenter();
+    setMockMediaCaptureDevicesEnabled(true);
     enableMockMediaEndpoint();
     enableMockRTCPeerConnectionHandler();
 #endif
@@ -950,7 +948,7 @@ void Internals::enableMockSpeechSynthesizer()
     Document* document = contextDocument();
     if (!document || !document->domWindow())
         return;
-    SpeechSynthesis* synthesis = DOMWindowSpeechSynthesis::speechSynthesis(document->domWindow());
+    SpeechSynthesis* synthesis = DOMWindowSpeechSynthesis::speechSynthesis(*document->domWindow());
     if (!synthesis)
         return;
     
@@ -967,6 +965,11 @@ void Internals::enableMockMediaEndpoint()
 void Internals::enableMockRTCPeerConnectionHandler()
 {
     RTCPeerConnectionHandler::create = RTCPeerConnectionHandlerMock::create;
+}
+
+void Internals::setMockMediaCaptureDevicesEnabled(bool enabled)
+{
+    WebCore::Settings::setMockCaptureDevicesEnabled(enabled);
 }
 #endif
 
@@ -1805,7 +1808,7 @@ RefPtr<DOMWindow> Internals::openDummyInspectorFrontend(const String& url)
     RefPtr<DOMWindow> frontendWindow = window->open(url, "", "", *window, *window);
     m_inspectorFrontend = std::make_unique<InspectorStubFrontend>(inspectedPage, frontendWindow.copyRef());
 
-    return WTF::move(frontendWindow);
+    return frontendWindow;
 }
 
 void Internals::closeDummyInspectorFrontend()
@@ -1987,7 +1990,7 @@ void Internals::insertAuthorCSS(const String& css, ExceptionCode& ec) const
     auto parsedSheet = StyleSheetContents::create(*document);
     parsedSheet.get().setIsUserStyleSheet(false);
     parsedSheet.get().parseString(css);
-    document->extensionStyleSheets().addAuthorStyleSheetForTesting(WTF::move(parsedSheet));
+    document->extensionStyleSheets().addAuthorStyleSheetForTesting(WTFMove(parsedSheet));
 }
 
 void Internals::insertUserCSS(const String& css, ExceptionCode& ec) const
@@ -2001,7 +2004,7 @@ void Internals::insertUserCSS(const String& css, ExceptionCode& ec) const
     auto parsedSheet = StyleSheetContents::create(*document);
     parsedSheet.get().setIsUserStyleSheet(true);
     parsedSheet.get().parseString(css);
-    document->extensionStyleSheets().addUserStyleSheet(WTF::move(parsedSheet));
+    document->extensionStyleSheets().addUserStyleSheet(WTFMove(parsedSheet));
 }
 
 String Internals::counterValue(Element* element)
@@ -2830,6 +2833,8 @@ void Internals::setMediaElementRestrictions(HTMLMediaElement* element, const Str
             restrictions |= MediaElementSession::MetadataPreloadingNotPermitted;
         if (equalIgnoringCase(restrictionString, "AutoPreloadingNotPermitted"))
             restrictions |= MediaElementSession::AutoPreloadingNotPermitted;
+        if (equalIgnoringCase(restrictionString, "InvisibleAutoplayNotPermitted"))
+            restrictions |= MediaElementSession::InvisibleAutoplayNotPermitted;
     }
     element->mediaSession().addBehaviorRestriction(restrictions);
 }
@@ -2992,16 +2997,15 @@ void Internals::setMockMediaPlaybackTargetPickerState(const String& deviceName, 
 }
 #endif
 
-
-void Internals::installMockPageOverlay(const String& overlayType, ExceptionCode& ec)
+RefPtr<MockPageOverlay> Internals::installMockPageOverlay(const String& overlayType, ExceptionCode& ec)
 {
     Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
-        return;
+        return nullptr;
     }
 
-    MockPageOverlayClient::singleton().installOverlay(document->frame()->mainFrame(), overlayType == "view" ? PageOverlay::OverlayType::View : PageOverlay::OverlayType::Document);
+    return MockPageOverlayClient::singleton().installOverlay(document->frame()->mainFrame(), overlayType == "view" ? PageOverlay::OverlayType::View : PageOverlay::OverlayType::Document);
 }
 
 String Internals::pageOverlayLayerTreeAsText(ExceptionCode& ec) const
@@ -3060,8 +3064,15 @@ RefPtr<File> Internals::createFile(const String& path)
 
 void Internals::queueMicroTask(int testNumber)
 {
-    if (contextDocument())
-        MicroTaskQueue::singleton().queueMicroTask(std::make_unique<MicroTaskTest>(contextDocument()->createWeakPtr(), testNumber));
+    Document* document = contextDocument();
+    if (!document)
+        return;
+
+    auto microtask = std::make_unique<ActiveDOMCallbackMicrotask>(MicrotaskQueue::mainThreadQueue(), *document, [document, testNumber]() {
+        document->addConsoleMessage(MessageSource::JS, MessageLevel::Debug, makeString("MicroTask #", String::number(testNumber), " has run."));
+    });
+
+    MicrotaskQueue::mainThreadQueue().append(WTFMove(microtask));
 }
 
 #if ENABLE(CONTENT_FILTERING)

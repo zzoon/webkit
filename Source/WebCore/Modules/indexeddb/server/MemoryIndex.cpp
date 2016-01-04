@@ -70,7 +70,7 @@ void MemoryIndex::objectStoreCleared()
     auto transaction = m_objectStore.writeTransaction();
     ASSERT(transaction);
 
-    transaction->indexCleared(*this, WTF::move(m_records));
+    transaction->indexCleared(*this, WTFMove(m_records));
 
     notifyCursorsOfAllRecordsChanged();
 }
@@ -106,7 +106,7 @@ void MemoryIndex::replaceIndexValueStore(std::unique_ptr<IndexValueStore>&& valu
     ASSERT(m_objectStore.writeTransaction());
     ASSERT(m_objectStore.writeTransaction()->isAborting());
 
-    m_records = WTF::move(valueStore);
+    m_records = WTFMove(valueStore);
 }
 
 IDBGetResult MemoryIndex::getResultForKeyRange(IndexedDB::IndexRecordType type, const IDBKeyRangeData& range) const
@@ -177,7 +177,7 @@ IDBError MemoryIndex::putIndexKey(const IDBKeyData& valueKey, const IndexKey& in
     if (m_info.unique()) {
         for (auto& key : keys) {
             if (m_records->contains(key))
-                return IDBError(IDBExceptionCode::ConstraintError);
+                return IDBError(IDBDatabaseException::ConstraintError);
         }
     }
 

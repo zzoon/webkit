@@ -33,10 +33,13 @@
 #include "InjectedBundleNodeHandle.h"
 #include "InjectedBundleRangeHandle.h"
 #include "InjectedBundleScriptWorld.h"
+#include "NetworkConnectionToWebProcessMessages.h"
+#include "NetworkProcessConnection.h"
 #include "PluginView.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
 #include "WebChromeClient.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebDocumentLoader.h"
 #include "WebPage.h"
 #include "WebPageProxyMessages.h"
@@ -79,12 +82,6 @@
 
 #if PLATFORM(COCOA)
 #include <WebCore/LegacyWebArchive.h>
-#endif
-
-#if ENABLE(NETWORK_PROCESS)
-#include "NetworkConnectionToWebProcessMessages.h"
-#include "NetworkProcessConnection.h"
-#include "WebCoreArgumentCoders.h"
 #endif
 
 #ifndef NDEBUG
@@ -131,7 +128,7 @@ PassRefPtr<WebFrame> WebFrame::createSubframe(WebPage* page, const String& frame
     frame->m_coreFrame->tree().setName(frameName);
     if (ownerElement) {
         ASSERT(ownerElement->document().frame());
-        ownerElement->document().frame()->tree().appendChild(WTF::move(coreFrame));
+        ownerElement->document().frame()->tree().appendChild(WTFMove(coreFrame));
     }
     frame->m_coreFrame->init();
     return frame.release();
@@ -139,7 +136,7 @@ PassRefPtr<WebFrame> WebFrame::createSubframe(WebPage* page, const String& frame
 
 PassRefPtr<WebFrame> WebFrame::create(std::unique_ptr<WebFrameLoaderClient> frameLoaderClient)
 {
-    RefPtr<WebFrame> frame = adoptRef(new WebFrame(WTF::move(frameLoaderClient)));
+    RefPtr<WebFrame> frame = adoptRef(new WebFrame(WTFMove(frameLoaderClient)));
 
     // Add explict ref() that will be balanced in WebFrameLoaderClient::frameLoaderDestroyed().
     frame->ref();
@@ -152,7 +149,7 @@ WebFrame::WebFrame(std::unique_ptr<WebFrameLoaderClient> frameLoaderClient)
     , m_policyListenerID(0)
     , m_policyFunction(0)
     , m_policyDownloadID(0)
-    , m_frameLoaderClient(WTF::move(frameLoaderClient))
+    , m_frameLoaderClient(WTFMove(frameLoaderClient))
     , m_loadListener(0)
     , m_frameID(generateFrameID())
 #if PLATFORM(IOS)
@@ -218,12 +215,12 @@ void WebFrame::invalidatePolicyListener()
     if (!m_policyListenerID)
         return;
 
-    m_policyDownloadID = 0;
+    m_policyDownloadID = { };
     m_policyListenerID = 0;
     m_policyFunction = 0;
 }
 
-void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action, uint64_t navigationID, uint64_t downloadID)
+void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action, uint64_t navigationID, DownloadID downloadID)
 {
     if (!m_coreFrame)
         return;
@@ -236,7 +233,7 @@ void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action
 
     ASSERT(m_policyFunction);
 
-    FramePolicyFunction function = WTF::move(m_policyFunction);
+    FramePolicyFunction function = WTFMove(m_policyFunction);
 
     invalidatePolicyListener();
 
@@ -251,74 +248,36 @@ void WebFrame::didReceivePolicyDecision(uint64_t listenerID, PolicyAction action
 
 void WebFrame::startDownload(const WebCore::ResourceRequest& request)
 {
-    ASSERT(m_policyDownloadID);
+    ASSERT(m_policyDownloadID.downloadID());
 
-    uint64_t policyDownloadID = m_policyDownloadID;
-    m_policyDownloadID = 0;
+    auto policyDownloadID = m_policyDownloadID;
+    m_policyDownloadID = { };
 
     auto& webProcess = WebProcess::singleton();
-#if USE(NETWORK_SESSION)
-    ASSERT(webProcess.usesNetworkProcess());
-#endif
     SessionID sessionID = page() ? page()->sessionID() : SessionID::defaultSessionID();
-#if ENABLE(NETWORK_PROCESS)
-    if (webProcess.usesNetworkProcess()) {
-        webProcess.networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::StartDownload(sessionID, policyDownloadID, request), 0);
-        return;
-    }
-#endif
-
-#if USE(NETWORK_SESSION)
-    // Using NETWORK_SESSION requires the use of a network process.
-    RELEASE_ASSERT_NOT_REACHED();
-#else
-    webProcess.downloadManager().startDownload(sessionID, policyDownloadID, request);
-#endif
+    webProcess.networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::StartDownload(sessionID, policyDownloadID, request), 0);
 }
 
 void WebFrame::convertMainResourceLoadToDownload(DocumentLoader* documentLoader, SessionID sessionID, const ResourceRequest& request, const ResourceResponse& response)
 {
-    ASSERT(m_policyDownloadID);
+    ASSERT(m_policyDownloadID.downloadID());
 
-    uint64_t policyDownloadID = m_policyDownloadID;
-    m_policyDownloadID = 0;
+    auto policyDownloadID = m_policyDownloadID;
+    m_policyDownloadID = { };
 
     SubresourceLoader* mainResourceLoader = documentLoader->mainResourceLoader();
 
     auto& webProcess = WebProcess::singleton();
-#if ENABLE(NETWORK_PROCESS)
-#if USE(NETWORK_SESSION)
-    ASSERT(webProcess.usesNetworkProcess());
-#endif
-    if (webProcess.usesNetworkProcess()) {
-        // Use 0 to indicate that the resource load can't be converted and a new download must be started.
-        // This can happen if there is no loader because the main resource is in the WebCore memory cache,
-        // or because the conversion was attempted when not calling SubresourceLoader::didReceiveResponse().
-        uint64_t mainResourceLoadIdentifier;
-        if (mainResourceLoader)
-            mainResourceLoadIdentifier = mainResourceLoader->identifier();
-        else
-            mainResourceLoadIdentifier = 0;
+    // Use 0 to indicate that the resource load can't be converted and a new download must be started.
+    // This can happen if there is no loader because the main resource is in the WebCore memory cache,
+    // or because the conversion was attempted when not calling SubresourceLoader::didReceiveResponse().
+    uint64_t mainResourceLoadIdentifier;
+    if (mainResourceLoader)
+        mainResourceLoadIdentifier = mainResourceLoader->identifier();
+    else
+        mainResourceLoadIdentifier = 0;
 
-        webProcess.networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::ConvertMainResourceLoadToDownload(sessionID, mainResourceLoadIdentifier, policyDownloadID, request, response), 0);
-        return;
-    }
-#endif
-
-    if (!mainResourceLoader) {
-        // The main resource has already been loaded. Start a new download instead.
-#if !USE(NETWORK_SESSION)
-        webProcess.downloadManager().startDownload(sessionID, policyDownloadID, request);
-#endif
-        return;
-    }
-
-#if USE(NETWORK_SESSION)
-    // Using NETWORK_SESSION requires the use of a network process.
-    RELEASE_ASSERT_NOT_REACHED();
-#else
-    webProcess.downloadManager().convertHandleToDownload(policyDownloadID, documentLoader->mainResourceLoader()->handle(), request, response);
-#endif
+    webProcess.networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::ConvertMainResourceLoadToDownload(sessionID, mainResourceLoadIdentifier, policyDownloadID, request, response), 0);
 }
 
 String WebFrame::source() const
@@ -486,7 +445,7 @@ Ref<API::Array> WebFrame::childFrames()
         vector.uncheckedAppend(webFrame);
     }
 
-    return API::Array::create(WTF::move(vector));
+    return API::Array::create(WTFMove(vector));
 }
 
 String WebFrame::layerTreeAsText() const
@@ -609,7 +568,7 @@ IntSize WebFrame::scrollOffset() const
     if (!view)
         return IntSize();
 
-    return view->scrollOffset();
+    return toIntSize(view->scrollPosition());
 }
 
 bool WebFrame::hasHorizontalScrollbar() const
@@ -867,7 +826,7 @@ PassRefPtr<ShareableBitmap> WebFrame::createSelectionSnapshot() const
     auto graphicsContext = sharedSnapshot->createGraphicsContext();
     float deviceScaleFactor = coreFrame()->page()->deviceScaleFactor();
     graphicsContext->scale(FloatSize(deviceScaleFactor, deviceScaleFactor));
-    graphicsContext->drawImageBuffer(*snapshot, FloatPoint());
+    graphicsContext->drawConsumingImageBuffer(WTFMove(snapshot), FloatPoint());
 
     return sharedSnapshot.release();
 }

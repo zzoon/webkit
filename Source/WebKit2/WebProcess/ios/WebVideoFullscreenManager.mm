@@ -80,7 +80,7 @@ WebVideoFullscreenInterfaceContext::~WebVideoFullscreenInterfaceContext()
 
 void WebVideoFullscreenInterfaceContext::setLayerHostingContext(std::unique_ptr<LayerHostingContext>&& context)
 {
-    m_layerHostingContext = WTF::move(context);
+    m_layerHostingContext = WTFMove(context);
 }
 
 void WebVideoFullscreenInterfaceContext::resetMediaState()
@@ -195,7 +195,7 @@ WebVideoFullscreenManager::ModelInterfaceTuple WebVideoFullscreenManager::create
     interface->setLayerHostingContext(LayerHostingContext::createForExternalHostingProcess());
     model->setWebVideoFullscreenInterface(interface.get());
 
-    return std::make_tuple(WTF::move(model), WTF::move(interface));
+    return std::make_tuple(WTFMove(model), WTFMove(interface));
 }
 
 WebVideoFullscreenManager::ModelInterfaceTuple& WebVideoFullscreenManager::ensureModelAndInterface(uint64_t contextId)
@@ -240,11 +240,13 @@ void WebVideoFullscreenManager::enterVideoFullscreenForVideoElement(HTMLVideoEle
 
     FloatRect clientRect = clientRectForElement(&videoElement);
     FloatRect videoLayerFrame = FloatRect(0, 0, clientRect.width(), clientRect.height());
-    
+
+    HTMLMediaElementEnums::VideoFullscreenMode oldMode = interface->fullscreenMode();
     interface->setTargetIsFullscreen(true);
     interface->setFullscreenMode(mode);
     model->setVideoElement(&videoElement);
-    model->setVideoLayerFrame(videoLayerFrame);
+    if (oldMode == HTMLMediaElementEnums::VideoFullscreenModeNone)
+        model->setVideoLayerFrame(videoLayerFrame);
 
     if (interface->isAnimating())
         return;
@@ -314,7 +316,7 @@ void WebVideoFullscreenManager::setSeekableRanges(uint64_t contextId, const WebC
         rangesVector.append(std::pair<double,double>(start, end));
     }
 
-    m_page->send(Messages::WebVideoFullscreenManagerProxy::SetSeekableRangesVector(contextId, WTF::move(rangesVector)), m_page->pageID());
+    m_page->send(Messages::WebVideoFullscreenManagerProxy::SetSeekableRangesVector(contextId, WTFMove(rangesVector)), m_page->pageID());
 }
 
 void WebVideoFullscreenManager::setCanPlayFastReverse(uint64_t contextId, bool value)
@@ -394,9 +396,9 @@ void WebVideoFullscreenManager::endScanning(uint64_t contextId)
     ensureModel(contextId).endScanning();
 }
 
-void WebVideoFullscreenManager::requestExitFullscreen(uint64_t contextId)
+void WebVideoFullscreenManager::requestFullscreenMode(uint64_t contextId, WebCore::HTMLMediaElementEnums::VideoFullscreenMode mode)
 {
-    ensureModel(contextId).requestExitFullscreen();
+    ensureModel(contextId).requestFullscreenMode(mode);
 }
 
 void WebVideoFullscreenManager::selectAudioMediaOption(uint64_t contextId, uint64_t index)

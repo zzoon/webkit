@@ -69,6 +69,7 @@
 #include "VirtualRegister.h"
 #include "Watchpoint.h"
 #include <wtf/Bag.h>
+#include <wtf/FastBitVector.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/RefCountedArray.h>
 #include <wtf/RefPtr.h>
@@ -140,6 +141,8 @@ public:
 
     int numParameters() const { return m_numParameters; }
     void setNumParameters(int newValue);
+
+    int numCalleeLocals() const { return m_numCalleeLocals; }
 
     int* addressOfNumParameters() { return &m_numParameters; }
     static ptrdiff_t offsetOfNumParameters() { return OBJECT_OFFSETOF(CodeBlock, m_numParameters); }
@@ -264,7 +267,7 @@ public:
 
     void setJITCodeMap(std::unique_ptr<CompactJITCodeMap> jitCodeMap)
     {
-        m_jitCodeMap = WTF::move(jitCodeMap);
+        m_jitCodeMap = WTFMove(jitCodeMap);
     }
     CompactJITCodeMap* jitCodeMap()
     {
@@ -299,6 +302,7 @@ public:
         m_jitCode = code;
     }
     PassRefPtr<JITCode> jitCode() { return m_jitCode; }
+    static ptrdiff_t jitCodeOffset() { return OBJECT_OFFSETOF(CodeBlock, m_jitCode); }
     JITCode::JITType jitType() const
     {
         JITCode* jitCode = m_jitCode.get();
@@ -448,25 +452,22 @@ public:
         return value >= Options::couldTakeSlowCaseMinimumCount();
     }
 
-    RareCaseProfile* addSpecialFastCaseProfile(int bytecodeOffset)
+    ResultProfile* addResultProfile(int bytecodeOffset)
     {
-        m_specialFastCaseProfiles.append(RareCaseProfile(bytecodeOffset));
-        return &m_specialFastCaseProfiles.last();
+        m_resultProfiles.append(ResultProfile(bytecodeOffset));
+        return &m_resultProfiles.last();
     }
-    unsigned numberOfSpecialFastCaseProfiles() { return m_specialFastCaseProfiles.size(); }
-    RareCaseProfile* specialFastCaseProfile(int index) { return &m_specialFastCaseProfiles[index]; }
-    RareCaseProfile* specialFastCaseProfileForBytecodeOffset(int bytecodeOffset)
-    {
-        return tryBinarySearch<RareCaseProfile, int>(
-            m_specialFastCaseProfiles, m_specialFastCaseProfiles.size(), bytecodeOffset,
-            getRareCaseProfileBytecodeOffset);
-    }
+    unsigned numberOfResultProfiles() { return m_resultProfiles.size(); }
+    ResultProfile* resultProfileForBytecodeOffset(int bytecodeOffset);
+
+    void updateResultProfileForBytecodeOffset(int bytecodeOffset, JSValue result);
+
     unsigned specialFastCaseProfileCountForBytecodeOffset(int bytecodeOffset)
     {
-        RareCaseProfile* profile = specialFastCaseProfileForBytecodeOffset(bytecodeOffset);
+        ResultProfile* profile = resultProfileForBytecodeOffset(bytecodeOffset);
         if (!profile)
             return 0;
-        return profile->m_counter;
+        return profile->specialFastPathCount();
     }
 
     bool couldTakeSpecialFastCase(int bytecodeOffset)
@@ -631,7 +632,7 @@ public:
         {
             ConcurrentJITLocker locker(m_lock);
             if (!m_livenessAnalysis)
-                m_livenessAnalysis = WTF::move(analysis);
+                m_livenessAnalysis = WTFMove(analysis);
             return *m_livenessAnalysis;
         }
     }
@@ -653,6 +654,18 @@ public:
     size_t numberOfStringSwitchJumpTables() const { return m_rareData ? m_rareData->m_stringSwitchJumpTables.size() : 0; }
     StringJumpTable& addStringSwitchJumpTable() { createRareDataIfNecessary(); m_rareData->m_stringSwitchJumpTables.append(StringJumpTable()); return m_rareData->m_stringSwitchJumpTables.last(); }
     StringJumpTable& stringSwitchJumpTable(int tableIndex) { RELEASE_ASSERT(m_rareData); return m_rareData->m_stringSwitchJumpTables[tableIndex]; }
+
+    // Live callee registers at yield points.
+    const FastBitVector& liveCalleeLocalsAtYield(unsigned index) const
+    {
+        RELEASE_ASSERT(m_rareData);
+        return m_rareData->m_liveCalleeLocalsAtYield[index];
+    }
+    FastBitVector& liveCalleeLocalsAtYield(unsigned index)
+    {
+        RELEASE_ASSERT(m_rareData);
+        return m_rareData->m_liveCalleeLocalsAtYield[index];
+    }
 
     EvalCodeCache& evalCodeCache() { createRareDataIfNecessary(); return m_rareData->m_evalCodeCache; }
 
@@ -855,7 +868,7 @@ public:
     // FIXME: Make these remaining members private.
 
     int m_numLocalRegistersForCalleeSaves;
-    int m_numCalleeRegisters;
+    int m_numCalleeLocals;
     int m_numVars;
     bool m_isConstructor : 1;
     
@@ -899,6 +912,8 @@ public:
         // Jump Tables
         Vector<SimpleJumpTable> m_switchJumpTables;
         Vector<StringJumpTable> m_stringSwitchJumpTables;
+
+        Vector<FastBitVector> m_liveCalleeLocalsAtYield;
 
         EvalCodeCache m_evalCodeCache;
     };
@@ -976,7 +991,8 @@ private:
     void dumpValueProfiling(PrintStream&, const Instruction*&, bool& hasPrintedProfiling);
     void dumpArrayProfiling(PrintStream&, const Instruction*&, bool& hasPrintedProfiling);
     void dumpRareCaseProfile(PrintStream&, const char* name, RareCaseProfile*, bool& hasPrintedProfiling);
-        
+    void dumpResultProfile(PrintStream&, ResultProfile*, bool& hasPrintedProfiling);
+
     bool shouldVisitStrongly();
     bool shouldJettisonDueToWeakReference();
     bool shouldJettisonDueToOldAge();
@@ -1051,7 +1067,7 @@ private:
     Vector<ValueProfile> m_argumentValueProfiles;
     Vector<ValueProfile> m_valueProfiles;
     SegmentedVector<RareCaseProfile, 8> m_rareCaseProfiles;
-    SegmentedVector<RareCaseProfile, 8> m_specialFastCaseProfiles;
+    SegmentedVector<ResultProfile, 8> m_resultProfiles;
     Vector<ArrayAllocationProfile> m_arrayAllocationProfiles;
     ArrayProfileVector m_arrayProfiles;
     Vector<ObjectAllocationProfile> m_objectAllocationProfiles;

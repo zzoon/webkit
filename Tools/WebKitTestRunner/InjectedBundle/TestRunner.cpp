@@ -96,6 +96,9 @@ TestRunner::TestRunner()
     , m_databaseMaxQuota(-1)
     , m_userStyleSheetEnabled(false)
     , m_userStyleSheetLocation(adoptWK(WKStringCreateWithUTF8CString("")))
+#if PLATFORM(GTK)
+    , m_waitToDumpWatchdogTimer(RunLoop::main(), this, &TestRunner::waitToDumpWatchdogTimerFired)
+#endif
 {
     platformInitialize();
 }
@@ -770,6 +773,12 @@ void TestRunner::setUserMediaPermission(bool enabled)
 {
     // FIXME: this should be done by frame.
     InjectedBundle::singleton().setUserMediaPermission(enabled);
+}
+
+void TestRunner::setUserMediaPermissionForOrigin(bool permission, JSStringRef url)
+{
+    WKRetainPtr<WKStringRef> urlWK = toWK(url);
+    InjectedBundle::singleton().setUserMediaPermissionForOrigin(permission, urlWK.get());
 }
 
 bool TestRunner::callShouldCloseOnWebView()

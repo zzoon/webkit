@@ -43,6 +43,7 @@
 #include "JSLexicalEnvironment.h"
 #include "JSCInlines.h"
 #include "JSCJSValue.h"
+#include "JSGeneratorFunction.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSStackInlines.h"
 #include "JSString.h"
@@ -224,9 +225,9 @@ static void traceFunctionPrologue(ExecState* exec, const char* comment, CodeSpec
     JSFunction* callee = jsCast<JSFunction*>(exec->callee());
     FunctionExecutable* executable = callee->jsExecutable();
     CodeBlock* codeBlock = executable->codeBlockFor(kind);
-    dataLogF("%p / %p: in %s of function %p, executable %p; numVars = %u, numParameters = %u, numCalleeRegisters = %u, caller = %p.\n",
+    dataLogF("%p / %p: in %s of function %p, executable %p; numVars = %u, numParameters = %u, numCalleeLocals = %u, caller = %p.\n",
             codeBlock, exec, comment, callee, executable,
-            codeBlock->m_numVars, codeBlock->numParameters(), codeBlock->m_numCalleeRegisters,
+            codeBlock->m_numVars, codeBlock->numParameters(), codeBlock->m_numCalleeLocals,
             exec->callerFrame());
 }
 
@@ -458,7 +459,7 @@ LLINT_SLOW_PATH_DECL(stack_check)
 #if LLINT_SLOW_PATH_TRACING
     dataLogF("Checking stack height with exec = %p.\n", exec);
     dataLogF("CodeBlock = %p.\n", exec->codeBlock());
-    dataLogF("Num callee registers = %u.\n", exec->codeBlock()->m_numCalleeRegisters);
+    dataLogF("Num callee registers = %u.\n", exec->codeBlock()->m_numCalleeLocals);
     dataLogF("Num vars = %u.\n", exec->codeBlock()->m_numVars);
 
 #if ENABLE(JIT)
@@ -521,23 +522,6 @@ LLINT_SLOW_PATH_DECL(slow_path_new_regexp)
     LLINT_RETURN(RegExpObject::create(vm, exec->lexicalGlobalObject()->regExpStructure(), regExp));
 }
 
-LLINT_SLOW_PATH_DECL(slow_path_check_has_instance)
-{
-    LLINT_BEGIN();
-    
-    JSValue value = LLINT_OP_C(2).jsValue();
-    JSValue baseVal = LLINT_OP_C(3).jsValue();
-    if (baseVal.isObject()) {
-        JSObject* baseObject = asObject(baseVal);
-        ASSERT(!baseObject->structure()->typeInfo().implementsDefaultHasInstance());
-        if (baseObject->structure()->typeInfo().implementsHasInstance()) {
-            JSValue result = jsBoolean(baseObject->methodTable()->customHasInstance(baseObject, exec, value));
-            LLINT_RETURN_WITH_PC_ADJUSTMENT(result, pc[4].u.operand);
-        }
-    }
-    LLINT_THROW(createInvalidInstanceofParameterError(exec, baseVal));
-}
-
 LLINT_SLOW_PATH_DECL(slow_path_instanceof)
 {
     LLINT_BEGIN();
@@ -545,6 +529,21 @@ LLINT_SLOW_PATH_DECL(slow_path_instanceof)
     JSValue proto = LLINT_OP_C(3).jsValue();
     ASSERT(!value.isObject() || !proto.isObject());
     LLINT_RETURN(jsBoolean(JSObject::defaultHasInstance(exec, value, proto)));
+}
+
+LLINT_SLOW_PATH_DECL(slow_path_instanceof_custom)
+{
+    LLINT_BEGIN();
+
+    JSValue value = LLINT_OP_C(2).jsValue();
+    JSValue constructor = LLINT_OP_C(3).jsValue();
+    JSValue hasInstanceValue = LLINT_OP_C(4).jsValue();
+
+    ASSERT(constructor.isObject());
+    ASSERT(hasInstanceValue != exec->lexicalGlobalObject()->functionProtoHasInstanceSymbolFunction() || !constructor.getObject()->structure()->typeInfo().implementsDefaultHasInstance());
+
+    JSValue result = jsBoolean(constructor.getObject()->hasInstance(exec, value, hasInstanceValue));
+    LLINT_RETURN(result);
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_get_by_id)
@@ -619,7 +618,7 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_id)
     if (pc[8].u.putByIdFlags & PutByIdIsDirect)
         asObject(baseValue)->putDirect(vm, ident, LLINT_OP_C(3).jsValue(), slot);
     else
-        baseValue.put(exec, ident, LLINT_OP_C(3).jsValue(), slot);
+        baseValue.putInline(exec, ident, LLINT_OP_C(3).jsValue(), slot);
     LLINT_CHECK_EXCEPTION();
     
     if (!LLINT_ALWAYS_ACCESS_SLOW
@@ -1041,6 +1040,18 @@ LLINT_SLOW_PATH_DECL(slow_path_new_func)
     LLINT_RETURN(JSFunction::create(vm, codeBlock->functionDecl(pc[3].u.operand), scope));
 }
 
+LLINT_SLOW_PATH_DECL(slow_path_new_generator_func)
+{
+    LLINT_BEGIN();
+    CodeBlock* codeBlock = exec->codeBlock();
+    ASSERT(codeBlock->codeType() != FunctionCode || !codeBlock->needsActivation() || exec->hasActivation());
+    JSScope* scope = exec->uncheckedR(pc[2].u.operand).Register::scope();
+#if LLINT_SLOW_PATH_TRACING
+    dataLogF("Creating function!\n");
+#endif
+    LLINT_RETURN(JSGeneratorFunction::create(vm, codeBlock->functionDecl(pc[3].u.operand), scope));
+}
+
 LLINT_SLOW_PATH_DECL(slow_path_new_func_exp)
 {
     LLINT_BEGIN();
@@ -1052,16 +1063,26 @@ LLINT_SLOW_PATH_DECL(slow_path_new_func_exp)
     LLINT_RETURN(JSFunction::create(vm, executable, scope));
 }
 
-LLINT_SLOW_PATH_DECL(slow_path_new_arrow_func_exp)
+LLINT_SLOW_PATH_DECL(slow_path_new_generator_func_exp)
 {
     LLINT_BEGIN();
 
-    JSValue thisValue = LLINT_OP_C(4).jsValue();
+    CodeBlock* codeBlock = exec->codeBlock();
+    JSScope* scope = exec->uncheckedR(pc[2].u.operand).Register::scope();
+    FunctionExecutable* executable = codeBlock->functionExpr(pc[3].u.operand);
+
+    LLINT_RETURN(JSGeneratorFunction::create(vm, executable, scope));
+}
+
+LLINT_SLOW_PATH_DECL(slow_path_new_arrow_func_exp)
+{
+    LLINT_BEGIN();
+    
     CodeBlock* codeBlock = exec->codeBlock();
     JSScope* scope = exec->uncheckedR(pc[2].u.operand).Register::scope();
     FunctionExecutable* executable = codeBlock->functionExpr(pc[3].u.operand);
     
-    LLINT_RETURN(JSArrowFunction::create(vm, executable, scope, thisValue));
+    LLINT_RETURN(JSFunction::create(vm, executable, scope));
 }
 
 static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc, JSValue callee, CodeSpecializationKind kind)
@@ -1346,7 +1367,7 @@ LLINT_SLOW_PATH_DECL(slow_path_throw_static_error)
 LLINT_SLOW_PATH_DECL(slow_path_handle_watchdog_timer)
 {
     LLINT_BEGIN_NO_SET_PC();
-    ASSERT(vm.watchdog);
+    ASSERT(vm.watchdog());
     if (UNLIKELY(vm.shouldTriggerTermination(exec)))
         LLINT_THROW(createTerminatedExecutionException(&vm));
     LLINT_RETURN_TWO(0, exec);

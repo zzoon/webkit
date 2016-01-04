@@ -727,6 +727,7 @@ public:
     
     void compileInstanceOfForObject(Node*, GPRReg valueReg, GPRReg prototypeReg, GPRReg scratchAndResultReg, GPRReg scratch2Reg);
     void compileInstanceOf(Node*);
+    void compileInstanceOfCustom(Node*);
     
     void emitCall(Node*);
     
@@ -1221,9 +1222,9 @@ public:
         return appendCall(operation);
     }
 
-    JITCompiler::Call callOperation(V_JITOperation_ECRUiUi operation, GPRReg arg1, GPRReg arg2, TrustedImm32 arg3, GPRReg arg4)
+    JITCompiler::Call callOperation(V_JITOperation_ECRUiUi operation, GPRReg arg1, GPRReg arg2, Imm32 arg3, GPRReg arg4)
     {
-        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3, arg4);
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3.asTrustedImm32(), arg4);
         return appendCall(operation);
     }
 
@@ -1511,6 +1512,17 @@ public:
         m_jit.setupArgumentsWithExecState(arg1, arg2, TrustedImm32(arg3), arg4);
         return appendCallSetResult(operation, result);
     }
+
+    JITCompiler::Call callOperation(Z_JITOperation_EJOJ operation, GPRReg result, GPRReg arg1, GPRReg arg2, GPRReg arg3)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2, arg3);
+        return appendCallSetResult(operation, result);
+    }
+    JITCompiler::Call callOperation(Z_JITOperation_EJOJ operation, GPRReg result, JSValueRegs arg1, GPRReg arg2, JSValueRegs arg3)
+    {
+        return callOperation(operation, result, arg1.payloadGPR(), arg2, arg3.payloadGPR());
+    }
+
     JITCompiler::Call callOperation(Z_JITOperation_EJZ operation, GPRReg result, GPRReg arg1, unsigned arg2)
     {
         m_jit.setupArgumentsWithExecState(arg1, TrustedImm32(arg2));
@@ -1550,6 +1562,11 @@ public:
 #define SH4_32BIT_DUMMY_ARG
 #endif
 
+    JITCompiler::Call callOperation(D_JITOperation_G operation, FPRReg result, JSGlobalObject* globalObject)
+    {
+        m_jit.setupArguments(TrustedImmPtr(globalObject));
+        return appendCallSetResult(operation, result);
+    }
     JITCompiler::Call callOperation(Z_JITOperation_D operation, GPRReg result, FPRReg arg1)
     {
         prepareForExternalCall();
@@ -1830,6 +1847,16 @@ public:
     {
         m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG SH4_32BIT_DUMMY_ARG arg3Payload, arg3Tag);
         return appendCall(operation);
+    }
+
+    JITCompiler::Call callOperation(Z_JITOperation_EJOJ operation, GPRReg result, GPRReg arg1Tag, GPRReg arg1Payload, GPRReg arg2, GPRReg arg3Tag, GPRReg arg3Payload)
+    {
+        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg1Payload, arg1Tag, arg2, EABI_32BIT_DUMMY_ARG arg3Payload, arg3Tag);
+        return appendCallSetResult(operation, result);
+    }
+    JITCompiler::Call callOperation(Z_JITOperation_EJOJ operation, GPRReg result, JSValueRegs arg1, GPRReg arg2, JSValueRegs arg3)
+    {
+        return callOperation(operation, result, arg1.tagGPR(), arg1.payloadGPR(), arg2, arg3.tagGPR(), arg3.payloadGPR());
     }
 
     JITCompiler::Call callOperation(Z_JITOperation_EJZZ operation, GPRReg result, GPRReg arg1Tag, GPRReg arg1Payload, unsigned arg2, unsigned arg3)
@@ -2200,11 +2227,11 @@ public:
     void compileGetByValOnScopedArguments(Node*);
     
     void compileGetScope(Node*);
-    void compileLoadArrowFunctionThis(Node*);
     void compileSkipScope(Node*);
 
     void compileGetArrayLength(Node*);
 
+    void compileCheckTypeInfoFlags(Node*);
     void compileCheckIdent(Node*);
     
     void compileValueRep(Node*);
@@ -2213,6 +2240,14 @@ public:
     void compileValueToInt32(Node*);
     void compileUInt32ToNumber(Node*);
     void compileDoubleAsInt32(Node*);
+
+    template<typename SnippetGenerator, J_JITOperation_EJJ slowPathFunction>
+    void emitUntypedBitOp(Node*);
+    void compileBitwiseOp(Node*);
+
+    void emitUntypedRightShiftBitOp(Node*);
+    void compileShiftOp(Node*);
+
     void compileValueAdd(Node*);
     void compileArithAdd(Node*);
     void compileMakeRope(Node*);
@@ -2224,6 +2259,7 @@ public:
     void compileArithMod(Node*);
     void compileArithPow(Node*);
     void compileArithRound(Node*);
+    void compileArithRandom(Node*);
     void compileArithSqrt(Node*);
     void compileArithLog(Node*);
     void compileConstantStoragePointer(Node*);
@@ -2245,6 +2281,7 @@ public:
     void compileCreateScopedArguments(Node*);
     void compileCreateClonedArguments(Node*);
     void compileCopyRest(Node*);
+    void compileGetRestLength(Node*);
     void compileNotifyWrite(Node*);
     bool compileRegExpExec(Node*);
     void compileIsObjectOrNull(Node*);

@@ -28,7 +28,6 @@
 
 #include "APIObject.h"
 #include "CacheModel.h"
-#include "ProcessModel.h"
 #include <wtf/Ref.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
@@ -47,12 +46,6 @@ public:
 
     bool shouldHaveLegacyDataStore() const { return m_shouldHaveLegacyDataStore; }
     void setShouldHaveLegacyDataStore(bool shouldHaveLegacyDataStore) { m_shouldHaveLegacyDataStore = shouldHaveLegacyDataStore; }
-
-    WebKit::ProcessModel processModel() const { return m_processModel; }
-    void setProcessModel(WebKit::ProcessModel processModel) { m_processModel = processModel; } 
-
-    bool useNetworkProcess() const { return m_useNetworkProcess; }
-    void setUseNetworkProcess(bool useNetworkProcess) { m_useNetworkProcess = useNetworkProcess; } 
 
     unsigned maximumProcessCount() const { return m_maximumProcessCount; }
     void setMaximumProcessCount(unsigned maximumProcessCount) { m_maximumProcessCount = maximumProcessCount; } 
@@ -85,19 +78,17 @@ public:
     void setMediaKeysStorageDirectory(const WTF::String& mediaKeysStorageDirectory) { m_mediaKeysStorageDirectory = mediaKeysStorageDirectory; }
 
     const Vector<WTF::String>& cachePartitionedURLSchemes() { return m_cachePartitionedURLSchemes; }
-    void setCachePartitionedURLSchemes(Vector<WTF::String>&& cachePartitionedURLSchemes) { m_cachePartitionedURLSchemes = WTF::move(cachePartitionedURLSchemes); }
+    void setCachePartitionedURLSchemes(Vector<WTF::String>&& cachePartitionedURLSchemes) { m_cachePartitionedURLSchemes = WTFMove(cachePartitionedURLSchemes); }
 
     bool fullySynchronousModeIsAllowedForTesting() const { return m_fullySynchronousModeIsAllowedForTesting; }
     void setFullySynchronousModeIsAllowedForTesting(bool allowed) { m_fullySynchronousModeIsAllowedForTesting = allowed; }
 
     const Vector<WTF::String>& overrideLanguages() const { return m_overrideLanguages; }
-    void setOverrideLanguages(Vector<WTF::String>&& languages) { m_overrideLanguages = WTF::move(languages); }
+    void setOverrideLanguages(Vector<WTF::String>&& languages) { m_overrideLanguages = WTFMove(languages); }
 
 private:
     bool m_shouldHaveLegacyDataStore { false };
 
-    WebKit::ProcessModel m_processModel { WebKit::ProcessModelMultipleSecondaryProcesses };
-    bool m_useNetworkProcess { true };
     unsigned m_maximumProcessCount { 0 };
     WebKit::CacheModel m_cacheModel { WebKit::CacheModelPrimaryWebBrowser };
     int64_t m_diskCacheSizeOverride { -1 };

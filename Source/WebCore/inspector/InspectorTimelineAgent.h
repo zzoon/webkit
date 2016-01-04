@@ -92,9 +92,7 @@ class InspectorTimelineAgent final
     WTF_MAKE_NONCOPYABLE(InspectorTimelineAgent);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    enum InspectorType { PageInspector, WorkerInspector };
-
-    InspectorTimelineAgent(WebAgentContext&, InspectorPageAgent*, InspectorType);
+    InspectorTimelineAgent(WebAgentContext&, InspectorPageAgent*);
     virtual ~InspectorTimelineAgent();
 
     virtual void didCreateFrontendAndBackend(Inspector::FrontendRouter*, Inspector::BackendDispatcher*) override;
@@ -158,9 +156,9 @@ private:
         TimelineRecordEntry()
             : type(TimelineRecordType::EventDispatch) { }
         TimelineRecordEntry(RefPtr<Inspector::InspectorObject>&& record, RefPtr<Inspector::InspectorObject>&& data, RefPtr<Inspector::InspectorArray>&& children, TimelineRecordType type)
-            : record(WTF::move(record))
-            , data(WTF::move(data))
-            , children(WTF::move(children))
+            : record(WTFMove(record))
+            , data(WTFMove(data))
+            , children(WTFMove(children))
             , type(type)
         {
         }
@@ -200,7 +198,6 @@ private:
     int m_id { 1 };
     int m_callStackDepth { 0 };
     int m_maxCallStackDepth { 5 };
-    InspectorType m_inspectorType;
 
     Vector<TimelineRecordEntry> m_pendingConsoleProfileRecords;
 

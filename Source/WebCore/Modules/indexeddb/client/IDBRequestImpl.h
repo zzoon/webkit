@@ -60,9 +60,9 @@ public:
 
     virtual ~IDBRequest() override;
 
-    virtual RefPtr<WebCore::IDBAny> result(ExceptionCode&) const override;
+    virtual RefPtr<WebCore::IDBAny> result(ExceptionCodeWithMessage&) const override;
     virtual unsigned short errorCode(ExceptionCode&) const override;
-    virtual RefPtr<DOMError> error(ExceptionCode&) const override;
+    virtual RefPtr<DOMError> error(ExceptionCodeWithMessage&) const override;
     virtual RefPtr<WebCore::IDBAny> source() const override;
     virtual RefPtr<WebCore::IDBTransaction> transaction() const override;
     virtual const String& readyState() const override;
@@ -79,7 +79,7 @@ public:
     using RefCounted<IDBRequest>::deref;
 
     void enqueueEvent(Ref<Event>&&);
-    virtual bool dispatchEvent(Event&) override final;
+    virtual bool dispatchEvent(Event&) override;
 
     IDBConnectionToServer& connection() { return m_connection; }
 
@@ -97,6 +97,11 @@ public:
 
     const IDBCursor* pendingCursor() const { return m_pendingCursor.get(); }
 
+    void setSource(IDBCursor&);
+    void setVersionChangeTransaction(IDBTransaction&);
+
+    IndexedDB::RequestType requestType() const { return m_requestType; }
+
 protected:
     IDBRequest(IDBConnectionToServer&, ScriptExecutionContext*);
     IDBRequest(ScriptExecutionContext&, IDBObjectStore&, IDBTransaction&);
@@ -106,18 +111,24 @@ protected:
 
     // ActiveDOMObject.
     virtual const char* activeDOMObjectName() const override final;
-    virtual bool canSuspendForPageCache() const override final;
+    virtual bool canSuspendForDocumentSuspension() const override final;
     virtual bool hasPendingActivity() const override final;
-    
+    virtual void stop() override final;
+
     // EventTarget.
     virtual void refEventTarget() override final { RefCounted<IDBRequest>::ref(); }
     virtual void derefEventTarget() override final { RefCounted<IDBRequest>::deref(); }
+    virtual void uncaughtExceptionInEventHandler() override final;
+
+    virtual bool isOpenDBRequest() const { return false; }
 
     IDBRequestReadyState m_readyState { IDBRequestReadyState::Pending };
     RefPtr<IDBAny> m_result;
     RefPtr<IDBTransaction> m_transaction;
+    bool m_shouldExposeTransactionToDOM { true };
     RefPtr<DOMError> m_domError;
     IDBError m_idbError;
+    IndexedDB::RequestType m_requestType = { IndexedDB::RequestType::Other };
 
 private:
     void onError();
@@ -132,6 +143,8 @@ private:
     IndexedDB::IndexRecordType m_requestedIndexRecordType;
 
     RefPtr<IDBCursor> m_pendingCursor;
+
+    bool m_contextStopped { false };
 };
 
 } // namespace IDBClient

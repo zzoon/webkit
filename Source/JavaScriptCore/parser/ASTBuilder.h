@@ -341,9 +341,11 @@ public:
         return new (m_parserArena) YieldExprNode(location, nullptr, /* delegate */ false);
     }
 
-    YieldExprNode* createYield(const JSTokenLocation& location, ExpressionNode* argument, bool delegate)
+    YieldExprNode* createYield(const JSTokenLocation& location, ExpressionNode* argument, bool delegate, const JSTextPosition& start, const JSTextPosition& divot, const JSTextPosition& end)
     {
-        return new (m_parserArena) YieldExprNode(location, argument, delegate);
+        YieldExprNode* node = new (m_parserArena) YieldExprNode(location, argument, delegate);
+        setExceptionLocation(node, start, divot, end);
+        return node;
     }
 
     ClassExprNode* createClassExpr(const JSTokenLocation& location, const Identifier& name, VariableEnvironment& classEnvironment, ExpressionNode* constructor,
@@ -364,17 +366,17 @@ public:
         const JSTokenLocation& startLocation, const JSTokenLocation& endLocation, 
         unsigned startColumn, unsigned endColumn, int functionKeywordStart, 
         int functionNameStart, int parametersStart, bool inStrictContext, 
-        ConstructorKind constructorKind, unsigned parameterCount, SourceParseMode mode, bool isArrowFunction, bool isArrowFunctionBodyExpression)
+        ConstructorKind constructorKind, SuperBinding superBinding, unsigned parameterCount, SourceParseMode mode, bool isArrowFunctionBodyExpression)
     {
         return new (m_parserArena) FunctionMetadataNode(
             m_parserArena, startLocation, endLocation, startColumn, endColumn, 
             functionKeywordStart, functionNameStart, parametersStart, 
-            inStrictContext, constructorKind, parameterCount, mode, isArrowFunction, isArrowFunctionBodyExpression);
+            inStrictContext, constructorKind, superBinding, parameterCount, mode, isArrowFunctionBodyExpression);
     }
 
     ExpressionNode* createArrowFunctionExpr(const JSTokenLocation& location, const ParserFunctionInfo<ASTBuilder>& functionInfo)
     {
-        usesThis();
+        usesArrowFunction();
         SourceCode source = m_sourceCode->subExpression(functionInfo.startOffset, functionInfo.body->isArrowFunctionBodyExpression() ? functionInfo.endOffset - 1 : functionInfo.endOffset, functionInfo.startLine, functionInfo.bodyStartColumn);
         ArrowFuncExprNode* result = new (m_parserArena) ArrowFuncExprNode(location, *functionInfo.name, functionInfo.body, source);
         functionInfo.body->setLoc(functionInfo.startLine, functionInfo.endLine, location.startOffset, location.lineStartOffset);
@@ -851,7 +853,12 @@ public:
     {
         node->appendEntry(location, identifier, wasString, pattern, defaultValue);
     }
-    
+
+    void appendObjectPatternEntry(ObjectPattern node, const JSTokenLocation& location, ExpressionNode* propertyExpression, DestructuringPattern pattern, ExpressionNode* defaultValue)
+    {
+        node->appendEntry(location, propertyExpression, pattern, defaultValue);
+    }
+
     BindingPattern createBindingLocation(const JSTokenLocation&, const Identifier& boundProperty, const JSTextPosition& start, const JSTextPosition& end, AssignmentContext context)
     {
         return new (m_parserArena) BindingNode(boundProperty, start, end, context);
@@ -886,6 +893,9 @@ public:
     {
         node->setStartOffset(offset);
     }
+
+
+    void propagateArgumentsUse() { usesArguments(); }
     
 private:
     struct Scope {
@@ -907,6 +917,7 @@ private:
 
     void incConstants() { m_scope.m_numConstants++; }
     void usesThis() { m_scope.m_features |= ThisFeature; }
+    void usesArrowFunction() { m_scope.m_features |= ArrowFunctionFeature; }
     void usesArguments() { m_scope.m_features |= ArgumentsFeature; }
     void usesWith() { m_scope.m_features |= WithFeature; }
     void usesEval() 

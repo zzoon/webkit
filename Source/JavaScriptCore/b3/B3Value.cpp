@@ -32,6 +32,7 @@
 #include "B3CCallValue.h"
 #include "B3ControlValue.h"
 #include "B3MemoryValue.h"
+#include "B3OriginDump.h"
 #include "B3ProcedureInlines.h"
 #include "B3StackSlotValue.h"
 #include "B3UpsilonValue.h"
@@ -53,6 +54,13 @@ void Value::replaceWithIdentity(Value* value)
     // This is a bit crazy. It does an in-place replacement of whatever Value subclass this is with
     // a plain Identity Value. We first collect all of the information we need, then we destruct the
     // previous value in place, and then we construct the Identity Value in place.
+
+    ASSERT(m_type == value->m_type);
+
+    if (m_type == Void) {
+        replaceWithNop();
+        return;
+    }
 
     unsigned index = m_index;
     Type type = m_type;
@@ -92,7 +100,7 @@ void Value::dumpChildren(CommaPrinter& comma, PrintStream& out) const
         out.print(comma, pointerDump(child));
 }
 
-void Value::deepDump(PrintStream& out) const
+void Value::deepDump(const Procedure& proc, PrintStream& out) const
 {
     out.print(m_type, " ", *this, " = ", m_opcode);
 
@@ -101,7 +109,7 @@ void Value::deepDump(PrintStream& out) const
     dumpChildren(comma, out);
 
     if (m_origin)
-        out.print(comma, m_origin);
+        out.print(comma, OriginDump(proc, m_origin));
 
     dumpMeta(comma, out);
 
@@ -164,6 +172,11 @@ Value* Value::divConstant(Procedure&, const Value*) const
     return nullptr;
 }
 
+Value* Value::modConstant(Procedure&, const Value*) const
+{
+    return nullptr;
+}
+
 Value* Value::bitAndConstant(Procedure&, const Value*) const
 {
     return nullptr;
@@ -195,6 +208,31 @@ Value* Value::zShrConstant(Procedure&, const Value*) const
 }
 
 Value* Value::bitwiseCastConstant(Procedure&) const
+{
+    return nullptr;
+}
+
+Value* Value::doubleToFloatConstant(Procedure&) const
+{
+    return nullptr;
+}
+
+Value* Value::floatToDoubleConstant(Procedure&) const
+{
+    return nullptr;
+}
+
+Value* Value::absConstant(Procedure&) const
+{
+    return nullptr;
+}
+
+Value* Value::ceilConstant(Procedure&) const
+{
+    return nullptr;
+}
+
+Value* Value::sqrtConstant(Procedure&) const
 {
     return nullptr;
 }
@@ -249,6 +287,11 @@ TriState Value::belowEqualConstant(const Value*) const
     return MixedTriState;
 }
 
+TriState Value::equalOrUnorderedConstant(const Value*) const
+{
+    return MixedTriState;
+}
+
 Value* Value::invertedCompare(Procedure& proc) const
 {
     if (!numChildren())
@@ -266,7 +309,8 @@ bool Value::returnsBool() const
     case Const32:
         return asInt32() == 0 || asInt32() == 1;
     case BitAnd:
-        return child(1)->isInt32(1);
+        return child(1)->isInt32(1)
+            || (child(0)->returnsBool() && child(1)->hasInt() && child(1)->asInt() & 1);
     case Equal:
     case NotEqual:
     case LessThan:
@@ -277,6 +321,7 @@ bool Value::returnsBool() const
     case Below:
     case AboveEqual:
     case BelowEqual:
+    case EqualOrUnordered:
         return true;
     case Phi:
         // FIXME: We should have a story here.
@@ -297,6 +342,8 @@ TriState Value::asTriState() const
     case ConstDouble:
         // Use "!= 0" to really emphasize what this mean with respect to NaN and such.
         return triState(asDouble() != 0);
+    case ConstFloat:
+        return triState(asFloat() != 0.);
     default:
         return MixedTriState;
     }
@@ -311,6 +358,7 @@ Effects Value::effects() const
     case Const32:
     case Const64:
     case ConstDouble:
+    case ConstFloat:
     case StackSlot:
     case ArgumentReg:
     case FramePointer:
@@ -318,22 +366,26 @@ Effects Value::effects() const
     case Sub:
     case Mul:
     case ChillDiv:
-    case Mod:
+    case ChillMod:
     case BitAnd:
     case BitOr:
     case BitXor:
     case Shl:
     case SShr:
     case ZShr:
+    case Clz:
+    case Abs:
+    case Ceil:
+    case Sqrt:
     case BitwiseCast:
     case SExt8:
     case SExt16:
     case SExt32:
     case ZExt32:
     case Trunc:
-    case FRound:
     case IToD:
-    case DToI32:
+    case FloatToDouble:
+    case DoubleToFloat:
     case Equal:
     case NotEqual:
     case LessThan:
@@ -344,22 +396,23 @@ Effects Value::effects() const
     case Below:
     case AboveEqual:
     case BelowEqual:
+    case EqualOrUnordered:
+    case Select:
         break;
     case Div:
+    case Mod:
         result.controlDependent = true;
         break;
     case Load8Z:
     case Load8S:
     case Load16Z:
     case Load16S:
-    case LoadFloat:
     case Load:
         result.reads = as<MemoryValue>()->range();
         result.controlDependent = true;
         break;
     case Store8:
     case Store16:
-    case StoreFloat:
     case Store:
         result.writes = as<MemoryValue>()->range();
         result.controlDependent = true;
@@ -375,6 +428,8 @@ Effects Value::effects() const
     case CheckMul:
     case Check:
         result.exitsSideways = true;
+        // The program could read anything after exiting, and it's on us to declare this.
+        result.reads = HeapRange::top();
         break;
     case Upsilon:
         result.writesSSAState = true;
@@ -399,21 +454,28 @@ ValueKey Value::key() const
     case FramePointer:
         return ValueKey(opcode(), type());
     case Identity:
+    case Abs:
+    case Ceil:
+    case Sqrt:
     case SExt8:
     case SExt16:
     case SExt32:
     case ZExt32:
+    case Clz:
     case Trunc:
-    case FRound:
     case IToD:
-    case DToI32:
+    case FloatToDouble:
+    case DoubleToFloat:
     case Check:
+    case BitwiseCast:
         return ValueKey(opcode(), type(), child(0));
     case Add:
     case Sub:
     case Mul:
-    case ChillDiv:
+    case Div:
     case Mod:
+    case ChillDiv:
+    case ChillMod:
     case BitAnd:
     case BitOr:
     case BitXor:
@@ -428,17 +490,21 @@ ValueKey Value::key() const
     case Below:
     case AboveEqual:
     case BelowEqual:
-    case Div:
+    case EqualOrUnordered:
     case CheckAdd:
     case CheckSub:
     case CheckMul:
         return ValueKey(opcode(), type(), child(0), child(1));
+    case Select:
+        return ValueKey(opcode(), type(), child(0), child(1), child(2));
     case Const32:
         return ValueKey(Const32, type(), static_cast<int64_t>(asInt32()));
     case Const64:
         return ValueKey(Const64, type(), asInt64());
     case ConstDouble:
         return ValueKey(ConstDouble, type(), asDouble());
+    case ConstFloat:
+        return ValueKey(ConstFloat, type(), asFloat());
     case ArgumentReg:
         return ValueKey(
             ArgumentReg, type(),
@@ -469,6 +535,7 @@ void Value::checkOpcode(Opcode opcode)
     ASSERT(!Const32Value::accepts(opcode));
     ASSERT(!Const64Value::accepts(opcode));
     ASSERT(!ConstDoubleValue::accepts(opcode));
+    ASSERT(!ConstFloatValue::accepts(opcode));
     ASSERT(!ControlValue::accepts(opcode));
     ASSERT(!MemoryValue::accepts(opcode));
     ASSERT(!PatchpointValue::accepts(opcode));
@@ -477,7 +544,7 @@ void Value::checkOpcode(Opcode opcode)
 }
 #endif // !ASSERT_DISABLED
 
-Type Value::typeFor(Opcode opcode, Value* firstChild)
+Type Value::typeFor(Opcode opcode, Value* firstChild, Value* secondChild)
 {
     switch (opcode) {
     case Identity:
@@ -485,14 +552,19 @@ Type Value::typeFor(Opcode opcode, Value* firstChild)
     case Sub:
     case Mul:
     case Div:
-    case ChillDiv:
     case Mod:
+    case ChillDiv:
+    case ChillMod:
     case BitAnd:
     case BitOr:
     case BitXor:
     case Shl:
     case SShr:
     case ZShr:
+    case Clz:
+    case Abs:
+    case Ceil:
+    case Sqrt:
     case CheckAdd:
     case CheckSub:
     case CheckMul:
@@ -502,7 +574,6 @@ Type Value::typeFor(Opcode opcode, Value* firstChild)
     case SExt8:
     case SExt16:
     case Trunc:
-    case DToI32:
     case Equal:
     case NotEqual:
     case LessThan:
@@ -513,22 +584,35 @@ Type Value::typeFor(Opcode opcode, Value* firstChild)
     case Below:
     case AboveEqual:
     case BelowEqual:
+    case EqualOrUnordered:
         return Int32;
     case SExt32:
     case ZExt32:
         return Int64;
-    case FRound:
+    case FloatToDouble:
     case IToD:
         return Double;
+    case DoubleToFloat:
+        return Float;
     case BitwiseCast:
-        if (firstChild->type() == Int64)
+        switch (firstChild->type()) {
+        case Int64:
             return Double;
-        if (firstChild->type() == Double)
+        case Double:
             return Int64;
-        ASSERT_NOT_REACHED();
+        case Int32:
+            return Float;
+        case Float:
+            return Int32;
+        case Void:
+            ASSERT_NOT_REACHED();
+        }
         return Void;
     case Nop:
         return Void;
+    case Select:
+        ASSERT(secondChild);
+        return secondChild->type();
     default:
         RELEASE_ASSERT_NOT_REACHED();
     }

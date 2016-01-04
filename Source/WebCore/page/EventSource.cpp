@@ -273,7 +273,7 @@ void EventSource::didFail(const ResourceError& error)
 
 void EventSource::didFailAccessControlCheck(const ResourceError& error)
 {
-    String message = makeString("EventSource cannot load ", error.failingURL(), ". ", error.localizedDescription());
+    String message = makeString("EventSource cannot load ", error.failingURL().string(), ". ", error.localizedDescription());
     scriptExecutionContext()->addConsoleMessage(MessageSource::JS, MessageLevel::Error, message);
 
     abortConnectionAttempt();
@@ -404,7 +404,7 @@ const char* EventSource::activeDOMObjectName() const
     return "EventSource";
 }
 
-bool EventSource::canSuspendForPageCache() const
+bool EventSource::canSuspendForDocumentSuspension() const
 {
     // FIXME: We should try and do better here.
     return false;

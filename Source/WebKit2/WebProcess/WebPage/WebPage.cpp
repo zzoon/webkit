@@ -40,7 +40,6 @@
 #include "EventDispatcher.h"
 #include "InjectedBundle.h"
 #include "InjectedBundleBackForwardList.h"
-#include "LayerTreeHost.h"
 #include "Logging.h"
 #include "NetscapePlugin.h"
 #include "NotificationPermissionRequestManager.h"
@@ -210,6 +209,10 @@
 
 #ifndef NDEBUG
 #include <wtf/RefCountedLeakCounter.h>
+#endif
+
+#if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
+#include "LayerTreeHost.h"
 #endif
 
 #if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
@@ -617,7 +620,7 @@ void WebPage::setInjectedBundleContextMenuClient(std::unique_ptr<API::InjectedBu
         return;
     }
 
-    m_contextMenuClient = WTF::move(contextMenuClient);
+    m_contextMenuClient = WTFMove(contextMenuClient);
 }
 #endif
 
@@ -633,7 +636,7 @@ void WebPage::setInjectedBundleFormClient(std::unique_ptr<API::InjectedBundle::F
         return;
     }
 
-    m_formClient = WTF::move(formClient);
+    m_formClient = WTFMove(formClient);
 }
 
 void WebPage::initializeInjectedBundleLoaderClient(WKBundlePageLoaderClientBase* client)
@@ -672,7 +675,7 @@ void WebPage::setInjectedBundleUIClient(std::unique_ptr<API::InjectedBundle::Pag
         return;
     }
 
-    m_uiClient = WTF::move(uiClient);
+    m_uiClient = WTFMove(uiClient);
 }
 
 #if ENABLE(FULLSCREEN_API)
@@ -837,7 +840,7 @@ Ref<API::Array> WebPage::trackedRepaintRects()
     for (const auto& repaintRect : view->trackedRepaintRects())
         repaintRects.uncheckedAppend(API::Rect::create(toAPI(repaintRect)));
 
-    return API::Array::create(WTF::move(repaintRects));
+    return API::Array::create(WTFMove(repaintRects));
 }
 
 PluginView* WebPage::focusedPluginViewForFrame(Frame& frame)
@@ -1313,8 +1316,8 @@ void WebPage::scrollMainFrameIfNotAtMaxScrollPosition(const IntSize& scrollOffse
 {
     FrameView* frameView = m_page->mainFrame().view();
 
-    IntPoint scrollPosition = frameView->scrollPosition();
-    IntPoint maximumScrollPosition = frameView->maximumScrollPosition();
+    ScrollPosition scrollPosition = frameView->scrollPosition();
+    ScrollPosition maximumScrollPosition = frameView->maximumScrollPosition();
 
     // If the current scroll position in a direction is the max scroll position 
     // we don't want to scroll at all.
@@ -1459,8 +1462,10 @@ void WebPage::scalePage(double scale, const IntPoint& origin)
     for (auto* pluginView : m_pluginViews)
         pluginView->pageScaleFactorDidChange();
 
+#if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
     if (m_drawingArea->layerTreeHost())
         m_drawingArea->layerTreeHost()->deviceOrPageScaleFactorChanged();
+#endif
 
     send(Messages::WebPageProxy::PageScaleFactorDidChange(scale));
 }
@@ -1535,8 +1540,10 @@ void WebPage::setDeviceScaleFactor(float scaleFactor)
         m_findController.deviceScaleFactorDidChange();
     }
 
+#if USE(COORDINATED_GRAPHICS) || USE(TEXTURE_MAPPER)
     if (m_drawingArea->layerTreeHost())
         m_drawingArea->layerTreeHost()->deviceOrPageScaleFactorChanged();
+#endif
 }
 
 float WebPage::deviceScaleFactor() const
@@ -2401,7 +2408,7 @@ void WebPage::setSessionID(SessionID sessionID)
     m_page->setSessionID(sessionID);
 }
 
-void WebPage::didReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t navigationID, uint64_t downloadID)
+void WebPage::didReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t navigationID, DownloadID downloadID)
 {
     WebFrame* frame = WebProcess::singleton().webFrame(frameID);
     if (!frame)
@@ -2783,6 +2790,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setAudioPlaybackRequiresUserGesture(store.getBoolValueForKey(WebPreferencesKey::requiresUserGestureForAudioPlaybackKey()));
     settings.setAllowsInlineMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::allowsInlineMediaPlaybackKey()));
     settings.setInlineMediaPlaybackRequiresPlaysInlineAttribute(store.getBoolValueForKey(WebPreferencesKey::inlineMediaPlaybackRequiresPlaysInlineAttributeKey()));
+    settings.setInvisibleAutoplayNotPermitted(store.getBoolValueForKey(WebPreferencesKey::invisibleAutoplayNotPermittedKey()));
     settings.setMediaDataLoadsAutomatically(store.getBoolValueForKey(WebPreferencesKey::mediaDataLoadsAutomaticallyKey()));
     settings.setAllowsPictureInPictureMediaPlayback(store.getBoolValueForKey(WebPreferencesKey::allowsPictureInPictureMediaPlaybackKey()));
     settings.setMediaControlsScaleWithPageZoom(store.getBoolValueForKey(WebPreferencesKey::mediaControlsScaleWithPageZoomKey()));
@@ -2901,6 +2909,10 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setMediaSourceEnabled(store.getBoolValueForKey(WebPreferencesKey::mediaSourceEnabledKey()));
 #endif
 
+#if ENABLE(MEDIA_STREAM)
+    settings.setMockCaptureDevicesEnabled(store.getBoolValueForKey(WebPreferencesKey::mockCaptureDevicesEnabledKey()));
+#endif
+
     settings.setShouldConvertPositionStyleOnCopy(store.getBoolValueForKey(WebPreferencesKey::shouldConvertPositionStyleOnCopyKey()));
 
     settings.setStandalone(store.getBoolValueForKey(WebPreferencesKey::standaloneKey()));
@@ -2942,7 +2954,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
         m_drawingArea->updatePreferences(store);
 
 #if PLATFORM(IOS)
-    m_viewportConfiguration.setCanIgnoreScalingConstraints(store.getBoolValueForKey(WebPreferencesKey::ignoreViewportScalingConstraintsKey()));
+    m_ignoreViewportScalingConstraints = store.getBoolValueForKey(WebPreferencesKey::ignoreViewportScalingConstraintsKey());
+    m_viewportConfiguration.setCanIgnoreScalingConstraints(m_ignoreViewportScalingConstraints);
     m_viewportConfiguration.setForceAlwaysUserScalable(store.getBoolValueForKey(WebPreferencesKey::forceAlwaysUserScalableKey()));
 #endif
 }
@@ -3364,6 +3377,11 @@ void WebPage::didReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool a
 {
     m_userMediaPermissionRequestManager.didReceiveUserMediaPermissionDecision(userMediaID, allowed, audioDeviceUID, videoDeviceUID);
 }
+
+void WebPage::didCompleteUserMediaPermissionCheck(uint64_t userMediaID, bool allowed)
+{
+    m_userMediaPermissionRequestManager.didCompleteUserMediaPermissionCheck(userMediaID, allowed);
+}
 #endif
 
 #if !PLATFORM(IOS)
@@ -3486,9 +3504,9 @@ void WebPage::addMIMETypeWithCustomContentProvider(const String& mimeType)
 void WebPage::updateMainFrameScrollOffsetPinning()
 {
     Frame& frame = m_page->mainFrame();
-    IntPoint scrollPosition = frame.view()->scrollPosition();
-    IntPoint maximumScrollPosition = frame.view()->maximumScrollPosition();
-    IntPoint minimumScrollPosition = frame.view()->minimumScrollPosition();
+    ScrollPosition scrollPosition = frame.view()->scrollPosition();
+    ScrollPosition maximumScrollPosition = frame.view()->maximumScrollPosition();
+    ScrollPosition minimumScrollPosition = frame.view()->minimumScrollPosition();
 
     bool isPinnedToLeftSide = (scrollPosition.x() <= minimumScrollPosition.x());
     bool isPinnedToRightSide = (scrollPosition.x() >= maximumScrollPosition.x());
@@ -3519,10 +3537,8 @@ void WebPage::mainFrameDidLayout()
 #if PLATFORM(IOS)
     if (FrameView* frameView = mainFrameView()) {
         IntSize newContentSize = frameView->contentsSizeRespectingOverflow();
-        if (m_viewportConfiguration.contentsSize() != newContentSize) {
-            m_viewportConfiguration.setContentsSize(newContentSize);
+        if (m_viewportConfiguration.setContentsSize(newContentSize))
             viewportConfigurationChanged();
-        }
     }
     m_findController.redraw();
 #endif
@@ -4470,7 +4486,7 @@ void WebPage::didChangeSelection()
     auto editorState = this->editorState(view && view->needsLayout() ? IncludePostLayoutDataHint::No : IncludePostLayoutDataHint::Yes);
     m_isEditorStateMissingPostLayoutData = editorState.isMissingPostLayoutData;
 
-#if PLATFORM(MAC) && USE(ASYNC_NSTEXTINPUTCLIENT)
+#if PLATFORM(MAC)
     // Abandon the current inline input session if selection changed for any other reason but an input method direct action.
     // FIXME: This logic should be in WebCore.
     // FIXME: Many changes that affect composition node do not go through didChangeSelection(). We need to do something when DOM manipulation affects the composition, because otherwise input method's idea about it will be different from Editor's.
@@ -4668,9 +4684,16 @@ void WebPage::didCommitLoad(WebFrame* frame)
 
     resetViewportDefaultConfiguration(frame);
     const Frame* coreFrame = frame->coreFrame();
-    m_viewportConfiguration.setContentsSize(coreFrame->view()->contentsSize());
-    m_viewportConfiguration.setViewportArguments(coreFrame->document()->viewportArguments());
-    viewportConfigurationChanged();
+    
+    bool viewportChanged = false;
+    if (m_viewportConfiguration.setContentsSize(coreFrame->view()->contentsSize()))
+        viewportChanged = true;
+
+    if (m_viewportConfiguration.setViewportArguments(coreFrame->document()->viewportArguments()))
+        viewportChanged = true;
+
+    if (viewportChanged)
+        viewportConfigurationChanged();
 #endif
 
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
@@ -4776,8 +4799,8 @@ void WebPage::determinePrimarySnapshottedPlugIn()
                 continue;
 
             IntRect plugInRectRelativeToView = plugInImageElement.clientRect();
-            IntSize scrollOffset = mainFrame.view()->documentScrollOffsetRelativeToViewOrigin();
-            IntRect plugInRectRelativeToTopDocument(plugInRectRelativeToView.location() + scrollOffset, plugInRectRelativeToView.size());
+            ScrollPosition scrollPosition = mainFrame.view()->documentScrollPositionRelativeToViewOrigin();
+            IntRect plugInRectRelativeToTopDocument(plugInRectRelativeToView.location() + scrollPosition, plugInRectRelativeToView.size());
             HitTestResult hitTestResult(plugInRectRelativeToTopDocument.center());
             mainRenderView.hitTest(request, hitTestResult);
 
@@ -4786,7 +4809,7 @@ void WebPage::determinePrimarySnapshottedPlugIn()
                 continue;
 
             IntRect elementRectRelativeToView = element->clientRect();
-            IntRect elementRectRelativeToTopDocument(elementRectRelativeToView.location() + scrollOffset, elementRectRelativeToView.size());
+            IntRect elementRectRelativeToTopDocument(elementRectRelativeToView.location() + scrollPosition, elementRectRelativeToView.size());
             LayoutRect inflatedPluginRect = plugInRectRelativeToTopDocument;
             LayoutUnit xOffset = (inflatedPluginRect.width() * overlappingImageBoundsScale - inflatedPluginRect.width()) / 2;
             LayoutUnit yOffset = (inflatedPluginRect.height() * overlappingImageBoundsScale - inflatedPluginRect.height()) / 2;
@@ -4855,8 +4878,8 @@ bool WebPage::plugInIntersectsSearchRect(HTMLPlugInImageElement& plugInImageElem
     IntRect plugInRectRelativeToView = plugInImageElement.clientRect();
     if (plugInRectRelativeToView.isEmpty())
         return false;
-    IntSize scrollOffset = mainFrame.view()->documentScrollOffsetRelativeToViewOrigin();
-    IntRect plugInRectRelativeToTopDocument(plugInRectRelativeToView.location() + scrollOffset, plugInRectRelativeToView.size());
+    ScrollPosition scrollPosition = mainFrame.view()->documentScrollPositionRelativeToViewOrigin();
+    IntRect plugInRectRelativeToTopDocument(plugInRectRelativeToView.location() + toIntSize(scrollPosition), plugInRectRelativeToView.size());
 
     return plugInRectRelativeToTopDocument.intersects(searchRect);
 }
@@ -4939,7 +4962,7 @@ Ref<DocumentLoader> WebPage::createDocumentLoader(Frame& frame, const ResourceRe
         }
     }
 
-    return WTF::move(documentLoader);
+    return WTFMove(documentLoader);
 }
 
 void WebPage::updateCachedDocumentLoader(WebDocumentLoader& documentLoader, Frame& frame)
@@ -4984,14 +5007,6 @@ PassRefPtr<WebCore::Range> WebPage::rangeFromEditingRange(WebCore::Frame& frame,
     return TextIterator::rangeFromLocationAndLength(frame.selection().rootEditableElementOrDocumentElement(), static_cast<int>(range.location), length);
 }
     
-bool WebPage::synchronousMessagesShouldSpinRunLoop()
-{
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED < 101000
-    return WebCore::AXObjectCache::accessibilityEnabled();
-#endif
-    return false;
-}
-
 void WebPage::didChangeScrollOffsetForFrame(Frame* frame)
 {
     if (!frame->isMainFrame())
@@ -5081,6 +5096,11 @@ void WebPage::dispatchDidLayout(WebCore::LayoutMilestones milestones)
         return;
 
     send(Messages::WebPageProxy::DidLayout(milestones));
+}
+
+void WebPage::didRestoreScrollPosition()
+{
+    send(Messages::WebPageProxy::DidRestoreScrollPosition());
 }
 
 } // namespace WebKit

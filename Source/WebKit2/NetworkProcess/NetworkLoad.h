@@ -26,14 +26,13 @@
 #ifndef NetworkLoad_h
 #define NetworkLoad_h
 
-#if ENABLE(NETWORK_PROCESS)
-
 #include "NetworkLoadClient.h"
 #include "NetworkLoadParameters.h"
 #include "RemoteNetworkingContext.h"
 
 #if USE(NETWORK_SESSION)
 #include "NetworkSession.h"
+#include <WebCore/AuthenticationChallenge.h>
 #else
 #include <WebCore/ResourceHandleClient.h>
 #endif
@@ -54,18 +53,22 @@ public:
     void setDefersLoading(bool);
     void cancel();
 
+    const WebCore::ResourceRequest& currentRequest() const { return m_currentRequest; }
     void clearCurrentRequest() { m_currentRequest = WebCore::ResourceRequest(); }
 
     void continueWillSendRequest(const WebCore::ResourceRequest&);
     void continueDidReceiveResponse();
 
 #if USE(NETWORK_SESSION)
+    void convertTaskToDownload();
+    
     // NetworkSessionTaskClient.
     virtual void willPerformHTTPRedirection(const WebCore::ResourceResponse&, const WebCore::ResourceRequest&, std::function<void(const WebCore::ResourceRequest&)>) final override;
     virtual void didReceiveChallenge(const WebCore::AuthenticationChallenge&, std::function<void(AuthenticationChallengeDisposition, const WebCore::Credential&)>) final override;
     virtual void didReceiveResponse(const WebCore::ResourceResponse&, std::function<void(WebCore::PolicyAction)>) final override;
     virtual void didReceiveData(RefPtr<WebCore::SharedBuffer>&&) final override;
     virtual void didCompleteWithError(const WebCore::ResourceError&) final override;
+    virtual void didBecomeDownload() final override;
 #else
     // ResourceHandleClient
     virtual void willSendRequestAsync(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse& redirectResponse) override;
@@ -117,6 +120,10 @@ private:
     RefPtr<RemoteNetworkingContext> m_networkingContext;
 #if USE(NETWORK_SESSION)
     Ref<NetworkDataTask> m_task;
+    WebCore::AuthenticationChallenge m_challenge;
+    ChallengeCompletionHandler m_challengeCompletionHandler;
+    ResponseCompletionHandler m_responseCompletionHandler;
+    RedirectCompletionHandler m_redirectCompletionHandler;
 #else
     RefPtr<WebCore::ResourceHandle> m_handle;
 #endif
@@ -125,7 +132,5 @@ private:
 };
 
 } // namespace WebKit
-
-#endif // ENABLE(NETWORK_PROCESS)
 
 #endif // NetworkLoad_h

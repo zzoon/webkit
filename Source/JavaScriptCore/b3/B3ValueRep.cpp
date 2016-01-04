@@ -28,13 +28,18 @@
 
 #if ENABLE(B3_JIT)
 
+#include "AssemblyHelpers.h"
+#include "JSCInlines.h"
+
 namespace JSC { namespace B3 {
 
 void ValueRep::dump(PrintStream& out) const
 {
     out.print(m_kind);
     switch (m_kind) {
-    case Any:
+    case WarmAny:
+    case ColdAny:
+    case LateColdAny:
     case SomeRegister:
         return;
     case Register:
@@ -53,6 +58,67 @@ void ValueRep::dump(PrintStream& out) const
     RELEASE_ASSERT_NOT_REACHED();
 }
 
+void ValueRep::emitRestore(AssemblyHelpers& jit, Reg reg) const
+{
+    if (reg.isGPR()) {
+        switch (kind()) {
+        case Register:
+            if (isGPR())
+                jit.move(gpr(), reg.gpr());
+            else
+                jit.moveDoubleTo64(fpr(), reg.gpr());
+            break;
+        case Stack:
+            jit.load64(AssemblyHelpers::Address(GPRInfo::callFrameRegister, offsetFromFP()), reg.gpr());
+            break;
+        case Constant:
+            jit.move(AssemblyHelpers::TrustedImm64(value()), reg.gpr());
+            break;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            break;
+        }
+        return;
+    }
+    
+    switch (kind()) {
+    case Register:
+        if (isGPR())
+            jit.move64ToDouble(gpr(), reg.fpr());
+        else
+            jit.moveDouble(fpr(), reg.fpr());
+        break;
+    case Stack:
+        jit.loadDouble(AssemblyHelpers::Address(GPRInfo::callFrameRegister, offsetFromFP()), reg.fpr());
+        break;
+    case Constant:
+        jit.move(AssemblyHelpers::TrustedImm64(value()), jit.scratchRegister());
+        jit.move64ToDouble(jit.scratchRegister(), reg.fpr());
+        break;
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+        break;
+    }
+}
+
+ValueRecovery ValueRep::recoveryForJSValue() const
+{
+    switch (kind()) {
+    case Register:
+        return ValueRecovery::inGPR(gpr(), DataFormatJS);
+    case Stack:
+        RELEASE_ASSERT(!(offsetFromFP() % sizeof(EncodedJSValue)));
+        return ValueRecovery::displacedInJSStack(
+            VirtualRegister(offsetFromFP() / sizeof(EncodedJSValue)),
+            DataFormatJS);
+    case Constant:
+        return ValueRecovery::constant(JSValue::decode(value()));
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+        return { };
+    }
+}
+
 } } // namespace JSC::B3
 
 namespace WTF {
@@ -62,8 +128,14 @@ using namespace JSC::B3;
 void printInternal(PrintStream& out, ValueRep::Kind kind)
 {
     switch (kind) {
-    case ValueRep::Any:
-        out.print("Any");
+    case ValueRep::WarmAny:
+        out.print("WarmAny");
+        return;
+    case ValueRep::ColdAny:
+        out.print("ColdAny");
+        return;
+    case ValueRep::LateColdAny:
+        out.print("LateColdAny");
         return;
     case ValueRep::SomeRegister:
         out.print("SomeRegister");

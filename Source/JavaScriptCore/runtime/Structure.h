@@ -204,13 +204,18 @@ public:
     {
         return dictionaryKind() != UncachedDictionaryKind
             && !typeInfo().prohibitsPropertyCaching()
-            && !(typeInfo().hasImpureGetOwnPropertySlot() && !typeInfo().newImpurePropertyFiresWatchpoints());
+            && !(typeInfo().getOwnPropertySlotIsImpure() && !typeInfo().newImpurePropertyFiresWatchpoints());
+    }
+
+    bool propertyAccessesAreCacheableForAbsence()
+    {
+        return !typeInfo().getOwnPropertySlotIsImpureForPropertyAbsence();
     }
     
     bool needImpurePropertyWatchpoint()
     {
         return propertyAccessesAreCacheable()
-            && typeInfo().hasImpureGetOwnPropertySlot()
+            && typeInfo().getOwnPropertySlotIsImpure()
             && typeInfo().newImpurePropertyFiresWatchpoints();
     }
 
@@ -218,7 +223,7 @@ public:
     // DFG from inlining property accesses since structures don't transition when a new impure property appears.
     bool takesSlowPathInDFGForImpureProperty()
     {
-        return typeInfo().hasImpureGetOwnPropertySlot();
+        return typeInfo().getOwnPropertySlotIsImpure();
     }
     
     // Type accessors.
@@ -253,7 +258,7 @@ public:
     static void visitChildren(JSCell*, SlotVisitor&);
         
     // Will just the prototype chain intercept this property access?
-    bool prototypeChainMayInterceptStoreTo(VM&, PropertyName);
+    JS_EXPORT_PRIVATE bool prototypeChainMayInterceptStoreTo(VM&, PropertyName);
         
     Structure* previousID() const
     {

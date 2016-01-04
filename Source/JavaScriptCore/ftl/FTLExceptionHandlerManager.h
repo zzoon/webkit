@@ -26,7 +26,9 @@
 #ifndef FTLExceptionHandlerManager_h
 #define FTLExceptionHandlerManager_h
 
-#if ENABLE(FTL_JIT)
+#include "DFGCommon.h"
+
+#if ENABLE(FTL_JIT) && !FTL_USES_B3
 
 #include "CallFrame.h"
 #include "FTLJSCall.h"
@@ -54,14 +56,14 @@ public:
     ExceptionHandlerManager(State& state);
 
     void addNewExit(uint32_t stackmapRecordIndex, size_t osrExitIndex);
+    void addNewCallOperationExit(uint32_t stackmapRecordIndex, size_t osrExitIndex);
 
     // These functions only make sense to be called after we've generated the OSR
     // exit thunks and allocated the OSR exit thunks' link buffer.
     CodeLocationLabel callOperationExceptionTarget(uint32_t stackmapRecordIndex);
     CodeLocationLabel lazySlowPathExceptionTarget(uint32_t stackmapRecordIndex);
 
-    OSRExit* getByIdOSRExit(uint32_t stackmapRecordIndex);
-    OSRExit* subOSRExit(uint32_t stackmapRecordIndex);
+    OSRExit* callOperationOSRExit(uint32_t stackmapRecordIndex);
     OSRExit* getCallOSRExit(uint32_t stackmapRecordIndex, const JSCall&);
     OSRExit* getCallOSRExit(uint32_t stackmapRecordIndex, const JSTailCall&);
     OSRExit* getCallOSRExit(uint32_t stackmapRecordIndex, const JSCallVarargs&);
@@ -78,10 +80,11 @@ private:
     State& m_state;
     typedef HashMap<uint32_t, size_t, WTF::IntHash<uint32_t>, WTF::UnsignedWithZeroKeyHashTraits<uint32_t>> RecordIndexToOSRExitIndexMap;
     RecordIndexToOSRExitIndexMap m_map;
+    RecordIndexToOSRExitIndexMap m_callOperationMap;
 };
 
 } } // namespace JSC::FTL
 
-#endif // ENABLE(FTL_JIT)
+#endif // ENABLE(FTL_JIT) && !FTL_USES_B3
 
 #endif // FTLExceptionHandlerManager_h

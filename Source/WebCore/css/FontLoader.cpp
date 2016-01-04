@@ -161,14 +161,14 @@ const char* FontLoader::activeDOMObjectName() const
     return "FontLoader";
 }
 
-bool FontLoader::canSuspendForPageCache() const
+bool FontLoader::canSuspendForDocumentSuspension() const
 {
     return !m_numLoadingFromCSS && !m_numLoadingFromJS;
 }
 
 void FontLoader::scheduleEvent(Ref<Event>&& event)
 {
-    m_pendingEvents.append(WTF::move(event));
+    m_pendingEvents.append(WTFMove(event));
     if (!m_pendingEventsTimer.isActive())
         m_pendingEventsTimer.startOneShot(0);
 }

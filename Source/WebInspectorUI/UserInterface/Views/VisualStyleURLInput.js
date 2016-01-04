@@ -45,7 +45,7 @@ WebInspector.VisualStyleURLInput = class VisualStyleURLInput extends WebInspecto
 
     set value(value)
     {
-        if (value && value === this.value)
+        if ((value && value === this.value) || this._propertyMissing)
             return;
 
         this._urlInputElement.value = value;

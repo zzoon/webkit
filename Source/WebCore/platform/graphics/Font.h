@@ -35,6 +35,8 @@
 #if ENABLE(OPENTYPE_VERTICAL)
 #include "OpenTypeVerticalData.h"
 #endif
+#include <wtf/BitVector.h>
+#include <wtf/Optional.h>
 #include <wtf/TypeCasts.h>
 #include <wtf/text/StringHash.h>
 
@@ -87,7 +89,7 @@ public:
     // Used to create SVG Fonts.
     static Ref<Font> create(std::unique_ptr<SVGData> svgData, float fontSize, bool syntheticBold, bool syntheticItalic)
     {
-        return adoptRef(*new Font(WTF::move(svgData), fontSize, syntheticBold, syntheticItalic));
+        return adoptRef(*new Font(WTFMove(svgData), fontSize, syntheticBold, syntheticItalic));
     }
 
     WEBCORE_EXPORT ~Font();
@@ -101,12 +103,16 @@ public:
 #endif
 
     const Font* smallCapsFont(const FontDescription&) const;
+    const Font& noSynthesizableFeaturesFont() const;
     const Font* emphasisMarkFont(const FontDescription&) const;
     const Font& brokenIdeographFont() const;
     const Font& nonSyntheticItalicFont() const;
 
     const Font* variantFont(const FontDescription& description, FontVariant variant) const
     {
+#if PLATFORM(COCOA)
+        ASSERT(variant != SmallCapsVariant);
+#endif
         switch (variant) {
         case SmallCapsVariant:
             return smallCapsFont(description);
@@ -121,6 +127,8 @@ public:
         ASSERT_NOT_REACHED();
         return const_cast<Font*>(this);
     }
+
+    bool variantCapsSupportsCharacterForSynthesis(FontVariantCaps, UChar32) const;
 
     const Font& verticalRightOrientationFont() const;
     const Font& uprightOrientationFont() const;
@@ -193,7 +201,10 @@ public:
 #endif
 #if PLATFORM(COCOA)
     CFDictionaryRef getCFStringAttributes(bool enableKerning, FontOrientation) const;
-    bool hasCustomTracking() const { return isSystemFont(); }
+    const BitVector& glyphsSupportedBySmallCaps() const;
+    const BitVector& glyphsSupportedByAllSmallCaps() const;
+    const BitVector& glyphsSupportedByPetiteCaps() const;
+    const BitVector& glyphsSupportedByAllPetiteCaps() const;
 #endif
 
 #if PLATFORM(COCOA) || USE(HARFBUZZ)
@@ -203,7 +214,6 @@ public:
     bool applyTransforms(GlyphBufferGlyph*, GlyphBufferAdvance*, size_t glyphCount, bool enableKerning, bool requiresShaping) const;
 
 #if PLATFORM(COCOA) || PLATFORM(WIN)
-    bool isSystemFont() const { return m_isSystemFont; }
 #endif
 
 #if PLATFORM(WIN)
@@ -228,6 +238,7 @@ private:
 
     void initCharWidths();
 
+    RefPtr<Font> createFontWithoutSynthesizableFeatures() const;
     RefPtr<Font> createScaledFont(const FontDescription&, float scaleFactor) const;
     RefPtr<Font> platformCreateScaledFont(const FontDescription&, float scaleFactor) const;
 
@@ -277,6 +288,7 @@ private:
 
         bool forCustomFont;
         RefPtr<Font> smallCaps;
+        RefPtr<Font> noSynthesizableFeatures;
         RefPtr<Font> emphasisMark;
         RefPtr<Font> brokenIdeograph;
         RefPtr<Font> verticalRightOrientation;
@@ -292,6 +304,10 @@ private:
 
 #if PLATFORM(COCOA)
     mutable HashMap<unsigned, RetainPtr<CFDictionaryRef>> m_CFStringAttributes;
+    mutable Optional<BitVector> m_glyphsSupportedBySmallCaps;
+    mutable Optional<BitVector> m_glyphsSupportedByAllSmallCaps;
+    mutable Optional<BitVector> m_glyphsSupportedByPetiteCaps;
+    mutable Optional<BitVector> m_glyphsSupportedByAllPetiteCaps;
 #endif
 
 #if PLATFORM(COCOA) || USE(HARFBUZZ)
@@ -313,9 +329,6 @@ private:
 
     unsigned m_isUsedInSystemFallbackCache : 1;
 
-#if PLATFORM(COCOA) || PLATFORM(WIN)
-    unsigned m_isSystemFont : 1;
-#endif
 #if PLATFORM(IOS)
     unsigned m_shouldNotBeUsedForArabic : 1;
 #endif

@@ -55,7 +55,8 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
         selectorSection.element.appendChild(selectorListElement);
 
         this._selectors = new WebInspector.TreeOutline(selectorListElement);
-        this._selectors.onselect = this._selectorChanged.bind(this);
+        this._selectors.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._selectorChanged, this);
+
         this._focusNextNewInspectorRule = false;
 
         let addGlyphElement = useSVGSymbol("Images/Plus13.svg", "visual-style-selector-section-add-rule", WebInspector.UIString("Click to add a new rule."));
@@ -183,14 +184,18 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
             if (!inherited.matchedRules || !inherited.matchedRules.length)
                 continue;
 
-            let dividerText = WebInspector.UIString("Inherited from %s").format(WebInspector.displayNameForNode(inherited.node));
-            let divider = new WebInspector.GeneralTreeElement("section-divider", dividerText);
-            divider.selectable = false;
-            this._selectors.appendChild(divider);
+            let divider = null;
 
             for (let rule of uniqueOrderedRules(inherited.matchedRules)) {
                 if (rule.type === WebInspector.CSSStyleSheet.Type.UserAgent)
                     continue;
+
+                if (!divider) {
+                    let dividerText = WebInspector.UIString("Inherited from %s").format(WebInspector.displayNameForNode(inherited.node));
+                    divider = new WebInspector.GeneralTreeElement("section-divider", dividerText);
+                    divider.selectable = false;
+                    this._selectors.appendChild(divider);
+                }
 
                 createSelectorItem.call(this, rule.style, rule.selectorText, rule.mediaText);
             }
@@ -209,9 +214,9 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
 
     // Private
 
-    _selectorChanged(selectedTreeElement)
+    _selectorChanged(event)
     {
-        console.assert(selectedTreeElement);
+        let selectedTreeElement = event.data.selectedElement;
         if (!selectedTreeElement)
             return;
 
@@ -240,7 +245,7 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
         if (!this._nodeStyles)
             return;
 
-        this._nodeStyles.addEmptyRule();
+        this._nodeStyles.addRule();
         this._focusNextNewInspectorRule = true;
     }
 

@@ -84,7 +84,7 @@ public:
     WEBCORE_EXPORT void show();
 
     WEBCORE_EXPORT void setInspectorFrontendClient(InspectorFrontendClient*);
-    bool hasInspectorFrontendClient() const;
+    unsigned inspectionLevel() const;
     void didClearWindowObjectInWorld(Frame&, DOMWrapperWorld&);
 
     WEBCORE_EXPORT void dispatchMessageFromFrontend(const String& message);
@@ -121,8 +121,6 @@ public:
     virtual bool canAccessInspectedScriptState(JSC::ExecState*) const override;
     virtual Inspector::InspectorFunctionCallHandler functionCallHandler() const override;
     virtual Inspector::InspectorEvaluateHandler evaluateHandler() const override;
-    virtual void willCallInjectedScriptFunction(JSC::ExecState*, const String& scriptName, int scriptLine) override;
-    virtual void didCallInjectedScriptFunction(JSC::ExecState*) override;
     virtual void frontendInitialized() override;
     virtual Ref<WTF::Stopwatch> executionStopwatch() override;
     virtual PageScriptDebugServer& scriptDebugServer() override;

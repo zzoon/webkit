@@ -50,7 +50,7 @@ class RTCRtpSender : public RTCRtpSenderReceiverBase {
 public:
     static Ref<RTCRtpSender> create(RefPtr<MediaStreamTrack>&& track, Vector<String>&& mediaStreamIds, RTCRtpSenderClient& client)
     {
-        return adoptRef(*new RTCRtpSender(WTF::move(track), WTF::move(mediaStreamIds), client));
+        return adoptRef(*new RTCRtpSender(WTFmove(track), WTFmove(mediaStreamIds), client));
     }
 
     const String& trackId() { return m_trackId; }

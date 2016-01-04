@@ -584,7 +584,7 @@ void FrameLoader::clear(Document* newDocument, bool clearWindowProperties, bool 
     // Do this after detaching the document so that the unload event works.
     if (clearWindowProperties) {
         InspectorInstrumentation::frameWindowDiscarded(&m_frame, m_frame.document()->domWindow());
-        m_frame.document()->domWindow()->resetUnlessSuspendedForPageCache();
+        m_frame.document()->domWindow()->resetUnlessSuspendedForDocumentSuspension();
         m_frame.script().clearWindowShell(newDocument->domWindow(), m_frame.document()->inPageCache());
     }
 
@@ -1820,7 +1820,7 @@ void FrameLoader::commitProvisionalLoad()
         if (m_frame.document()->doctype() && m_frame.page())
             m_frame.page()->chrome().didReceiveDocType(&m_frame);
 #endif
-        m_frame.document()->documentDidResumeFromPageCache();
+        m_frame.document()->resume();
 
         // Force a layout to update view size and thereby update scrollbars.
 #if PLATFORM(IOS)
@@ -2074,7 +2074,7 @@ void FrameLoader::open(CachedFrameBase& cachedFrame)
         view->setFrameRect(previousViewFrameRect.value());
     
     m_frame.setDocument(document);
-    document->domWindow()->resumeFromPageCache();
+    document->domWindow()->resumeFromDocumentSuspension();
 
     updateFirstPartyForCookies();
 
@@ -2431,8 +2431,10 @@ void FrameLoader::checkLoadComplete()
         frames.append(*frame);
 
     // To process children before their parents, iterate the vector backwards.
-    for (unsigned i = frames.size(); i; --i)
-        frames[i - 1]->loader().checkLoadCompleteForThisFrame();
+    for (auto frame = frames.rbegin(); frame != frames.rend(); ++frame) {
+        if ((*frame)->page())
+            (*frame)->loader().checkLoadCompleteForThisFrame();
+    }
 }
 
 int FrameLoader::numPendingOrLoadingRequests(bool recurse) const
@@ -2684,7 +2686,7 @@ unsigned long FrameLoader::loadResourceSynchronously(const ResourceRequest& requ
             if (auto* controller = page->userContentController()) {
                 if (m_documentLoader && controller->processContentExtensionRulesForLoad(newRequest, ResourceType::Raw, *m_documentLoader) == ContentExtensions::BlockedStatus::Blocked) {
                     newRequest = { };
-                    error = ResourceError(errorDomainWebKitInternal, 0, initialRequest.url().string(), emptyString());
+                    error = ResourceError(errorDomainWebKitInternal, 0, initialRequest.url(), emptyString());
                     response = { };
                     data = nullptr;
                 }
@@ -3521,7 +3523,7 @@ RefPtr<Frame> createWindow(Frame& openerFrame, Frame& lookupFrame, const FrameLo
                 if (Page* page = frame->page())
                     page->chrome().focus();
             }
-            return WTF::move(frame);
+            return frame;
         }
     }
 
@@ -3613,7 +3615,7 @@ RefPtr<Frame> createWindow(Frame& openerFrame, Frame& lookupFrame, const FrameLo
     page->chrome().show();
 
     created = true;
-    return WTF::move(frame);
+    return frame;
 }
 
 } // namespace WebCore

@@ -56,8 +56,6 @@ public:
 
     static Ref<WebView> create(WebProcessPool*, API::PageConfiguration&);
 
-    void initialize();
-
     void setSize(const WebCore::IntSize&);
     const WebCore::IntSize& size() const { return m_size; }
 
@@ -213,6 +211,8 @@ protected:
 
     virtual void didChangeBackgroundColor() override { }
     virtual void didFailLoadForMainFrame() override { }
+
+    virtual void didRestoreScrollPosition() override { }
 
     WebViewClient m_client;
     RefPtr<WebPageProxy> m_page;

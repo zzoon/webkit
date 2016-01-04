@@ -75,6 +75,7 @@ my (
     $directoryUploadSupport,
     $dom4EventsConstructor,
     $downloadAttributeSupport,
+    $fetchAPISupport,
     $fontLoadEventsSupport,
     $ftpDirSupport,
     $fullscreenAPISupport,
@@ -185,7 +186,7 @@ my @features = (
       define => "ENABLE_ES6_CLASS_SYNTAX", default => 1, value => \$classSyntax },
 
     { option => "generators", desc => "Toggle ES6 generators support",
-      define => "ENABLE_ES6_GENERATORS", default => 0, value => \$generatorsSupport },
+      define => "ENABLE_ES6_GENERATORS", default => 1, value => \$generatorsSupport },
 
     { option => "modules", desc => "Toggle ES6 modules support",
       define => "ENABLE_ES6_MODULES", default => 0, value => \$modulesSupport },
@@ -252,6 +253,9 @@ my @features = (
 
     { option => "download-attribute", desc => "Toggle Download Attribute support",
       define => "ENABLE_DOWNLOAD_ATTRIBUTE", default => isEfl(), value => \$downloadAttributeSupport },
+
+    { option => "fetch-api", desc => "Toggle Fetch API support",
+      define => "ENABLE_FETCH_API", default => 1, value => \$fetchAPISupport },
 
     { option => "font-load-events", desc => "Toggle Font Load Events support",
       define => "ENABLE_FONT_LOAD_EVENTS", default => 0, value => \$fontLoadEventsSupport },
@@ -458,7 +462,7 @@ my @features = (
       define => "ENABLE_XSLT", default => 1, value => \$xsltSupport },
 
     { option => "ftl-jit", desc => "Toggle FTLJIT support",
-      define => "ENABLE_FTL_JIT", default => (isGtk() && isX86_64()), value => \$ftlJITSupport },
+      define => "ENABLE_FTL_JIT", default => (isX86_64() && (isGtk() || isEfl())) , value => \$ftlJITSupport },
 );
 
 sub getFeatureOptionList()

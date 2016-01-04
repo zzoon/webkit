@@ -37,7 +37,7 @@ namespace JSC { namespace B3 {
 
 void ValueKey::dump(PrintStream& out) const
 {
-    out.print(m_type, " ", m_opcode, "(", u.indices[0], ", ", u.indices[1], ")");
+    out.print(m_type, " ", m_opcode, "(", u.indices[0], ", ", u.indices[1], ", ", u.indices[2], ")");
 }
 
 Value* ValueKey::materialize(Procedure& proc, Origin origin) const
@@ -46,14 +46,16 @@ Value* ValueKey::materialize(Procedure& proc, Origin origin) const
     case FramePointer:
         return proc.add<Value>(opcode(), type(), origin);
     case Identity:
+    case Sqrt:
     case SExt8:
     case SExt16:
     case SExt32:
     case ZExt32:
+    case Clz:
     case Trunc:
-    case FRound:
     case IToD:
-    case DToI32:
+    case FloatToDouble:
+    case DoubleToFloat:
     case Check:
         return proc.add<Value>(opcode(), type(), origin, child(proc, 0));
     case Add:
@@ -77,12 +79,16 @@ Value* ValueKey::materialize(Procedure& proc, Origin origin) const
     case BelowEqual:
     case Div:
         return proc.add<Value>(opcode(), type(), origin, child(proc, 0), child(proc, 1));
+    case Select:
+        return proc.add<Value>(opcode(), type(), origin, child(proc, 0), child(proc, 1), child(proc, 2));
     case Const32:
         return proc.add<Const32Value>(origin, static_cast<int32_t>(value()));
     case Const64:
         return proc.add<Const64Value>(origin, value());
     case ConstDouble:
         return proc.add<ConstDoubleValue>(origin, doubleValue());
+    case ConstFloat:
+        return proc.add<ConstFloatValue>(origin, floatValue());
     case ArgumentReg:
         return proc.add<ArgumentRegValue>(origin, Reg::fromIndex(static_cast<unsigned>(value())));
     default:

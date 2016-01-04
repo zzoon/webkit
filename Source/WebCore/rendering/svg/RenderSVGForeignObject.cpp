@@ -37,7 +37,7 @@
 namespace WebCore {
 
 RenderSVGForeignObject::RenderSVGForeignObject(SVGForeignObjectElement& element, Ref<RenderStyle>&& style)
-    : RenderSVGBlock(element, WTF::move(style))
+    : RenderSVGBlock(element, WTFMove(style))
     , m_needsTransformUpdate(true)
 {
 }
@@ -183,7 +183,7 @@ bool RenderSVGForeignObject::nodeAtFloatPoint(const HitTestRequest& request, Hit
     if (hitTestAction != HitTestForeground)
         return false;
 
-    FloatPoint localPoint = localTransform().inverse().mapPoint(pointInParent);
+    FloatPoint localPoint = localTransform().inverse().valueOr(AffineTransform()).mapPoint(pointInParent);
 
     // Early exit if local point is not contained in clipped viewport area
     if (SVGRenderSupport::isOverflowHidden(*this) && !m_viewport.contains(localPoint))

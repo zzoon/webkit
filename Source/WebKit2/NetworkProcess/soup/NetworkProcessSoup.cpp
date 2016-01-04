@@ -25,7 +25,6 @@
  */
 
 #include "config.h"
-#if ENABLE(NETWORK_PROCESS)
 #include "NetworkProcess.h"
 
 #include "NetworkCache.h"
@@ -156,7 +155,7 @@ void NetworkProcess::clearCacheForAllOrigins(uint32_t cachesToClear)
 void NetworkProcess::clearDiskCache(std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler)
 {
 #if ENABLE(NETWORK_CACHE)
-    NetworkCache::singleton().clear(modifiedSince, WTF::move(completionHandler));
+    NetworkCache::singleton().clear(modifiedSince, WTFMove(completionHandler));
 #else
     UNUSED_PARAM(modifiedSince);
     UNUSED_PARAM(completionHandler);
@@ -170,5 +169,3 @@ void NetworkProcess::platformTerminate()
 }
 
 } // namespace WebKit
-
-#endif

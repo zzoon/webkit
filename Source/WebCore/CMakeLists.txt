@@ -6,8 +6,6 @@ set(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/airplay"
     "${WEBCORE_DIR}/Modules/battery"
     "${WEBCORE_DIR}/Modules/encryptedmedia"
-    "${WEBCORE_DIR}/Modules/gamepad"
-    "${WEBCORE_DIR}/Modules/gamepad/deprecated"
     "${WEBCORE_DIR}/Modules/geolocation"
     "${WEBCORE_DIR}/Modules/indexeddb"
     "${WEBCORE_DIR}/Modules/indexeddb/client"
@@ -139,7 +137,6 @@ set(WebCore_IDL_INCLUDES
     Modules/airplay
     Modules/battery
     Modules/encryptedmedia
-    Modules/gamepad
     Modules/geolocation
     Modules/indexeddb
     Modules/indieui
@@ -154,8 +151,6 @@ set(WebCore_IDL_INCLUDES
     Modules/webaudio
     Modules/webdatabase
     Modules/websockets
-
-    Modules/gamepad/deprecated
 
     bindings/generic
     bindings/js
@@ -172,17 +167,6 @@ set(WebCore_NON_SVG_IDL_FILES
 
     Modules/battery/BatteryManager.idl
     Modules/battery/NavigatorBattery.idl
-
-# FIXME: These were causing name conflicts on Mac, and the Gamepad API is not finished yet.
-# https://bugs.webkit.org/show_bug.cgi?id=135858
-#   Modules/gamepad/Gamepad.idl
-#   Modules/gamepad/GamepadButton.idl
-#   Modules/gamepad/GamepadEvent.idl
-#   Modules/gamepad/NavigatorGamepad.idl
-
-    Modules/gamepad/deprecated/Gamepad.idl
-    Modules/gamepad/deprecated/GamepadList.idl
-    Modules/gamepad/deprecated/NavigatorGamepad.idl
 
     Modules/geolocation/Coordinates.idl
     Modules/geolocation/Geolocation.idl
@@ -221,16 +205,11 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/mediasource/SourceBufferList.idl
     Modules/mediasource/VideoPlaybackQuality.idl
 
-    Modules/mediastream/AllAudioCapabilities.idl
-    Modules/mediastream/AllVideoCapabilities.idl
-    Modules/mediastream/CapabilityRange.idl
     Modules/mediastream/DOMURLMediaStream.idl
     Modules/mediastream/HTMLMediaElementMediaStream.idl
     Modules/mediastream/MediaDeviceInfo.idl
     Modules/mediastream/MediaDevices.idl
-    Modules/mediastream/MediaSourceStates.idl
     Modules/mediastream/MediaStream.idl
-    Modules/mediastream/MediaStreamCapabilities.idl
     Modules/mediastream/MediaStreamTrack.idl
     Modules/mediastream/MediaStreamTrackEvent.idl
     Modules/mediastream/MediaStreamTrackSourcesCallback.idl
@@ -503,6 +482,7 @@ set(WebCore_NON_SVG_IDL_FILES
     html/HTMLOutputElement.idl
     html/HTMLParagraphElement.idl
     html/HTMLParamElement.idl
+    html/HTMLPictureElement.idl
     html/HTMLPreElement.idl
     html/HTMLProgressElement.idl
     html/HTMLQuoteElement.idl
@@ -813,11 +793,6 @@ set(WebCore_SVG_IDL_FILES
     svg/SVGZoomEvent.idl
 )
 
-set(WebCore_IDL_FILES
-    ${WebCore_NON_SVG_IDL_FILES}
-    ${WebCore_SVG_IDL_FILES}
-)
-
 if (WIN32 AND INTERNAL_BUILD)
     set(JavaScriptCore_SCRIPTS_DIR "${CMAKE_BINARY_DIR}/../include/private/JavaScriptCore/Scripts")
 else ()
@@ -831,10 +806,6 @@ set(WebCore_SOURCES
     Modules/battery/BatteryManager.cpp
     Modules/battery/BatteryStatus.cpp
     Modules/battery/NavigatorBattery.cpp
-
-    Modules/gamepad/deprecated/Gamepad.cpp
-    Modules/gamepad/deprecated/GamepadList.cpp
-    Modules/gamepad/deprecated/NavigatorGamepad.cpp
 
     Modules/geolocation/Coordinates.cpp
     Modules/geolocation/GeoNotifier.cpp
@@ -852,6 +823,7 @@ set(WebCore_SOURCES
     Modules/indexeddb/IDBDatabaseMetadata.cpp
     Modules/indexeddb/IDBEventDispatcher.cpp
     Modules/indexeddb/IDBFactory.cpp
+    Modules/indexeddb/IDBGetResult.cpp
     Modules/indexeddb/IDBIndex.cpp
     Modules/indexeddb/IDBKey.cpp
     Modules/indexeddb/IDBKeyData.cpp
@@ -901,7 +873,6 @@ set(WebCore_SOURCES
 
     Modules/indexeddb/server/IDBConnectionToClient.cpp
     Modules/indexeddb/server/IDBServer.cpp
-    Modules/indexeddb/server/IDBServerOperation.cpp
     Modules/indexeddb/server/IndexValueEntry.cpp
     Modules/indexeddb/server/IndexValueStore.cpp
     Modules/indexeddb/server/MemoryBackingStoreTransaction.cpp
@@ -911,6 +882,7 @@ set(WebCore_SOURCES
     Modules/indexeddb/server/MemoryIndexCursor.cpp
     Modules/indexeddb/server/MemoryObjectStore.cpp
     Modules/indexeddb/server/MemoryObjectStoreCursor.cpp
+    Modules/indexeddb/server/ServerOpenDBRequest.cpp
     Modules/indexeddb/server/UniqueIDBDatabase.cpp
     Modules/indexeddb/server/UniqueIDBDatabaseConnection.cpp
     Modules/indexeddb/server/UniqueIDBDatabaseTransaction.cpp
@@ -941,7 +913,6 @@ set(WebCore_SOURCES
     Modules/mediasource/SourceBufferList.cpp
     Modules/mediasource/VideoPlaybackQuality.cpp
 
-    Modules/mediastream/CapabilityRange.cpp
     Modules/mediastream/DOMURLMediaStream.cpp
     Modules/mediastream/HTMLMediaElementMediaStream.cpp
     Modules/mediastream/MediaConstraintsImpl.cpp
@@ -949,13 +920,11 @@ set(WebCore_SOURCES
     Modules/mediastream/MediaDevices.cpp
     Modules/mediastream/MediaDevicesRequest.cpp
     Modules/mediastream/MediaEndpointPeerConnection.cpp
-    Modules/mediastream/MediaSourceStates.cpp
+    Modules/mediastream/MediaSourceSettings.cpp
     Modules/mediastream/MediaStream.cpp
-    Modules/mediastream/MediaStreamCapabilities.cpp
     Modules/mediastream/MediaStreamRegistry.cpp
     Modules/mediastream/MediaStreamTrack.cpp
     Modules/mediastream/MediaStreamTrackEvent.cpp
-    Modules/mediastream/MediaStreamTrackSourcesRequest.cpp
     Modules/mediastream/MediaTrackConstraint.cpp
     Modules/mediastream/MediaTrackConstraintSet.cpp
     Modules/mediastream/MediaTrackConstraints.cpp
@@ -979,6 +948,7 @@ set(WebCore_SOURCES
     Modules/mediastream/SDPProcessor.cpp
     Modules/mediastream/SourceInfo.cpp
     Modules/mediastream/UserMediaController.cpp
+    Modules/mediastream/UserMediaPermissionCheck.cpp
     Modules/mediastream/UserMediaRequest.cpp
 
     Modules/navigatorcontentutils/NavigatorContentUtils.cpp
@@ -1204,8 +1174,7 @@ set(WebCore_SOURCES
     bindings/js/JSLazyEventListener.cpp
     bindings/js/JSLocationCustom.cpp
     bindings/js/JSMainThreadExecState.cpp
-    bindings/js/JSMediaSourceStatesCustom.cpp
-    bindings/js/JSMediaStreamCapabilitiesCustom.cpp
+    bindings/js/JSMediaStreamTrackCustom.cpp
     bindings/js/JSMediaTrackSupportedConstraintsCustom.cpp
     bindings/js/JSMessageChannelCustom.cpp
     bindings/js/JSMessageEventCustom.cpp
@@ -1264,7 +1233,6 @@ set(WebCore_SOURCES
     bindings/js/WebCoreJSBuiltins.cpp
     bindings/js/WebCoreTypedArrayController.cpp
     bindings/js/WorkerScriptController.cpp
-    bindings/js/WorkerScriptDebugServer.cpp
 
     bridge/IdentifierRep.cpp
     bridge/NP_jsobject.cpp
@@ -1411,6 +1379,7 @@ set(WebCore_SOURCES
 
     cssjit/SelectorCompiler.cpp
 
+    dom/ActiveDOMCallbackMicrotask.cpp
     dom/ActiveDOMObject.cpp
     dom/AnimationEvent.cpp
     dom/Attr.cpp
@@ -1483,7 +1452,7 @@ set(WebCore_SOURCES
     dom/MessageEvent.cpp
     dom/MessagePort.cpp
     dom/MessagePortChannel.cpp
-    dom/MicroTask.cpp
+    dom/Microtasks.cpp
     dom/MouseEvent.cpp
     dom/MouseRelatedEvent.cpp
     dom/MutationEvent.cpp
@@ -1717,6 +1686,7 @@ set(WebCore_SOURCES
     html/HTMLOutputElement.cpp
     html/HTMLParagraphElement.cpp
     html/HTMLParamElement.cpp
+    html/HTMLPictureElement.cpp
     html/HTMLPlugInElement.cpp
     html/HTMLPlugInImageElement.cpp
     html/HTMLPreElement.cpp
@@ -1902,7 +1872,6 @@ set(WebCore_SOURCES
     inspector/InspectorPageAgent.cpp
     inspector/InspectorStyleSheet.cpp
     inspector/InspectorTimelineAgent.cpp
-    inspector/InspectorWorkerAgent.cpp
     inspector/InstrumentingAgents.cpp
     inspector/NetworkResourcesData.cpp
     inspector/PageConsoleAgent.cpp
@@ -1914,10 +1883,6 @@ set(WebCore_SOURCES
     inspector/WebDebuggerAgent.cpp
     inspector/WebInjectedScriptHost.cpp
     inspector/WebInjectedScriptManager.cpp
-    inspector/WorkerConsoleAgent.cpp
-    inspector/WorkerDebuggerAgent.cpp
-    inspector/WorkerInspectorController.cpp
-    inspector/WorkerRuntimeAgent.cpp
 
     loader/ContentFilter.cpp
     loader/CookieJar.cpp
@@ -1948,7 +1913,6 @@ set(WebCore_SOURCES
     loader/PolicyChecker.cpp
     loader/ProgressTracker.cpp
     loader/ResourceLoadNotifier.cpp
-    loader/ResourceLoadScheduler.cpp
     loader/ResourceLoader.cpp
     loader/SinkDocument.cpp
     loader/SubframeLoader.cpp
@@ -2307,7 +2271,7 @@ set(WebCore_SOURCES
     platform/mediastream/RTCSessionDescriptionDescriptor.cpp
     platform/mediastream/RealtimeMediaSource.cpp
     platform/mediastream/RealtimeMediaSourceCenter.cpp
-    platform/mediastream/RealtimeMediaSourceStates.cpp
+    platform/mediastream/RealtimeMediaSourceSettings.cpp
 
     platform/mock/DeviceMotionClientMock.cpp
     platform/mock/DeviceOrientationClientMock.cpp
@@ -2509,6 +2473,7 @@ set(WebCore_SOURCES
     rendering/SimpleLineLayoutResolver.cpp
     rendering/SimpleLineLayoutTextFragmentIterator.cpp
     rendering/TextAutosizer.cpp
+    rendering/TextDecorationPainter.cpp
     rendering/TextPaintStyle.cpp
     rendering/TextPainter.cpp
     rendering/break_lines.cpp
@@ -2518,6 +2483,7 @@ set(WebCore_SOURCES
     rendering/line/LineWidth.cpp
     rendering/line/TrailingObjects.cpp
 
+    rendering/mathml/MathMLOperatorDictionary.cpp
     rendering/mathml/RenderMathMLBlock.cpp
     rendering/mathml/RenderMathMLFenced.cpp
     rendering/mathml/RenderMathMLFraction.cpp
@@ -2856,6 +2822,58 @@ set(WebCore_SOURCES
     xml/parser/XMLDocumentParser.cpp
     xml/parser/XMLDocumentParserLibxml2.cpp
     xml/parser/XMLDocumentParserScope.cpp
+)
+
+if (ENABLE_GAMEPAD)
+    list(APPEND WebCore_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/Modules/gamepad"
+    )
+
+    list(APPEND WebCore_IDL_INCLUDES
+        Modules/gamepad
+    )
+
+    list(APPEND WebCore_NON_SVG_IDL_FILES
+        Modules/gamepad/Gamepad.idl
+        Modules/gamepad/GamepadButton.idl
+        Modules/gamepad/GamepadEvent.idl
+        Modules/gamepad/NavigatorGamepad.idl
+    )
+
+    list(APPEND WebCore_SOURCES
+        Modules/gamepad/Gamepad.cpp
+        Modules/gamepad/GamepadButton.cpp
+        Modules/gamepad/GamepadEvent.cpp
+        Modules/gamepad/GamepadManager.cpp
+        Modules/gamepad/NavigatorGamepad.cpp
+
+        platform/GamepadProvider.cpp
+    )
+elseif (ENABLE_GAMEPAD_DEPRECATED)
+    list(APPEND WebCore_INCLUDE_DIRECTORIES
+        "${WEBCORE_DIR}/Modules/gamepad/deprecated"
+    )
+
+    list(APPEND WebCore_IDL_INCLUDES
+        Modules/gamepad/deprecated
+    )
+
+    list(APPEND WebCore_NON_SVG_IDL_FILES
+        Modules/gamepad/deprecated/Gamepad.idl
+        Modules/gamepad/deprecated/GamepadList.idl
+        Modules/gamepad/deprecated/NavigatorGamepad.idl
+    )
+
+    list(APPEND WebCore_SOURCES
+        Modules/gamepad/deprecated/Gamepad.cpp
+        Modules/gamepad/deprecated/GamepadList.cpp
+        Modules/gamepad/deprecated/NavigatorGamepad.cpp
+    )
+endif ()
+
+set(WebCore_IDL_FILES
+    ${WebCore_NON_SVG_IDL_FILES}
+    ${WebCore_SVG_IDL_FILES}
 )
 
 if (ENABLE_ALLINONE_BUILD)
@@ -3330,6 +3348,7 @@ set(WebCoreTestSupport_IDL_FILES
     testing/MallocStatistics.idl
     testing/MemoryInfo.idl
     testing/MockContentFilterSettings.idl
+    testing/MockPageOverlay.idl
     testing/TypeConversions.idl
 )
 
@@ -3344,7 +3363,7 @@ list(APPEND WebCoreTestSupport_SOURCES
 
     testing/InternalSettings.cpp
     testing/Internals.cpp
-    testing/MicroTaskTest.cpp
+    testing/MockPageOverlay.cpp
     testing/MockPageOverlayClient.cpp
 
     testing/js/WebCoreTestSupport.cpp
@@ -3671,8 +3690,8 @@ GENERATE_DOM_NAMES(HTML ${WEBCORE_DIR}/html/HTMLAttributeNames.in ${WEBCORE_DIR}
 list(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/HTMLNames.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/HTMLElementFactory.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/JSHTMLElementWrapperFactory.cpp)
 
 
-GENERATE_EVENT_FACTORY(${WEBCORE_DIR}/dom/EventNames.in EventFactory.cpp)
-list(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/EventFactory.cpp)
+GENERATE_EVENT_FACTORY(${WEBCORE_DIR}/dom/EventNames.in EventInterfaces.h)
+list(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/EventInterfaces.h)
 
 
 GENERATE_EVENT_FACTORY(${WEBCORE_DIR}/dom/EventTargetFactory.in EventTargetInterfaces.h)
@@ -3729,10 +3748,6 @@ include_directories(SYSTEM ${WebCore_SYSTEM_INCLUDE_DIRECTORIES})
 
 if (MSVC)
     ADD_PRECOMPILED_HEADER("WebCorePrefix.h" "WebCorePrefix.cpp" WebCore_SOURCES)
-    if (CMAKE_SIZEOF_VOID_P EQUAL 4)
-        list(APPEND WebCore_SOURCES platform/win/makesafeseh.asm)
-        set_source_files_properties(platform/win/makesafeseh.asm PROPERTIES COMPILE_FLAGS "/safeseh")
-    endif ()
 endif ()
 
 add_library(WebCore ${WebCore_LIBRARY_TYPE} ${WebCore_SOURCES})

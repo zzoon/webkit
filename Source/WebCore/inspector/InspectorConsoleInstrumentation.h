@@ -41,18 +41,17 @@ namespace WebCore {
 
 inline void InspectorInstrumentation::addMessageToConsole(Page& page, std::unique_ptr<Inspector::ConsoleMessage> message)
 {
-    addMessageToConsoleImpl(instrumentingAgentsForPage(page), WTF::move(message));
+    addMessageToConsoleImpl(instrumentingAgentsForPage(page), WTFMove(message));
 }
 
-inline void InspectorInstrumentation::addMessageToConsole(WorkerGlobalScope* workerGlobalScope, std::unique_ptr<Inspector::ConsoleMessage> message)
+inline void InspectorInstrumentation::addMessageToConsole(WorkerGlobalScope*, std::unique_ptr<Inspector::ConsoleMessage>)
 {
-    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForWorkerGlobalScope(workerGlobalScope))
-        addMessageToConsoleImpl(*instrumentingAgents, WTF::move(message));
+    // FIXME: <https://webkit.org/b/127634> Web Inspector: support debugging web workers
 }
 
 inline void InspectorInstrumentation::consoleCount(Page& page, JSC::ExecState* state, RefPtr<Inspector::ScriptArguments>&& arguments)
 {
-    consoleCountImpl(instrumentingAgentsForPage(page), state, WTF::move(arguments));
+    consoleCountImpl(instrumentingAgentsForPage(page), state, WTFMove(arguments));
 }
 
 inline void InspectorInstrumentation::startConsoleTiming(Frame& frame, const String& title)
@@ -64,14 +63,14 @@ inline void InspectorInstrumentation::startConsoleTiming(Frame& frame, const Str
 inline void InspectorInstrumentation::stopConsoleTiming(Frame& frame, const String& title, RefPtr<Inspector::ScriptCallStack>&& stack)
 {
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
-        stopConsoleTimingImpl(*instrumentingAgents, frame, title, WTF::move(stack));
+        stopConsoleTimingImpl(*instrumentingAgents, frame, title, WTFMove(stack));
 }
 
 inline void InspectorInstrumentation::consoleTimeStamp(Frame& frame, RefPtr<Inspector::ScriptArguments>&& arguments)
 {
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
-        consoleTimeStampImpl(*instrumentingAgents, frame, WTF::move(arguments));
+        consoleTimeStampImpl(*instrumentingAgents, frame, WTFMove(arguments));
 }
 
 inline void InspectorInstrumentation::startProfiling(Page& page, JSC::ExecState* exec, const String &title)

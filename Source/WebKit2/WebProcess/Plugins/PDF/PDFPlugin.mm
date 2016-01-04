@@ -382,7 +382,7 @@ const double zoomButtonScaleMultiplier = 1.18920;
     if (!(self = [super init]))
         return nil;
 
-    _completionHandler = WTF::move(completionHandler);
+    _completionHandler = WTFMove(completionHandler);
 
     return self;
 }
@@ -932,7 +932,7 @@ IntRect PDFPlugin::boundsOnScreen() const
 void PDFPlugin::geometryDidChange(const IntSize& pluginSize, const IntRect&, const AffineTransform& pluginToRootViewTransform)
 {
     m_pluginToRootViewTransform = pluginToRootViewTransform;
-    m_rootViewToPluginTransform = pluginToRootViewTransform.inverse();
+    m_rootViewToPluginTransform = pluginToRootViewTransform.inverse().valueOr(AffineTransform());
     m_size = pluginSize;
 
     FrameView* frameView = webFrame()->coreFrame()->view();

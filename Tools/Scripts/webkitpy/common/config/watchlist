@@ -236,6 +236,9 @@
             "filename": r"PerformanceTests"
                         r"|Tools/Scripts/webkitpy/performance_tests",
         },
+        "Animometer": {
+            "filename": r"PerformanceTests/Animometer",
+        },
         "ConsoleUsage": {
             "more": r"[Aa]ddConsoleMessage|reportException|logExceptionToConsole|addMessage|printErrorMessage"
         },
@@ -303,7 +306,13 @@
                         r"|LayoutTests/media/media-source/",
         },
         "StreamsAPI": {
-            "filename": r"Source/WebCore/Modules/streams/"
+            "filename": r"Source/WebCore/bindings/js/JSDOMGlobalObject\.cpp"
+                        r"Source/WebCore/bindings/js/JSReadableStreamPrivateConstructors\.(h|cpp)"
+                        r"Source/WebCore/bindings/js/WebCoreBuiltinNames\.h"
+                        r"Source/WebCore/bindings/js/WebCoreJSBuiltinInternals\.(h|cpp)"
+                        r"Source/WebCore/bindings/js/WebCoreJSBuiltins\.(h|cpp)"
+                        r"Source/WebCore/Modules/streams/"
+                        r"|LayoutTests/imported/w3c/web-platform-tests/streams-api/"
                         r"|LayoutTests/streams/",
         },
         "MacAndIOSTextLayoutAndRendering": {
@@ -339,6 +348,7 @@
         # two different accounts as far as bugzilla is concerned.
         "Accessibility": [ "cfleizach@apple.com", "dmazzoni@google.com", "apinheiro@igalia.com", "jdiggs@igalia.com", "aboxhall@chromium.org", "mario@webkit.org", "samuel_white@apple.com", "jcraig@apple.com" ],
         "Animation" : [ "simon.fraser@apple.com", "dino@apple.com", "dstockwell@chromium.org" ],
+        "Animometer" : [ "sabouhallawa@apple.com" ],
         "AppleMacPublicApi": [ "timothy@apple.com" ],
         "Battery": [ "gyuyoung.kim@webkit.org" ],
         "BindingsScripts": [ "cdumez@apple.com", "cgarcia@igalia.com" ],

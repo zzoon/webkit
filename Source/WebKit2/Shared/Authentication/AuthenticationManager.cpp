@@ -30,16 +30,13 @@
 #include "ChildProcess.h"
 #include "Download.h"
 #include "DownloadProxyMessages.h"
+#include "NetworkProcessProxyMessages.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebFrame.h"
 #include "WebPage.h"
 #include "WebPageProxyMessages.h"
 #include <WebCore/AuthenticationChallenge.h>
 #include <WebCore/AuthenticationClient.h>
-
-#if ENABLE(NETWORK_PROCESS)
-#include "NetworkProcessProxyMessages.h"
-#endif
 
 using namespace WebCore;
 
@@ -79,13 +76,13 @@ uint64_t AuthenticationManager::addChallengeToChallengeMap(const Challenge& chal
     return challengeID;
 }
 
-bool AuthenticationManager::shouldCoalesceChallenge(uint64_t challengeID, const AuthenticationChallenge& challenge) const
+bool AuthenticationManager::shouldCoalesceChallenge(uint64_t pageID, uint64_t challengeID, const AuthenticationChallenge& challenge) const
 {
     if (!canCoalesceChallenge(challenge))
         return false;
 
     for (auto& item : m_challenges) {
-        if (item.key != challengeID && ProtectionSpace::compare(challenge.protectionSpace(), item.value.challenge.protectionSpace()))
+        if (item.key != challengeID && item.value.pageID == pageID && ProtectionSpace::compare(challenge.protectionSpace(), item.value.challenge.protectionSpace()))
             return true;
     }
     return false;
@@ -103,7 +100,7 @@ Vector<uint64_t> AuthenticationManager::coalesceChallengesMatching(uint64_t chal
         return challengesToCoalesce;
 
     for (auto& item : m_challenges) {
-        if (item.key != challengeID && ProtectionSpace::compare(challenge.challenge.protectionSpace(), item.value.challenge.protectionSpace()))
+        if (item.key != challengeID && item.value.pageID == challenge.pageID && ProtectionSpace::compare(challenge.challenge.protectionSpace(), item.value.challenge.protectionSpace()))
             challengesToCoalesce.append(item.key);
     }
 
@@ -115,28 +112,30 @@ void AuthenticationManager::didReceiveAuthenticationChallenge(WebFrame* frame, c
     ASSERT(frame);
     ASSERT(frame->page());
 
-    uint64_t challengeID = addChallengeToChallengeMap({authenticationChallenge
+    auto pageID = frame->page()->pageID();
+    uint64_t challengeID = addChallengeToChallengeMap({pageID, authenticationChallenge
 #if USE(NETWORK_SESSION)
         , ChallengeCompletionHandler()
 #endif
     });
 
-    // Coalesce challenges in the same protection space.
-    if (shouldCoalesceChallenge(challengeID, authenticationChallenge))
+    // Coalesce challenges in the same protection space and in the same page.
+    if (shouldCoalesceChallenge(pageID, challengeID, authenticationChallenge))
         return;
     
     m_process->send(Messages::WebPageProxy::DidReceiveAuthenticationChallenge(frame->frameID(), authenticationChallenge, challengeID), frame->page()->pageID());
 }
 
-#if ENABLE(NETWORK_PROCESS)
 #if USE(NETWORK_SESSION)
 void AuthenticationManager::didReceiveAuthenticationChallenge(uint64_t pageID, uint64_t frameID, const AuthenticationChallenge& authenticationChallenge, ChallengeCompletionHandler completionHandler)
 {
     ASSERT(pageID);
     ASSERT(frameID);
 
-    uint64_t challengeID = addChallengeToChallengeMap({authenticationChallenge, completionHandler});
-    if (shouldCoalesceChallenge(challengeID, authenticationChallenge))
+    uint64_t challengeID = addChallengeToChallengeMap({pageID, authenticationChallenge, completionHandler});
+
+    // Coalesce challenges in the same protection space and in the same page.
+    if (shouldCoalesceChallenge(pageID, challengeID, authenticationChallenge))
         return;
     
     m_process->send(Messages::NetworkProcessProxy::DidReceiveAuthenticationChallenge(pageID, frameID, authenticationChallenge, challengeID));
@@ -147,26 +146,30 @@ void AuthenticationManager::didReceiveAuthenticationChallenge(uint64_t pageID, u
     ASSERT(pageID);
     ASSERT(frameID);
 
-    uint64_t challengeID = addChallengeToChallengeMap({authenticationChallenge
+    uint64_t challengeID = addChallengeToChallengeMap({pageID, authenticationChallenge
 #if USE(NETWORK_SESSION)
         , ChallengeCompletionHandler()
 #endif
     });
-    if (shouldCoalesceChallenge(challengeID, authenticationChallenge))
+
+    // Coalesce challenges in the same protection space and in the same page.
+    if (shouldCoalesceChallenge(pageID, challengeID, authenticationChallenge))
         return;
     
     m_process->send(Messages::NetworkProcessProxy::DidReceiveAuthenticationChallenge(pageID, frameID, authenticationChallenge, challengeID));
 }
-#endif
 
 #if !USE(NETWORK_SESSION)
-void AuthenticationManager::didReceiveAuthenticationChallenge(Download* download, const AuthenticationChallenge& authenticationChallenge)
+void AuthenticationManager::didReceiveAuthenticationChallenge(Download& download, const AuthenticationChallenge& authenticationChallenge)
 {
-    uint64_t challengeID = addChallengeToChallengeMap({authenticationChallenge});
-    if (shouldCoalesceChallenge(challengeID, authenticationChallenge))
+    uint64_t dummyPageID = 0;
+    uint64_t challengeID = addChallengeToChallengeMap({dummyPageID, authenticationChallenge});
+
+    // Coalesce challenges in the same protection space and in the same page.
+    if (shouldCoalesceChallenge(dummyPageID, challengeID, authenticationChallenge))
         return;
 
-    download->send(Messages::DownloadProxy::DidReceiveAuthenticationChallenge(authenticationChallenge, challengeID));
+    download.send(Messages::DownloadProxy::DidReceiveAuthenticationChallenge(authenticationChallenge, challengeID));
 }
 #endif
 

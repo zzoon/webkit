@@ -233,6 +233,12 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case BitRShift:
     case BitLShift:
     case BitURShift: {
+        if (node->child1().useKind() == UntypedUse || node->child2().useKind() == UntypedUse) {
+            clobberWorld(node->origin.semantic, clobberLimit);
+            forNode(node).setType(m_graph, SpecInt32);
+            break;
+        }
+
         JSValue left = forNode(node->child1()).value();
         JSValue right = forNode(node->child2()).value();
         if (left && right && left.isInt32() && right.isInt32()) {
@@ -528,7 +534,8 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                     forNode(node->child1()).m_type, forNode(node->child2()).m_type));
             break;
         case UntypedUse:
-            forNode(node).setType(m_graph, SpecHeapTop);
+            clobberWorld(node->origin.semantic, clobberLimit);
+            forNode(node).setType(m_graph, SpecBytecodeNumber);
             break;
         default:
             RELEASE_ASSERT_NOT_REACHED();
@@ -633,6 +640,10 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                 typeOfDoubleProduct(
                     forNode(node->child1()).m_type, forNode(node->child2()).m_type));
             break;
+        case UntypedUse:
+            clobberWorld(node->origin.semantic, clobberLimit);
+            forNode(node).setType(m_graph, SpecBytecodeNumber);
+            break;
         default:
             RELEASE_ASSERT_NOT_REACHED();
             break;
@@ -667,6 +678,10 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             forNode(node).setType(
                 typeOfDoubleQuotient(
                     forNode(node->child1()).m_type, forNode(node->child2()).m_type));
+            break;
+        case UntypedUse:
+            clobberWorld(node->origin.semantic, clobberLimit);
+            forNode(node).setType(m_graph, SpecBytecodeNumber);
             break;
         default:
             RELEASE_ASSERT_NOT_REACHED();
@@ -810,6 +825,11 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             }
         }
         forNode(node).setType(typeOfDoublePow(forNode(node->child1()).m_type, forNode(node->child2()).m_type));
+        break;
+    }
+
+    case ArithRandom: {
+        forNode(node).setType(m_graph, SpecDoubleReal);
         break;
     }
 
@@ -1694,6 +1714,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         
     case PhantomNewObject:
     case PhantomNewFunction:
+    case PhantomNewGeneratorFunction:
     case PhantomCreateActivation:
     case PhantomDirectArguments:
     case PhantomClonedArguments:
@@ -1740,7 +1761,12 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         forNode(node).set(
             m_graph, m_codeBlock->globalObjectFor(node->origin.semantic)->arrowFunctionStructure());
         break;
-            
+
+    case NewGeneratorFunction:
+        forNode(node).set(
+            m_graph, m_codeBlock->globalObjectFor(node->origin.semantic)->generatorFunctionStructure());
+        break;
+
     case NewFunction:
         forNode(node).set(
             m_graph, m_codeBlock->globalObjectFor(node->origin.semantic)->functionStructure());
@@ -1760,6 +1786,10 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
         
     case GetArgumentCount:
+        forNode(node).setType(SpecInt32);
+        break;
+        
+    case GetRestLength:
         forNode(node).setType(SpecInt32);
         break;
         
@@ -1801,15 +1831,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         forNode(node).setType(m_graph, SpecObjectOther);
         break;
 
-    case LoadArrowFunctionThis:
-        if (JSValue base = forNode(node->child1()).m_value) {
-            JSArrowFunction* function = jsDynamicCast<JSArrowFunction*>(base);
-            setConstant(node, *m_graph.freeze(function->boundThis()));
-            break;
-        }
-        forNode(node).setType(m_graph, SpecFinalObject);
-        break;
-            
     case SkipScope: {
         JSValue child = forNode(node->child1()).value();
         if (child) {
@@ -2444,12 +2465,17 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case NotifyWrite:
         break;
             
-    case CheckHasInstance:
-        // Sadly, we don't propagate the fact that we've done CheckHasInstance
+    case OverridesHasInstance:
+        forNode(node).setType(SpecBoolean);
         break;
             
     case InstanceOf:
-        // Again, sadly, we don't propagate the fact that we've done InstanceOf
+        // Sadly, we don't propagate the fact that we've done InstanceOf
+        forNode(node).setType(SpecBoolean);
+        break;
+
+    case InstanceOfCustom:
+        clobberWorld(node->origin.semantic, clobberLimit);
         forNode(node).setType(SpecBoolean);
         break;
             
@@ -2506,6 +2532,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case CountExecution:
     case CheckTierUpInLoop:
     case CheckTierUpAtReturn:
+    case CheckTypeInfoFlags:
         break;
 
     case CopyRest:

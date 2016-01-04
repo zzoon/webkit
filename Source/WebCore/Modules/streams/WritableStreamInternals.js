@@ -54,22 +54,22 @@ function syncWritableStreamStateWithQueue(stream)
     }
 }
 
-function errorWritableStream(e)
+function errorWritableStream(stream, e)
 {
     "use strict";
 
-    if (this.@state === @streamClosed || this.@state === @streamErrored)
+    if (stream.@state === @streamClosed || stream.@state === @streamErrored)
         return;
-    while (this.@queue.content.length > 0) {
-        const writeRecord = @dequeueValue(this.@queue);
+    while (stream.@queue.content.length > 0) {
+        const writeRecord = @dequeueValue(stream.@queue);
         if (writeRecord !== "close")
             writeRecord.promiseCapability.@reject.@call(undefined, e);
     }
-    this.@storedError = e;
-    if (this.@state === @streamWaiting)
-        this.@readyPromiseCapability.@resolve.@call();
-    this.@closedPromiseCapability.@reject.@call(undefined, e);
-    this.@state = @streamErrored;
+    stream.@storedError = e;
+    if (stream.@state === @streamWaiting)
+        stream.@readyPromiseCapability.@resolve.@call();
+    stream.@closedPromiseCapability.@reject.@call(undefined, e);
+    stream.@state = @streamErrored;
 }
 
 function callOrScheduleWritableStreamAdvanceQueue(stream)
@@ -77,7 +77,7 @@ function callOrScheduleWritableStreamAdvanceQueue(stream)
     "use strict";
 
     if (!stream.@started)
-        @Promise.prototype.@then.@call(stream.@startedPromise, function() { @writableStreamAdvanceQueue(stream); });
+        stream.@startedPromise.@then(function() { @writableStreamAdvanceQueue(stream); });
     else
         @writableStreamAdvanceQueue(stream);
 }
@@ -99,7 +99,7 @@ function writableStreamAdvanceQueue(stream)
     }
 
     stream.@writing = true;
-    @Promise.prototype.@then.@call(@promiseInvokeOrNoop(stream.@underlyingSink, "write", [writeRecord.chunk]),
+    @promiseInvokeOrNoop(stream.@underlyingSink, "write", [writeRecord.chunk]).@then(
         function() {
             if (stream.@state === @streamErrored)
                 return;
@@ -110,7 +110,7 @@ function writableStreamAdvanceQueue(stream)
             @writableStreamAdvanceQueue(stream);
         },
         function(r) {
-            @errorWritableStream.@call(stream, r);
+            @errorWritableStream(stream, r);
         }
     );
 }
@@ -120,7 +120,7 @@ function closeWritableStream(stream)
     "use strict";
 
     @assert(stream.@state === @streamClosing);
-    @Promise.prototype.@then.@call(@promiseInvokeOrNoop(stream.@underlyingSink, "close"),
+    @promiseInvokeOrNoop(stream.@underlyingSink, "close").@then(
         function() {
             if (stream.@state === @streamErrored)
                 return;
@@ -129,7 +129,7 @@ function closeWritableStream(stream)
             stream.@state = @streamClosed;
         },
         function(r) {
-            @errorWritableStream.@call(stream, r);
+            @errorWritableStream(stream, r);
         }
     );
 }

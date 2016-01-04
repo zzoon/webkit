@@ -86,14 +86,6 @@ void JITCompiler::linkOSRExits()
         else
             info.m_replacementDestination = label();
 
-        if (exit.m_willArriveAtOSRExitFromGenericUnwind) {
-            // We are acting as a defacto op_catch because we arrive here from genericUnwind().
-            // So, we must restore our call frame and stack pointer.
-            restoreCalleeSavesFromVMCalleeSavesBuffer();
-            loadPtr(vm()->addressOfCallFrameForCatch(), GPRInfo::callFrameRegister);
-            addPtr(TrustedImm32(graph().stackPointerOffset() * sizeof(Register)), GPRInfo::callFrameRegister, stackPointerRegister);
-        }
-
         jitAssertHasValidCallFrame();
         store32(TrustedImm32(i), &vm()->osrExitIndex);
         exit.setPatchableCodeOffset(patchableJump());
@@ -179,7 +171,7 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
         m_jitCode->common.inlineCallFrames = m_graph.m_plan.inlineCallFrames;
     
 #if USE(JSVALUE32_64)
-    m_jitCode->common.doubleConstants = WTF::move(m_graph.m_doubleConstants);
+    m_jitCode->common.doubleConstants = WTFMove(m_graph.m_doubleConstants);
 #endif
     
     m_graph.registerFrozenValues();
@@ -371,7 +363,7 @@ void JITCompiler::compile()
     disassemble(*linkBuffer);
     
     m_graph.m_plan.finalizer = std::make_unique<JITFinalizer>(
-        m_graph.m_plan, m_jitCode.release(), WTF::move(linkBuffer));
+        m_graph.m_plan, m_jitCode.release(), WTFMove(linkBuffer));
 }
 
 void JITCompiler::compileFunction()
@@ -468,7 +460,7 @@ void JITCompiler::compileFunction()
     MacroAssemblerCodePtr withArityCheck = linkBuffer->locationOf(m_arityCheck);
 
     m_graph.m_plan.finalizer = std::make_unique<JITFinalizer>(
-        m_graph.m_plan, m_jitCode.release(), WTF::move(linkBuffer), withArityCheck);
+        m_graph.m_plan, m_jitCode.release(), WTFMove(linkBuffer), withArityCheck);
 }
 
 void JITCompiler::disassemble(LinkBuffer& linkBuffer)

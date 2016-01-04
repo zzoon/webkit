@@ -135,7 +135,6 @@ public:
 #endif
         
 #if PLATFORM(COCOA) && ENABLE(WEB_TIMING)
-    void setCollectsTimingData();
 #if USE(CFNETWORK)
     static void getConnectionTimingData(CFURLConnectionRef, ResourceLoadTiming&);
 #else
@@ -159,7 +158,7 @@ public:
 
 #if USE(QUICK_LOOK)
     QuickLookHandle* quickLookHandle() { return m_quickLook.get(); }
-    void setQuickLookHandle(std::unique_ptr<QuickLookHandle> handle) { m_quickLook = WTF::move(handle); }
+    void setQuickLookHandle(std::unique_ptr<QuickLookHandle> handle) { m_quickLook = WTFMove(handle); }
 #endif
 
 #if PLATFORM(WIN) && USE(CURL)
@@ -283,10 +282,6 @@ private:
 
 #if PLATFORM(IOS) && !USE(CFNETWORK)
     void createNSURLConnection(id delegate, bool shouldUseCredentialStorage, bool shouldContentSniff, SchedulingBehavior, NSDictionary *connectionProperties);
-#endif
-
-#if PLATFORM(COCOA) && ENABLE(WEB_TIMING)
-static void getConnectionTimingData(NSDictionary *timingData, ResourceLoadTiming&);
 #endif
 
 #if USE(SOUP)

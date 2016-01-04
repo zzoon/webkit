@@ -46,6 +46,7 @@ enum Opcode : int16_t {
     Const32,
     Const64,
     ConstDouble,
+    ConstFloat,
 
     // The magical stack slot. This is viewed as executing at the top of the program regardless of
     // where in control flow you put it. Each instance of a StackSlot Value gets a disjoint range of
@@ -70,16 +71,23 @@ enum Opcode : int16_t {
     Sub,
     Mul,
     Div, // All bets are off as to what will happen when you execute this for -2^31/-1 and x/0.
+    Mod, // All bets are off as to what will happen when you execute this for -2^31%-1 and x%0.
 
     // Integer math.
     ChillDiv, // doesn't trap ever, behaves like JS (x/y)|0.
-    Mod,
+    ChillMod, // doesn't trap ever, behaves like JS (x%y)|0.
     BitAnd,
     BitOr,
     BitXor,
     Shl,
     SShr, // Arithmetic Shift.
     ZShr, // Logical Shift.
+    Clz, // Count leading zeros.
+
+    // Floating point math.
+    Abs,
+    Ceil,
+    Sqrt,
 
     // Casts and such.
     // Bitwise Cast of Double->Int64 or Int64->Double
@@ -92,12 +100,13 @@ enum Opcode : int16_t {
     ZExt32,
     // Takes Int64 and returns Int32:
     Trunc,
-    // Takes and returns Double:
-    FRound,
-    // Takes ints and returns Double:
+    // Takes ints and returns Double. Note that we don't currently provide the opposite operation,
+    // because double-to-int conversions have weirdly different semantics on different platforms. Use
+    // a patchpoint if you need to do that.
     IToD,
-    // Takes Double and returns Int32:
-    DToI32,
+    // Convert between double and float.
+    FloatToDouble,
+    DoubleToFloat,
 
     // Polymorphic comparisons, usable with any value type. Returns int32 0 or 1. Note that "Not"
     // is just Equal(x, 0), and "ToBoolean" is just NotEqual(x, 0).
@@ -114,14 +123,19 @@ enum Opcode : int16_t {
     AboveEqual,
     BelowEqual,
 
+    // Unordered floating point compare: values are equal or either one is NaN.
+    EqualOrUnordered,
+
+    // SSA form of conditional move. The first child is evaluated for truthiness. If true, the second child
+    // is returned. Otherwise, the third child is returned.
+    Select,
+
     // Memory loads. Opcode indicates how we load and the loaded type. These use MemoryValue.
     // These return Int32:
     Load8Z,
     Load8S,
     Load16Z,
     Load16S,
-    // This returns Double:
-    LoadFloat,
     // This returns whatever the return type is:
     Load,
 
@@ -129,9 +143,7 @@ enum Opcode : int16_t {
     // These take an Int32 value:
     Store8,
     Store16,
-    // This takes a Double value:
-    StoreFloat,
-    // This is a polymorphic store for Int32, Int64, and Double:
+    // This is a polymorphic store for Int32, Int64, Float, and Double.
     Store,
 
     // This is a regular ordinary C function call, using the system C calling convention. Make sure
@@ -166,9 +178,8 @@ enum Opcode : int16_t {
     // after the first CheckAdd executes, the second CheckAdd could not have possibly taken slow
     // path. Therefore, the second CheckAdd's callback is irrelevant.
     //
-    // Note that the first two children of these operations have ValueRep's, both as input constraints and
-    // in the reps provided to the generator. The output constraints could be anything, and should not be
-    // inspected for meaning. If you want to capture the values of the inputs, use stackmap arguments.
+    // Note that the first two children of these operations have ValueRep's as input constraints but do
+    // not have output constraints.
     CheckAdd,
     CheckSub,
     CheckMul,
@@ -176,8 +187,8 @@ enum Opcode : int16_t {
     // Check that side-exits. Use the CheckValue class. Like CheckAdd and friends, this has a
     // stackmap with a generation callback. This takes an int argument that this branches on, with
     // full branch fusion in the instruction selector. A true value jumps to the generator's slow
-    // path. Note that the predicate child is has both an input and output ValueRep. The input constraint
-    // must be Any, and the output could be anything.
+    // path. Note that the predicate child is has both an input ValueRep. The input constraint must be
+    // WarmAny. It will not have an output constraint.
     Check,
 
     // SSA support, in the style of DFG SSA.
@@ -221,6 +232,19 @@ inline Opcode constPtrOpcode()
     if (is64Bit())
         return Const64;
     return Const32;
+}
+
+inline bool isConstant(Opcode opcode)
+{
+    switch (opcode) {
+    case Const32:
+    case Const64:
+    case ConstDouble:
+    case ConstFloat:
+        return true;
+    default:
+        return false;
+    }
 }
 
 } } // namespace JSC::B3

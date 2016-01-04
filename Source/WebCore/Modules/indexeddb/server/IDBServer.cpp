@@ -135,11 +135,22 @@ void IDBServer::deleteDatabase(const IDBRequestData& requestData)
         // well as no way to message back failure.
         return;
     }
-    
-    // FIXME: During bringup of modern IDB, the database deletion is a no-op, and is
-    // immediately reported back to the WebProcess as failure.
-    auto result = IDBResultData::error(requestData.requestIdentifier(), IDBError(IDBExceptionCode::Unknown));
-    connection->didDeleteDatabase(result);
+
+    auto* database = m_uniqueIDBDatabaseMap.get(requestData.databaseIdentifier());
+    if (!database) {
+        connection->didDeleteDatabase(IDBResultData::deleteDatabaseSuccess(requestData.requestIdentifier(), IDBDatabaseInfo(requestData.databaseIdentifier().databaseName(), 0)));
+        return;
+    }
+
+    database->handleDelete(*connection, requestData);
+}
+
+void IDBServer::deleteUniqueIDBDatabase(UniqueIDBDatabase& database)
+{
+    LOG(IndexedDB, "IDBServer::deleteUniqueIDBDatabase");
+
+    auto deletedDatabase = m_uniqueIDBDatabaseMap.take(database.identifier());
+    ASSERT_UNUSED(deletedDatabase, deletedDatabase.get() == &database);
 }
 
 void IDBServer::abortTransaction(const IDBResourceIdentifier& transactionIdentifier)
@@ -306,6 +317,17 @@ void IDBServer::commitTransaction(const IDBResourceIdentifier& transactionIdenti
     transaction->commit();
 }
 
+void IDBServer::didFinishHandlingVersionChangeTransaction(const IDBResourceIdentifier& transactionIdentifier)
+{
+    LOG(IndexedDB, "IDBServer::didFinishHandlingVersionChangeTransaction");
+
+    auto transaction = m_transactions.get(transactionIdentifier);
+    if (!transaction)
+        return;
+
+    transaction->didFinishHandlingVersionChange();
+}
+
 void IDBServer::databaseConnectionClosed(uint64_t databaseConnectionIdentifier)
 {
     LOG(IndexedDB, "IDBServer::databaseConnectionClosed");
@@ -317,16 +339,24 @@ void IDBServer::databaseConnectionClosed(uint64_t databaseConnectionIdentifier)
     databaseConnection->connectionClosedFromClient();
 }
 
+void IDBServer::didFireVersionChangeEvent(uint64_t databaseConnectionIdentifier, const IDBResourceIdentifier& requestIdentifier)
+{
+    LOG(IndexedDB, "IDBServer::didFireVersionChangeEvent");
+
+    if (auto databaseConnection = m_databaseConnections.get(databaseConnectionIdentifier))
+        databaseConnection->didFireVersionChangeEvent(requestIdentifier);
+}
+
 void IDBServer::postDatabaseTask(std::unique_ptr<CrossThreadTask>&& task)
 {
     ASSERT(isMainThread());
-    m_databaseQueue.append(WTF::move(task));
+    m_databaseQueue.append(WTFMove(task));
 }
 
 void IDBServer::postDatabaseTaskReply(std::unique_ptr<CrossThreadTask>&& task)
 {
     ASSERT(!isMainThread());
-    m_databaseReplyQueue.append(WTF::move(task));
+    m_databaseReplyQueue.append(WTFMove(task));
 
 
     Locker<Lock> locker(m_mainThreadReplyLock);

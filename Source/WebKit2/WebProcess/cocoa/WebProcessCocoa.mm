@@ -145,9 +145,10 @@ void WebProcess::platformInitializeWebProcess(WebProcessCreationParameters&& par
 
 #if PLATFORM(MAC)
     WebCore::FontCache::setFontWhitelist(parameters.fontWhitelist);
+    Page::setTabSuspensionEnabled(parameters.shouldEnableTabSuspension);
 #endif
 
-    m_compositingRenderServerPort = WTF::move(parameters.acceleratedCompositingPort);
+    m_compositingRenderServerPort = WTFMove(parameters.acceleratedCompositingPort);
     m_presenterApplicationPid = parameters.presenterApplicationPid;
 
     MemoryPressureHandler::ReliefLogger::setLoggingEnabled(parameters.shouldEnableMemoryPressureReliefLogging);

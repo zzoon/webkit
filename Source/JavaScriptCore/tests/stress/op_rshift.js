@@ -1,4 +1,5 @@
-//@ runFTLNoCJIT
+//@ skip
+// FIXME: https://bugs.webkit.org/show_bug.cgi?id=151514
 
 // If all goes well, this test module will terminate silently. If not, it will print
 // errors. See binary-op-test.js for debugging options if needed.
@@ -30,6 +31,8 @@ var values = [
     'negInfinity',
     '100.2', // Some random small double value.
     '-100.2',
+    '2147483647.5', // Value that will get truncated down to 0x7fffffff.
+    '-2147483647.5',
     '54294967296.2923', // Some random large double value.
     '-54294967296.2923',
 
@@ -49,8 +52,8 @@ var values = [
     '-0x7fff',
     '0x10000',
     '-0x10000',
-    '0x7ffffff',
-    '-0x7ffffff',
+    '0x7fffffff',
+    '-0x7fffffff',
     '0x100000000',
     '-0x100000000',
 

@@ -63,6 +63,8 @@ public:
     virtual void play();
     virtual void pause();
 
+    virtual bool supportsFullscreen() const;
+
     virtual FloatSize naturalSize() const;
 
     virtual bool hasVideo() const;
@@ -72,6 +74,9 @@ public:
 
     virtual bool seeking() const;
     virtual void seekDouble(double) override;
+
+    virtual void setRateDouble(double) override;
+
     virtual double durationDouble() const override;
 
     virtual float currentTime() const override;
@@ -80,6 +85,8 @@ public:
 
     virtual MediaPlayer::NetworkState networkState() const;
     virtual MediaPlayer::ReadyState readyState() const;
+
+    virtual float maxTimeSeekable() const override;
 
     virtual std::unique_ptr<PlatformTimeRanges> buffered() const;
 
@@ -229,6 +236,10 @@ private:
         float m_playbackRate { 1.0f };
         MFTIME m_frameDuration { 0 };
         MFTIME m_lastSampleTime { 0 };
+
+        std::atomic<bool> m_exitThread { false };
+
+        void stopThread() { m_exitThread = true; }
     };
 
     class Direct3DPresenter {
@@ -392,6 +403,8 @@ private:
 
         float currentTime();
 
+        float maxTimeLoaded() const { return m_maxTimeLoaded; }
+
     private:
         ULONG m_refCount { 0 };
         Lock m_lock;
@@ -419,6 +432,7 @@ private:
         VideoSamplePool m_samplePool;
         unsigned m_tokenCounter { 0 };
         float m_rate { 1.0f };
+        float m_maxTimeLoaded { 0.0f };
 
         bool isActive() const;
 

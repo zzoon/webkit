@@ -68,17 +68,17 @@ std::unique_ptr<ContentFilter> ContentFilter::createIfEnabled(DocumentLoader& do
 
         auto filter = type.create();
         ASSERT(filter);
-        filters.append(WTF::move(filter));
+        filters.append(WTFMove(filter));
     }
 
     if (filters.isEmpty())
         return nullptr;
 
-    return std::make_unique<ContentFilter>(WTF::move(filters), documentLoader);
+    return std::make_unique<ContentFilter>(WTFMove(filters), documentLoader);
 }
 
 ContentFilter::ContentFilter(Container contentFilters, DocumentLoader& documentLoader)
-    : m_contentFilters { WTF::move(contentFilters) }
+    : m_contentFilters { WTFMove(contentFilters) }
     , m_documentLoader { documentLoader }
 {
     LOG(ContentFiltering, "Creating ContentFilter with %zu platform content filter(s).\n", m_contentFilters.size());
@@ -120,6 +120,17 @@ void ContentFilter::startFilteringMainResource(CachedRawResource& resource)
     m_mainResource = &resource;
     ASSERT(!m_mainResource->hasClient(this));
     m_mainResource->addClient(this);
+}
+
+void ContentFilter::stopFilteringMainResource()
+{
+    m_state = State::Stopped;
+    if (!m_mainResource)
+        return;
+
+    ASSERT(m_mainResource->hasClient(this));
+    m_mainResource->removeClient(this);
+    m_mainResource = nullptr;
 }
 
 ContentFilterUnblockHandler ContentFilter::unblockHandler() const
@@ -216,6 +227,9 @@ void ContentFilter::notifyFinished(CachedResource* resource)
 
         if (m_state != State::Blocked)
             deliverResourceData(*resource);
+        
+        if (m_state == State::Stopped)
+            return;
     }
 
     if (m_state != State::Blocked)

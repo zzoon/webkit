@@ -47,7 +47,6 @@
 #include "RenderText.h"
 #include "RenderTreePosition.h"
 #include "RenderWidget.h"
-#include "ResourceLoadScheduler.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
 #include "StyleResolveForDocument.h"
@@ -204,7 +203,7 @@ static void createRendererIfNeeded(Element& element, RenderStyle& inheritedStyle
     // This just does what setAnimatedStyle() does, except with setStyleInternal() instead of setStyle().
     Ref<RenderStyle> animatedStyle = newRenderer->style();
     newRenderer->animation().updateAnimations(*newRenderer, animatedStyle, animatedStyle);
-    newRenderer->setStyleInternal(WTF::move(animatedStyle));
+    newRenderer->setStyleInternal(WTFMove(animatedStyle));
 
     newRenderer->initializeStyle();
 
@@ -382,10 +381,10 @@ static void setBeforeOrAfterPseudoElement(Element& current, Ref<PseudoElement>&&
 {
     ASSERT(pseudoId == BEFORE || pseudoId == AFTER);
     if (pseudoId == BEFORE) {
-        current.setBeforePseudoElement(WTF::move(pseudoElement));
+        current.setBeforePseudoElement(WTFMove(pseudoElement));
         return;
     }
-    current.setAfterPseudoElement(WTF::move(pseudoElement));
+    current.setAfterPseudoElement(WTFMove(pseudoElement));
 }
 
 static void clearBeforeOrAfterPseudoElement(Element& current, PseudoId pseudoId)
@@ -758,6 +757,8 @@ public:
     {
         if (!WKObservingContentChanges())
             return;
+        if (m_element->isInUserAgentShadowTree())
+            return;
         RenderStyle* style = m_element->renderStyle();
         if (!style)
             return;
@@ -884,7 +885,7 @@ void resolveTree(Document& document, Change change)
 
         Style::Change documentChange = determineChange(documentStyle.get(), renderView.style());
         if (documentChange != NoChange)
-            renderView.setStyle(WTF::move(documentStyle));
+            renderView.setStyle(WTFMove(documentStyle));
     }
 
     Element* documentElement = document.documentElement();
@@ -944,7 +945,7 @@ PostResolutionCallbackDisabler::PostResolutionCallbackDisabler(Document& documen
     ++resolutionNestingDepth;
 
     if (resolutionNestingDepth == 1)
-        platformStrategies()->loaderStrategy()->resourceLoadScheduler()->suspendPendingRequests();
+        platformStrategies()->loaderStrategy()->suspendPendingRequests();
 
     // FIXME: It's strange to build this into the disabler.
     suspendMemoryCacheClientCalls(document);
@@ -959,7 +960,7 @@ PostResolutionCallbackDisabler::~PostResolutionCallbackDisabler()
             queue[i]();
         queue.clear();
 
-        platformStrategies()->loaderStrategy()->resourceLoadScheduler()->resumePendingRequests();
+        platformStrategies()->loaderStrategy()->resumePendingRequests();
     }
 
     --resolutionNestingDepth;

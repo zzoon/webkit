@@ -37,6 +37,7 @@
 #include "ModuleAnalyzer.h"
 #include "ModuleLoaderObject.h"
 #include "Parser.h"
+#include "ScriptProfilingScope.h"
 #include <wtf/WTFThreadData.h>
 
 namespace JSC {
@@ -63,7 +64,7 @@ bool checkSyntax(VM& vm, const SourceCode& source, ParserError& error)
     RELEASE_ASSERT(vm.atomicStringTable() == wtfThreadData().atomicStringTable());
     return !!parse<ProgramNode>(
         &vm, source, Identifier(), JSParserBuiltinMode::NotBuiltin,
-        JSParserStrictMode::NotStrict, SourceParseMode::ProgramMode, error);
+        JSParserStrictMode::NotStrict, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, error);
 }
 
 bool checkModuleSyntax(ExecState* exec, const SourceCode& source, ParserError& error)
@@ -73,7 +74,7 @@ bool checkModuleSyntax(ExecState* exec, const SourceCode& source, ParserError& e
     RELEASE_ASSERT(vm.atomicStringTable() == wtfThreadData().atomicStringTable());
     std::unique_ptr<ModuleProgramNode> moduleProgramNode = parse<ModuleProgramNode>(
         &vm, source, Identifier(), JSParserBuiltinMode::NotBuiltin,
-        JSParserStrictMode::Strict, SourceParseMode::ModuleAnalyzeMode, error);
+        JSParserStrictMode::Strict, SourceParseMode::ModuleAnalyzeMode, SuperBinding::NotNeeded, error);
     if (!moduleProgramNode)
         return false;
 
@@ -111,6 +112,12 @@ JSValue evaluate(ExecState* exec, const SourceCode& source, JSValue thisValue, N
 
     RELEASE_ASSERT(result);
     return result;
+}
+
+JSValue profiledEvaluate(ExecState* exec, ProfilingReason reason, const SourceCode& source, JSValue thisValue, NakedPtr<Exception>& returnedException)
+{
+    ScriptProfilingScope profilingScope(exec->vmEntryGlobalObject(), reason);
+    return evaluate(exec, source, thisValue, returnedException);
 }
 
 static JSValue identifierToJSValue(VM& vm, const Identifier& identifier)
@@ -167,7 +174,7 @@ JSInternalPromise* loadAndEvaluateModule(ExecState* exec, const SourceCode& sour
     JSGlobalObject* globalObject = exec->vmEntryGlobalObject();
 
     // Insert the given source code to the ModuleLoader registry as the fetched registry entry.
-    globalObject->moduleLoader()->provide(exec, key, ModuleLoaderObject::Status::Fetch, source.toString());
+    globalObject->moduleLoader()->provide(exec, key, ModuleLoaderObject::Status::Fetch, source.view().toString());
     if (exec->hadException())
         return rejectPromise(exec, globalObject);
 
@@ -204,7 +211,7 @@ JSInternalPromise* loadModule(ExecState* exec, const SourceCode& source)
     JSGlobalObject* globalObject = exec->vmEntryGlobalObject();
 
     // Insert the given source code to the ModuleLoader registry as the fetched registry entry.
-    globalObject->moduleLoader()->provide(exec, key, ModuleLoaderObject::Status::Fetch, source.toString());
+    globalObject->moduleLoader()->provide(exec, key, ModuleLoaderObject::Status::Fetch, source.view().toString());
     if (exec->hadException())
         return rejectPromise(exec, globalObject);
 

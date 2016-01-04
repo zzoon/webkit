@@ -30,12 +30,15 @@ var verboseTestGeneration = false;
 function stringifyIfNeeded(x) {
     if (typeof x == "string")
         return '"' + x + '"';
+    if (typeof x == "object")
+        return 'objWithVal:' + x;
     return x;
 }
 
 // operandTypes are "VarVar", "VarConst", and "ConstVar".
+var funcIndex = 0;
 function generateBinaryTests(tests, opName, op, operandTypes, leftValues, rightValues) {
-    var funcName = opName + operandTypes;
+    var funcNamePrefix = opName + operandTypes;
     for (var i = 0; i < leftValues.length; i++) {
         for (var j = 0; j < rightValues.length; j++) {
             var test = { };
@@ -44,6 +47,7 @@ function generateBinaryTests(tests, opName, op, operandTypes, leftValues, rightV
             test.x = eval(xStr);
             test.y = eval(yStr);
 
+            var funcName = funcNamePrefix + funcIndex++;
             if (operandTypes == "VarVar") {
                 test.signature = funcName + "(x, y) { return x " + op + " y }";
                 test.name = test.signature + " with x:" + xStr + ", y:" + yStr;
@@ -74,6 +78,8 @@ function generateBinaryTests(tests, opName, op, operandTypes, leftValues, rightV
 var errorReport = "";
 
 function isIdentical(x, y) {
+    if (typeof x == "undefined" && typeof y == "undefined")
+        return true;
     if (typeof x != typeof y)
         return false;
     if (x == y) {
@@ -120,8 +126,6 @@ function run() {
 
     for (var test of tests)
         runTest(test);
-    // for (var i = 0; i < tests.length; i++)
-    //     runTest(tests[i]);
 
     if (errorReport !== "")
         throw "Found failures:\n" + errorReport;

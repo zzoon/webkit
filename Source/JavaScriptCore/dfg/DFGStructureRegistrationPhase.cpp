@@ -109,8 +109,12 @@ public:
                     
                 case NewArray:
                 case NewArrayBuffer:
-                    registerStructure(m_graph.globalObjectFor(node->origin.semantic)->arrayStructureForIndexingTypeDuringAllocation(node->indexingType()));
+                case NewArrayWithSize: {
+                    JSGlobalObject* globalObject = m_graph.globalObjectFor(node->origin.semantic);
+                    registerStructure(globalObject->arrayStructureForIndexingTypeDuringAllocation(node->indexingType()));
+                    registerStructure(globalObject->originalArrayStructureForIndexingType(ArrayWithSlowPutArrayStorage));
                     break;
+                }
                     
                 case NewTypedArray:
                     registerStructure(m_graph.globalObjectFor(node->origin.semantic)->typedArrayStructure(node->typedArrayType()));
@@ -141,6 +145,9 @@ public:
                     break;
                 case NewFunction:
                     registerStructure(m_graph.globalObjectFor(node->origin.semantic)->functionStructure());
+                    break;
+                case NewGeneratorFunction:
+                    registerStructure(m_graph.globalObjectFor(node->origin.semantic)->generatorFunctionStructure());
                     break;
                     
                 default:

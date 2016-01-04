@@ -28,7 +28,6 @@
 
 #include "CacheModel.h"
 #include "ChildProcess.h"
-#include "DownloadManager.h"
 #include "DrawingArea.h"
 #include "PluginProcessConnectionManager.h"
 #include "ResourceCachesToClear.h"
@@ -71,14 +70,15 @@ struct SecurityOriginData;
 
 namespace WebKit {
 
-class DownloadManager;
 class EventDispatcher;
 class InjectedBundle;
+class NetworkProcessConnection;
 class ObjCObjectGraph;
 class UserData;
 class WebConnectionToUIProcess;
 class WebFrame;
 class WebIconDatabaseProxy;
+class WebLoaderStrategy;
 class WebPage;
 class WebPageGroupProxy;
 class WebProcessSupplement;
@@ -87,17 +87,11 @@ struct WebPageGroupData;
 struct WebPreferencesStore;
 struct WebProcessCreationParameters;
 
-#if ENABLE(NETWORK_PROCESS)
-class NetworkProcessConnection;
-class WebResourceLoadScheduler;
-#endif
-
 #if ENABLE(DATABASE_PROCESS)
 class WebToDatabaseProcessConnection;
 #endif
 
-class WebProcess : public ChildProcess, private DownloadManager::Client {
-    friend class NeverDestroyed<DownloadManager>;
+class WebProcess : public ChildProcess {
 public:
     static WebProcess& singleton();
 
@@ -147,7 +141,6 @@ public:
 #endif
     
     const TextCheckerState& textCheckerState() const { return m_textCheckerState; }
-    DownloadManager& downloadManager();
 
     void clearResourceCaches(ResourceCachesToClear = AllResourceCaches);
     
@@ -157,13 +150,9 @@ public:
 
     EventDispatcher& eventDispatcher() { return *m_eventDispatcher; }
 
-    bool usesNetworkProcess() const;
-
-#if ENABLE(NETWORK_PROCESS)
     NetworkProcessConnection* networkConnection();
     void networkProcessConnectionClosed(NetworkProcessConnection*);
-    WebResourceLoadScheduler& webResourceLoadScheduler();
-#endif
+    WebLoaderStrategy& webLoaderStrategy();
 
 #if ENABLE(DATABASE_PROCESS)
     void webToDatabaseProcessConnectionClosed(WebToDatabaseProcessConnection*);
@@ -185,10 +174,6 @@ public:
 #endif
 
     void updateActivePages();
-
-#if USE(SOUP)
-    void allowSpecificHTTPSCertificateForHost(const WebCore::CertificateInfo&, const String& host);
-#endif
 
     void processWillSuspendImminently(bool& handled);
     void prepareToSuspend();
@@ -221,12 +206,6 @@ public:
 private:
     WebProcess();
     ~WebProcess();
-
-    // DownloadManager::Client.
-    virtual void didCreateDownload() override;
-    virtual void didDestroyDownload() override;
-    virtual IPC::Connection* downloadProxyConnection() override;
-    virtual AuthenticationManager& downloadsAuthenticationManager() override;
 
     void initializeWebProcess(WebProcessCreationParameters&&);
     void platformInitializeWebProcess(WebProcessCreationParameters&&);
@@ -263,25 +242,19 @@ private:
     void startMemorySampler(const SandboxExtension::Handle&, const String&, const double);
     void stopMemorySampler();
 
-    void downloadRequest(WebCore::SessionID, uint64_t downloadID, uint64_t initiatingPageID, const WebCore::ResourceRequest&);
-    void resumeDownload(uint64_t downloadID, const IPC::DataReference& resumeData, const String& path, const SandboxExtension::Handle&);
-    void cancelDownload(uint64_t downloadID);
-
     void setTextCheckerState(const TextCheckerState&);
     
     void getWebCoreStatistics(uint64_t callbackID);
     void garbageCollectJavaScriptObjects();
     void setJavaScriptGarbageCollectorTimerEnabled(bool flag);
 
+    void mainThreadPing();
+
     void releasePageCache();
 
     void fetchWebsiteData(WebCore::SessionID, uint64_t websiteDataTypes, uint64_t callbackID);
     void deleteWebsiteData(WebCore::SessionID, uint64_t websiteDataTypes, std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID);
     void deleteWebsiteDataForOrigins(WebCore::SessionID, uint64_t websiteDataTypes, const Vector<WebCore::SecurityOriginData>& origins, uint64_t callbackID);
-
-#if USE(SOUP)
-    void setIgnoreTLSErrors(bool);
-#endif
 
     void setMemoryCacheDisabled(bool);
 
@@ -357,16 +330,13 @@ private:
 
     TextCheckerState m_textCheckerState;
 
-    WebIconDatabaseProxy* m_iconDatabaseProxy;
+    WebIconDatabaseProxy& m_iconDatabaseProxy;
 
-#if ENABLE(NETWORK_PROCESS)
     void ensureNetworkProcessConnection();
     RefPtr<NetworkProcessConnection> m_networkProcessConnection;
-    bool m_usesNetworkProcess;
-    WebResourceLoadScheduler* m_webResourceLoadScheduler;
+    WebLoaderStrategy& m_webLoaderStrategy;
     HashSet<String> m_dnsPrefetchedHosts;
     WebCore::HysteresisActivity m_dnsPrefetchHystereris;
-#endif
 
 #if ENABLE(DATABASE_PROCESS)
     void ensureWebToDatabaseProcessConnection();

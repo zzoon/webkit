@@ -115,7 +115,7 @@ private:
 };
 
 RenderView::RenderView(Document& document, Ref<RenderStyle>&& style)
-    : RenderBlockFlow(document, WTF::move(style))
+    : RenderBlockFlow(document, WTFMove(style))
     , m_frameView(*document.view())
     , m_selectionUnsplitStart(nullptr)
     , m_selectionUnsplitEnd(nullptr)
@@ -204,8 +204,8 @@ bool RenderView::hitTest(const HitTestRequest& request, const HitTestLocation& l
     if (request.allowsFrameScrollbars()) {
         // ScrollView scrollbars are not the same as RenderLayer scrollbars tested by RenderLayer::hitTestOverflowControls,
         // so we need to test ScrollView scrollbars separately here.
-        Scrollbar* frameScrollbar = frameView().scrollbarAtPoint(location.roundedPoint());
-        if (frameScrollbar) {
+        IntPoint windowPoint = frameView().contentsToWindow(location.roundedPoint());
+        if (Scrollbar* frameScrollbar = frameView().scrollbarAtPoint(windowPoint)) {
             result.setScrollbar(frameScrollbar);
             return true;
         }
@@ -441,7 +441,7 @@ void RenderView::mapLocalToContainer(const RenderLayerModelObject* repaintContai
     }
     
     if (mode & IsFixed)
-        transformState.move(frameView().scrollOffsetRespectingCustomFixedPosition());
+        transformState.move(toLayoutSize(frameView().scrollPositionRespectingCustomFixedPosition()));
 }
 
 const RenderObject* RenderView::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
@@ -450,14 +450,14 @@ const RenderObject* RenderView::pushMappingToContainer(const RenderLayerModelObj
     // then we should have found it by now.
     ASSERT_ARG(ancestorToStopAt, !ancestorToStopAt || ancestorToStopAt == this);
 
-    LayoutSize scrollOffset = frameView().scrollOffsetRespectingCustomFixedPosition();
+    LayoutPoint scrollPosition = frameView().scrollPositionRespectingCustomFixedPosition();
 
     if (!ancestorToStopAt && shouldUseTransformFromContainer(nullptr)) {
         TransformationMatrix t;
         getTransformFromContainer(nullptr, LayoutSize(), t);
-        geometryMap.pushView(this, scrollOffset, &t);
+        geometryMap.pushView(this, toLayoutSize(scrollPosition), &t);
     } else
-        geometryMap.pushView(this, scrollOffset);
+        geometryMap.pushView(this, toLayoutSize(scrollPosition));
 
     return nullptr;
 }
@@ -465,7 +465,7 @@ const RenderObject* RenderView::pushMappingToContainer(const RenderLayerModelObj
 void RenderView::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
 {
     if (mode & IsFixed)
-        transformState.move(frameView().scrollOffsetRespectingCustomFixedPosition());
+        transformState.move(toLayoutSize(frameView().scrollPositionRespectingCustomFixedPosition()));
 
     if (mode & UseTransforms && shouldUseTransformFromContainer(nullptr)) {
         TransformationMatrix t;
@@ -696,10 +696,9 @@ LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const Rende
             adjustedRect.setX(viewWidth() - adjustedRect.maxX());
     }
 
-    if (fixed) {
-        adjustedRect.move(frameView().scrollOffsetRespectingCustomFixedPosition());
-    }
-        
+    if (fixed)
+        adjustedRect.moveBy(frameView().scrollPositionRespectingCustomFixedPosition());
+    
     // Apply our transform if we have one (because of full page zooming).
     if (!repaintContainer && layer() && layer()->transform())
         adjustedRect = LayoutRect(layer()->transform()->mapRect(snapRectToDevicePixels(adjustedRect, document().deviceScaleFactor())));
@@ -826,7 +825,7 @@ void RenderView::repaintSubtreeSelection(const SelectionSubtreeRoot& root) const
 // Compositing layer dimensions take outline size into account, so we have to recompute layer
 // bounds when it changes.
 // FIXME: This is ugly; it would be nice to have a better way to do this.
-void RenderView::setMaximalOutlineSize(int outlineSize)
+void RenderView::setMaximalOutlineSize(float outlineSize)
 {
     if (outlineSize == m_maximalOutlineSize)
         return;
@@ -923,7 +922,7 @@ void RenderView::updateSelectionForSubtrees(RenderSubtreesMap& renderSubtreesMap
         std::unique_ptr<OldSelectionData> oldSelectionData = std::make_unique<OldSelectionData>();
 
         clearSubtreeSelection(root, blockRepaintMode, *oldSelectionData);
-        oldSelectionDataMap.set(&root, WTF::move(oldSelectionData));
+        oldSelectionDataMap.set(&root, WTFMove(oldSelectionData));
 
         root.setSelectionData(subtreeSelectionInfo.value);
         if (hasRenderNamedFlowThreads())
@@ -1027,7 +1026,7 @@ void RenderView::applySubtreeSelection(const SelectionSubtreeRoot& root, Selecti
                 m_selectionRectGatherer.setTextOnly(false);
 #endif
 
-            newSelectedObjects.set(currentRenderer, WTF::move(selectionInfo));
+            newSelectedObjects.set(currentRenderer, WTFMove(selectionInfo));
 
             RenderBlock* containingBlock = currentRenderer->containingBlock();
             while (containingBlock && !containingBlock->isRenderView()) {
@@ -1337,6 +1336,26 @@ ImageQualityController& RenderView::imageQualityController()
     if (!m_imageQualityController)
         m_imageQualityController = std::make_unique<ImageQualityController>(*this);
     return *m_imageQualityController;
+}
+
+void RenderView::registerForVisibleInViewportCallback(RenderElement& renderer)
+{
+    ASSERT(!m_visibleInViewportRenderers.contains(&renderer));
+    m_visibleInViewportRenderers.add(&renderer);
+}
+
+void RenderView::unregisterForVisibleInViewportCallback(RenderElement& renderer)
+{
+    ASSERT(m_visibleInViewportRenderers.contains(&renderer));
+    m_visibleInViewportRenderers.remove(&renderer);
+}
+
+void RenderView::updateVisibleViewportRect(const IntRect& visibleRect)
+{
+    resumePausedImageAnimationsIfNeeded(visibleRect);
+
+    for (auto* renderer : m_visibleInViewportRenderers)
+        renderer->visibleInViewportStateChanged(visibleRect.intersects(enclosingIntRect(renderer->absoluteClippedOverflowRect())) ? RenderElement::VisibleInViewport : RenderElement::NotVisibleInViewport);
 }
 
 void RenderView::addRendererWithPausedImageAnimations(RenderElement& renderer)

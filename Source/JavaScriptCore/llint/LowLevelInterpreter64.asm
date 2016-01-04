@@ -1069,16 +1069,27 @@ _llint_op_bitor:
         5)
 
 
-_llint_op_check_has_instance:
+_llint_op_overrides_has_instance:
     traceExecution()
-    loadisFromInstruction(3, t1)
-    loadConstantOrVariableCell(t1, t0, .opCheckHasInstanceSlow)
-    btbz JSCell::m_flags[t0], ImplementsDefaultHasInstance, .opCheckHasInstanceSlow
-    dispatch(5)
+    loadisFromInstruction(1, t3)
 
-.opCheckHasInstanceSlow:
-    callSlowPath(_llint_slow_path_check_has_instance)
-    dispatch(0)
+    loadisFromInstruction(3, t1)
+    loadConstantOrVariable(t1, t0)
+    loadp CodeBlock[cfr], t2
+    loadp CodeBlock::m_globalObject[t2], t2
+    loadp JSGlobalObject::m_functionProtoHasInstanceSymbolFunction[t2], t2
+    bqneq t0, t2, .opOverridesHasInstanceNotDefaultSymbol
+
+    loadisFromInstruction(2, t1)
+    loadConstantOrVariable(t1, t0)
+    tbz JSCell::m_flags[t0], ImplementsDefaultHasInstance, t1
+    orq ValueFalse, t1
+    storeq t1, [cfr, t3, 8]
+    dispatch(4)
+
+.opOverridesHasInstanceNotDefaultSymbol:
+    storeq ValueTrue, [cfr, t3, 8]
+    dispatch(4)
 
 
 _llint_op_instanceof:
@@ -1109,6 +1120,10 @@ _llint_op_instanceof:
     callSlowPath(_llint_slow_path_instanceof)
     dispatch(4)
 
+_llint_op_instanceof_custom:
+    traceExecution()
+    callSlowPath(_llint_slow_path_instanceof_custom)
+    dispatch(5)
 
 _llint_op_is_undefined:
     traceExecution()
@@ -2291,10 +2306,18 @@ _llint_op_profile_control_flow:
     dispatch(2)
 
 
-_llint_op_load_arrowfunction_this:
+_llint_op_get_rest_length:
     traceExecution()
-    loadp Callee[cfr], t0
-    loadp JSArrowFunction::m_boundThis[t0], t0
+    loadi PayloadOffset + ArgumentCount[cfr], t0
+    subi 1, t0
+    loadisFromInstruction(2, t1)
+    bilteq t0, t1, .storeZero
+    subi t1, t0
+    jmp .boxUp
+.storeZero:
+    move 0, t0
+.boxUp:
+    orq tagTypeNumber, t0
     loadisFromInstruction(1, t1)
     storeq t0, [cfr, t1, 8]
-    dispatch(2)
+    dispatch(3)

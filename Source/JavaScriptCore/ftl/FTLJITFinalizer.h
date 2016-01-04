@@ -42,7 +42,7 @@ namespace JSC { namespace FTL {
 class OutOfLineCodeInfo {
 public:
     OutOfLineCodeInfo(std::unique_ptr<LinkBuffer> linkBuffer, const char* codeDescription)
-        : m_linkBuffer(WTF::move(linkBuffer))
+        : m_linkBuffer(WTFMove(linkBuffer))
         , m_codeDescription(codeDescription)
     {
     }
@@ -73,9 +73,9 @@ public:
     std::unique_ptr<LinkBuffer> sideCodeLinkBuffer;
     std::unique_ptr<LinkBuffer> handleExceptionsLinkBuffer;
     Vector<OutOfLineCodeInfo> outOfLineCodeInfos;
-#endif
-    
     Vector<OSRExitCompilationInfo> osrExit;
+#endif
+
     Vector<CCallHelpers::Jump> lazySlowPathGeneratorJumps;
     GeneratedFunction function;
     RefPtr<JITCode> jitCode;

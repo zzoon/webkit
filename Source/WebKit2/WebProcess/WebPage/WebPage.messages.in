@@ -141,7 +141,7 @@ messages -> WebPage LegacyReceiver {
 
     DidRemoveBackForwardItem(uint64_t backForwardItemID)
 
-    DidReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t navigationID, uint64_t downloadID)
+    DidReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t navigationID, WebKit::DownloadID downloadID)
 
     ClearSelection()
     RestoreSelectionInFocusedEditableElement()
@@ -282,6 +282,7 @@ messages -> WebPage LegacyReceiver {
 #if ENABLE(MEDIA_STREAM)
     # MediaSteam
     DidReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed, String audioDeviceUID, String videoDeviceUID)
+    DidCompleteUserMediaPermissionCheck(uint64_t userMediaID, bool allowed)
 #endif
 
     # Notification
@@ -367,19 +368,6 @@ messages -> WebPage LegacyReceiver {
     InsertDictatedTextAsync(String text, struct WebKit::EditingRange replacementRange, Vector<WebCore::DictationAlternative> dictationAlternatives, bool registerUndoGroup)
     AttributedSubstringForCharacterRangeAsync(struct WebKit::EditingRange range, uint64_t callbackID);
     FontAtSelection(uint64_t callbackID);
-#endif
-#if PLATFORM(MAC) && !USE(ASYNC_NSTEXTINPUTCLIENT)
-    InsertText(String text, struct WebKit::EditingRange replacementRange) -> (bool handled, struct WebKit::EditorState newState)
-    SetComposition(String text, Vector<WebCore::CompositionUnderline> underlines, struct WebKit::EditingRange selectionRange, struct WebKit::EditingRange replacementRange) -> (struct WebKit::EditorState newState)
-    ConfirmComposition() -> (struct WebKit::EditorState newState)
-    InsertDictatedText(String text, struct WebKit::EditingRange replacementRange, Vector<WebCore::DictationAlternative> dictationAlternatives) -> (bool handled, struct WebKit::EditorState newState)
-    GetAttributedSubstringFromRange(struct WebKit::EditingRange range) -> (struct WebKit::AttributedString result)
-    GetMarkedRange() -> (struct WebKit::EditingRange range)
-    GetSelectedRange() -> (struct WebKit::EditingRange range)
-    CharacterIndexForPoint(WebCore::IntPoint point) -> (uint64_t result)
-    FirstRectForCharacterRange(struct WebKit::EditingRange range) -> (WebCore::IntRect resultRect)
-    ExecuteKeypressCommands(Vector<WebCore::KeypressCommand> savedCommands) -> (bool handled, struct WebKit::EditorState newState)
-    CancelComposition() -> (struct WebKit::EditorState newState)
 #endif
 
     SetMinimumLayoutSize(WebCore::IntSize minimumLayoutSize)

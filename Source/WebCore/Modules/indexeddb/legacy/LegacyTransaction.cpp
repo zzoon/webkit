@@ -112,10 +112,10 @@ void LegacyTransaction::setError(PassRefPtr<DOMError> error, const String& error
     }
 }
 
-RefPtr<IDBObjectStore> LegacyTransaction::objectStore(const String& name, ExceptionCode& ec)
+RefPtr<IDBObjectStore> LegacyTransaction::objectStore(const String& name, ExceptionCodeWithMessage& ec)
 {
     if (m_state == Finished) {
-        ec = IDBDatabaseException::InvalidStateError;
+        ec.code = IDBDatabaseException::InvalidStateError;
         return 0;
     }
 
@@ -124,14 +124,14 @@ RefPtr<IDBObjectStore> LegacyTransaction::objectStore(const String& name, Except
         return it->value;
 
     if (!isVersionChange() && !m_objectStoreNames.contains(name)) {
-        ec = IDBDatabaseException::NotFoundError;
+        ec.code = IDBDatabaseException::NotFoundError;
         return 0;
     }
 
     int64_t objectStoreId = m_database->findObjectStoreId(name);
     if (objectStoreId == IDBObjectStoreMetadata::InvalidId) {
         ASSERT(isVersionChange());
-        ec = IDBDatabaseException::NotFoundError;
+        ec.code = IDBDatabaseException::NotFoundError;
         return 0;
     }
 
@@ -178,10 +178,10 @@ void LegacyTransaction::setActive(bool active)
         backendDB()->commit(m_id);
 }
 
-void LegacyTransaction::abort(ExceptionCode& ec)
+void LegacyTransaction::abort(ExceptionCodeWithMessage& ec)
 {
     if (m_state == Finishing || m_state == Finished) {
-        ec = IDBDatabaseException::InvalidStateError;
+        ec.code = IDBDatabaseException::InvalidStateError;
         return;
     }
 
@@ -340,7 +340,7 @@ bool LegacyTransaction::dispatchEvent(Event& event)
     return returnValue;
 }
 
-bool LegacyTransaction::canSuspendForPageCache() const
+bool LegacyTransaction::canSuspendForDocumentSuspension() const
 {
     // FIXME: Technically we can suspend before the first request is schedule
     //        and after the complete/abort event is enqueued.
@@ -350,8 +350,8 @@ bool LegacyTransaction::canSuspendForPageCache() const
 void LegacyTransaction::stop()
 {
     m_contextStopped = true;
-
-    abort(IGNORE_EXCEPTION);
+    ExceptionCodeWithMessage ec;
+    abort(ec);
 }
 
 const char* LegacyTransaction::activeDOMObjectName() const
@@ -366,7 +366,7 @@ void LegacyTransaction::enqueueEvent(Ref<Event>&& event)
         return;
 
     event->setTarget(this);
-    scriptExecutionContext()->eventQueue().enqueueEvent(WTF::move(event));
+    scriptExecutionContext()->eventQueue().enqueueEvent(WTFMove(event));
 }
 
 IDBDatabaseBackend* LegacyTransaction::backendDB() const

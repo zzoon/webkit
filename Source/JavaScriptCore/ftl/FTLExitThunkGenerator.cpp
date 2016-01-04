@@ -26,7 +26,7 @@
 #include "config.h"
 #include "FTLExitThunkGenerator.h"
 
-#if ENABLE(FTL_JIT)
+#if ENABLE(FTL_JIT) && !FTL_USES_B3
 
 #include "FTLOSRExitCompilationInfo.h"
 #include "FTLState.h"
@@ -46,33 +46,13 @@ ExitThunkGenerator::~ExitThunkGenerator()
 {
 }
 
-void ExitThunkGenerator::emitThunk(unsigned index, int32_t osrExitFromGenericUnwindStackSpillSlot)
+void ExitThunkGenerator::emitThunk(unsigned index)
 {
-    OSRExitCompilationInfo& info = m_state.finalizer->osrExit[index];
     OSRExit& exit = m_state.jitCode->osrExit[index];
+    ASSERT_UNUSED(exit, !(exit.willArriveAtOSRExitFromGenericUnwind() && exit.willArriveAtOSRExitFromCallOperation()));
     
+    OSRExitCompilationInfo& info = m_state.finalizer->osrExit[index];
     info.m_thunkLabel = label();
-
-    Jump jumpToPushIndexFromGenericUnwind;
-    if (exit.m_descriptor.mightArriveAtOSRExitFromGenericUnwind()) {
-        restoreCalleeSavesFromVMCalleeSavesBuffer();
-        loadPtr(vm()->addressOfCallFrameForCatch(), framePointerRegister);
-        addPtr(TrustedImm32(- static_cast<int64_t>(m_state.jitCode->stackmaps.stackSizeForLocals())), 
-            framePointerRegister, stackPointerRegister);
-
-        if (exit.m_descriptor.needsRegisterRecoveryOnGenericUnwindOSRExitPath())
-            exit.recoverRegistersFromSpillSlot(*this, osrExitFromGenericUnwindStackSpillSlot);
-
-        jumpToPushIndexFromGenericUnwind = jump();
-    }
-
-    if (exit.m_descriptor.mightArriveAtOSRExitFromCallOperation()) {
-        info.m_callOperationExceptionOSRExitEntrance = label();
-        exit.recoverRegistersFromSpillSlot(*this, osrExitFromGenericUnwindStackSpillSlot);
-    }
-    
-    if (exit.m_descriptor.mightArriveAtOSRExitFromGenericUnwind())
-        jumpToPushIndexFromGenericUnwind.link(this);
 
     pushToSaveImmediateWithoutTouchingRegisters(TrustedImm32(index));
     info.m_thunkJump = patchableJump();
@@ -80,13 +60,13 @@ void ExitThunkGenerator::emitThunk(unsigned index, int32_t osrExitFromGenericUnw
     m_didThings = true;
 }
 
-void ExitThunkGenerator::emitThunks(int32_t osrExitFromGenericUnwindStackSpillSlot)
+void ExitThunkGenerator::emitThunks()
 {
     for (unsigned i = 0; i < m_state.finalizer->osrExit.size(); ++i)
-        emitThunk(i, osrExitFromGenericUnwindStackSpillSlot);
+        emitThunk(i);
 }
 
 } } // namespace JSC::FTL
 
-#endif // ENABLE(FTL_JIT)
+#endif // ENABLE(FTL_JIT) && !FTL_USES_B3
 

@@ -31,12 +31,14 @@
 #include "DOMError.h"
 #include "EventQueue.h"
 #include "IDBCursorWithValueImpl.h"
+#include "IDBDatabaseException.h"
 #include "IDBDatabaseImpl.h"
 #include "IDBError.h"
 #include "IDBEventDispatcher.h"
 #include "IDBKeyData.h"
 #include "IDBKeyRangeData.h"
 #include "IDBObjectStore.h"
+#include "IDBOpenDBRequestImpl.h"
 #include "IDBRequestImpl.h"
 #include "IDBResultData.h"
 #include "JSDOMWindowBase.h"
@@ -49,20 +51,27 @@ namespace IDBClient {
 
 Ref<IDBTransaction> IDBTransaction::create(IDBDatabase& database, const IDBTransactionInfo& info)
 {
-    return adoptRef(*new IDBTransaction(database, info));
+    return adoptRef(*new IDBTransaction(database, info, nullptr));
 }
 
-IDBTransaction::IDBTransaction(IDBDatabase& database, const IDBTransactionInfo& info)
+Ref<IDBTransaction> IDBTransaction::create(IDBDatabase& database, const IDBTransactionInfo& info, IDBOpenDBRequest& request)
+{
+    return adoptRef(*new IDBTransaction(database, info, &request));
+}
+
+IDBTransaction::IDBTransaction(IDBDatabase& database, const IDBTransactionInfo& info, IDBOpenDBRequest* request)
     : WebCore::IDBTransaction(database.scriptExecutionContext())
     , m_database(database)
     , m_info(info)
     , m_operationTimer(*this, &IDBTransaction::operationTimerFired)
+    , m_openDBRequest(request)
 
 {
     relaxAdoptionRequirement();
 
     if (m_info.mode() == IndexedDB::TransactionMode::VersionChange) {
-        m_originalDatabaseInfo = std::make_unique<IDBDatabaseInfo>(m_database->info());
+        ASSERT(m_openDBRequest);
+        m_openDBRequest->setVersionChangeTransaction(*this);
         m_startedOnServer = true;
     } else {
         activate();
@@ -109,21 +118,16 @@ IDBConnectionToServer& IDBTransaction::serverConnection()
 
 RefPtr<DOMError> IDBTransaction::error() const
 {
-    ASSERT_NOT_REACHED();
-    return nullptr;
+    return m_domError;
 }
 
-RefPtr<WebCore::IDBObjectStore> IDBTransaction::objectStore(const String& objectStoreName, ExceptionCode& ec)
+RefPtr<WebCore::IDBObjectStore> IDBTransaction::objectStore(const String& objectStoreName, ExceptionCodeWithMessage& ec)
 {
     LOG(IndexedDB, "IDBTransaction::objectStore");
 
-    if (objectStoreName.isEmpty()) {
-        ec = NOT_FOUND_ERR;
-        return nullptr;
-    }
-
     if (isFinishedOrFinishing()) {
-        ec = INVALID_STATE_ERR;
+        ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'objectStore' on 'IDBTransaction': The transaction finished.");
         return nullptr;
     }
 
@@ -141,13 +145,15 @@ RefPtr<WebCore::IDBObjectStore> IDBTransaction::objectStore(const String& object
 
     auto* info = m_database->info().infoForExistingObjectStore(objectStoreName);
     if (!info) {
-        ec = NOT_FOUND_ERR;
+        ec.code = IDBDatabaseException::NotFoundError;
+        ec.message = ASCIILiteral("Failed to execute 'objectStore' on 'IDBTransaction': The specified object store was not found.");
         return nullptr;
     }
 
     // Version change transactions are scoped to every object store in the database.
-    if (!found && !isVersionChange()) {
-        ec = NOT_FOUND_ERR;
+    if (!info || (!found && !isVersionChange())) {
+        ec.code = IDBDatabaseException::NotFoundError;
+        ec.message = ASCIILiteral("Failed to execute 'objectStore' on 'IDBTransaction': The specified object store was not found.");
         return nullptr;
     }
 
@@ -157,40 +163,58 @@ RefPtr<WebCore::IDBObjectStore> IDBTransaction::objectStore(const String& object
     return adoptRef(&objectStore.leakRef());
 }
 
-void IDBTransaction::immediateAbort()
-{
-    LOG(IndexedDB, "IDBTransaction::immediateAbort");
 
+void IDBTransaction::abortDueToFailedRequest(DOMError& error)
+{
+    LOG(IndexedDB, "IDBTransaction::abortDueToFailedRequest");
     if (isFinishedOrFinishing())
         return;
 
-    m_state = IndexedDB::TransactionState::Aborting;
-    m_database->willAbortTransaction(*this);
-
-    auto operation = createTransactionOperation(*this, nullptr, &IDBTransaction::abortOnServer);
-    abortOnServer(*operation);
+    m_domError = &error;
+    ExceptionCodeWithMessage ec;
+    abort(ec);
 }
 
-void IDBTransaction::abort(ExceptionCode& ec)
+void IDBTransaction::abort(ExceptionCodeWithMessage& ec)
 {
     LOG(IndexedDB, "IDBTransaction::abort");
 
     if (isFinishedOrFinishing()) {
-        ec = INVALID_STATE_ERR;
+        ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'abort' on 'IDBTransaction': The transaction is inactive or finished.");
         return;
     }
 
     m_state = IndexedDB::TransactionState::Aborting;
     m_database->willAbortTransaction(*this);
 
-    auto operation = createTransactionOperation(*this, nullptr, &IDBTransaction::abortOnServer);
-    scheduleOperation(WTF::move(operation));
+    if (isVersionChange()) {
+        for (auto& objectStore : m_referencedObjectStores.values())
+            objectStore->rollbackInfoForVersionChangeAbort();
+    }
+    
+    m_abortQueue.swap(m_transactionOperationQueue);
+
+    auto operation = createTransactionOperation(*this, nullptr, &IDBTransaction::abortOnServerAndCancelRequests);
+    scheduleOperation(WTFMove(operation));
 }
 
-void IDBTransaction::abortOnServer(TransactionOperation&)
+void IDBTransaction::abortOnServerAndCancelRequests(TransactionOperation&)
 {
-    LOG(IndexedDB, "IDBTransaction::abortOnServer");
+    LOG(IndexedDB, "IDBTransaction::abortOnServerAndCancelRequests");
+
+    ASSERT(m_transactionOperationQueue.isEmpty());
+
     serverConnection().abortTransaction(*this);
+
+    IDBError error(IDBDatabaseException::AbortError);
+    for (auto& operation : m_abortQueue)
+        operation->completed(IDBResultData::error(operation->identifier(), error));
+
+    // Since we're aborting, this abortOnServerAndCancelRequests() operation should be the only
+    // in-progress operation, and it should be impossible to have queued any further operations.
+    ASSERT(m_transactionOperationMap.size() == 1);
+    ASSERT(m_transactionOperationQueue.isEmpty());
 }
 
 const char* IDBTransaction::activeDOMObjectName() const
@@ -198,17 +222,20 @@ const char* IDBTransaction::activeDOMObjectName() const
     return "IDBTransaction";
 }
 
-bool IDBTransaction::canSuspendForPageCache() const
+bool IDBTransaction::canSuspendForDocumentSuspension() const
 {
     return false;
 }
 
 bool IDBTransaction::hasPendingActivity() const
 {
-    if (m_state == IndexedDB::TransactionState::Inactive)
-        return !m_transactionOperationQueue.isEmpty() || !m_transactionOperationMap.isEmpty();
+    return !m_contextStopped && m_state != IndexedDB::TransactionState::Finished;
+}
 
-    return m_state != IndexedDB::TransactionState::Finished;
+void IDBTransaction::stop()
+{
+    ASSERT(!m_contextStopped);
+    m_contextStopped = true;
 }
 
 bool IDBTransaction::isActive() const
@@ -239,7 +266,7 @@ void IDBTransaction::scheduleOperation(RefPtr<TransactionOperation>&& operation)
     ASSERT(!m_transactionOperationMap.contains(operation->identifier()));
 
     m_transactionOperationQueue.append(operation);
-    m_transactionOperationMap.set(operation->identifier(), WTF::move(operation));
+    m_transactionOperationMap.set(operation->identifier(), WTFMove(operation));
 
     scheduleOperationTimer();
 }
@@ -281,7 +308,7 @@ void IDBTransaction::commit()
     m_database->willCommitTransaction(*this);
 
     auto operation = createTransactionOperation(*this, nullptr, &IDBTransaction::commitOnServer);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 }
 
 void IDBTransaction::commitOnServer(TransactionOperation&)
@@ -294,8 +321,6 @@ void IDBTransaction::finishAbortOrCommit()
 {
     ASSERT(m_state != IndexedDB::TransactionState::Finished);
     m_state = IndexedDB::TransactionState::Finished;
-
-    m_originalDatabaseInfo = nullptr;
 }
 
 void IDBTransaction::didStart(const IDBError& error)
@@ -316,6 +341,18 @@ void IDBTransaction::didStart(const IDBError& error)
     scheduleOperationTimer();
 }
 
+void IDBTransaction::notifyDidAbort(const IDBError& error)
+{
+    m_database->didAbortTransaction(*this);
+    m_idbError = error;
+    fireOnAbort();
+
+    if (isVersionChange()) {
+        ASSERT(m_openDBRequest);
+        m_openDBRequest->fireErrorAfterVersionChangeCompletion();
+    }
+}
+
 void IDBTransaction::didAbort(const IDBError& error)
 {
     LOG(IndexedDB, "IDBTransaction::didAbort");
@@ -323,10 +360,7 @@ void IDBTransaction::didAbort(const IDBError& error)
     if (m_state == IndexedDB::TransactionState::Finished)
         return;
 
-    m_database->didAbortTransaction(*this);
-
-    m_idbError = error;
-    fireOnAbort();
+    notifyDidAbort(error);
 
     finishAbortOrCommit();
 }
@@ -340,11 +374,8 @@ void IDBTransaction::didCommit(const IDBError& error)
     if (error.isNull()) {
         m_database->didCommitTransaction(*this);
         fireOnComplete();
-    } else {
-        m_database->didAbortTransaction(*this);
-        m_idbError = error;
-        fireOnAbort();
-    }
+    } else
+        notifyDidAbort(error);
 
     finishAbortOrCommit();
 }
@@ -365,11 +396,11 @@ void IDBTransaction::enqueueEvent(Ref<Event>&& event)
 {
     ASSERT(m_state != IndexedDB::TransactionState::Finished);
 
-    if (!scriptExecutionContext())
+    if (!scriptExecutionContext() || m_contextStopped)
         return;
 
     event->setTarget(this);
-    scriptExecutionContext()->eventQueue().enqueueEvent(WTF::move(event));
+    scriptExecutionContext()->eventQueue().enqueueEvent(WTFMove(event));
 }
 
 bool IDBTransaction::dispatchEvent(Event& event)
@@ -377,6 +408,7 @@ bool IDBTransaction::dispatchEvent(Event& event)
     LOG(IndexedDB, "IDBTransaction::dispatchEvent");
 
     ASSERT(scriptExecutionContext());
+    ASSERT(!m_contextStopped);
     ASSERT(event.target() == this);
     ASSERT(event.type() == eventNames().completeEvent || event.type() == eventNames().abortEvent);
 
@@ -384,7 +416,21 @@ bool IDBTransaction::dispatchEvent(Event& event)
     targets.append(this);
     targets.append(db());
 
-    return IDBEventDispatcher::dispatch(event, targets);
+    bool result = IDBEventDispatcher::dispatch(event, targets);
+
+    if (isVersionChange()) {
+        ASSERT(m_openDBRequest);
+        m_openDBRequest->versionChangeTransactionDidFinish();
+
+        if (event.type() == eventNames().completeEvent) {
+            if (m_database->isClosingOrClosed())
+                m_openDBRequest->fireErrorAfterVersionChangeCompletion();
+            else
+                m_openDBRequest->fireSuccessAfterVersionChangeCommit();
+        }
+    }
+
+    return result;
 }
 
 Ref<IDBObjectStore> IDBTransaction::createObjectStore(const IDBObjectStoreInfo& info)
@@ -396,9 +442,9 @@ Ref<IDBObjectStore> IDBTransaction::createObjectStore(const IDBObjectStoreInfo& 
     m_referencedObjectStores.set(info.name(), &objectStore.get());
 
     auto operation = createTransactionOperation(*this, &IDBTransaction::didCreateObjectStoreOnServer, &IDBTransaction::createObjectStoreOnServer, info);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 
-    return WTF::move(objectStore);
+    return objectStore;
 }
 
 void IDBTransaction::createObjectStoreOnServer(TransactionOperation& operation, const IDBObjectStoreInfo& info)
@@ -414,7 +460,7 @@ void IDBTransaction::didCreateObjectStoreOnServer(const IDBResultData& resultDat
 {
     LOG(IndexedDB, "IDBTransaction::didCreateObjectStoreOnServer");
 
-    ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::CreateObjectStoreSuccess);
+    ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::CreateObjectStoreSuccess || resultData.type() == IDBResultType::Error);
 }
 
 Ref<IDBIndex> IDBTransaction::createIndex(IDBObjectStore& objectStore, const IDBIndexInfo& info)
@@ -425,9 +471,9 @@ Ref<IDBIndex> IDBTransaction::createIndex(IDBObjectStore& objectStore, const IDB
     Ref<IDBIndex> index = IDBIndex::create(info, objectStore);
 
     auto operation = createTransactionOperation(*this, &IDBTransaction::didCreateIndexOnServer, &IDBTransaction::createIndexOnServer, info);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 
-    return WTF::move(index);
+    return index;
 }
 
 void IDBTransaction::createIndexOnServer(TransactionOperation& operation, const IDBIndexInfo& info)
@@ -446,8 +492,14 @@ void IDBTransaction::didCreateIndexOnServer(const IDBResultData& resultData)
     if (resultData.type() == IDBResultType::CreateIndexSuccess)
         return;
 
-    // If index creation failed, the transaction is aborted.
-    immediateAbort();
+    ASSERT(resultData.type() == IDBResultType::Error);
+
+    // This operation might have failed because the transaction is already aborting.
+    if (m_state == IndexedDB::TransactionState::Aborting)
+        return;
+
+    // Otherwise, failure to create an index forced abortion of the transaction.
+    abortDueToFailedRequest(DOMError::create(IDBDatabaseException::getErrorName(resultData.error().code())));
 }
 
 Ref<IDBRequest> IDBTransaction::requestOpenCursor(ScriptExecutionContext& context, IDBObjectStore& objectStore, const IDBCursorInfo& info)
@@ -475,9 +527,9 @@ Ref<IDBRequest> IDBTransaction::doRequestOpenCursor(ScriptExecutionContext& cont
     addRequest(request.get());
 
     auto operation = createTransactionOperation(*this, request.get(), &IDBTransaction::didOpenCursorOnServer, &IDBTransaction::openCursorOnServer, cursor->info());
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 
-    return WTF::move(request);
+    return request;
 }
 
 void IDBTransaction::openCursorOnServer(TransactionOperation& operation, const IDBCursorInfo& info)
@@ -503,7 +555,7 @@ void IDBTransaction::iterateCursor(IDBCursor& cursor, const IDBKeyData& key, uns
     addRequest(*cursor.request());
 
     auto operation = createTransactionOperation(*this, *cursor.request(), &IDBTransaction::didIterateCursorOnServer, &IDBTransaction::iterateCursorOnServer, key, count);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 }
 
 void IDBTransaction::iterateCursorOnServer(TransactionOperation& operation, const IDBKeyData& key, const unsigned long& count)
@@ -530,9 +582,9 @@ Ref<IDBRequest> IDBTransaction::requestGetRecord(ScriptExecutionContext& context
     addRequest(request.get());
 
     auto operation = createTransactionOperation(*this, request.get(), &IDBTransaction::didGetRecordOnServer, &IDBTransaction::getRecordOnServer, keyRangeData);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 
-    return WTF::move(request);
+    return request;
 }
 
 Ref<IDBRequest> IDBTransaction::requestGetValue(ScriptExecutionContext& context, IDBIndex& index, const IDBKeyRangeData& range)
@@ -557,9 +609,9 @@ Ref<IDBRequest> IDBTransaction::requestIndexRecord(ScriptExecutionContext& conte
     addRequest(request.get());
 
     auto operation = createTransactionOperation(*this, request.get(), &IDBTransaction::didGetRecordOnServer, &IDBTransaction::getRecordOnServer, range);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 
-    return WTF::move(request);
+    return request;
 }
 
 void IDBTransaction::getRecordOnServer(TransactionOperation& operation, const IDBKeyRangeData& keyRange)
@@ -573,16 +625,23 @@ void IDBTransaction::didGetRecordOnServer(IDBRequest& request, const IDBResultDa
 {
     LOG(IndexedDB, "IDBTransaction::didGetRecordOnServer");
 
+    if (resultData.type() == IDBResultType::Error) {
+        request.requestCompleted(resultData);
+        return;
+    }
+
+    ASSERT(resultData.type() == IDBResultType::GetRecordSuccess);
+
     const IDBGetResult& result = resultData.getResult();
 
     if (request.sourceIndexIdentifier() && request.requestedIndexRecordType() == IndexedDB::IndexRecordType::Key) {
-        if (!result.keyData.isNull())
-            request.setResult(&result.keyData);
+        if (!result.keyData().isNull())
+            request.setResult(&result.keyData());
         else
             request.setResultToUndefined();
     } else {
-        if (resultData.getResult().valueBuffer.data())
-            request.setResultToStructuredClone(resultData.getResult().valueBuffer);
+        if (resultData.getResult().valueBuffer().data())
+            request.setResultToStructuredClone(resultData.getResult().valueBuffer());
         else
             request.setResultToUndefined();
     }
@@ -671,9 +730,9 @@ Ref<IDBRequest> IDBTransaction::requestClearObjectStore(ScriptExecutionContext& 
 
     uint64_t objectStoreIdentifier = objectStore.info().identifier();
     auto operation = createTransactionOperation(*this, request.get(), &IDBTransaction::didClearObjectStoreOnServer, &IDBTransaction::clearObjectStoreOnServer, objectStoreIdentifier);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 
-    return WTF::move(request);
+    return request;
 }
 
 void IDBTransaction::clearObjectStoreOnServer(TransactionOperation& operation, const uint64_t& objectStoreIdentifier)
@@ -702,9 +761,9 @@ Ref<IDBRequest> IDBTransaction::requestPutOrAdd(ScriptExecutionContext& context,
     addRequest(request.get());
 
     auto operation = createTransactionOperation(*this, request.get(), &IDBTransaction::didPutOrAddOnServer, &IDBTransaction::putOrAddOnServer, key, &value, overwriteMode);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 
-    return WTF::move(request);
+    return request;
 }
 
 void IDBTransaction::putOrAddOnServer(TransactionOperation& operation, RefPtr<IDBKey> key, RefPtr<SerializedScriptValue> value, const IndexedDB::ObjectStoreOverwriteMode& overwriteMode)
@@ -734,7 +793,7 @@ void IDBTransaction::deleteObjectStore(const String& objectStoreName)
         objectStore->markAsDeleted();
 
     auto operation = createTransactionOperation(*this, &IDBTransaction::didDeleteObjectStoreOnServer, &IDBTransaction::deleteObjectStoreOnServer, objectStoreName);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 }
 
 void IDBTransaction::deleteObjectStoreOnServer(TransactionOperation& operation, const String& objectStoreName)
@@ -748,7 +807,7 @@ void IDBTransaction::deleteObjectStoreOnServer(TransactionOperation& operation, 
 void IDBTransaction::didDeleteObjectStoreOnServer(const IDBResultData& resultData)
 {
     LOG(IndexedDB, "IDBTransaction::didDeleteObjectStoreOnServer");
-    ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::DeleteObjectStoreSuccess);
+    ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::DeleteObjectStoreSuccess || resultData.type() == IDBResultType::Error);
 }
 
 void IDBTransaction::deleteIndex(uint64_t objectStoreIdentifier, const String& indexName)
@@ -758,7 +817,7 @@ void IDBTransaction::deleteIndex(uint64_t objectStoreIdentifier, const String& i
     ASSERT(isVersionChange());
 
     auto operation = createTransactionOperation(*this, &IDBTransaction::didDeleteIndexOnServer, &IDBTransaction::deleteIndexOnServer, objectStoreIdentifier, indexName);
-    scheduleOperation(WTF::move(operation));
+    scheduleOperation(WTFMove(operation));
 }
 
 void IDBTransaction::deleteIndexOnServer(TransactionOperation& operation, const uint64_t& objectStoreIdentifier, const String& indexName)
@@ -772,7 +831,7 @@ void IDBTransaction::deleteIndexOnServer(TransactionOperation& operation, const 
 void IDBTransaction::didDeleteIndexOnServer(const IDBResultData& resultData)
 {
     LOG(IndexedDB, "IDBTransaction::didDeleteIndexOnServer");
-    ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::DeleteIndexSuccess);
+    ASSERT_UNUSED(resultData, resultData.type() == IDBResultType::DeleteIndexSuccess || resultData.type() == IDBResultType::Error);
 }
 
 void IDBTransaction::operationDidComplete(TransactionOperation& operation)

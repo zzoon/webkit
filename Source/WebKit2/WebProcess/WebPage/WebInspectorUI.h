@@ -53,7 +53,7 @@ public:
     virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Web; }
 
     // Called by WebInspectorUI messages
-    void establishConnection(IPC::Attachment connectionIdentifier, uint64_t inspectedPageIdentifier, bool underTest);
+    void establishConnection(IPC::Attachment connectionIdentifier, uint64_t inspectedPageIdentifier, bool underTest, unsigned inspectionLevel);
 
     void showConsole();
     void showResources();
@@ -91,8 +91,6 @@ public:
     void changeAttachedWindowHeight(unsigned) override;
     void changeAttachedWindowWidth(unsigned) override;
 
-    void setToolbarHeight(unsigned) override;
-
     void openInNewTab(const String& url) override;
 
     bool canSave() override;
@@ -104,6 +102,7 @@ public:
     void sendMessageToBackend(const String&) override;
 
     bool isUnderTest() override { return m_underTest; }
+    unsigned inspectionLevel() const override { return m_inspectionLevel; }
 
 private:
     explicit WebInspectorUI(WebPage&);
@@ -119,7 +118,9 @@ private:
 
     uint64_t m_inspectedPageIdentifier { 0 };
     bool m_underTest { false };
+    bool m_dockingUnavailable { false };
     DockSide m_dockSide { DockSide::Undocked };
+    unsigned m_inspectionLevel { 1 };
 
 #if PLATFORM(COCOA)
     mutable String m_localizedStringsURL;

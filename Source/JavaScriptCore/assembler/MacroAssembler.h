@@ -1301,6 +1301,87 @@ public:
 
 #endif // !CPU(X86_64)
 
+#if ENABLE(B3_JIT)
+    template<typename LeftType, typename RightType>
+    void moveDoubleConditionally32(RelationalCondition cond, LeftType left, RightType right, FPRegisterID src, FPRegisterID dest)
+    {
+        Jump falseCase = branch32(invert(cond), left, right);
+        moveDouble(src, dest);
+        falseCase.link(this);
+    }
+
+    template<typename LeftType, typename RightType>
+    void moveDoubleConditionally64(RelationalCondition cond, LeftType left, RightType right, FPRegisterID src, FPRegisterID dest)
+    {
+        Jump falseCase = branch64(invert(cond), left, right);
+        moveDouble(src, dest);
+        falseCase.link(this);
+    }
+
+    template<typename TestType, typename MaskType>
+    void moveDoubleConditionallyTest32(ResultCondition cond, TestType test, MaskType mask, FPRegisterID src, FPRegisterID dest)
+    {
+        if (isInvertible(cond)) {
+            Jump falseCase = branchTest32(invert(cond), test, mask);
+            moveDouble(src, dest);
+            falseCase.link(this);
+        }
+
+        Jump trueCase = branchTest32(cond, test, mask);
+        Jump falseCase = jump();
+        trueCase.link(this);
+        moveDouble(src, dest);
+        falseCase.link(this);
+    }
+
+    template<typename TestType, typename MaskType>
+    void moveDoubleConditionallyTest64(ResultCondition cond, TestType test, MaskType mask, FPRegisterID src, FPRegisterID dest)
+    {
+        if (isInvertible(cond)) {
+            Jump falseCase = branchTest64(invert(cond), test, mask);
+            moveDouble(src, dest);
+            falseCase.link(this);
+        }
+
+        Jump trueCase = branchTest64(cond, test, mask);
+        Jump falseCase = jump();
+        trueCase.link(this);
+        moveDouble(src, dest);
+        falseCase.link(this);
+    }
+
+    void moveDoubleConditionallyDouble(DoubleCondition cond, FPRegisterID left, FPRegisterID right, FPRegisterID src, FPRegisterID dest)
+    {
+        Jump falseCase = branchDouble(invert(cond), left, right);
+        moveDouble(src, dest);
+        falseCase.link(this);
+    }
+
+    void moveDoubleConditionallyFloat(DoubleCondition cond, FPRegisterID left, FPRegisterID right, FPRegisterID src, FPRegisterID dest)
+    {
+        Jump falseCase = branchFloat(invert(cond), left, right);
+        moveDouble(src, dest);
+        falseCase.link(this);
+    }
+
+    // We should implement this the right way eventually, but for now, it's fine because it arises so
+    // infrequently.
+    void compareDouble(DoubleCondition cond, FPRegisterID left, FPRegisterID right, RegisterID dest)
+    {
+        move(TrustedImm32(0), dest);
+        Jump falseCase = branchDouble(invert(cond), left, right);
+        move(TrustedImm32(1), dest);
+        falseCase.link(this);
+    }
+    void compareFloat(DoubleCondition cond, FPRegisterID left, FPRegisterID right, RegisterID dest)
+    {
+        move(TrustedImm32(0), dest);
+        Jump falseCase = branchFloat(invert(cond), left, right);
+        move(TrustedImm32(1), dest);
+        falseCase.link(this);
+    }
+#endif
+
     void lea(Address address, RegisterID dest)
     {
         addPtr(TrustedImm32(address.offset), address.base, dest);

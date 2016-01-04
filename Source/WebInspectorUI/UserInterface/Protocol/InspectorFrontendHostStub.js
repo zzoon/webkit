@@ -84,10 +84,6 @@ if (!window.InspectorFrontendHost) {
         {
         },
 
-        setToolbarHeight: function(width)
-        {
-        },
-
         startWindowDrag: function()
         {
         },
@@ -108,6 +104,11 @@ if (!window.InspectorFrontendHost) {
         debuggableType: function()
         {
             return "web";
+        },
+
+        inspectionLevel: function()
+        {
+            return 1;
         },
 
         inspectedURLChanged: function(title)

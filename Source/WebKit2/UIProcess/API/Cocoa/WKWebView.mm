@@ -195,6 +195,8 @@ WKWebView* fromWebPageProxy(WebKit::WebPageProxy& page)
 
     UIInterfaceOrientation _interfaceOrientationOverride;
     BOOL _overridesInterfaceOrientation;
+    
+    BOOL _allowsViewportShrinkToFit;
 
     BOOL _hasCommittedLoadForMainFrame;
     BOOL _needsResetViewStateAfterCommitLoadForMainFrame;
@@ -361,6 +363,7 @@ static bool shouldAllowPictureInPictureMediaPlayback()
     pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::allowsPictureInPictureMediaPlaybackKey(), WebKit::WebPreferencesStore::Value(!![_configuration allowsPictureInPictureMediaPlayback] && shouldAllowPictureInPictureMediaPlayback()));
     pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::requiresUserGestureForMediaPlaybackKey(), WebKit::WebPreferencesStore::Value(!![_configuration requiresUserActionForMediaPlayback]));
     pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::requiresUserGestureForAudioPlaybackKey(), WebKit::WebPreferencesStore::Value(!![_configuration _requiresUserActionForAudioPlayback]));
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::invisibleAutoplayNotPermittedKey(), WebKit::WebPreferencesStore::Value(!![_configuration _invisibleAutoplayNotPermitted]));
     pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::mediaDataLoadsAutomaticallyKey(), WebKit::WebPreferencesStore::Value(!![_configuration _mediaDataLoadsAutomatically]));
 #endif
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
@@ -375,7 +378,7 @@ static bool shouldAllowPictureInPictureMediaPlayback()
 
     [self addSubview:_scrollView.get()];
 
-    _contentView = adoptNS([[WKContentView alloc] initWithFrame:bounds processPool:processPool configuration:WTF::move(pageConfiguration) webView:self]);
+    _contentView = adoptNS([[WKContentView alloc] initWithFrame:bounds processPool:processPool configuration:WTFMove(pageConfiguration) webView:self]);
 
     _page = [_contentView page];
     _page->setDeviceOrientation(deviceOrientation());
@@ -405,12 +408,10 @@ static bool shouldAllowPictureInPictureMediaPlayback()
 #endif
 
 #if PLATFORM(MAC)
-    _impl = std::make_unique<WebKit::WebViewImpl>(self, self, processPool, WTF::move(pageConfiguration));
+    _impl = std::make_unique<WebKit::WebViewImpl>(self, self, processPool, WTFMove(pageConfiguration));
     _page = &_impl->page();
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
     _impl->setAutomaticallyAdjustsContentInsets(true);
-#endif
 #endif
 
     _page->setBackgroundExtendsBeyondPage(true);
@@ -749,6 +750,15 @@ static WKErrorCode callbackErrorCode(WebKit::CallbackBase::Error error)
 #pragma mark iOS-specific methods
 
 #if PLATFORM(IOS)
+
+- (BOOL)_isBackground
+{
+    if ([self _isDisplayingPDF])
+        return [(WKPDFView *)_customContentView isBackground];
+
+    return [_contentView isBackground];
+}
+
 - (void)setFrame:(CGRect)frame
 {
     CGRect oldFrame = self.frame;
@@ -803,6 +813,16 @@ static CGSize roundScrollViewContentSize(const WebKit::WebPageProxy& page, CGSiz
 - (UIView *)_currentContentView
 {
     return _customContentView ? _customContentView.get() : _contentView.get();
+}
+
+- (WKWebViewContentProviderRegistry *)_contentProviderRegistry
+{
+    return [_configuration _contentProviderRegistry];
+}
+
+- (WKSelectionGranularity)_selectionGranularity
+{
+    return [_configuration selectionGranularity];
 }
 
 - (void)_setHasCustomContentView:(BOOL)pageHasCustomContentView loadedMIMEType:(const WTF::String&)mimeType
@@ -1171,8 +1191,8 @@ static inline bool areEssentiallyEqualAsFloat(float a, float b)
     CARenderServerRenderLayerWithTransform(MACH_PORT_NULL, self.layer.context.contextId, reinterpret_cast<uint64_t>(self.layer), surface->surface(), 0, 0, &transform);
 
     RefPtr<WebKit::ViewSnapshot> viewSnapshot = WebKit::ViewSnapshot::create(nullptr);
-    WebCore::IOSurface::convertToFormat(WTF::move(surface), WebCore::IOSurface::Format::YUV422, [viewSnapshot](std::unique_ptr<WebCore::IOSurface> convertedSurface) {
-        viewSnapshot->setSurface(WTF::move(convertedSurface));
+    WebCore::IOSurface::convertToFormat(WTFMove(surface), WebCore::IOSurface::Format::YUV422, [viewSnapshot](std::unique_ptr<WebCore::IOSurface> convertedSurface) {
+        viewSnapshot->setSurface(WTFMove(convertedSurface));
     });
 
     return viewSnapshot;
@@ -1239,9 +1259,7 @@ static inline bool areEssentiallyEqualAsFloat(float a, float b)
 static WebCore::FloatPoint constrainContentOffset(WebCore::FloatPoint contentOffset, WebCore::FloatSize contentSize, WebCore::FloatSize unobscuredContentSize)
 {
     WebCore::FloatSize maximumContentOffset = contentSize - unobscuredContentSize;
-    contentOffset = contentOffset.shrunkTo(WebCore::FloatPoint(maximumContentOffset.width(), maximumContentOffset.height()));
-    contentOffset = contentOffset.expandedTo(WebCore::FloatPoint());
-    return contentOffset;
+    return contentOffset.constrainedBetween(WebCore::FloatPoint(), WebCore::FloatPoint(maximumContentOffset));
 }
 
 - (void)_scrollToContentOffset:(WebCore::FloatPoint)contentOffsetInPageCoordinates scrollOrigin:(WebCore::IntPoint)scrollOrigin
@@ -1753,7 +1771,8 @@ static WebCore::FloatPoint constrainContentOffset(WebCore::FloatPoint contentOff
         unobscuredRect:unobscuredRectInContentCoordinates
         unobscuredRectInScrollViewCoordinates:unobscuredRect
         scale:scaleFactor minimumScale:[_scrollView minimumZoomScale]
-        inStableState:isStableState isChangingObscuredInsetsInteractively:_isChangingObscuredInsetsInteractively];
+        inStableState:isStableState
+        isChangingObscuredInsetsInteractively:_isChangingObscuredInsetsInteractively];
 }
 
 - (void)_didFinishLoadForMainFrame
@@ -2390,8 +2409,6 @@ WEBCORE_COMMAND(yankAndSelect)
     return _impl->firstRectForCharacterRange(theRange, actualRange);
 }
 
-#if USE(ASYNC_NSTEXTINPUTCLIENT)
-
 - (void)selectedRangeWithCompletionHandler:(void(^)(NSRange selectedRange))completionHandlerPtr
 {
     _impl->selectedRangeWithCompletionHandler(completionHandlerPtr);
@@ -2421,8 +2438,6 @@ WEBCORE_COMMAND(yankAndSelect)
 {
     _impl->characterIndexForPoint(thePoint, completionHandlerPtr);
 }
-
-#endif // USE(ASYNC_NSTEXTINPUTCLIENT)
 
 - (NSArray *)validAttributesForMarkedText
 {
@@ -2695,6 +2710,26 @@ WEBCORE_COMMAND(yankAndSelect)
     [[self _ensureTextFinderClient] selectFindMatch:findMatch completionHandler:completionHandler];
 }
 
+- (void)touchesBeganWithEvent:(NSEvent *)event
+{
+    _impl->touchesBeganWithEvent(event);
+}
+
+- (void)touchesMovedWithEvent:(NSEvent *)event
+{
+    _impl->touchesMovedWithEvent(event);
+}
+
+- (void)touchesEndedWithEvent:(NSEvent *)event
+{
+    _impl->touchesEndedWithEvent(event);
+}
+
+- (void)touchesCancelledWithEvent:(NSEvent *)event
+{
+    _impl->touchesCancelledWithEvent(event);
+}
+
 - (NSTextInputContext *)_web_superInputContext
 {
     return [super inputContext];
@@ -2755,7 +2790,8 @@ WEBCORE_COMMAND(yankAndSelect)
 
 - (id)_web_immediateActionAnimationControllerForHitTestResultInternal:(API::HitTestResult*)hitTestResult withType:(uint32_t)type userData:(API::Object*)userData
 {
-    return [self _immediateActionAnimationControllerForHitTestResult:wrapper(*hitTestResult) withType:(_WKImmediateActionType)type userData:(id)userData];
+    id<NSSecureCoding> data = userData ? static_cast<id<NSSecureCoding>>(userData->wrapper()) : nil;
+    return [self _immediateActionAnimationControllerForHitTestResult:wrapper(*hitTestResult) withType:(_WKImmediateActionType)type userData:data];
 }
 
 // We don't expose these various bits of SPI like WKView does,
@@ -3034,7 +3070,7 @@ static int32_t activeOrientation(WKWebView *webView)
     if (!WebKit::decodeLegacySessionState(static_cast<const uint8_t*>(sessionStateData.bytes), sessionStateData.length, sessionState))
         return;
 
-    _page->restoreFromSessionState(WTF::move(sessionState), true);
+    _page->restoreFromSessionState(WTFMove(sessionState), true);
 }
 
 - (WKNavigation *)_restoreSessionState:(_WKSessionState *)sessionState andNavigate:(BOOL)navigate
@@ -3403,7 +3439,7 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
                 }
             }
 
-            RefPtr<WebKit::WebFormSubmissionListenerProxy> localListener = WTF::move(listener);
+            RefPtr<WebKit::WebFormSubmissionListenerProxy> localListener = WTFMove(listener);
             RefPtr<WebKit::CompletionHandlerCallChecker> checker = WebKit::CompletionHandlerCallChecker::create(inputDelegate.get(), @selector(_webView:willSubmitFormValues:userObject:submissionHandler:));
             [inputDelegate _webView:m_webView willSubmitFormValues:valueMap.get() userObject:userObject submissionHandler:[localListener, checker] {
                 checker->didCallCompletionHandler();
@@ -3651,6 +3687,16 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
 - (BOOL)_backgroundExtendsBeyondPage
 {
     return _page->backgroundExtendsBeyondPage();
+}
+
+- (void)_setAllowsViewportShrinkToFit:(BOOL)allowShrinkToFit
+{
+    _allowsViewportShrinkToFit = allowShrinkToFit;
+}
+
+- (BOOL)_allowsViewportShrinkToFit
+{
+    return _allowsViewportShrinkToFit;
 }
 
 - (void)_beginInteractiveObscuredInsetsChange
@@ -4040,7 +4086,6 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
     return nil;
 }
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 - (void)_setAutomaticallyAdjustsContentInsets:(BOOL)automaticallyAdjustsContentInsets
 {
     _impl->setAutomaticallyAdjustsContentInsets(automaticallyAdjustsContentInsets);
@@ -4050,7 +4095,6 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
 {
     return _impl->automaticallyAdjustsContentInsets();
 }
-#endif
 
 - (CGFloat)_minimumLayoutWidth
 {

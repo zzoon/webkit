@@ -47,7 +47,6 @@
 #include "ProgressTracker.h"
 #include "ResourceError.h"
 #include "ResourceHandle.h"
-#include "ResourceLoadScheduler.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
 #include "SharedBuffer.h"
@@ -83,7 +82,7 @@ ResourceLoader::~ResourceLoader()
 
 void ResourceLoader::finishNetworkLoad()
 {
-    platformStrategies()->loaderStrategy()->resourceLoadScheduler()->remove(this);
+    platformStrategies()->loaderStrategy()->remove(this);
 
     if (m_handle) {
         ASSERT(m_handle->client() == this);
@@ -233,7 +232,7 @@ void ResourceLoader::setDefersLoading(bool defers)
         start();
     }
 
-    platformStrategies()->loaderStrategy()->resourceLoadScheduler()->setDefersLoading(this, defers);
+    platformStrategies()->loaderStrategy()->setDefersLoading(this, defers);
 }
 
 FrameLoader* ResourceLoader::frameLoader() const
@@ -258,7 +257,7 @@ void ResourceLoader::loadDataURL()
         if (loader->reachedTerminalState())
             return;
         if (!decodeResult) {
-            loader->didFail(ResourceError(errorDomainWebKitInternal, 0, url.string(), "Data URL decoding failed"));
+            loader->didFail(ResourceError(errorDomainWebKitInternal, 0, url, "Data URL decoding failed"));
             return;
         }
         if (loader->wasCancelled())
@@ -289,7 +288,7 @@ void ResourceLoader::setDataBufferingPolicy(DataBufferingPolicy dataBufferingPol
 void ResourceLoader::willSwitchToSubstituteResource()
 {
     ASSERT(!m_documentLoader->isSubstituteLoadPending(this));
-    platformStrategies()->loaderStrategy()->resourceLoadScheduler()->remove(this);
+    platformStrategies()->loaderStrategy()->remove(this);
     if (m_handle)
         m_handle->cancel();
 }
@@ -376,7 +375,7 @@ void ResourceLoader::willSendRequestInternal(ResourceRequest& request, const Res
 
     bool isRedirect = !redirectResponse.isNull();
     if (isRedirect)
-        platformStrategies()->loaderStrategy()->resourceLoadScheduler()->crossOriginRedirectReceived(this, request.url());
+        platformStrategies()->loaderStrategy()->crossOriginRedirectReceived(this, request.url());
 
     m_request = request;
 
@@ -396,7 +395,7 @@ void ResourceLoader::willSendRequestInternal(ResourceRequest& request, const Res
 void ResourceLoader::willSendRequest(ResourceRequest&& request, const ResourceResponse& redirectResponse, std::function<void(ResourceRequest&&)>&& callback)
 {
     willSendRequestInternal(request, redirectResponse);
-    callback(WTF::move(request));
+    callback(WTFMove(request));
 }
 
 void ResourceLoader::didSendData(unsigned long long, unsigned long long)
@@ -725,7 +724,7 @@ void ResourceLoader::receivedCancellation(const AuthenticationChallenge&)
     cancel();
 }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA) && !USE(CFNETWORK)
 
 void ResourceLoader::schedule(SchedulePair& pair)
 {

@@ -261,7 +261,7 @@ void Editor::removeUnchangeableStyles()
     // FIXME: it'd be nice if knowledge about which styles were unchangeable was not hard-coded here.
     defaultStyle->removeProperty(CSSPropertyFontWeight);
     defaultStyle->removeProperty(CSSPropertyFontStyle);
-    defaultStyle->removeProperty(CSSPropertyFontVariant);
+    defaultStyle->removeProperty(CSSPropertyFontVariantCaps);
     // FIXME: we should handle also pasted quoted text, strikethrough, etc. <rdar://problem/9255115>
     defaultStyle->removeProperty(CSSPropertyTextDecoration);
     defaultStyle->removeProperty(CSSPropertyWebkitTextDecorationsInEffect); // implements underline
@@ -496,7 +496,7 @@ bool Editor::WebContentReader::readURL(const URL& url, const String&)
         anchor->appendChild(frame.document()->createTextNode([[(NSURL *)url absoluteString] precomposedStringWithCanonicalMapping]));
 
         RefPtr<DocumentFragment> newFragment = frame.document()->createDocumentFragment();
-        newFragment->appendChild(WTF::move(anchor));
+        newFragment->appendChild(WTFMove(anchor));
         addFragment(newFragment);
         return true;
     }
@@ -589,7 +589,7 @@ PassRefPtr<DocumentFragment> Editor::createFragmentForImageResourceAndAddResourc
     imageElement->setAttribute(HTMLNames::srcAttr, [URL isFileURL] ? [URL absoluteString] : resource->url());
 
     RefPtr<DocumentFragment> fragment = m_frame.document()->createDocumentFragment();
-    fragment->appendChild(WTF::move(imageElement));
+    fragment->appendChild(WTFMove(imageElement));
 
     return fragment.release();
 }

@@ -12,6 +12,10 @@ list(APPEND WebKit2_LIBRARIES
 list(APPEND WebKit2_SOURCES
     DatabaseProcess/mac/DatabaseProcessMac.mm
 
+    NetworkProcess/CustomProtocols/Cocoa/CustomProtocolManagerCocoa.mm
+
+    NetworkProcess/Downloads/mac/DownloadMac.mm
+
     NetworkProcess/cache/NetworkCacheDataCocoa.mm
     NetworkProcess/cache/NetworkCacheIOChannelCocoa.mm
 
@@ -88,10 +92,6 @@ list(APPEND WebKit2_SOURCES
     Shared/Cocoa/WKNSURLExtras.mm
     Shared/Cocoa/WKNSURLRequest.mm
     Shared/Cocoa/WKObject.mm
-
-    Shared/Downloads/mac/DownloadMac.mm
-
-    Shared/Network/CustomProtocols/Cocoa/CustomProtocolManagerCocoa.mm
 
     Shared/Plugins/Netscape/mac/NetscapePluginModuleMac.mm
     Shared/Plugins/Netscape/mac/PluginInformationMac.mm
@@ -332,6 +332,7 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/icu"
     "${WEBCORE_DIR}/platform/cf"
     "${WEBCORE_DIR}/platform/cocoa"
+    "${WEBCORE_DIR}/platform/graphics/cocoa"
     "${WEBCORE_DIR}/platform/mac"
     "${WEBCORE_DIR}/platform/network/cf"
     "${WEBCORE_DIR}/platform/network/cocoa"

@@ -32,8 +32,8 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
         console.assert(timelineRecording instanceof WebInspector.TimelineRecording);
 
         this._recording = timelineRecording;
-        this._recording.addEventListener(WebInspector.TimelineRecording.Event.TimelineAdded, this._timelineAdded, this);
-        this._recording.addEventListener(WebInspector.TimelineRecording.Event.TimelineRemoved, this._timelineRemoved, this);
+        this._recording.addEventListener(WebInspector.TimelineRecording.Event.InstrumentAdded, this._instrumentAdded, this);
+        this._recording.addEventListener(WebInspector.TimelineRecording.Event.InstrumentRemoved, this._instrumentRemoved, this);
         this._recording.addEventListener(WebInspector.TimelineRecording.Event.MarkerAdded, this._markerAdded, this);
         this._recording.addEventListener(WebInspector.TimelineRecording.Event.Reset, this._recordingReset, this);
 
@@ -43,9 +43,9 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
         this.element.addEventListener("gesturechange", this._handleGestureChange.bind(this));
         this.element.addEventListener("gestureend", this._handleGestureEnd.bind(this));
 
-        this._graphsContainerElement = document.createElement("div");
-        this._graphsContainerElement.classList.add("graphs-container");
-        this.element.appendChild(this._graphsContainerElement);
+        this._graphsContainerView = new WebInspector.View;
+        this._graphsContainerView.element.classList.add("graphs-container");
+        this.addSubview(this._graphsContainerView);
 
         this._timelineOverviewGraphsMap = new Map;
 
@@ -90,8 +90,8 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
         this.selectionStartTime = this._selectionStartValueSetting.value;
         this.selectionDuration = this._selectionDurationSetting.value;
 
-        for (var timeline of this._recording.timelines.values())
-            this._timelineAdded(timeline);
+        for (let instrument of this._recording.instruments)
+            this._instrumentAdded(instrument);
 
         if (!WebInspector.timelineManager.isCapturingPageReload())
             this._resetSelection();
@@ -106,10 +106,12 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
 
     set startTime(x)
     {
+        x = x || 0;
+
         if (this._startTime === x)
             return;
 
-        this._startTime = x || 0;
+        this._startTime = x;
 
         this.needsLayout();
     }
@@ -121,10 +123,12 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
 
     set currentTime(x)
     {
+        x = x || 0;
+
         if (this._currentTime === x)
             return;
 
-        this._currentTime = x || 0;
+        this._currentTime = x;
         this._revealCurrentTime = true;
 
         this.needsLayout();
@@ -177,10 +181,12 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
 
     set endTime(x)
     {
+        x = x || 0;
+
         if (this._endTime === x)
             return;
 
-        this._endTime = x || 0;
+        this._endTime = x;
 
         this.needsLayout();
     }
@@ -192,10 +198,12 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
 
     set scrollStartTime(x)
     {
+        x = x || 0;
+
         if (this._scrollStartTime === x)
             return;
 
-        this._scrollStartTime = x || 0;
+        this._scrollStartTime = x;
 
         this.needsLayout();
     }
@@ -220,7 +228,10 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
     {
         x = x || 0;
 
-        var selectionDuration = this.selectionDuration;
+        if (this._timelineRuler.selectionStartTime === x)
+            return;
+
+        let selectionDuration = this.selectionDuration;
         this._timelineRuler.selectionStartTime = x;
         this._timelineRuler.selectionEndTime = x + selectionDuration;
     }
@@ -367,7 +378,6 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
             timelineOverviewGraph.startTime = scrollStartTime;
             timelineOverviewGraph.currentTime = this._currentTime;
             timelineOverviewGraph.endTime = scrollStartTime + visibleDuration;
-            timelineOverviewGraph.updateLayout();
         }
     }
 
@@ -378,17 +388,6 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
         var currentWidth = parseInt(element.style.width);
         if (currentWidth !== newWidth)
             element.style.width = newWidth + "px";
-    }
-
-    _needsLayout()
-    {
-        if (!this._visible)
-            return;
-
-        if (this._scheduledLayoutUpdateIdentifier)
-            return;
-
-        this._scheduledLayoutUpdateIdentifier = requestAnimationFrame(this.updateLayout.bind(this));
     }
 
     _handleScrollEvent(event)
@@ -496,29 +495,29 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
         this._gestureStartDurationPerPixel = NaN;
     }
 
-    _timelineAdded(timelineOrEvent)
+    _instrumentAdded(instrumentOrEvent)
     {
-        var timeline = timelineOrEvent;
-        if (!(timeline instanceof WebInspector.Timeline))
-            timeline = timelineOrEvent.data.timeline;
+        let instrument = instrumentOrEvent instanceof WebInspector.Instrument ? instrumentOrEvent : instrumentOrEvent.data.instrument;
+        console.assert(instrument instanceof WebInspector.Instrument, instrument);
 
-        console.assert(timeline instanceof WebInspector.Timeline, timeline);
+        let timeline = this._recording.timelineForInstrument(instrument);
         console.assert(!this._timelineOverviewGraphsMap.has(timeline), timeline);
         if (!this.canShowTimeline(timeline))
             return;
 
-        var overviewGraph = WebInspector.TimelineOverviewGraph.createForTimeline(timeline, this);
+        let overviewGraph = WebInspector.TimelineOverviewGraph.createForTimeline(timeline, this);
         overviewGraph.addEventListener(WebInspector.TimelineOverviewGraph.Event.RecordSelected, this._recordSelected, this);
         this._timelineOverviewGraphsMap.set(timeline, overviewGraph);
 
-        // FIXME: use View.prototype.addSubview(overviewGraph) once <https://webkit.org/b/150982> is fixed.
-        this._graphsContainerElement.appendChild(overviewGraph.element);
+        this._graphsContainerView.addSubview(overviewGraph);
     }
 
-    _timelineRemoved(event)
+    _instrumentRemoved(event)
     {
-        let timeline = event.data.timeline;
-        console.assert(timeline instanceof WebInspector.Timeline, timeline);
+        let instrument = event.data.instrument;
+        console.assert(instrument instanceof WebInspector.Instrument, instrument);
+
+        let timeline = this._recording.timelineForInstrument(instrument);
         if (!this.canShowTimeline(timeline))
             return;
 
@@ -526,7 +525,7 @@ WebInspector.TimelineOverview = class TimelineOverview extends WebInspector.View
 
         let overviewGraph = this._timelineOverviewGraphsMap.take(timeline);
         overviewGraph.removeEventListener(WebInspector.TimelineOverviewGraph.Event.RecordSelected, this._recordSelected, this);
-        overviewGraph.element.remove();
+        this._graphsContainerView.removeSubview(overviewGraph);
     }
 
     _markerAdded(event)

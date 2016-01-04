@@ -54,7 +54,7 @@ const ClassInfo UnlinkedFunctionCodeBlock::s_info = { "UnlinkedFunctionCodeBlock
 UnlinkedCodeBlock::UnlinkedCodeBlock(VM* vm, Structure* structure, CodeType codeType, const ExecutableInfo& info)
     : Base(*vm, structure)
     , m_numVars(0)
-    , m_numCalleeRegisters(0)
+    , m_numCalleeLocals(0)
     , m_numParameters(0)
     , m_vm(vm)
     , m_globalObjectRegister(VirtualRegister())
@@ -65,10 +65,14 @@ UnlinkedCodeBlock::UnlinkedCodeBlock(VM* vm, Structure* structure, CodeType code
     , m_hasCapturedVariables(false)
     , m_isBuiltinFunction(info.isBuiltinFunction())
     , m_constructorKind(static_cast<unsigned>(info.constructorKind()))
-    , m_isArrowFunction(info.isArrowFunction())
+    , m_superBinding(static_cast<unsigned>(info.superBinding()))
+    , m_derivedContextType(static_cast<unsigned>(info.derivedContextType()))
+    , m_isArrowFunctionContext(info.isArrowFunctionContext())
+    , m_isClassContext(info.isClassContext())
     , m_firstLine(0)
     , m_lineCount(0)
     , m_endColumn(UINT_MAX)
+    , m_parseMode(info.parseMode())
     , m_features(0)
     , m_codeType(codeType)
     , m_arrayProfileCount(0)
@@ -330,7 +334,7 @@ void UnlinkedFunctionExecutable::destroy(JSCell* cell)
 
 void UnlinkedCodeBlock::setInstructions(std::unique_ptr<UnlinkedInstructionStream> instructions)
 {
-    m_unlinkedInstructions = WTF::move(instructions);
+    m_unlinkedInstructions = WTFMove(instructions);
 }
 
 const UnlinkedInstructionStream& UnlinkedCodeBlock::instructions() const

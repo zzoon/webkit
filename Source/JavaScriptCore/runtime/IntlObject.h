@@ -57,11 +57,16 @@ private:
     IntlObject(VM&, Structure*);
 };
 
-bool getIntlBooleanOption(ExecState*, JSValue options, PropertyName, bool& usesFallback);
-String getIntlStringOption(ExecState*, JSValue options, PropertyName, const HashSet<String>& values, const char* notFound, String fallback);
-Vector<String> canonicalizeLocaleList(ExecState*, JSValue locales);
-HashMap<String, String> resolveLocale(const HashSet<String>& availableLocales, const Vector<String>& requestedLocales, const HashMap<String, String>& options, const Vector<String>& relevantExtensionKeys, Vector<String> (*localeData)(const String&, const String&));
-JSValue supportedLocales(ExecState*, const HashSet<String>& availableLocales, const Vector<String>& requestedLocales, JSValue options);
+String defaultLocale();
+void convertICULocaleToBCP47LanguageTag(String& locale);
+bool intlBooleanOption(ExecState&, JSValue options, PropertyName, bool& usesFallback);
+String intlStringOption(ExecState&, JSValue options, PropertyName, std::initializer_list<const char*> values, const char* notFound, const char* fallback);
+Vector<String> canonicalizeLocaleList(ExecState&, JSValue locales);
+HashMap<String, String> resolveLocale(const HashSet<String>& availableLocales, const Vector<String>& requestedLocales, const HashMap<String, String>& options, const char* const relevantExtensionKeys[], size_t relevantExtensionKeyCount, Vector<String> (*localeData)(const String&, size_t));
+JSValue supportedLocales(ExecState&, const HashSet<String>& availableLocales, const Vector<String>& requestedLocales, JSValue options);
+String removeUnicodeLocaleExtension(const String& locale);
+String bestAvailableLocale(const HashSet<String>& availableLocales, const String& requestedLocale);
+Vector<String> getNumberingSystemsForLocale(const String& locale);
 
 } // namespace JSC
 

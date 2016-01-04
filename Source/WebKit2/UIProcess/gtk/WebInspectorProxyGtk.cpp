@@ -31,6 +31,7 @@
 
 #include "WebKitWebViewBasePrivate.h"
 #include "WebPageGroup.h"
+#include "WebProcessPool.h"
 #include "WebProcessProxy.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/GtkUtilities.h>
@@ -340,11 +341,6 @@ void WebInspectorProxy::platformSetAttachedWindowWidth(unsigned width)
 
     m_client.didChangeAttachedWidth(this, width);
     webkitWebViewBaseSetInspectorViewSize(WEBKIT_WEB_VIEW_BASE(inspectedPage()->viewWidget()), width);
-}
-
-void WebInspectorProxy::platformSetToolbarHeight(unsigned)
-{
-    notImplemented();
 }
 
 void WebInspectorProxy::platformStartWindowDrag()

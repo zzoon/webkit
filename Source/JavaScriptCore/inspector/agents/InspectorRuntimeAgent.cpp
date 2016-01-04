@@ -241,11 +241,6 @@ void InspectorRuntimeAgent::releaseObjectGroup(ErrorString&, const String& objec
     m_injectedScriptManager.releaseObjectGroup(objectGroup);
 }
 
-void InspectorRuntimeAgent::run(ErrorString&)
-{
-    // FIXME: <https://webkit.org/b/127634> Web Inspector: support debugging web workers
-}
-
 void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& errorString, const Inspector::InspectorArray& locations, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::TypeDescription>>& typeDescriptions)
 {
     static const bool verbose = false;
@@ -298,7 +293,7 @@ void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& er
             description->setIsTruncated(typeSet->isOverflown());
         }
 
-        typeDescriptions->addItem(WTF::move(description));
+        typeDescriptions->addItem(WTFMove(description));
     }
 
     double end = currentTimeMS();
@@ -358,7 +353,7 @@ void InspectorRuntimeAgent::getBasicBlocks(ErrorString& errorString, const Strin
             .setHasExecuted(block.m_hasExecuted)
             .setExecutionCount(block.m_executionCount)
             .release();
-        basicBlocks->addItem(WTF::move(location));
+        basicBlocks->addItem(WTFMove(location));
     }
 }
 

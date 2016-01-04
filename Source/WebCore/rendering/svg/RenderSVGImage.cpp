@@ -44,7 +44,7 @@
 namespace WebCore {
 
 RenderSVGImage::RenderSVGImage(SVGImageElement& element, Ref<RenderStyle>&& style)
-    : RenderSVGModelObject(element, WTF::move(style))
+    : RenderSVGModelObject(element, WTFMove(style))
     , m_needsBoundariesUpdate(true)
     , m_needsTransformUpdate(true)
     , m_imageResource(std::make_unique<RenderImageResource>())
@@ -186,7 +186,7 @@ bool RenderSVGImage::nodeAtFloatPoint(const HitTestRequest& request, HitTestResu
     PointerEventsHitRules hitRules(PointerEventsHitRules::SVG_IMAGE_HITTESTING, request, style().pointerEvents());
     bool isVisible = (style().visibility() == VISIBLE);
     if (isVisible || !hitRules.requireVisible) {
-        FloatPoint localPoint = localToParentTransform().inverse().mapPoint(pointInParent);
+        FloatPoint localPoint = localToParentTransform().inverse().valueOr(AffineTransform()).mapPoint(pointInParent);
             
         if (!SVGRenderSupport::pointInClippingArea(*this, localPoint))
             return false;

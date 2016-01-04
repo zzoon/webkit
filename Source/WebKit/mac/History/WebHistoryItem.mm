@@ -125,7 +125,6 @@ void WKNotifyHistoryItemChanged(HistoryItem*)
     WTF::initializeMainThreadToProcessMainThread();
     RunLoop::initializeMainRunLoop();
 #endif
-    WebCoreObjCFinalizeOnMainThread(self);
 }
 
 - (instancetype)init
@@ -152,18 +151,6 @@ void WKNotifyHistoryItemChanged(HistoryItem*)
     [_private release];
 
     [super dealloc];
-}
-
-- (void)finalize
-{
-    WebCoreThreadViolationCheckRoundOne();
-
-    // FIXME: ~HistoryItem is what releases the history item's icon from the icon database
-    // It's probably not good to release icons from the database only when the object is garbage-collected. 
-    // Need to change design so this happens at a predictable time.
-    historyItemWrappers().remove(_private->_historyItem.get());
-
-    [super finalize];
 }
 
 - (id)copyWithZone:(NSZone *)zone
@@ -366,7 +353,7 @@ WebHistoryItem *kit(HistoryItem* item)
             redirectURLsVector->uncheckedAppend((NSString *)redirectURL);
         }
 
-        core(_private)->setRedirectURLs(WTF::move(redirectURLsVector));
+        core(_private)->setRedirectURLs(WTFMove(redirectURLsVector));
     }
 
     NSArray *childDicts = [dict objectForKey:childrenKey];
@@ -390,7 +377,7 @@ WebHistoryItem *kit(HistoryItem* item)
     NSNumber *scrollPointXValue = [dict objectForKey:scrollPointXKey];
     NSNumber *scrollPointYValue = [dict objectForKey:scrollPointYKey];
     if (scrollPointXValue && scrollPointYValue)
-        core(_private)->setScrollPoint(IntPoint([scrollPointXValue intValue], [scrollPointYValue intValue]));
+        core(_private)->setScrollPosition(IntPoint([scrollPointXValue intValue], [scrollPointYValue intValue]));
 
     uint32_t bookmarkIDValue = [[dict objectForKey:bookmarkIDKey] unsignedIntValue];
     if (bookmarkIDValue)
@@ -406,7 +393,7 @@ WebHistoryItem *kit(HistoryItem* item)
 
 - (NSPoint)scrollPoint
 {
-    return core(_private)->scrollPoint();
+    return core(_private)->scrollPosition();
 }
 
 - (void)_visitedWithTitle:(NSString *)title
@@ -484,9 +471,9 @@ WebHistoryItem *kit(HistoryItem* item)
     if (viewportArguments)
         [dict setObject:viewportArguments forKey:@"WebViewportArguments"];
 
-    IntPoint scrollPoint = core(_private)->scrollPoint();
-    [dict setObject:[NSNumber numberWithInt:scrollPoint.x()] forKey:scrollPointXKey];
-    [dict setObject:[NSNumber numberWithInt:scrollPoint.y()] forKey:scrollPointYKey];
+    IntPoint scrollPosition = core(_private)->scrollPosition();
+    [dict setObject:[NSNumber numberWithInt:scrollPosition.x()] forKey:scrollPointXKey];
+    [dict setObject:[NSNumber numberWithInt:scrollPosition.y()] forKey:scrollPointYKey];
 
     uint32_t bookmarkID = core(_private)->bookmarkID();
     if (bookmarkID)
@@ -623,12 +610,12 @@ WebHistoryItem *kit(HistoryItem* item)
 
 - (CGPoint)_scrollPoint
 {
-    return core(_private)->scrollPoint();
+    return core(_private)->scrollPosition();
 }
 
 - (void)_setScrollPoint:(CGPoint)scrollPoint
 {
-    core(_private)->setScrollPoint(IntPoint(scrollPoint));
+    core(_private)->setScrollPosition(IntPoint(scrollPoint));
 }
 
 - (uint32_t)_bookmarkID

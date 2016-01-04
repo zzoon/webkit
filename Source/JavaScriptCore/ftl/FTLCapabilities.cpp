@@ -94,6 +94,7 @@ inline CapabilityLevel canCompile(Node* node)
     case ArithSin:
     case ArithCos:
     case ArithPow:
+    case ArithRandom:
     case ArithRound:
     case ArithSqrt:
     case ArithLog:
@@ -110,6 +111,7 @@ inline CapabilityLevel canCompile(Node* node)
     case CreateActivation:
     case NewArrowFunction:
     case NewFunction:
+    case NewGeneratorFunction:
     case GetClosureVar:
     case PutClosureVar:
     case CreateDirectArguments:
@@ -152,7 +154,6 @@ inline CapabilityLevel canCompile(Node* node)
     case CountExecution:
     case GetExecutable:
     case GetScope:
-    case LoadArrowFunctionThis:
     case GetCallee:
     case GetArgumentCount:
     case ToString:
@@ -175,8 +176,10 @@ inline CapabilityLevel canCompile(Node* node)
     case IsObject:
     case IsObjectOrNull:
     case IsFunction:
-    case CheckHasInstance:
+    case CheckTypeInfoFlags:
+    case OverridesHasInstance:
     case InstanceOf:
+    case InstanceOfCustom:
     case DoubleRep:
     case ValueRep:
     case Int52Rep:
@@ -194,6 +197,7 @@ inline CapabilityLevel canCompile(Node* node)
     case BottomValue:
     case PhantomNewObject:
     case PhantomNewFunction:
+    case PhantomNewGeneratorFunction:
     case PhantomCreateActivation:
     case PutHint:
     case CheckStructureImmediate:
@@ -211,6 +215,7 @@ inline CapabilityLevel canCompile(Node* node)
     case PutGetterByVal:
     case PutSetterByVal:
     case CopyRest:
+    case GetRestLength:
         // These are OK.
         break;
 

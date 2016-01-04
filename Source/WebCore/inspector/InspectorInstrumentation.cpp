@@ -51,7 +51,6 @@
 #include "InspectorNetworkAgent.h"
 #include "InspectorPageAgent.h"
 #include "InspectorTimelineAgent.h"
-#include "InspectorWorkerAgent.h"
 #include "InstrumentingAgents.h"
 #include "MainFrame.h"
 #include "PageDebuggerAgent.h"
@@ -62,10 +61,6 @@
 #include "StyleResolver.h"
 #include "StyleRule.h"
 #include "WebConsoleAgent.h"
-#include "WorkerGlobalScope.h"
-#include "WorkerInspectorController.h"
-#include "WorkerRuntimeAgent.h"
-#include "WorkerThread.h"
 #include "XMLHttpRequest.h"
 #include <inspector/ConsoleMessage.h>
 #include <inspector/ScriptArguments.h>
@@ -845,7 +840,7 @@ void InspectorInstrumentation::addMessageToConsoleImpl(InstrumentingAgents& inst
     String messageText = message->message();
 
     if (WebConsoleAgent* consoleAgent = instrumentingAgents.webConsoleAgent())
-        consoleAgent->addMessageToConsole(WTF::move(message));
+        consoleAgent->addMessageToConsole(WTFMove(message));
     // FIXME: This should just pass the message on to the debugger agent. JavaScriptCore InspectorDebuggerAgent should know Console MessageTypes.
     if (InspectorDebuggerAgent* debuggerAgent = instrumentingAgents.inspectorDebuggerAgent()) {
         if (isConsoleAssertMessage(source, type))
@@ -902,45 +897,13 @@ void InspectorInstrumentation::didOpenDatabaseImpl(InstrumentingAgents& instrume
     if (!instrumentingAgents.inspectorEnvironment().developerExtrasEnabled())
         return;
     if (InspectorDatabaseAgent* dbAgent = instrumentingAgents.inspectorDatabaseAgent())
-        dbAgent->didOpenDatabase(WTF::move(database), domain, name, version);
+        dbAgent->didOpenDatabase(WTFMove(database), domain, name, version);
 }
 
 void InspectorInstrumentation::didDispatchDOMStorageEventImpl(InstrumentingAgents& instrumentingAgents, const String& key, const String& oldValue, const String& newValue, StorageType storageType, SecurityOrigin* securityOrigin, Page* page)
 {
     if (InspectorDOMStorageAgent* domStorageAgent = instrumentingAgents.inspectorDOMStorageAgent())
         domStorageAgent->didDispatchDOMStorageEvent(key, oldValue, newValue, storageType, securityOrigin, page);
-}
-
-bool InspectorInstrumentation::shouldPauseDedicatedWorkerOnStartImpl(InstrumentingAgents& instrumentingAgents)
-{
-    if (InspectorWorkerAgent* workerAgent = instrumentingAgents.inspectorWorkerAgent())
-        return workerAgent->shouldPauseDedicatedWorkerOnStart();
-    return false;
-}
-
-void InspectorInstrumentation::didStartWorkerGlobalScopeImpl(InstrumentingAgents& instrumentingAgents, WorkerGlobalScopeProxy* workerGlobalScopeProxy, const URL& url)
-{
-    if (InspectorWorkerAgent* workerAgent = instrumentingAgents.inspectorWorkerAgent())
-        workerAgent->didStartWorkerGlobalScope(workerGlobalScopeProxy, url);
-}
-
-void InspectorInstrumentation::willEvaluateWorkerScript(WorkerGlobalScope* workerGlobalScope, int workerThreadStartMode)
-{
-    if (workerThreadStartMode != PauseWorkerGlobalScopeOnStart)
-        return;
-
-    InstrumentingAgents* instrumentingAgents = instrumentingAgentsForWorkerGlobalScope(workerGlobalScope);
-    if (!instrumentingAgents)
-        return;
-
-    if (WorkerRuntimeAgent* runtimeAgent = instrumentingAgents->workerRuntimeAgent())
-        runtimeAgent->pauseWorkerGlobalScope(workerGlobalScope);
-}
-
-void InspectorInstrumentation::workerGlobalScopeTerminatedImpl(InstrumentingAgents& instrumentingAgents, WorkerGlobalScopeProxy* proxy)
-{
-    if (InspectorWorkerAgent* workerAgent = instrumentingAgents.inspectorWorkerAgent())
-        workerAgent->workerGlobalScopeTerminated(proxy);
 }
 
 #if ENABLE(WEB_SOCKETS)
@@ -994,37 +957,37 @@ void InspectorInstrumentation::didSendWebSocketFrameImpl(InstrumentingAgents& in
 void InspectorInstrumentation::sessionCreatedImpl(InstrumentingAgents& instrumentingAgents, RefPtr<ReplaySession>&& session)
 {
     if (InspectorReplayAgent* replayAgent = instrumentingAgents.inspectorReplayAgent())
-        replayAgent->sessionCreated(WTF::move(session));
+        replayAgent->sessionCreated(WTFMove(session));
 }
 
 void InspectorInstrumentation::sessionLoadedImpl(InstrumentingAgents& instrumentingAgents, RefPtr<ReplaySession>&& session)
 {
     if (InspectorReplayAgent* replayAgent = instrumentingAgents.inspectorReplayAgent())
-        replayAgent->sessionLoaded(WTF::move(session));
+        replayAgent->sessionLoaded(WTFMove(session));
 }
 
 void InspectorInstrumentation::sessionModifiedImpl(InstrumentingAgents& instrumentingAgents, RefPtr<ReplaySession>&& session)
 {
     if (InspectorReplayAgent* replayAgent = instrumentingAgents.inspectorReplayAgent())
-        replayAgent->sessionModified(WTF::move(session));
+        replayAgent->sessionModified(WTFMove(session));
 }
 
 void InspectorInstrumentation::segmentCreatedImpl(InstrumentingAgents& instrumentingAgents, RefPtr<ReplaySessionSegment>&& segment)
 {
     if (InspectorReplayAgent* replayAgent = instrumentingAgents.inspectorReplayAgent())
-        replayAgent->segmentCreated(WTF::move(segment));
+        replayAgent->segmentCreated(WTFMove(segment));
 }
 
 void InspectorInstrumentation::segmentCompletedImpl(InstrumentingAgents& instrumentingAgents, RefPtr<ReplaySessionSegment>&& segment)
 {
     if (InspectorReplayAgent* replayAgent = instrumentingAgents.inspectorReplayAgent())
-        replayAgent->segmentCompleted(WTF::move(segment));
+        replayAgent->segmentCompleted(WTFMove(segment));
 }
 
 void InspectorInstrumentation::segmentLoadedImpl(InstrumentingAgents& instrumentingAgents, RefPtr<ReplaySessionSegment>&& segment)
 {
     if (InspectorReplayAgent* replayAgent = instrumentingAgents.inspectorReplayAgent())
-        replayAgent->segmentLoaded(WTF::move(segment));
+        replayAgent->segmentLoaded(WTFMove(segment));
 }
 
 void InspectorInstrumentation::segmentUnloadedImpl(InstrumentingAgents& instrumentingAgents)
@@ -1197,19 +1160,6 @@ InstrumentingAgents& InspectorInstrumentation::instrumentingAgentsForPage(Page& 
 InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForRenderer(RenderObject* renderer)
 {
     return instrumentingAgentsForFrame(renderer->frame());
-}
-
-InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForWorkerGlobalScope(WorkerGlobalScope* workerGlobalScope)
-{
-    return workerGlobalScope ? &workerGlobalScope->workerInspectorController().m_instrumentingAgents.get() : nullptr;
-}
-
-InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForNonDocumentContext(ScriptExecutionContext* context)
-{
-    ASSERT(context);
-    if (is<WorkerGlobalScope>(*context))
-        return instrumentingAgentsForWorkerGlobalScope(downcast<WorkerGlobalScope>(context));
-    return nullptr;
 }
 
 void InspectorInstrumentation::layerTreeDidChangeImpl(InstrumentingAgents& instrumentingAgents)

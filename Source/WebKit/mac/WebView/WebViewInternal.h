@@ -271,10 +271,8 @@ OBJC_CLASS NSTextAlternatives;
 - (void)_clearTextIndicatorWithAnimation:(WebCore::TextIndicatorWindowDismissalAnimation)animation;
 - (void)_setTextIndicatorAnimationProgress:(float)progress;
 - (void)_showDictionaryLookupPopup:(const WebCore::DictionaryPopupInfo&)dictionaryPopupInfo;
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 - (id)_animationControllerForDictionaryLookupPopupInfo:(const WebCore::DictionaryPopupInfo&)dictionaryPopupInfo;
 - (WebImmediateActionController *)_immediateActionController;
-#endif
 - (NSEvent *)_pressureEvent;
 - (void)_setPressureEvent:(NSEvent *)event;
 #endif
@@ -289,4 +287,8 @@ OBJC_CLASS NSTextAlternatives;
 - (void)_setMockMediaPlaybackTargetPickerName:(NSString *)name state:(WebCore::MediaPlaybackTargetContext::State)state;
 #endif
 
+@end
+
+@interface WebView (WebUpdateWebViewAdditions)
+- (void)updateWebViewAdditions;
 @end

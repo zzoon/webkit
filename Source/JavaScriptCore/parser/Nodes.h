@@ -1559,6 +1559,7 @@ namespace JSC {
 
         bool usesEval() const { return m_features & EvalFeature; }
         bool usesArguments() const { return (m_features & ArgumentsFeature) && !(m_features & ShadowsArgumentsFeature); }
+        bool usesArrowFunction() const { return m_features & ArrowFunctionFeature; }
         bool modifiesParameter() const { return m_features & ModifiedParameterFeature; }
         bool modifiesArguments() const { return m_features & (EvalFeature | ModifiedArgumentsFeature); }
         bool isStrictMode() const { return m_features & StrictModeFeature; }
@@ -1817,7 +1818,7 @@ namespace JSC {
             ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, 
             unsigned startColumn, unsigned endColumn, int functionKeywordStart, 
             int functionNameStart, int parametersStart, bool isInStrictContext, 
-            ConstructorKind, unsigned, SourceParseMode, bool isArrowFunction, bool isArrowFunctionBodyExpression);
+            ConstructorKind, SuperBinding, unsigned, SourceParseMode, bool isArrowFunctionBodyExpression);
 
         void finishParsing(const SourceCode&, const Identifier&, FunctionMode);
         
@@ -1842,8 +1843,8 @@ namespace JSC {
 
         int startStartOffset() const { return m_startStartOffset; }
         bool isInStrictContext() const { return m_isInStrictContext; }
+        SuperBinding superBinding() { return static_cast<SuperBinding>(m_superBinding); }
         ConstructorKind constructorKind() { return static_cast<ConstructorKind>(m_constructorKind); }
-        bool isArrowFunction() const { return m_isArrowFunction; }
         bool isArrowFunctionBodyExpression() const { return m_isArrowFunctionBodyExpression; }
 
         void setLoc(unsigned firstLine, unsigned lastLine, int startOffset, int lineStartOffset)
@@ -1869,8 +1870,8 @@ namespace JSC {
         int m_lastLine;
         SourceParseMode m_parseMode;
         unsigned m_isInStrictContext : 1;
+        unsigned m_superBinding : 1;
         unsigned m_constructorKind : 2;
-        unsigned m_isArrowFunction : 1;
         unsigned m_isArrowFunctionBodyExpression : 1;
     };
 
@@ -1932,7 +1933,7 @@ namespace JSC {
         virtual bool isArrowFuncExprNode() const override { return true; }
     };
 
-    class YieldExprNode final : public ExpressionNode {
+    class YieldExprNode final : public ExpressionNode, public ThrowableExpressionData {
     public:
         YieldExprNode(const JSTokenLocation&, ExpressionNode* argument, bool delegate);
 
@@ -2017,7 +2018,12 @@ namespace JSC {
         ObjectPatternNode();
         void appendEntry(const JSTokenLocation&, const Identifier& identifier, bool wasString, DestructuringPatternNode* pattern, ExpressionNode* defaultValue)
         {
-            m_targetPatterns.append(Entry{ identifier, wasString, pattern, defaultValue });
+            m_targetPatterns.append(Entry{ identifier, nullptr, wasString, pattern, defaultValue });
+        }
+
+        void appendEntry(const JSTokenLocation&, ExpressionNode* propertyExpression, DestructuringPatternNode* pattern, ExpressionNode* defaultValue)
+        {
+            m_targetPatterns.append(Entry{ Identifier(), propertyExpression, false, pattern, defaultValue });
         }
 
     private:
@@ -2026,6 +2032,7 @@ namespace JSC {
         virtual void toString(StringBuilder&) const override;
         struct Entry {
             const Identifier& propertyName;
+            ExpressionNode* propertyExpression;
             bool wasString;
             DestructuringPatternNode* pattern;
             ExpressionNode* defaultValue;

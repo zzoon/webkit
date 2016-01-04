@@ -40,37 +40,31 @@ namespace IDBServer {
 class MemoryObjectStore;
 
 class MemoryObjectStoreCursor : public MemoryCursor {
-    friend std::unique_ptr<MemoryObjectStoreCursor> std::make_unique<MemoryObjectStoreCursor>(WebCore::IDBServer::MemoryObjectStore&, const WebCore::IDBCursorInfo&);
 public:
-    static std::unique_ptr<MemoryObjectStoreCursor> create(MemoryObjectStore&, const IDBCursorInfo&);
+    MemoryObjectStoreCursor(MemoryObjectStore&, const IDBCursorInfo&);
 
     void objectStoreCleared();
     void keyDeleted(const IDBKeyData&);
     void keyAdded(std::set<IDBKeyData>::iterator);
 
 private:
-    MemoryObjectStoreCursor(MemoryObjectStore&, const IDBCursorInfo&);
-
     virtual void currentData(IDBGetResult&) override final;
     virtual void iterate(const IDBKeyData&, uint32_t count, IDBGetResult&) override final;
 
     void setFirstInRemainingRange(std::set<IDBKeyData>&);
-    std::set<IDBKeyData>::iterator firstForwardIteratorInRemainingRange(std::set<IDBKeyData>&);
-    std::set<IDBKeyData>::reverse_iterator firstReverseIteratorInRemainingRange(std::set<IDBKeyData>&);
+    void setForwardIteratorFromRemainingRange(std::set<IDBKeyData>&);
+    void setReverseIteratorFromRemainingRange(std::set<IDBKeyData>&);
 
     void incrementForwardIterator(std::set<IDBKeyData>&, const IDBKeyData&, uint32_t count);
     void incrementReverseIterator(std::set<IDBKeyData>&, const IDBKeyData&, uint32_t count);
 
-    bool hasIterators() const;
     bool hasValidPosition() const;
-    void clearIterators();
 
     MemoryObjectStore& m_objectStore;
 
     IDBKeyRangeData m_remainingRange;
 
-    WTF::Optional<std::set<IDBKeyData>::iterator> m_forwardIterator;
-    WTF::Optional<std::set<IDBKeyData>::reverse_iterator> m_reverseIterator;
+    WTF::Optional<std::set<IDBKeyData>::iterator> m_iterator;
 
     IDBKeyData m_currentPositionKey;
 };

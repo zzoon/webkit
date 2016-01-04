@@ -252,6 +252,9 @@ static void scaleJITPolicy()
 
 static void recomputeDependentOptions()
 {
+#if !defined(NDEBUG)
+    Options::validateDFGExceptionHandling() = true;
+#endif
 #if !ENABLE(JIT)
     Options::useLLInt() = true;
     Options::useJIT() = false;
@@ -312,6 +315,16 @@ static void recomputeDependentOptions()
         Options::useOSREntryToDFG() = false;
         Options::useOSREntryToFTL() = false;
     }
+
+#if CPU(ARM64)
+    // FIXME: https://bugs.webkit.org/show_bug.cgi?id=152510
+    // We're running into a bug where some ARM64 tests are failing in the FTL
+    // with what appears to be an llvm bug where llvm is miscalculating the
+    // live-out variables of a patchpoint. This causes us to not keep a 
+    // volatile register alive across a C call in a patchpoint, even though 
+    // that register is used immediately after the patchpoint.
+    Options::assumeAllRegsInFTLICAreLive() = true;
+#endif
 
     // Compute the maximum value of the reoptimization retry counter. This is simply
     // the largest value at which we don't overflow the execute counter, when using it
@@ -640,7 +653,7 @@ bool Option::operator==(const Option& other) const
     case Options::Type::unsignedType:
         return m_entry.unsignedVal == other.m_entry.unsignedVal;
     case Options::Type::doubleType:
-        return (m_entry.doubleVal == other.m_entry.doubleVal) || (isnan(m_entry.doubleVal) && isnan(other.m_entry.doubleVal));
+        return (m_entry.doubleVal == other.m_entry.doubleVal) || (std::isnan(m_entry.doubleVal) && std::isnan(other.m_entry.doubleVal));
     case Options::Type::int32Type:
         return m_entry.int32Val == other.m_entry.int32Val;
     case Options::Type::optionRangeType:

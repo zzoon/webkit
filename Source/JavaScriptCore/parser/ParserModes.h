@@ -46,7 +46,8 @@ enum FunctionMode { FunctionExpression, FunctionDeclaration };
 
 enum class SourceParseMode {
     NormalFunctionMode,
-    GeneratorMode,
+    GeneratorBodyMode,
+    GeneratorWrapperFunctionMode,
     GetterMode,
     SetterMode,
     MethodMode,
@@ -60,7 +61,8 @@ inline bool isFunctionParseMode(SourceParseMode parseMode)
 {
     switch (parseMode) {
     case SourceParseMode::NormalFunctionMode:
-    case SourceParseMode::GeneratorMode:
+    case SourceParseMode::GeneratorBodyMode:
+    case SourceParseMode::GeneratorWrapperFunctionMode:
     case SourceParseMode::GetterMode:
     case SourceParseMode::SetterMode:
     case SourceParseMode::MethodMode:
@@ -84,7 +86,8 @@ inline bool isModuleParseMode(SourceParseMode parseMode)
         return true;
 
     case SourceParseMode::NormalFunctionMode:
-    case SourceParseMode::GeneratorMode:
+    case SourceParseMode::GeneratorBodyMode:
+    case SourceParseMode::GeneratorWrapperFunctionMode:
     case SourceParseMode::GetterMode:
     case SourceParseMode::SetterMode:
     case SourceParseMode::MethodMode:
@@ -103,7 +106,8 @@ inline bool isProgramParseMode(SourceParseMode parseMode)
         return true;
 
     case SourceParseMode::NormalFunctionMode:
-    case SourceParseMode::GeneratorMode:
+    case SourceParseMode::GeneratorBodyMode:
+    case SourceParseMode::GeneratorWrapperFunctionMode:
     case SourceParseMode::GetterMode:
     case SourceParseMode::SetterMode:
     case SourceParseMode::MethodMode:
@@ -143,17 +147,19 @@ inline bool functionNameScopeIsDynamic(bool usesEval, bool isStrictMode)
 
 typedef unsigned CodeFeatures;
 
-const CodeFeatures NoFeatures =                    0;
-const CodeFeatures EvalFeature =              1 << 0;
-const CodeFeatures ArgumentsFeature =         1 << 1;
-const CodeFeatures WithFeature =              1 << 2;
-const CodeFeatures ThisFeature =              1 << 3;
-const CodeFeatures StrictModeFeature =        1 << 4;
-const CodeFeatures ShadowsArgumentsFeature =  1 << 5;
-const CodeFeatures ModifiedParameterFeature = 1 << 6;
-const CodeFeatures ModifiedArgumentsFeature = 1 << 7;
+const CodeFeatures NoFeatures =                       0;
+const CodeFeatures EvalFeature =                 1 << 0;
+const CodeFeatures ArgumentsFeature =            1 << 1;
+const CodeFeatures WithFeature =                 1 << 2;
+const CodeFeatures ThisFeature =                 1 << 3;
+const CodeFeatures StrictModeFeature =           1 << 4;
+const CodeFeatures ShadowsArgumentsFeature =     1 << 5;
+const CodeFeatures ModifiedParameterFeature =    1 << 6;
+const CodeFeatures ModifiedArgumentsFeature =    1 << 7;
+const CodeFeatures ArrowFunctionFeature =        1 << 8;
+const CodeFeatures ArrowFunctionContextFeature = 1 << 9;
 
-const CodeFeatures AllFeatures = EvalFeature | ArgumentsFeature | WithFeature | ThisFeature | StrictModeFeature | ShadowsArgumentsFeature | ModifiedParameterFeature;
+const CodeFeatures AllFeatures = EvalFeature | ArgumentsFeature | WithFeature | ThisFeature | StrictModeFeature | ShadowsArgumentsFeature | ModifiedParameterFeature | ArrowFunctionFeature | ArrowFunctionContextFeature;
 
 } // namespace JSC
 

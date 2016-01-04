@@ -176,7 +176,7 @@ void SpeculativeJIT::cachedGetById(CodeOrigin codeOrigin, GPRReg baseGPR, GPRReg
         identifierUID(identifierNumber), spillMode);
     
     m_jit.addGetById(gen, slowPath.get());
-    addSlowPathGenerator(WTF::move(slowPath));
+    addSlowPathGenerator(WTFMove(slowPath));
 }
 
 void SpeculativeJIT::cachedPutById(CodeOrigin codeOrigin, GPRReg baseGPR, GPRReg valueGPR, GPRReg scratchGPR, unsigned identifierNumber, PutKind putKind, JITCompiler::Jump slowPathTarget, SpillRegistersMode spillMode)
@@ -205,7 +205,7 @@ void SpeculativeJIT::cachedPutById(CodeOrigin codeOrigin, GPRReg baseGPR, GPRReg
         identifierUID(identifierNumber));
 
     m_jit.addPutById(gen, slowPath.get());
-    addSlowPathGenerator(WTF::move(slowPath));
+    addSlowPathGenerator(WTFMove(slowPath));
 }
 
 void SpeculativeJIT::nonSpeculativeNonPeepholeCompareNullOrUndefined(Edge operand)
@@ -2144,55 +2144,13 @@ void SpeculativeJIT::compile(Node* node)
     case BitAnd:
     case BitOr:
     case BitXor:
-        if (node->child1()->isInt32Constant()) {
-            SpeculateInt32Operand op2(this, node->child2());
-            GPRTemporary result(this, Reuse, op2);
-
-            bitOp(op, node->child1()->asInt32(), op2.gpr(), result.gpr());
-
-            int32Result(result.gpr(), node);
-        } else if (node->child2()->isInt32Constant()) {
-            SpeculateInt32Operand op1(this, node->child1());
-            GPRTemporary result(this, Reuse, op1);
-
-            bitOp(op, node->child2()->asInt32(), op1.gpr(), result.gpr());
-
-            int32Result(result.gpr(), node);
-        } else {
-            SpeculateInt32Operand op1(this, node->child1());
-            SpeculateInt32Operand op2(this, node->child2());
-            GPRTemporary result(this, Reuse, op1, op2);
-
-            GPRReg reg1 = op1.gpr();
-            GPRReg reg2 = op2.gpr();
-            bitOp(op, reg1, reg2, result.gpr());
-
-            int32Result(result.gpr(), node);
-        }
+        compileBitwiseOp(node);
         break;
 
     case BitRShift:
     case BitLShift:
     case BitURShift:
-        if (node->child2()->isInt32Constant()) {
-            SpeculateInt32Operand op1(this, node->child1());
-            GPRTemporary result(this, Reuse, op1);
-
-            shiftOp(op, op1.gpr(), node->child2()->asInt32() & 0x1f, result.gpr());
-
-            int32Result(result.gpr(), node);
-        } else {
-            // Do not allow shift amount to be used as the result, MacroAssembler does not permit this.
-            SpeculateInt32Operand op1(this, node->child1());
-            SpeculateInt32Operand op2(this, node->child2());
-            GPRTemporary result(this, Reuse, op1);
-
-            GPRReg reg1 = op1.gpr();
-            GPRReg reg2 = op2.gpr();
-            shiftOp(op, reg1, reg2, result.gpr());
-
-            int32Result(result.gpr(), node);
-        }
+        compileShiftOp(node);
         break;
 
     case UInt32ToNumber: {
@@ -2450,6 +2408,10 @@ void SpeculativeJIT::compile(Node* node)
         doubleResult(result.fpr(), node);
         break;
     }
+
+    case ArithRandom:
+        compileArithRandom(node);
+        break;
 
     case ArithRound:
         compileArithRound(node);
@@ -3827,13 +3789,14 @@ void SpeculativeJIT::compile(Node* node)
         int32Result(result.gpr(), node);
         break;
     }
+
+    case GetRestLength: {
+        compileGetRestLength(node);
+        break;
+    }
         
     case GetScope:
         compileGetScope(node);
-        break;
-            
-    case LoadArrowFunctionThis:
-        compileLoadArrowFunctionThis(node);
         break;
             
     case SkipScope:
@@ -4190,22 +4153,52 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
 
-    case CheckHasInstance: {
+    case CheckTypeInfoFlags: {
+        compileCheckTypeInfoFlags(node);
+        break;
+    }
+
+    case OverridesHasInstance: {
+
+        Node* hasInstanceValueNode = node->child2().node();
+        JSFunction* defaultHasInstanceFunction = jsCast<JSFunction*>(node->cellOperand()->value());
+
+        MacroAssembler::Jump notDefault;
         SpeculateCellOperand base(this, node->child1());
-        GPRTemporary structure(this);
+        JSValueOperand hasInstanceValue(this, node->child2());
+        GPRTemporary result(this);
 
-        // Speculate that base 'ImplementsDefaultHasInstance'.
-        speculationCheck(Uncountable, JSValueRegs(), 0, m_jit.branchTest8(
-            MacroAssembler::Zero, 
-            MacroAssembler::Address(base.gpr(), JSCell::typeInfoFlagsOffset()), 
-            MacroAssembler::TrustedImm32(ImplementsDefaultHasInstance)));
+        GPRReg resultGPR = result.gpr();
 
-        noResult(node);
+        // If we have proven that the constructor's Symbol.hasInstance will always be the one on Function.prototype[Symbol.hasInstance]
+        // then we don't need a runtime check here. We don't worry about the case where the constructor's Symbol.hasInstance is a constant
+        // but is not the default one as fixup should have converted this check to true.
+        ASSERT(!hasInstanceValueNode->isCellConstant() || defaultHasInstanceFunction == hasInstanceValueNode->asCell());
+        if (!hasInstanceValueNode->isCellConstant())
+            notDefault = m_jit.branchPtr(MacroAssembler::NotEqual, hasInstanceValue.gpr(), TrustedImmPtr(defaultHasInstanceFunction));
+
+        // Check that base 'ImplementsDefaultHasInstance'.
+        m_jit.test8(MacroAssembler::Zero, MacroAssembler::Address(base.gpr(), JSCell::typeInfoFlagsOffset()), MacroAssembler::TrustedImm32(ImplementsDefaultHasInstance), resultGPR);
+        m_jit.or32(TrustedImm32(ValueFalse), resultGPR);
+        MacroAssembler::Jump done = m_jit.jump();
+
+        if (notDefault.isSet()) {
+            notDefault.link(&m_jit);
+            moveTrueTo(resultGPR);
+        }
+
+        done.link(&m_jit);
+        jsValueResult(resultGPR, node, DataFormatJSBoolean);
         break;
     }
 
     case InstanceOf: {
         compileInstanceOf(node);
+        break;
+    }
+
+    case InstanceOfCustom: {
+        compileInstanceOfCustom(node);
         break;
     }
         
@@ -4434,6 +4427,7 @@ void SpeculativeJIT::compile(Node* node)
 
     case NewFunction:
     case NewArrowFunction:
+    case NewGeneratorFunction:
         compileNewFunction(node);
         break;
 
@@ -4455,12 +4449,12 @@ void SpeculativeJIT::compile(Node* node)
         break;
 
     case CheckWatchdogTimer: {
-        ASSERT(m_jit.vm()->watchdog);
+        ASSERT(m_jit.vm()->watchdog());
         GPRTemporary unused(this);
         GPRReg unusedGPR = unused.gpr();
 
         JITCompiler::Jump timerDidFire = m_jit.branchTest8(JITCompiler::NonZero,
-            JITCompiler::AbsoluteAddress(m_jit.vm()->watchdog->timerDidFireAddress()));
+            JITCompiler::AbsoluteAddress(m_jit.vm()->watchdog()->timerDidFireAddress()));
 
         addSlowPathGenerator(slowPathCall(timerDidFire, this, operationHandleWatchdogTimer, unusedGPR));
         break;
@@ -4889,6 +4883,7 @@ void SpeculativeJIT::compile(Node* node)
     case BottomValue:
     case PhantomNewObject:
     case PhantomNewFunction:
+    case PhantomNewGeneratorFunction:
     case PhantomCreateActivation:
     case GetMyArgumentByVal:
     case PutHint:
@@ -4991,6 +4986,17 @@ void SpeculativeJIT::speculateDoubleRepMachineInt(Edge edge)
         m_jit.branch64(
             JITCompiler::Equal, resultGPR,
             JITCompiler::TrustedImm64(JSValue::notInt52)));
+}
+
+void SpeculativeJIT::compileArithRandom(Node* node)
+{
+    JSGlobalObject* globalObject = m_jit.graph().globalObjectFor(node->origin.semantic);
+    GPRTemporary temp1(this);
+    GPRTemporary temp2(this);
+    GPRTemporary temp3(this);
+    FPRTemporary result(this);
+    m_jit.emitRandomThunk(globalObject, temp1.gpr(), temp2.gpr(), temp3.gpr(), result.fpr());
+    doubleResult(result.fpr(), node);
 }
 
 #endif

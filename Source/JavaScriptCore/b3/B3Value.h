@@ -71,11 +71,12 @@ public:
 
     unsigned numChildren() const { return m_children.size(); }
 
-    // This computes the type using the opcode.
     Type type() const { return m_type; }
+    void setType(Type type) { m_type = type; }
 
     // This is useful when lowering. Note that this is only valid for non-void values.
     Air::Arg::Type airType() const { return Air::Arg::typeForB3Type(type()); }
+    Air::Arg::Width airWidth() const { return Air::Arg::widthForB3Type(type()); }
 
     AdjacencyList& children() { return m_children; } 
     const AdjacencyList& children() const { return m_children; }
@@ -84,7 +85,7 @@ public:
     void replaceWithNop();
 
     void dump(PrintStream&) const;
-    void deepDump(PrintStream&) const;
+    void deepDump(const Procedure&, PrintStream&) const;
 
     // This is how you cast Values. For example, if you want to do something provided that we have a
     // ArgumentRegValue, you can do:
@@ -121,6 +122,7 @@ public:
     virtual Value* checkMulConstant(Procedure&, const Value* other) const;
     virtual Value* checkNegConstant(Procedure&) const;
     virtual Value* divConstant(Procedure&, const Value* other) const; // This chooses ChillDiv semantics for integers.
+    virtual Value* modConstant(Procedure&, const Value* other) const; // This chooses ChillMod semantics.
     virtual Value* bitAndConstant(Procedure&, const Value* other) const;
     virtual Value* bitOrConstant(Procedure&, const Value* other) const;
     virtual Value* bitXorConstant(Procedure&, const Value* other) const;
@@ -128,7 +130,12 @@ public:
     virtual Value* sShrConstant(Procedure&, const Value* other) const;
     virtual Value* zShrConstant(Procedure&, const Value* other) const;
     virtual Value* bitwiseCastConstant(Procedure&) const;
-    
+    virtual Value* doubleToFloatConstant(Procedure&) const;
+    virtual Value* floatToDoubleConstant(Procedure&) const;
+    virtual Value* absConstant(Procedure&) const;
+    virtual Value* ceilConstant(Procedure&) const;
+    virtual Value* sqrtConstant(Procedure&) const;
+
     virtual TriState equalConstant(const Value* other) const;
     virtual TriState notEqualConstant(const Value* other) const;
     virtual TriState lessThanConstant(const Value* other) const;
@@ -139,6 +146,7 @@ public:
     virtual TriState belowConstant(const Value* other) const;
     virtual TriState aboveEqualConstant(const Value* other) const;
     virtual TriState belowEqualConstant(const Value* other) const;
+    virtual TriState equalOrUnorderedConstant(const Value* other) const;
 
     // If the value is a comparison then this returns the inverted form of that comparison, if
     // possible. It can be impossible for double comparisons, where for example LessThan and
@@ -165,6 +173,9 @@ public:
     bool hasDouble() const;
     double asDouble() const;
     bool isEqualToDouble(double) const; // We say "isEqualToDouble" because "isDouble" would be a bit equality.
+
+    bool hasFloat() const;
+    float asFloat() const;
 
     bool hasNumber() const;
     template<typename T> bool representableAs() const;
@@ -230,12 +241,22 @@ protected:
     }
     // This form is for those opcodes that can infer their type from the opcode and first child:
     template<typename... Arguments>
-    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Origin origin, Value* firstChild, Arguments... arguments)
+    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Origin origin, Value* firstChild)
         : m_index(index)
         , m_opcode(opcode)
         , m_type(typeFor(opcode, firstChild))
         , m_origin(origin)
-        , m_children{ firstChild, arguments... }
+        , m_children{ firstChild }
+    {
+    }
+    // This form is for those opcodes that can infer their type from the opcode and first and second child:
+    template<typename... Arguments>
+    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Origin origin, Value* firstChild, Value* secondChild, Arguments... arguments)
+        : m_index(index)
+        , m_opcode(opcode)
+        , m_type(typeFor(opcode, firstChild, secondChild))
+        , m_origin(origin)
+        , m_children{ firstChild, secondChild, arguments... }
     {
     }
     // This form is for those opcodes that can infer their type from the opcode alone, and that don't
@@ -261,7 +282,7 @@ protected:
         , m_opcode(opcode)
         , m_type(type)
         , m_origin(origin)
-        , m_children(WTF::move(children))
+        , m_children(WTFMove(children))
     {
     }
 
@@ -277,7 +298,7 @@ protected:
 private:
     friend class CheckValue; // CheckValue::convertToAdd() modifies m_opcode.
     
-    static Type typeFor(Opcode, Value* firstChild);
+    static Type typeFor(Opcode, Value* firstChild, Value* secondChild = nullptr);
 
     // This group of fields is arranged to fit in 64 bits.
     unsigned m_index;
@@ -293,26 +314,28 @@ public:
 
 class DeepValueDump {
 public:
-    DeepValueDump(const Value* value)
-        : m_value(value)
+    DeepValueDump(const Procedure& proc, const Value* value)
+        : m_proc(proc)
+        , m_value(value)
     {
     }
 
     void dump(PrintStream& out) const
     {
         if (m_value)
-            m_value->deepDump(out);
+            m_value->deepDump(m_proc, out);
         else
             out.print("<null>");
     }
 
 private:
+    const Procedure& m_proc;
     const Value* m_value;
 };
 
-inline DeepValueDump deepDump(const Value* value)
+inline DeepValueDump deepDump(const Procedure& proc, const Value* value)
 {
-    return DeepValueDump(value);
+    return DeepValueDump(proc, value);
 }
 
 } } // namespace JSC::B3

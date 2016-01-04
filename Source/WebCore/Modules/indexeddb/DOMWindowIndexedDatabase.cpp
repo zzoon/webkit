@@ -59,20 +59,20 @@ DOMWindowIndexedDatabase* DOMWindowIndexedDatabase::from(DOMWindow* window)
     if (!supplement) {
         auto newSupplement = std::make_unique<DOMWindowIndexedDatabase>(window);
         supplement = newSupplement.get();
-        provideTo(window, supplementName(), WTF::move(newSupplement));
+        provideTo(window, supplementName(), WTFMove(newSupplement));
     }
     return supplement;
 }
 
-void DOMWindowIndexedDatabase::disconnectFrameForPageCache()
+void DOMWindowIndexedDatabase::disconnectFrameForDocumentSuspension()
 {
     m_suspendedIDBFactory = m_idbFactory.release();
-    DOMWindowProperty::disconnectFrameForPageCache();
+    DOMWindowProperty::disconnectFrameForDocumentSuspension();
 }
 
-void DOMWindowIndexedDatabase::reconnectFrameFromPageCache(Frame* frame)
+void DOMWindowIndexedDatabase::reconnectFrameFromDocumentSuspension(Frame* frame)
 {
-    DOMWindowProperty::reconnectFrameFromPageCache(frame);
+    DOMWindowProperty::reconnectFrameFromDocumentSuspension(frame);
     m_idbFactory = m_suspendedIDBFactory.release();
 }
 

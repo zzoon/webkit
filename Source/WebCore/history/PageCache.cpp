@@ -122,7 +122,7 @@ static bool canCacheFrame(Frame& frame, DiagnosticLoggingClient& diagnosticLoggi
         logPageCacheFailureDiagnosticMessage(diagnosticLoggingClient, DiagnosticLoggingKeys::hasPluginsKey());
         isCacheable = false;
     }
-    if (frame.isMainFrame() && frame.document()->url().protocolIs("https") && documentLoader->response().cacheControlContainsNoStore()) {
+    if (frame.isMainFrame() && frame.document() && frame.document()->url().protocolIs("https") && documentLoader->response().cacheControlContainsNoStore()) {
         PCLOG("   -Frame is HTTPS, and cache control prohibits storing");
         logPageCacheFailureDiagnosticMessage(diagnosticLoggingClient, DiagnosticLoggingKeys::httpsNoStoreKey());
         isCacheable = false;
@@ -149,7 +149,7 @@ static bool canCacheFrame(Frame& frame, DiagnosticLoggingClient& diagnosticLoggi
     }
 
     Vector<ActiveDOMObject*> unsuspendableObjects;
-    if (!frame.document()->canSuspendActiveDOMObjectsForPageCache(&unsuspendableObjects)) {
+    if (frame.document() && !frame.document()->canSuspendActiveDOMObjectsForDocumentSuspension(&unsuspendableObjects)) {
         PCLOG("   -The document cannot suspend its active DOM Objects");
         for (auto* activeDOMObject : unsuspendableObjects) {
             PCLOG("    - Unsuspendable: ", activeDOMObject->activeDOMObjectName());
@@ -397,7 +397,7 @@ std::unique_ptr<CachedPage> PageCache::take(HistoryItem& item, Page* page)
     }
 
     m_items.remove(&item);
-    std::unique_ptr<CachedPage> cachedPage = WTF::move(item.m_cachedPage);
+    std::unique_ptr<CachedPage> cachedPage = WTFMove(item.m_cachedPage);
 
     if (cachedPage->hasExpired()) {
         LOG(PageCache, "Not restoring page for %s from back/forward cache because cache entry has expired", item.url().string().ascii().data());

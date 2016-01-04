@@ -128,8 +128,9 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_profile_type:
     case op_profile_control_flow:
     case op_mov:
-    case op_check_has_instance:
+    case op_overrides_has_instance:
     case op_instanceof:
+    case op_instanceof_custom:
     case op_is_undefined:
     case op_is_boolean:
     case op_is_number:
@@ -173,6 +174,7 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_jngreater:
     case op_jngreatereq:
     case op_loop_hint:
+    case op_watchdog:
     case op_ret:
     case op_end:
     case op_new_object:
@@ -202,7 +204,6 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_switch_char:
     case op_in:
     case op_get_scope:
-    case op_load_arrowfunction_this:
     case op_get_from_scope:
     case op_get_enumerable_length:
     case op_has_generic_property:
@@ -215,11 +216,14 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_to_index_string:
     case op_new_func:
     case op_new_func_exp:
+    case op_new_generator_func:
+    case op_new_generator_func_exp:
     case op_new_arrow_func_exp:
     case op_create_lexical_environment:
     case op_get_parent_scope:
     case op_catch:
     case op_copy_rest:
+    case op_get_rest_length:
         return CanCompileAndInline;
 
     case op_put_to_scope: {

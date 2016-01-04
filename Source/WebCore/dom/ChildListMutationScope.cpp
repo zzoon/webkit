@@ -50,7 +50,7 @@ static AccumulatorMap& accumulatorMap()
 ChildListMutationAccumulator::ChildListMutationAccumulator(ContainerNode& target, std::unique_ptr<MutationObserverInterestGroup> observers)
     : m_target(target)
     , m_lastAdded(nullptr)
-    , m_observers(WTF::move(observers))
+    , m_observers(WTFMove(observers))
 {
 }
 
@@ -61,7 +61,7 @@ ChildListMutationAccumulator::~ChildListMutationAccumulator()
     accumulatorMap().remove(m_target.ptr());
 }
 
-PassRefPtr<ChildListMutationAccumulator> ChildListMutationAccumulator::getOrCreate(ContainerNode& target)
+RefPtr<ChildListMutationAccumulator> ChildListMutationAccumulator::getOrCreate(ContainerNode& target)
 {
     AccumulatorMap::AddResult result = accumulatorMap().add(&target, nullptr);
     RefPtr<ChildListMutationAccumulator> accumulator;
@@ -71,7 +71,7 @@ PassRefPtr<ChildListMutationAccumulator> ChildListMutationAccumulator::getOrCrea
         accumulator = adoptRef(new ChildListMutationAccumulator(target, MutationObserverInterestGroup::createForChildListMutation(target)));
         result.iterator->value = accumulator.get();
     }
-    return accumulator.release();
+    return accumulator;
 }
 
 inline bool ChildListMutationAccumulator::isAddedNodeInOrder(Node& child)

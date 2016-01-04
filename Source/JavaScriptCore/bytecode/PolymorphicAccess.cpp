@@ -54,7 +54,7 @@ Watchpoint* AccessGenerationState::addWatchpoint(const ObjectPropertyCondition& 
 
 void AccessGenerationState::restoreScratch()
 {
-    allocator->restoreReusedRegistersByPopping(*jit, numberOfBytesUsedToPreserveReusedRegisters, ScratchRegisterAllocator::ExtraStackSpace::NoExtraSpace);
+    allocator->restoreReusedRegistersByPopping(*jit, preservedReusedRegisterState);
 }
 
 void AccessGenerationState::succeed()
@@ -727,7 +727,7 @@ void AccessCase::generate(AccessGenerationState& state)
 
             done.link(&jit);
 
-            jit.addPtr(CCallHelpers::TrustedImm32((jit.codeBlock()->stackPointerOffset() * sizeof(Register)) - state.numberOfBytesUsedToPreserveReusedRegisters - state.numberOfStackBytesUsedForRegisterPreservation()),
+            jit.addPtr(CCallHelpers::TrustedImm32((jit.codeBlock()->stackPointerOffset() * sizeof(Register)) - state.preservedReusedRegisterState.numberOfBytesPreserved - state.numberOfStackBytesUsedForRegisterPreservation()),
                 GPRInfo::callFrameRegister, CCallHelpers::stackPointerRegister);
             state.restoreLiveRegistersFromStackForCall(isGetter());
 
@@ -886,12 +886,13 @@ void AccessCase::generate(AccessGenerationState& state)
         else
             scratchGPR3 = InvalidGPRReg;
 
-        size_t numberOfBytesUsedToPreserveReusedRegisters = allocator.preserveReusedRegistersByPushing(jit, ScratchRegisterAllocator::ExtraStackSpace::SpaceForCCall);
+        ScratchRegisterAllocator::PreservedState preservedState =
+            allocator.preserveReusedRegistersByPushing(jit, ScratchRegisterAllocator::ExtraStackSpace::SpaceForCCall);
 
         ASSERT(structure()->transitionWatchpointSetHasBeenInvalidated());
 
         bool scratchGPRHasStorage = false;
-        bool needsToMakeRoomOnStackForCCall = !numberOfBytesUsedToPreserveReusedRegisters && codeBlock->jitType() == JITCode::FTLJIT;
+        bool needsToMakeRoomOnStackForCCall = !preservedState.numberOfBytesPreserved && codeBlock->jitType() == JITCode::FTLJIT;
 
         if (newStructure()->outOfLineCapacity() != structure()->outOfLineCapacity()) {
             size_t newSize = newStructure()->outOfLineCapacity() * sizeof(JSValue);
@@ -1016,12 +1017,12 @@ void AccessCase::generate(AccessGenerationState& state)
                 });
         }
         
-        allocator.restoreReusedRegistersByPopping(jit, numberOfBytesUsedToPreserveReusedRegisters, ScratchRegisterAllocator::ExtraStackSpace::SpaceForCCall);
+        allocator.restoreReusedRegistersByPopping(jit, preservedState);
         state.succeed();
 
         if (newStructure()->outOfLineCapacity() != structure()->outOfLineCapacity()) {
             slowPath.link(&jit);
-            allocator.restoreReusedRegistersByPopping(jit, numberOfBytesUsedToPreserveReusedRegisters, ScratchRegisterAllocator::ExtraStackSpace::SpaceForCCall);
+            allocator.restoreReusedRegistersByPopping(jit, preservedState);
             allocator.preserveUsedRegistersToScratchBufferForCall(jit, scratchBuffer, scratchGPR);
             if (needsToMakeRoomOnStackForCCall)
                 jit.makeSpaceOnStackForCCall();
@@ -1111,7 +1112,7 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerateWithCases(
     // new cases that replace each other.
     Vector<std::unique_ptr<AccessCase>> casesToAdd;
     for (unsigned i = 0; i < originalCasesToAdd.size(); ++i) {
-        std::unique_ptr<AccessCase> myCase = WTF::move(originalCasesToAdd[i]);
+        std::unique_ptr<AccessCase> myCase = WTFMove(originalCasesToAdd[i]);
 
         // Add it only if it is not replaced by the subsequent cases in the list.
         bool found = false;
@@ -1125,7 +1126,7 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerateWithCases(
         if (found)
             continue;
         
-        casesToAdd.append(WTF::move(myCase));
+        casesToAdd.append(WTFMove(myCase));
     }
 
     if (verbose)
@@ -1160,7 +1161,7 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerateWithCases(
         newCases.append(oldCase->clone());
     }
     for (auto& caseToAdd : casesToAdd)
-        newCases.append(WTF::move(caseToAdd));
+        newCases.append(WTFMove(caseToAdd));
 
     if (verbose)
         dataLog("newCases: ", listDump(newCases), "\n");
@@ -1175,7 +1176,7 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerateWithCases(
     if (!result)
         return MacroAssemblerCodePtr();
 
-    m_list = WTF::move(newCases);
+    m_list = WTFMove(newCases);
     return result;
 }
 
@@ -1184,8 +1185,8 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerateWithCase(
     std::unique_ptr<AccessCase> newAccess)
 {
     Vector<std::unique_ptr<AccessCase>> newAccesses;
-    newAccesses.append(WTF::move(newAccess));
-    return regenerateWithCases(vm, codeBlock, stubInfo, ident, WTF::move(newAccesses));
+    newAccesses.append(WTFMove(newAccess));
+    return regenerateWithCases(vm, codeBlock, stubInfo, ident, WTFMove(newAccesses));
 }
 
 bool PolymorphicAccess::visitWeak(VM& vm) const
@@ -1245,7 +1246,8 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerate(
     CCallHelpers jit(&vm, codeBlock);
     state.jit = &jit;
 
-    state.numberOfBytesUsedToPreserveReusedRegisters = allocator.preserveReusedRegistersByPushing(jit, ScratchRegisterAllocator::ExtraStackSpace::NoExtraSpace);
+    state.preservedReusedRegisterState =
+        allocator.preserveReusedRegistersByPushing(jit, ScratchRegisterAllocator::ExtraStackSpace::NoExtraSpace);
 
     bool allGuardedByStructureCheck = true;
     bool hasJSGetterSetterCall = false;
@@ -1315,7 +1317,7 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerate(
         MacroAssembler::Label makeshiftCatchHandler = jit.label();
 
         int stackPointerOffset = codeBlock->stackPointerOffset() * sizeof(EncodedJSValue);
-        stackPointerOffset -= state.numberOfBytesUsedToPreserveReusedRegisters;
+        stackPointerOffset -= state.preservedReusedRegisterState.numberOfBytesPreserved;
         stackPointerOffset -= state.numberOfStackBytesUsedForRegisterPreservation();
 
         jit.loadPtr(vm.addressOfCallFrameForCatch(), GPRInfo::callFrameRegister);
@@ -1376,9 +1378,9 @@ MacroAssemblerCodePtr PolymorphicAccess::regenerate(
         doesCalls |= entry->doesCalls();
     
     m_stubRoutine = createJITStubRoutine(code, vm, codeBlock, doesCalls, nullptr, codeBlockThatOwnsExceptionHandlers, callSiteIndexForExceptionHandling);
-    m_watchpoints = WTF::move(state.watchpoints);
+    m_watchpoints = WTFMove(state.watchpoints);
     if (!state.weakReferences.isEmpty())
-        m_weakReferences = std::make_unique<Vector<WriteBarrier<JSCell>>>(WTF::move(state.weakReferences));
+        m_weakReferences = std::make_unique<Vector<WriteBarrier<JSCell>>>(WTFMove(state.weakReferences));
     if (verbose)
         dataLog("Returning: ", code.code(), "\n");
     return code.code();

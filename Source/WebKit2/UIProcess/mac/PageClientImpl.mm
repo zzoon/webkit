@@ -390,13 +390,6 @@ void PageClientImpl::notifyInputContextAboutDiscardedComposition()
     m_impl->notifyInputContextAboutDiscardedComposition();
 }
 
-#if PLATFORM(MAC) && !USE(ASYNC_NSTEXTINPUTCLIENT)
-void PageClientImpl::notifyApplicationAboutInputContextChange()
-{
-    [NSApp updateWindows];
-}
-#endif
-
 FloatRect PageClientImpl::convertToDeviceSpace(const FloatRect& rect)
 {
     return toDeviceSpace(rect, [m_view window]);
@@ -778,9 +771,7 @@ CGRect PageClientImpl::boundsOfLayerInLayerBackedWindowCoordinates(CALayer *laye
 
 void PageClientImpl::didPerformImmediateActionHitTest(const WebHitTestResultData& result, bool contentPreventsDefault, API::Object* userData)
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
     m_impl->didPerformImmediateActionHitTest(result, contentPreventsDefault, userData);
-#endif
 }
 
 void* PageClientImpl::immediateActionAnimationControllerForHitTestResult(RefPtr<API::HitTestResult> hitTestResult, uint64_t type, RefPtr<API::Object> userData)
@@ -833,6 +824,11 @@ _WKRemoteObjectRegistry *PageClientImpl::remoteObjectRegistry()
     return m_impl->remoteObjectRegistry();
 }
 #endif
+
+void PageClientImpl::didRestoreScrollPosition()
+{
+    m_impl->didRestoreScrollPosition();
+}
 
 } // namespace WebKit
 

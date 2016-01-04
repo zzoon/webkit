@@ -460,7 +460,7 @@ void ArgumentCoder<TextureMapperAnimation>::encode(ArgumentEncoder& encoder, con
 bool ArgumentCoder<TextureMapperAnimation>::decode(ArgumentDecoder& decoder, TextureMapperAnimation& animation)
 {
     String name;
-    IntSize boxSize;
+    FloatSize boxSize;
     TextureMapperAnimation::AnimationState state;
     double startTime;
     double pauseTime;
@@ -546,9 +546,7 @@ bool ArgumentCoder<TextureMapperAnimation>::decode(ArgumentDecoder& decoder, Tex
         }
     }
 
-    animation = TextureMapperAnimation(name, keyframes, boxSize, animationObject.get(), startTime, listsMatch);
-    animation.setState(state, pauseTime);
-
+    animation = TextureMapperAnimation(name, keyframes, boxSize, *animationObject, listsMatch, startTime, pauseTime, state);
     return true;
 }
 

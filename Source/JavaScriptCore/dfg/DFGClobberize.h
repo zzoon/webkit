@@ -121,12 +121,6 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case CheckStructureImmediate:
         return;
         
-    case BitAnd:
-    case BitOr:
-    case BitXor:
-    case BitLShift:
-    case BitRShift:
-    case BitURShift:
     case ArithIMul:
     case ArithAbs:
     case ArithClz32:
@@ -139,7 +133,6 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case ArithCos:
     case ArithLog:
     case GetScope:
-    case LoadArrowFunctionThis:
     case SkipScope:
     case StringCharCodeAt:
     case StringFromCharCode:
@@ -163,6 +156,25 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case BottomValue:
     case TypeOf:
         def(PureValue(node));
+        return;
+
+    case BitAnd:
+    case BitOr:
+    case BitXor:
+    case BitLShift:
+    case BitRShift:
+    case BitURShift:
+        if (node->child1().useKind() == UntypedUse || node->child2().useKind() == UntypedUse) {
+            read(World);
+            write(Heap);
+            return;
+        }
+        def(PureValue(node));
+        return;
+
+    case ArithRandom:
+        read(MathDotRandomState);
+        write(MathDotRandomState);
         return;
         
     case HasGenericProperty:
@@ -247,15 +259,29 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     }
 
     case ArithAdd:
-    case ArithSub:
     case ArithNegate:
-    case ArithMul:
-    case ArithDiv:
     case ArithMod:
     case DoubleAsInt32:
     case UInt32ToNumber:
         def(PureValue(node, node->arithMode()));
         return;
+
+    case ArithDiv:
+    case ArithMul:
+    case ArithSub:
+        switch (node->binaryUseKind()) {
+        case Int32Use:
+        case Int52RepUse:
+        case DoubleRepUse:
+            def(PureValue(node, node->arithMode()));
+            return;
+        case UntypedUse:
+            read(World);
+            write(Heap);
+            return;
+        default:
+            DFG_CRASH(graph, node, "Bad use kind");
+        }
 
     case ArithRound:
         def(PureValue(node, static_cast<uintptr_t>(node->arithRoundingMode())));
@@ -427,6 +453,10 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case GetArgumentCount:
         read(AbstractHeap(Stack, JSStack::ArgumentCount));
         def(HeapLocation(StackPayloadLoc, AbstractHeap(Stack, JSStack::ArgumentCount)), LazyNode(node));
+        return;
+
+    case GetRestLength:
+        read(Stack);
         return;
         
     case GetLocal:
@@ -710,14 +740,24 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         read(JSCell_structureID);
         return;
 
-    case CheckHasInstance:
+    case CheckTypeInfoFlags:
         read(JSCell_typeInfoFlags);
-        def(HeapLocation(CheckHasInstanceLoc, JSCell_typeInfoFlags, node->child1()), LazyNode(node));
+        def(HeapLocation(CheckTypeInfoFlagsLoc, JSCell_typeInfoFlags, node->child1()), LazyNode(node));
+        return;
+
+    case OverridesHasInstance:
+        read(JSCell_typeInfoFlags);
+        def(HeapLocation(OverridesHasInstanceLoc, JSCell_typeInfoFlags, node->child1()), LazyNode(node));
         return;
 
     case InstanceOf:
         read(JSCell_structureID);
         def(HeapLocation(InstanceOfLoc, JSCell_structureID, node->child1(), node->child2()), LazyNode(node));
+        return;
+
+    case InstanceOfCustom:
+        read(World);
+        write(Heap);
         return;
 
     case PutStructure:
@@ -995,6 +1035,7 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case PhantomNewObject:
     case MaterializeNewObject:
     case PhantomNewFunction:
+    case PhantomNewGeneratorFunction:
     case PhantomCreateActivation:
     case MaterializeCreateActivation:
         read(HeapObjectCount);
@@ -1003,6 +1044,7 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     
     case NewArrowFunction:
     case NewFunction:
+    case NewGeneratorFunction:
         if (node->castOperand<FunctionExecutable*>()->singletonFunction()->isStillValid())
             write(Watchpoint_fire);
         read(HeapObjectCount);

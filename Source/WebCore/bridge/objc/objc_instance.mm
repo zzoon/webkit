@@ -33,7 +33,6 @@
 #import "WebScriptObjectProtocol.h"
 #import "runtime/FunctionPrototype.h"
 #import "runtime_method.h"
-#import <objc/objc-auto.h>
 #import <runtime/Error.h>
 #import <runtime/JSLock.h>
 #import <runtime/ObjectPrototype.h>
@@ -102,7 +101,7 @@ void ObjcInstance::moveGlobalExceptionToExecState(ExecState* exec)
 }
 
 ObjcInstance::ObjcInstance(id instance, RefPtr<RootObject>&& rootObject) 
-    : Instance(WTF::move(rootObject))
+    : Instance(WTFMove(rootObject))
     , _instance(instance)
     , _class(0)
     , _pool(0)
@@ -116,7 +115,7 @@ RefPtr<ObjcInstance> ObjcInstance::create(id instance, RefPtr<RootObject>&& root
         s_instanceWrapperCache = createInstanceWrapperCache();
     if (void* existingWrapper = NSMapGet(s_instanceWrapperCache, instance))
         return static_cast<ObjcInstance*>(existingWrapper);
-    RefPtr<ObjcInstance> wrapper = adoptRef(new ObjcInstance(instance, WTF::move(rootObject)));
+    RefPtr<ObjcInstance> wrapper = adoptRef(new ObjcInstance(instance, WTFMove(rootObject)));
     NSMapInsert(s_instanceWrapperCache, instance, wrapper.get());
     return wrapper;
 }
@@ -137,21 +136,10 @@ ObjcInstance::~ObjcInstance()
     [pool drain];
 }
 
-static NSAutoreleasePool* allocateAutoReleasePool()
-{
-    // If GC is enabled an autorelease pool is unnecessary, and the
-    // pool cannot be protected from GC so may be collected leading
-    // to a crash when we try to drain the release pool.
-    if (objc_collectingEnabled())
-        return nil;
-
-    return [[NSAutoreleasePool alloc] init];
-}
-
 void ObjcInstance::virtualBegin()
 {
     if (!_pool)
-        _pool = allocateAutoReleasePool();
+        _pool = [[NSAutoreleasePool alloc] init];
     _beginCount++;
 }
 

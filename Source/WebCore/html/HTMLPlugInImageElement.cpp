@@ -123,7 +123,7 @@ HTMLPlugInImageElement::HTMLPlugInImageElement(const QualifiedName& tagName, Doc
 HTMLPlugInImageElement::~HTMLPlugInImageElement()
 {
     if (m_needsDocumentActivationCallbacks)
-        document().unregisterForPageCacheSuspensionCallbacks(this);
+        document().unregisterForDocumentSuspensionCallbacks(this);
 }
 
 void HTMLPlugInImageElement::setDisplayState(DisplayState state)
@@ -194,31 +194,31 @@ RenderPtr<RenderElement> HTMLPlugInImageElement::createElementRenderer(Ref<Rende
     ASSERT(!document().inPageCache());
 
     if (displayState() >= PreparingPluginReplacement)
-        return HTMLPlugInElement::createElementRenderer(WTF::move(style), insertionPosition);
+        return HTMLPlugInElement::createElementRenderer(WTFMove(style), insertionPosition);
 
     // Once a PlugIn Element creates its renderer, it needs to be told when the Document goes
     // inactive or reactivates so it can clear the renderer before going into the page cache.
     if (!m_needsDocumentActivationCallbacks) {
         m_needsDocumentActivationCallbacks = true;
-        document().registerForPageCacheSuspensionCallbacks(this);
+        document().registerForDocumentSuspensionCallbacks(this);
     }
 
     if (displayState() == DisplayingSnapshot) {
-        auto renderSnapshottedPlugIn = createRenderer<RenderSnapshottedPlugIn>(*this, WTF::move(style));
+        auto renderSnapshottedPlugIn = createRenderer<RenderSnapshottedPlugIn>(*this, WTFMove(style));
         renderSnapshottedPlugIn->updateSnapshot(m_snapshotImage);
-        return WTF::move(renderSnapshottedPlugIn);
+        return WTFMove(renderSnapshottedPlugIn);
     }
 
     // Fallback content breaks the DOM->Renderer class relationship of this
     // class and all superclasses because createObject won't necessarily
     // return a RenderEmbeddedObject or RenderWidget.
     if (useFallbackContent())
-        return RenderElement::createFor(*this, WTF::move(style));
+        return RenderElement::createFor(*this, WTFMove(style));
 
     if (isImageType())
-        return createRenderer<RenderImage>(*this, WTF::move(style));
+        return createRenderer<RenderImage>(*this, WTFMove(style));
 
-    return HTMLPlugInElement::createElementRenderer(WTF::move(style), insertionPosition);
+    return HTMLPlugInElement::createElementRenderer(WTFMove(style), insertionPosition);
 }
 
 bool HTMLPlugInImageElement::childShouldCreateRenderer(const Node& child) const
@@ -301,8 +301,8 @@ void HTMLPlugInImageElement::finishParsingChildren()
 void HTMLPlugInImageElement::didMoveToNewDocument(Document* oldDocument)
 {
     if (m_needsDocumentActivationCallbacks) {
-        oldDocument->unregisterForPageCacheSuspensionCallbacks(this);
-        document().registerForPageCacheSuspensionCallbacks(this);
+        oldDocument->unregisterForDocumentSuspensionCallbacks(this);
+        document().registerForDocumentSuspensionCallbacks(this);
     }
 
     if (m_imageLoader)
@@ -311,19 +311,19 @@ void HTMLPlugInImageElement::didMoveToNewDocument(Document* oldDocument)
     HTMLPlugInElement::didMoveToNewDocument(oldDocument);
 }
 
-void HTMLPlugInImageElement::documentWillSuspendForPageCache()
+void HTMLPlugInImageElement::prepareForDocumentSuspension()
 {
     if (renderer())
         Style::detachRenderTree(*this);
 
-    HTMLPlugInElement::documentWillSuspendForPageCache();
+    HTMLPlugInElement::prepareForDocumentSuspension();
 }
 
-void HTMLPlugInImageElement::documentDidResumeFromPageCache()
+void HTMLPlugInImageElement::resumeFromDocumentSuspension()
 {
     setNeedsStyleRecalc(ReconstructRenderTree);
 
-    HTMLPlugInElement::documentDidResumeFromPageCache();
+    HTMLPlugInElement::resumeFromDocumentSuspension();
 }
 
 void HTMLPlugInImageElement::startLoadingImage()

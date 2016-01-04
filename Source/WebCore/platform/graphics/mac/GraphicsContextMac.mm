@@ -72,7 +72,7 @@ static bool drawFocusRingToContextAtTime(CGContextRef context, CGPathRef focusRi
 }
 #endif // !PLATFORM(IOS)
 
-void GraphicsContext::drawFocusRing(const Path& path, int /* width */, int /* offset */, const Color&)
+void GraphicsContext::drawFocusRing(const Path& path, float /* width */, float /* offset */, const Color&)
 {
 #if PLATFORM(MAC)
     if (paintingDisabled() || path.isNull())
@@ -85,7 +85,7 @@ void GraphicsContext::drawFocusRing(const Path& path, int /* width */, int /* of
 }
 
 #if PLATFORM(MAC)
-void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int, int offset, double timeOffset, bool& needsRedraw)
+void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, float, float offset, double timeOffset, bool& needsRedraw)
 {
     if (paintingDisabled())
         return;
@@ -98,7 +98,7 @@ void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int, int offse
 }
 #endif
 
-void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int, int offset, const Color&)
+void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, float, float offset, const Color&)
 {
 #if !PLATFORM(IOS)
     if (paintingDisabled())
@@ -305,9 +305,9 @@ CGColorSpaceRef linearRGBColorSpaceRef()
     if (iccProfileData)
         linearSRGBSpace = CGColorSpaceCreateWithICCProfile((CFDataRef)iccProfileData.get());
 
-    // If we fail to load the linearized sRGB ICC profile, fall back to DeviceRGB.
+    // If we fail to load the linearized sRGB ICC profile, fall back to sRGB.
     if (!linearSRGBSpace)
-        return deviceRGBColorSpaceRef();
+        return sRGBColorSpaceRef();
 
     return linearSRGBSpace;
 }

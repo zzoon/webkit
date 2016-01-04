@@ -55,14 +55,12 @@ function initializeReadableStream(underlyingSource, strategy)
     this.@controller = new @ReadableStreamController(this);
     this.@strategy = @validateAndNormalizeQueuingStrategy(strategy.size, strategy.highWaterMark);
 
-    const result = @invokeOrNoop(underlyingSource, "start", [this.@controller]);
-    const _this = this;
-    @Promise.prototype.@then.@call(@Promise.@resolve(result), function() {
-        _this.@started = true;
-        @requestReadableStreamPull(_this);
-    }, function(error) {
-        if (_this.@state === @streamReadable)
-            @errorReadableStream(_this, error);
+    @promiseInvokeOrNoopNoCatch(underlyingSource, "start", [this.@controller]).@then(() => {
+        this.@started = true;
+        @requestReadableStreamPull(this);
+    }, (error) => {
+        if (this.@state === @streamReadable)
+            @errorReadableStream(this, error);
     });
 
     return this;
@@ -95,15 +93,97 @@ function pipeThrough(streams, options)
 {
     "use strict";
 
-    this.pipeTo(streams.writable, options);
-    return streams.readable;
+    const writable = streams.writable;
+    const readable = streams.readable;
+    this.pipeTo(writable, options);
+    return readable;
 }
 
-function pipeTo(dest)
+function pipeTo(destination, options)
 {
     "use strict";
 
-    throw new @TypeError("pipeTo is not implemented");
+    // FIXME: rewrite pipeTo so as to require to have 'this' as a ReadableStream and destination be a WritableStream.
+    // See https://github.com/whatwg/streams/issues/407.
+    // We should shield the pipeTo implementation at the same time.
+
+    const preventClose = @isObject(options) && !!options.preventClose;
+    const preventAbort = @isObject(options) && !!options.preventAbort;
+    const preventCancel = @isObject(options) && !!options.preventCancel;
+
+    const source = this;
+
+    let reader;
+    let lastRead;
+    let lastWrite;
+    let closedPurposefully = false;
+    let promiseCapability;
+
+    function doPipe() {
+        lastRead = reader.read();
+        @Promise.prototype.@then.@call(@Promise.all([lastRead, destination.ready]), function([{ value, done }]) {
+            if (done)
+                closeDestination();
+            else if (destination.state === "writable") {
+                lastWrite = destination.write(value);
+                doPipe();
+            }
+        }, function(e) {
+            throw e;
+        });
+    }
+
+    function cancelSource(reason) {
+        if (!preventCancel) {
+            reader.cancel(reason);
+            reader.releaseLock();
+            promiseCapability.@reject.@call(undefined, reason);
+        } else {
+            @Promise.prototype.@then.@call(lastRead, function() {
+                reader.releaseLock();
+                promiseCapability.@reject.@call(undefined, reason);
+            });
+        }
+    }
+
+    function closeDestination() {
+        reader.releaseLock();
+
+        const destinationState = destination.state;
+        if (!preventClose && (destinationState === "waiting" || destinationState === "writable")) {
+            closedPurposefully = true;
+            @Promise.prototype.@then.@call(destination.close(), promiseCapability.@resolve, promiseCapability.@reject);
+        } else if (lastWrite !== undefined)
+            @Promise.prototype.@then.@call(lastWrite, promiseCapability.@resolve, promiseCapability.@reject);
+        else
+            promiseCapability.@resolve.@call();
+
+    }
+
+    function abortDestination(reason) {
+        reader.releaseLock();
+
+        if (!preventAbort)
+            destination.abort(reason);
+        promiseCapability.@reject.@call(undefined, reason);
+    }
+
+    promiseCapability = @newPromiseCapability(@Promise);
+
+    reader = source.getReader();
+
+    @Promise.prototype.@then.@call(reader.closed, undefined, abortDestination);
+    @Promise.prototype.@then.@call(destination.closed,
+        function() {
+            if (!closedPurposefully)
+                cancelSource(new @TypeError('destination is closing or closed and cannot be piped to anymore'));
+        },
+        cancelSource
+    );
+
+    doPipe();
+    
+    return promiseCapability.@promise;
 }
 
 function tee()

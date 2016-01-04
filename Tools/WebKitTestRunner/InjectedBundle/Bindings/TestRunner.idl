@@ -135,6 +135,7 @@ interface TestRunner {
 
     void setWillSendRequestReturnsNull(boolean flag);
     void setWillSendRequestReturnsNullOnRedirect(boolean flag);
+    void setWillSendRequestAddsHTTPBody(DOMString body);
     
     void setShouldStayOnPageAfterHandlingBeforeUnload(boolean flag);
 
@@ -178,6 +179,7 @@ interface TestRunner {
 
     // MediaStream
     void setUserMediaPermission(boolean value);
+    void setUserMediaPermissionForOrigin(boolean permission, DOMString url);
 
     // Audio testing.
     [PassContext] void setAudioResult(object data);

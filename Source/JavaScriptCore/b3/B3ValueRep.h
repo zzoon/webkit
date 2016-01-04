@@ -30,10 +30,16 @@
 
 #include "FPRInfo.h"
 #include "GPRInfo.h"
+#include "JSCJSValue.h"
 #include "Reg.h"
+#include "ValueRecovery.h"
 #include <wtf/PrintStream.h>
 
-namespace JSC { namespace B3 {
+namespace JSC {
+
+class AssemblyHelpers;
+
+namespace B3 {
 
 // We use this class to describe value representations at stackmaps. It's used both to force a
 // representation and to get the representation. When the B3 client forces a representation, we say
@@ -43,10 +49,18 @@ namespace JSC { namespace B3 {
 class ValueRep {
 public:
     enum Kind {
-        // As an input representation, this means that B3 can pick any representation. As an
-        // output representation, this means that we don't know. This will only arise for the
-        // right operand (i.e. child(1)) of a CheckMul.
-        Any,
+        // As an input representation, this means that B3 can pick any representation. As an output
+        // representation, this means that we don't know. This will only arise as an output
+        // representation for the active arguments of Check/CheckAdd/CheckSub/CheckMul.
+        WarmAny,
+
+        // Same as WarmAny, but implies that the use is cold. A cold use is not counted as a use for
+        // computing the priority of the used temporary.
+        ColdAny,
+
+        // Same as ColdAny, but also implies that the use occurs after all other effects of the stackmap
+        // value.
+        LateColdAny,
 
         // As an input representation, this means that B3 should pick some register. It could be a
         // register that this claims to clobber!
@@ -69,7 +83,7 @@ public:
     };
     
     ValueRep()
-        : m_kind(Any)
+        : m_kind(WarmAny)
     {
     }
 
@@ -82,7 +96,7 @@ public:
     ValueRep(Kind kind)
         : m_kind(kind)
     {
-        ASSERT(kind == Any || kind == SomeRegister);
+        ASSERT(kind == WarmAny || kind == ColdAny || kind == LateColdAny || kind == SomeRegister);
     }
 
     static ValueRep reg(Reg reg)
@@ -144,9 +158,9 @@ public:
         return !(*this == other);
     }
 
-    explicit operator bool() const { return kind() != Any; }
+    explicit operator bool() const { return kind() != WarmAny; }
 
-    bool isAny() const { return kind() == Any; }
+    bool isAny() const { return kind() == WarmAny || kind() == ColdAny || kind() == LateColdAny; }
 
     bool isSomeRegister() const { return kind() == SomeRegister; }
     
@@ -193,7 +207,29 @@ public:
         return bitwise_cast<double>(value());
     }
 
-    void dump(PrintStream&) const;
+    ValueRep withOffset(intptr_t offset)
+    {
+        switch (kind()) {
+        case Stack:
+            return stack(offsetFromFP() + offset);
+        case StackArgument:
+            return stackArgument(offsetFromSP() + offset);
+        default:
+            return *this;
+        }
+    }
+
+    JS_EXPORT_PRIVATE void dump(PrintStream&) const;
+
+    // This has a simple contract: it emits code to restore the value into the given register. This
+    // will work even if it requires moving between bits a GPR and a FPR.
+    void emitRestore(AssemblyHelpers&, Reg) const;
+
+    // Computes the ValueRecovery assuming that the Value* was for a JSValue (i.e. Int64).
+    // NOTE: We should avoid putting JSValue-related methods in B3, but this was hard to avoid
+    // because some parts of JSC use ValueRecovery like a general "where my bits at" object, almost
+    // exactly like ValueRep.
+    ValueRecovery recoveryForJSValue() const;
 
 private:
     Kind m_kind;

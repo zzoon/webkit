@@ -41,6 +41,7 @@
 #import "WebSystemInterface.h"
 #import <WebCore/ApplicationCacheStorage.h>
 #import <WebCore/AudioSession.h>
+#import <WebCore/CFNetworkSPI.h>
 #import <WebCore/NetworkStorageSession.h>
 #import <WebCore/PlatformCookieJar.h>
 #import <WebCore/ResourceHandle.h>
@@ -50,10 +51,6 @@
 #import <wtf/MainThread.h>
 #import <wtf/RetainPtr.h>
 #import <wtf/RunLoop.h>
-
-enum {
-    NSHTTPCookieAcceptPolicyExclusivelyFromMainDocumentDomain = 3
-};
 
 using namespace WebCore;
 
@@ -599,6 +596,9 @@ public:
         [NSNumber numberWithBool:NO], WebKitEnableInheritURIQueryComponentPreferenceKey,
 #if ENABLE(ENCRYPTED_MEDIA_V2)
         @"~/Library/WebKit/MediaKeys", WebKitMediaKeysStorageDirectoryKey,
+#endif
+#if ENABLE(MEDIA_STREAM)
+        [NSNumber numberWithBool:NO], WebKitMockCaptureDevicesEnabledPreferenceKey,
 #endif
         nil];
 
@@ -1764,7 +1764,7 @@ static NSString *classIBCreatorID = nil;
 {
     RetainPtr<CFHTTPCookieStorageRef> cookieStorage = NetworkStorageSession::defaultStorageSession().cookieStorage();
     ASSERT(cookieStorage); // Will fail when building without USE(CFNETWORK) and NetworkStorageSession::switchToNewTestingSession() was not called beforehand.
-    WKSetHTTPCookieAcceptPolicy(cookieStorage.get(), policy);
+    CFHTTPCookieStorageSetCookieAcceptPolicy(cookieStorage.get(), policy);
 }
 
 - (BOOL)isDOMPasteAllowed
@@ -2218,6 +2218,16 @@ static NSString *classIBCreatorID = nil;
     [self _setBoolValue:flag forKey:WebKitInlineMediaPlaybackRequiresPlaysInlineAttributeKey];
 }
 
+- (BOOL)invisibleAutoplayNotPermitted
+{
+    return [self _boolValueForKey:WebKitInvisibleAutoplayNotPermittedKey];
+}
+
+- (void)setInvisibleAutoplayNotPermitted:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitInvisibleAutoplayNotPermittedKey];
+}
+
 - (BOOL)mediaControlsScaleWithPageZoom
 {
     return [self _boolValueForKey:WebKitMediaControlsScaleWithPageZoomPreferenceKey];
@@ -2595,6 +2605,16 @@ static NSString *classIBCreatorID = nil;
 - (void)setMediaDataLoadsAutomatically:(BOOL)flag
 {
     [self _setBoolValue:flag forKey:WebKitMediaDataLoadsAutomaticallyPreferenceKey];
+}
+
+- (BOOL)mockCaptureDevicesEnabled
+{
+    return [self _boolValueForKey:WebKitMockCaptureDevicesEnabledPreferenceKey];
+}
+
+- (void)setMockCaptureDevicesEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitMockCaptureDevicesEnabledPreferenceKey];
 }
 
 @end

@@ -208,12 +208,6 @@ void InspectorFrontendHost::setAttachedWindowWidth(unsigned width)
         m_client->changeAttachedWindowWidth(width);
 }
 
-void InspectorFrontendHost::setToolbarHeight(unsigned height)
-{
-    if (m_client)
-        m_client->setToolbarHeight(height);
-}
-
 void InspectorFrontendHost::startWindowDrag()
 {
     if (m_client)
@@ -234,6 +228,11 @@ String InspectorFrontendHost::localizedStringsURL()
 String InspectorFrontendHost::debuggableType()
 {
     return ASCIILiteral("web");
+}
+
+unsigned InspectorFrontendHost::inspectionLevel()
+{
+    return m_client ? m_client->inspectionLevel() : 1;
 }
 
 String InspectorFrontendHost::platform()

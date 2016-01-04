@@ -33,7 +33,7 @@
 namespace WebCore {
 
 RenderSVGResourcePattern::RenderSVGResourcePattern(SVGPatternElement& element, Ref<RenderStyle>&& style)
-    : RenderSVGResourceContainer(element, WTF::move(style))
+    : RenderSVGResourceContainer(element, WTFMove(style))
     , m_shouldCollectPatternAttributes(true)
 {
 }
@@ -113,7 +113,9 @@ PatternData* RenderSVGResourcePattern::buildPattern(RenderElement& renderer, uns
     if (!tileImage)
         return nullptr;
 
-    RefPtr<Image> copiedImage = tileImage->copyImage(CopyBackingStore);
+    const IntSize tileImageSize = tileImage->logicalSize();
+
+    RefPtr<Image> copiedImage = ImageBuffer::sinkIntoImage(WTFMove(tileImage));
     if (!copiedImage)
         return nullptr;
 
@@ -122,7 +124,7 @@ PatternData* RenderSVGResourcePattern::buildPattern(RenderElement& renderer, uns
     patternData->pattern = Pattern::create(copiedImage, true, true);
 
     // Compute pattern space transformation.
-    const IntSize tileImageSize = tileImage->logicalSize();
+
     patternData->transform.translate(tileBoundaries.x(), tileBoundaries.y());
     patternData->transform.scale(tileBoundaries.width() / tileImageSize.width(), tileBoundaries.height() / tileImageSize.height());
 
@@ -141,7 +143,7 @@ PatternData* RenderSVGResourcePattern::buildPattern(RenderElement& renderer, uns
     // Various calls above may trigger invalidations in some fringe cases (ImageBuffer allocation
     // failures in the SVG image cache for example). To avoid having our PatternData deleted by
     // removeAllClientsFromCache(), we only make it visible in the cache at the very end.
-    return m_patternMap.set(&renderer, WTF::move(patternData)).iterator->value.get();
+    return m_patternMap.set(&renderer, WTFMove(patternData)).iterator->value.get();
 }
 
 bool RenderSVGResourcePattern::applyResource(RenderElement& renderer, const RenderStyle& style, GraphicsContext*& context, unsigned short resourceMode)

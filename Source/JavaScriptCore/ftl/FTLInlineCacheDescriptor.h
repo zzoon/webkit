@@ -29,9 +29,13 @@
 #if ENABLE(FTL_JIT)
 
 #include "CodeOrigin.h"
+#include "DFGAbstractValue.h"
+#include "DFGOperations.h"
+#include "FTLInlineCacheSize.h"
 #include "FTLLazySlowPath.h"
 #include "JITInlineCacheGenerator.h"
 #include "MacroAssembler.h"
+#include "SnippetOperand.h"
 #include <wtf/text/UniquedStringImpl.h>
 
 namespace JSC { namespace FTL {
@@ -123,23 +127,171 @@ public:
     Vector<CheckInGenerator> m_generators;
 };
 
-class ArithSubDescriptor : public InlineCacheDescriptor {
+class BinaryOpDescriptor : public InlineCacheDescriptor {
 public:
-    ArithSubDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, ResultType leftType, ResultType rightType)
+    typedef EncodedJSValue (*SlowPathFunction)(ExecState*, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2);
+
+    unsigned nodeType() const { return m_nodeType; }
+    size_t size() const { return m_size; }
+    const char* name() const { return m_name; }
+    SlowPathFunction slowPathFunction() const { return m_slowPathFunction; }
+
+    SnippetOperand leftOperand() { return m_leftOperand; }
+    SnippetOperand rightOperand() { return m_rightOperand; }
+
+    Vector<MacroAssembler::Label> m_slowPathStarts;
+
+protected:
+    BinaryOpDescriptor(unsigned nodeType, unsigned stackmapID, CodeOrigin codeOrigin,
+        size_t size, const char* name, SlowPathFunction slowPathFunction,
+        const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
         : InlineCacheDescriptor(stackmapID, codeOrigin, nullptr)
-        , m_leftType(leftType)
-        , m_rightType(rightType)
+        , m_nodeType(nodeType)
+        , m_size(size)
+        , m_name(name)
+        , m_slowPathFunction(slowPathFunction)
+        , m_leftOperand(leftOperand)
+        , m_rightOperand(rightOperand)
     {
     }
 
-    ResultType leftType() const { return m_leftType; }
-    ResultType rightType() const { return m_rightType; }
-    
-    Vector<MacroAssembler::Label> m_slowPathStarts;
+    unsigned m_nodeType;
+    size_t m_size;
+    const char* m_name;
+    SlowPathFunction m_slowPathFunction;
 
-private:
-    ResultType m_leftType;
-    ResultType m_rightType;
+    SnippetOperand m_leftOperand;
+    SnippetOperand m_rightOperand;
+};
+
+class BitAndDescriptor : public BinaryOpDescriptor {
+public:
+    BitAndDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfBitAnd(); }
+    static unsigned nodeType() { return DFG::BitAnd; }
+    static const char* opName() { return "BitAnd"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueBitAnd; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return slowPathFunction(); }
+};
+
+class BitOrDescriptor : public BinaryOpDescriptor {
+public:
+    BitOrDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfBitOr(); }
+    static unsigned nodeType() { return DFG::BitOr; }
+    static const char* opName() { return "BitOr"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueBitOr; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return slowPathFunction(); }
+};
+
+class BitXorDescriptor : public BinaryOpDescriptor {
+public:
+    BitXorDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfBitXor(); }
+    static unsigned nodeType() { return DFG::BitXor; }
+    static const char* opName() { return "BitXor"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueBitXor; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return slowPathFunction(); }
+};
+
+class BitLShiftDescriptor : public BinaryOpDescriptor {
+public:
+    BitLShiftDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfBitLShift(); }
+    static unsigned nodeType() { return DFG::BitLShift; }
+    static const char* opName() { return "BitLShift"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueBitLShift; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return slowPathFunction(); }
+};
+
+class BitRShiftDescriptor : public BinaryOpDescriptor {
+public:
+    BitRShiftDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfBitRShift(); }
+    static unsigned nodeType() { return DFG::BitRShift; }
+    static const char* opName() { return "BitRShift"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueBitRShift; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return slowPathFunction(); }
+};
+
+class BitURShiftDescriptor : public BinaryOpDescriptor {
+public:
+    BitURShiftDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfBitURShift(); }
+    static unsigned nodeType() { return DFG::BitURShift; }
+    static const char* opName() { return "BitURShift"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueBitURShift; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return slowPathFunction(); }
+};
+
+class ArithDivDescriptor : public BinaryOpDescriptor {
+public:
+    ArithDivDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfArithDiv(); }
+    static unsigned nodeType() { return DFG::ArithDiv; }
+    static const char* opName() { return "ArithDiv"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueDiv; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return slowPathFunction(); }
+};
+
+class ArithMulDescriptor : public BinaryOpDescriptor {
+public:
+    ArithMulDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfArithMul(); }
+    static unsigned nodeType() { return DFG::ArithMul; }
+    static const char* opName() { return "ArithMul"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueMul; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return slowPathFunction(); }
+};
+
+class ArithSubDescriptor : public BinaryOpDescriptor {
+public:
+    ArithSubDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfArithSub(); }
+    static unsigned nodeType() { return DFG::ArithSub; }
+    static const char* opName() { return "ArithSub"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueSub; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return slowPathFunction(); }
+};
+
+class ValueAddDescriptor : public BinaryOpDescriptor {
+public:
+    ValueAddDescriptor(unsigned stackmapID, CodeOrigin codeOrigin, const SnippetOperand& leftOperand, const SnippetOperand& rightOperand)
+        : BinaryOpDescriptor(nodeType(), stackmapID, codeOrigin, icSize(), opName(), slowPathFunction(), leftOperand, rightOperand)
+    { }
+
+    static size_t icSize() { return sizeOfValueAdd(); }
+    static unsigned nodeType() { return DFG::ValueAdd; }
+    static const char* opName() { return "ValueAdd"; }
+    static J_JITOperation_EJJ slowPathFunction() { return DFG::operationValueAdd; }
+    static J_JITOperation_EJJ nonNumberSlowPathFunction() { return DFG::operationValueAddNotNumber; }
 };
 
 // You can create a lazy slow path call in lowerDFGToLLVM by doing:

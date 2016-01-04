@@ -267,7 +267,7 @@ public:
 
     DECLARE_INFO;
     typedef JSNonFinalObject Base;
-    static const unsigned StructureFlags = Base::StructureFlags | JSC::HasImpureGetOwnPropertySlot | JSC::OverridesGetOwnPropertySlot;
+    static const unsigned StructureFlags = Base::StructureFlags | JSC::GetOwnPropertySlotIsImpure | JSC::OverridesGetOwnPropertySlot;
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
@@ -1464,7 +1464,7 @@ EncodedJSValue JSC_HOST_CALL functionFindTypeForExpression(ExecState* exec)
 
     RELEASE_ASSERT(exec->argument(1).isString());
     String substring = exec->argument(1).getString(exec);
-    String sourceCodeText = executable->source().toString();
+    String sourceCodeText = executable->source().view().toString();
     unsigned offset = static_cast<unsigned>(sourceCodeText.find(substring) + executable->source().startOffset());
     
     String jsonString = exec->vm().typeProfiler()->typeInformationForExpressionAtOffset(TypeProfilerSearchDescriptorNormal, offset, executable->sourceID(), exec->vm());
@@ -1502,7 +1502,7 @@ EncodedJSValue JSC_HOST_CALL functionHasBasicBlockExecuted(ExecState* exec)
 
     RELEASE_ASSERT(exec->argument(1).isString());
     String substring = exec->argument(1).getString(exec);
-    String sourceCodeText = executable->source().toString();
+    String sourceCodeText = executable->source().view().toString();
     RELEASE_ASSERT(sourceCodeText.contains(substring));
     int offset = sourceCodeText.find(substring) + executable->source().startOffset();
     
@@ -1520,7 +1520,7 @@ EncodedJSValue JSC_HOST_CALL functionBasicBlockExecutionCount(ExecState* exec)
 
     RELEASE_ASSERT(exec->argument(1).isString());
     String substring = exec->argument(1).getString(exec);
-    String sourceCodeText = executable->source().toString();
+    String sourceCodeText = executable->source().view().toString();
     RELEASE_ASSERT(sourceCodeText.contains(substring));
     int offset = sourceCodeText.find(substring) + executable->source().startOffset();
     

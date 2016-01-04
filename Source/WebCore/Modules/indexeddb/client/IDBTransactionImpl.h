@@ -54,11 +54,13 @@ namespace IDBClient {
 class IDBCursor;
 class IDBDatabase;
 class IDBIndex;
+class IDBOpenDBRequest;
 class TransactionOperation;
 
 class IDBTransaction : public WebCore::IDBTransaction {
 public:
     static Ref<IDBTransaction> create(IDBDatabase&, const IDBTransactionInfo&);
+    static Ref<IDBTransaction> create(IDBDatabase&, const IDBTransactionInfo&, IDBOpenDBRequest&);
 
     virtual ~IDBTransaction() override final;
 
@@ -66,8 +68,8 @@ public:
     virtual const String& mode() const override final;
     virtual WebCore::IDBDatabase* db() override final;
     virtual RefPtr<DOMError> error() const override final;
-    virtual RefPtr<WebCore::IDBObjectStore> objectStore(const String& name, ExceptionCode&) override final;
-    virtual void abort(ExceptionCode&) override final;
+    virtual RefPtr<WebCore::IDBObjectStore> objectStore(const String& name, ExceptionCodeWithMessage&) override final;
+    virtual void abort(ExceptionCodeWithMessage&) override final;
 
     virtual EventTargetInterface eventTargetInterface() const override final { return IDBTransactionEventTargetInterfaceType; }
     virtual ScriptExecutionContext* scriptExecutionContext() const override final { return ActiveDOMObject::scriptExecutionContext(); }
@@ -77,13 +79,14 @@ public:
     virtual bool dispatchEvent(Event&) override final;
 
     virtual const char* activeDOMObjectName() const override final;
-    virtual bool canSuspendForPageCache() const override final;
+    virtual bool canSuspendForDocumentSuspension() const override final;
     virtual bool hasPendingActivity() const override final;
+    virtual void stop() override final;
 
-    const IDBTransactionInfo info() const { return m_info; }
+    const IDBTransactionInfo& info() const { return m_info; }
     IDBDatabase& database() { return m_database.get(); }
     const IDBDatabase& database() const { return m_database.get(); }
-    IDBDatabaseInfo* originalDatabaseInfo() const { return m_originalDatabaseInfo.get(); }
+    IDBDatabaseInfo* originalDatabaseInfo() const { return m_info.originalDatabaseInfo(); }
 
     void didStart(const IDBError&);
     void didAbort(const IDBError&);
@@ -114,6 +117,8 @@ public:
     void addRequest(IDBRequest&);
     void removeRequest(IDBRequest&);
 
+    void abortDueToFailedRequest(DOMError&);
+
     IDBConnectionToServer& serverConnection();
 
     void activate();
@@ -121,13 +126,15 @@ public:
 
     void operationDidComplete(TransactionOperation&);
 
-private:
-    IDBTransaction(IDBDatabase&, const IDBTransactionInfo&);
-
     bool isFinishedOrFinishing() const;
+    bool isFinished() const { return m_state == IndexedDB::TransactionState::Finished; }
+
+private:
+    IDBTransaction(IDBDatabase&, const IDBTransactionInfo&, IDBOpenDBRequest*);
 
     void commit();
 
+    void notifyDidAbort(const IDBError&);
     void finishAbortOrCommit();
 
     void scheduleOperation(RefPtr<TransactionOperation>&&);
@@ -140,7 +147,7 @@ private:
     Ref<IDBRequest> requestIndexRecord(ScriptExecutionContext&, IDBIndex&, IndexedDB::IndexRecordType, const IDBKeyRangeData&);
 
     void commitOnServer(TransactionOperation&);
-    void abortOnServer(TransactionOperation&);
+    void abortOnServerAndCancelRequests(TransactionOperation&);
 
     void createObjectStoreOnServer(TransactionOperation&, const IDBObjectStoreInfo&);
     void didCreateObjectStoreOnServer(const IDBResultData&);
@@ -180,26 +187,29 @@ private:
 
     void scheduleOperationTimer();
 
-    void immediateAbort();
-
     Ref<IDBDatabase> m_database;
     IDBTransactionInfo m_info;
-    std::unique_ptr<IDBDatabaseInfo> m_originalDatabaseInfo;
 
     IndexedDB::TransactionState m_state { IndexedDB::TransactionState::Inactive };
     bool m_startedOnServer { false };
 
     IDBError m_idbError;
+    RefPtr<DOMError> m_domError;
 
     Timer m_operationTimer;
     std::unique_ptr<Timer> m_activationTimer;
 
+    RefPtr<IDBOpenDBRequest> m_openDBRequest;
+
     Deque<RefPtr<TransactionOperation>> m_transactionOperationQueue;
+    Deque<RefPtr<TransactionOperation>> m_abortQueue;
     HashMap<IDBResourceIdentifier, RefPtr<TransactionOperation>> m_transactionOperationMap;
 
     HashMap<String, RefPtr<IDBObjectStore>> m_referencedObjectStores;
 
     HashSet<RefPtr<IDBRequest>> m_openRequests;
+
+    bool m_contextStopped { false };
 };
 
 class TransactionActivator {

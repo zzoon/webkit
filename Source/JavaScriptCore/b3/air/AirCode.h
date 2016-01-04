@@ -31,6 +31,7 @@
 #include "AirBasicBlock.h"
 #include "AirSpecial.h"
 #include "AirStackSlot.h"
+#include "AirTmp.h"
 #include "RegisterAtOffsetList.h"
 #include "StackAlignment.h"
 
@@ -56,6 +57,9 @@ public:
 
     BasicBlock* addBlock(double frequency = 1);
 
+    // Note that you can rely on stack slots always getting indices that are larger than the index
+    // of any prior stack slot. In fact, all stack slots you create in the future will have an index
+    // that is >= stackSlots().size().
     StackSlot* addStackSlot(unsigned byteSize, StackSlotKind, StackSlotValue* = nullptr);
     StackSlot* addStackSlot(StackSlotValue*);
 
@@ -103,6 +107,7 @@ public:
         m_frameSize = frameSize;
     }
 
+    const RegisterAtOffsetList& calleeSaveRegisters() const { return m_calleeSaveRegisters; }
     RegisterAtOffsetList& calleeSaveRegisters() { return m_calleeSaveRegisters; }
 
     // Recomputes predecessors and deletes unreachable blocks.
@@ -288,6 +293,18 @@ public:
     };
 
     SpecialsCollection specials() const { return SpecialsCollection(*this); }
+
+    template<typename Callback>
+    void forAllTmps(const Callback& callback) const
+    {
+        for (unsigned i = m_numGPTmps; i--;)
+            callback(Tmp::gpTmpForIndex(i));
+        for (unsigned i = m_numFPTmps; i--;)
+            callback(Tmp::fpTmpForIndex(i));
+    }
+
+    void addFastTmp(Tmp);
+    bool isFastTmp(Tmp tmp) const { return m_fastTmps.contains(tmp); }
     
     // The name has to be a string literal, since we don't do any memory management for the string.
     void setLastPhaseName(const char* name)
@@ -306,6 +323,7 @@ private:
     Vector<std::unique_ptr<StackSlot>> m_stackSlots;
     Vector<std::unique_ptr<BasicBlock>> m_blocks;
     Vector<std::unique_ptr<Special>> m_specials;
+    HashSet<Tmp> m_fastTmps;
     CCallSpecial* m_cCallSpecial { nullptr };
     unsigned m_numGPTmps { 0 };
     unsigned m_numFPTmps { 0 };

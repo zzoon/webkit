@@ -130,6 +130,7 @@ allowsInlineMediaPlayback initial=defaultAllowsInlineMediaPlayback
 inlineMediaPlaybackRequiresPlaysInlineAttribute initial=defaultInlineMediaPlaybackRequiresPlaysInlineAttribute
 allowsPictureInPictureMediaPlayback initial=defaultAllowsPictureInPictureMediaPlayback
 mediaControlsScaleWithPageZoom initial=defaultMediaControlsScaleWithPageZoom
+invisibleAutoplayNotPermitted initial=false
 passwordEchoEnabled initial=false
 suppressesIncrementalRendering initial=false
 incrementalRenderingSuppressionTimeoutInSeconds type=double, initial=defaultIncrementalRenderingSuppressionTimeoutInSeconds
@@ -232,8 +233,6 @@ useImageDocumentForSubframePDF initial=false
 maximumSourceBufferSize type=int, initial=318767104, conditional=MEDIA_SOURCE
 
 serviceControlsEnabled initial=false, conditional=SERVICE_CONTROLS
-
-ignoreViewportScalingConstraints initial=false
 
 appleMailPaginationQuirkEnabled initial=false
 

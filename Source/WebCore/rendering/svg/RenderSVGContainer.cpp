@@ -38,7 +38,7 @@
 namespace WebCore {
 
 RenderSVGContainer::RenderSVGContainer(SVGElement& element, Ref<RenderStyle>&& style)
-    : RenderSVGModelObject(element, WTF::move(style))
+    : RenderSVGModelObject(element, WTFMove(style))
     , m_objectBoundingBoxValid(false)
     , m_needsBoundariesUpdate(true)
 {
@@ -173,7 +173,7 @@ bool RenderSVGContainer::nodeAtFloatPoint(const HitTestRequest& request, HitTest
     if (!pointIsInsideViewportClip(pointInParent))
         return false;
 
-    FloatPoint localPoint = localToParentTransform().inverse().mapPoint(pointInParent);
+    FloatPoint localPoint = localToParentTransform().inverse().valueOr(AffineTransform()).mapPoint(pointInParent);
 
     if (!SVGRenderSupport::pointInClippingArea(*this, localPoint))
         return false;

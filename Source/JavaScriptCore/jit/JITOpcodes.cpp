@@ -105,17 +105,29 @@ void JIT::emitSlow_op_new_object(Instruction* currentInstruction, Vector<SlowCas
     emitStoreCell(dst, returnValueGPR);
 }
 
-void JIT::emit_op_check_has_instance(Instruction* currentInstruction)
+void JIT::emit_op_overrides_has_instance(Instruction* currentInstruction)
 {
-    int baseVal = currentInstruction[3].u.operand;
+    int dst = currentInstruction[1].u.operand;
+    int constructor = currentInstruction[2].u.operand;
+    int hasInstanceValue = currentInstruction[3].u.operand;
 
-    emitGetVirtualRegister(baseVal, regT0);
+    emitGetVirtualRegister(hasInstanceValue, regT0);
 
-    // Check that baseVal is a cell.
-    emitJumpSlowCaseIfNotJSCell(regT0, baseVal);
+    // We don't jump if we know what Symbol.hasInstance would do.
+    Jump customhasInstanceValue = branchPtr(NotEqual, regT0, TrustedImmPtr(m_codeBlock->globalObject()->functionProtoHasInstanceSymbolFunction()));
 
-    // Check that baseVal 'ImplementsHasInstance'.
-    addSlowCase(branchTest8(Zero, Address(regT0, JSCell::typeInfoFlagsOffset()), TrustedImm32(ImplementsDefaultHasInstance)));
+    emitGetVirtualRegister(constructor, regT0);
+
+    // Check that constructor 'ImplementsDefaultHasInstance' i.e. the object is not a C-API user nor a bound function.
+    test8(Zero, Address(regT0, JSCell::typeInfoFlagsOffset()), TrustedImm32(ImplementsDefaultHasInstance), regT0);
+    emitTagBool(regT0);
+    Jump done = jump();
+
+    customhasInstanceValue.link(this);
+    move(TrustedImm32(ValueTrue), regT0);
+
+    done.link(this);
+    emitPutVirtualRegister(dst);
 }
 
 void JIT::emit_op_instanceof(Instruction* currentInstruction)
@@ -129,7 +141,7 @@ void JIT::emit_op_instanceof(Instruction* currentInstruction)
     emitGetVirtualRegister(value, regT2);
     emitGetVirtualRegister(proto, regT1);
 
-    // Check that proto are cells.  baseVal must be a cell - this is checked by op_check_has_instance.
+    // Check that proto are cells. baseVal must be a cell - this is checked by the get_by_id for Symbol.hasInstance.
     emitJumpSlowCaseIfNotJSCell(regT2, value);
     emitJumpSlowCaseIfNotJSCell(regT1, proto);
 
@@ -155,6 +167,12 @@ void JIT::emit_op_instanceof(Instruction* currentInstruction)
     // isInstance jumps right down to here, to skip setting the result to false (it has already set true).
     isInstance.link(this);
     emitPutVirtualRegister(dst);
+}
+
+void JIT::emit_op_instanceof_custom(Instruction*)
+{
+    // This always goes to slow path since we expect it to be rare.
+    addSlowCase(jump());
 }
 
 void JIT::emit_op_is_undefined(Instruction* currentInstruction)
@@ -399,23 +417,6 @@ void JIT::emit_op_neq(Instruction* currentInstruction)
 
     emitPutVirtualRegister(currentInstruction[1].u.operand);
 
-}
-
-void JIT::emit_op_bitxor(Instruction* currentInstruction)
-{
-    emitGetVirtualRegisters(currentInstruction[2].u.operand, regT0, currentInstruction[3].u.operand, regT1);
-    emitJumpSlowCaseIfNotInt(regT0, regT1, regT2);
-    xor64(regT1, regT0);
-    emitTagInt(regT0, regT0);
-    emitPutVirtualRegister(currentInstruction[1].u.operand);
-}
-
-void JIT::emit_op_bitor(Instruction* currentInstruction)
-{
-    emitGetVirtualRegisters(currentInstruction[2].u.operand, regT0, currentInstruction[3].u.operand, regT1);
-    emitJumpSlowCaseIfNotInt(regT0, regT1, regT2);
-    or64(regT1, regT0);
-    emitPutVirtualRegister(currentInstruction[1].u.operand);
 }
 
 void JIT::emit_op_throw(Instruction* currentInstruction)
@@ -684,14 +685,6 @@ void JIT::emit_op_get_scope(Instruction* currentInstruction)
     loadPtr(Address(regT0, JSFunction::offsetOfScopeChain()), regT0);
     emitStoreCell(dst, regT0);
 }
-    
-void JIT::emit_op_load_arrowfunction_this(Instruction* currentInstruction)
-{
-    int dst = currentInstruction[1].u.operand;
-    emitGetFromCallFrameHeaderPtr(JSStack::Callee, regT0);
-    loadPtr(Address(regT0, JSArrowFunction::offsetOfThisValue()), regT0);
-    emitStoreCell(dst, regT0);
-}
 
 void JIT::emit_op_to_this(Instruction* currentInstruction)
 {
@@ -819,20 +812,6 @@ void JIT::emitSlow_op_jtrue(Instruction* currentInstruction, Vector<SlowCaseEntr
     emitJumpSlowToHot(branchTest32(NonZero, returnValueGPR), currentInstruction[2].u.operand);
 }
 
-void JIT::emitSlow_op_bitxor(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    linkSlowCase(iter);
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_bitxor);
-    slowPathCall.call();
-}
-
-void JIT::emitSlow_op_bitor(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    linkSlowCase(iter);
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_bitor);
-    slowPathCall.call();
-}
-
 void JIT::emitSlow_op_eq(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
     linkSlowCase(iter);
@@ -868,21 +847,6 @@ void JIT::emitSlow_op_nstricteq(Instruction* currentInstruction, Vector<SlowCase
     slowPathCall.call();
 }
 
-void JIT::emitSlow_op_check_has_instance(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    int dst = currentInstruction[1].u.operand;
-    int value = currentInstruction[2].u.operand;
-    int baseVal = currentInstruction[3].u.operand;
-
-    linkSlowCaseIfNotJSCell(iter, baseVal);
-    linkSlowCase(iter);
-    emitGetVirtualRegister(value, regT0);
-    emitGetVirtualRegister(baseVal, regT1);
-    callOperation(operationCheckHasInstance, dst, regT0, regT1);
-
-    emitJumpSlowToHot(jump(), currentInstruction[4].u.operand);
-}
-
 void JIT::emitSlow_op_instanceof(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
     int dst = currentInstruction[1].u.operand;
@@ -895,6 +859,22 @@ void JIT::emitSlow_op_instanceof(Instruction* currentInstruction, Vector<SlowCas
     emitGetVirtualRegister(value, regT0);
     emitGetVirtualRegister(proto, regT1);
     callOperation(operationInstanceOf, dst, regT0, regT1);
+}
+
+void JIT::emitSlow_op_instanceof_custom(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
+{
+    int dst = currentInstruction[1].u.operand;
+    int value = currentInstruction[2].u.operand;
+    int constructor = currentInstruction[3].u.operand;
+    int hasInstanceValue = currentInstruction[4].u.operand;
+
+    linkSlowCase(iter);
+    emitGetVirtualRegister(value, regT0);
+    emitGetVirtualRegister(constructor, regT1);
+    emitGetVirtualRegister(hasInstanceValue, regT2);
+    callOperation(operationInstanceOfCustom, regT0, regT1, regT2);
+    emitTagBool(returnValueGPR);
+    emitPutVirtualRegister(dst, returnValueGPR);
 }
 
 void JIT::emitSlow_op_to_number(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -923,10 +903,6 @@ void JIT::emit_op_loop_hint(Instruction*)
         addSlowCase(branchAdd32(PositiveOrZero, TrustedImm32(Options::executionCounterIncrementForLoop()),
             AbsoluteAddress(m_codeBlock->addressOfJITExecuteCounter())));
     }
-
-    // Emit the watchdog timer check:
-    if (m_vm->watchdog)
-        addSlowCase(branchTest8(NonZero, AbsoluteAddress(m_vm->watchdog->timerDidFireAddress())));
 }
 
 void JIT::emitSlow_op_loop_hint(Instruction*, Vector<SlowCaseEntry>::iterator& iter)
@@ -950,16 +926,22 @@ void JIT::emitSlow_op_loop_hint(Instruction*, Vector<SlowCaseEntry>::iterator& i
 
         emitJumpSlowToHot(jump(), OPCODE_LENGTH(op_loop_hint));
     }
+#else
+    UNUSED_PARAM(iter);
 #endif
+}
 
-    // Emit the slow path of the watchdog timer check:
-    if (m_vm->watchdog) {
-        linkSlowCase(iter);
-        callOperation(operationHandleWatchdogTimer);
+void JIT::emit_op_watchdog(Instruction*)
+{
+    ASSERT(m_vm->watchdog());
+    addSlowCase(branchTest8(NonZero, AbsoluteAddress(m_vm->watchdog()->timerDidFireAddress())));
+}
 
-        emitJumpSlowToHot(jump(), OPCODE_LENGTH(op_loop_hint));
-    }
-
+void JIT::emitSlow_op_watchdog(Instruction*, Vector<SlowCaseEntry>::iterator& iter)
+{
+    ASSERT(m_vm->watchdog());
+    linkSlowCase(iter);
+    callOperation(operationHandleWatchdogTimer);
 }
 
 void JIT::emit_op_new_regexp(Instruction* currentInstruction)
@@ -967,7 +949,7 @@ void JIT::emit_op_new_regexp(Instruction* currentInstruction)
     callOperation(operationNewRegexp, currentInstruction[1].u.operand, m_codeBlock->regexp(currentInstruction[2].u.operand));
 }
 
-void JIT::emit_op_new_func(Instruction* currentInstruction)
+void JIT::emitNewFuncCommon(Instruction* currentInstruction)
 {
     Jump lazyJump;
     int dst = currentInstruction[1].u.operand;
@@ -978,33 +960,36 @@ void JIT::emit_op_new_func(Instruction* currentInstruction)
     emitLoadPayload(currentInstruction[2].u.operand, regT0);
 #endif
     FunctionExecutable* funcExec = m_codeBlock->functionDecl(currentInstruction[3].u.operand);
-    callOperation(operationNewFunction, dst, regT0, funcExec);
+
+    OpcodeID opcodeID = m_vm->interpreter->getOpcodeID(currentInstruction->u.opcode);
+    if (opcodeID == op_new_func)
+        callOperation(operationNewFunction, dst, regT0, funcExec);
+    else {
+        ASSERT(opcodeID == op_new_generator_func);
+        callOperation(operationNewGeneratorFunction, dst, regT0, funcExec);
+    }
 }
 
-void JIT::emit_op_new_func_exp(Instruction* currentInstruction)
+void JIT::emit_op_new_func(Instruction* currentInstruction)
 {
-    emitNewFuncExprCommon(currentInstruction);
+    emitNewFuncCommon(currentInstruction);
 }
-    
+
+void JIT::emit_op_new_generator_func(Instruction* currentInstruction)
+{
+    emitNewFuncCommon(currentInstruction);
+}
+
 void JIT::emitNewFuncExprCommon(Instruction* currentInstruction)
 {
-    OpcodeID opcodeID = m_vm->interpreter->getOpcodeID(currentInstruction->u.opcode);
-    bool isArrowFunction = opcodeID == op_new_arrow_func_exp;
-    
     Jump notUndefinedScope;
     int dst = currentInstruction[1].u.operand;
 #if USE(JSVALUE64)
     emitGetVirtualRegister(currentInstruction[2].u.operand, regT0);
-    if (isArrowFunction)
-        emitGetVirtualRegister(currentInstruction[4].u.operand, regT1);
     notUndefinedScope = branch64(NotEqual, regT0, TrustedImm64(JSValue::encode(jsUndefined())));
     store64(TrustedImm64(JSValue::encode(jsUndefined())), Address(callFrameRegister, sizeof(Register) * dst));
 #else
     emitLoadPayload(currentInstruction[2].u.operand, regT0);
-    if (isArrowFunction) {
-        int value = currentInstruction[4].u.operand;
-        emitLoad(value, regT3, regT2);
-    }
     notUndefinedScope = branch32(NotEqual, tagFor(currentInstruction[2].u.operand), TrustedImm32(JSValue::UndefinedTag));
     emitStore(dst, jsUndefined());
 #endif
@@ -1012,17 +997,28 @@ void JIT::emitNewFuncExprCommon(Instruction* currentInstruction)
     notUndefinedScope.link(this);
         
     FunctionExecutable* function = m_codeBlock->functionExpr(currentInstruction[3].u.operand);
-    if (isArrowFunction)
-#if USE(JSVALUE64)
-        callOperation(operationNewArrowFunction, dst, regT0, function, regT1);
-#else 
-        callOperation(operationNewArrowFunction, dst, regT0, function, regT3, regT2);
-#endif
-    else
+    OpcodeID opcodeID = m_vm->interpreter->getOpcodeID(currentInstruction->u.opcode);
+
+    if (opcodeID == op_new_func_exp || opcodeID == op_new_arrow_func_exp)
         callOperation(operationNewFunction, dst, regT0, function);
+    else {
+        ASSERT(opcodeID == op_new_generator_func_exp);
+        callOperation(operationNewGeneratorFunction, dst, regT0, function);
+    }
+
     done.link(this);
 }
-    
+
+void JIT::emit_op_new_func_exp(Instruction* currentInstruction)
+{
+    emitNewFuncExprCommon(currentInstruction);
+}
+
+void JIT::emit_op_new_generator_func_exp(Instruction* currentInstruction)
+{
+    emitNewFuncExprCommon(currentInstruction);
+}
+
 void JIT::emit_op_new_arrow_func_exp(Instruction* currentInstruction)
 {
     emitNewFuncExprCommon(currentInstruction);
@@ -1402,6 +1398,47 @@ void JIT::emit_op_create_out_of_band_arguments(Instruction* currentInstruction)
 void JIT::emit_op_copy_rest(Instruction* currentInstruction)
 {
     JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_copy_rest);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_get_rest_length(Instruction* currentInstruction)
+{
+    int dst = currentInstruction[1].u.operand;
+    unsigned numParamsToSkip = currentInstruction[2].u.unsignedValue;
+    load32(payloadFor(JSStack::ArgumentCount), regT0);
+    sub32(TrustedImm32(1), regT0);
+    Jump zeroLength = branch32(LessThanOrEqual, regT0, Imm32(numParamsToSkip));
+    sub32(Imm32(numParamsToSkip), regT0);
+#if USE(JSVALUE64)
+    boxInt32(regT0, JSValueRegs(regT0));
+#endif
+    Jump done = jump();
+
+    zeroLength.link(this);
+#if USE(JSVALUE64)
+    move(TrustedImm64(JSValue::encode(jsNumber(0))), regT0);
+#else
+    move(TrustedImm32(0), regT0);
+#endif
+
+    done.link(this);
+#if USE(JSVALUE64)
+    emitPutVirtualRegister(dst, regT0);
+#else
+    move(TrustedImm32(JSValue::Int32Tag), regT1);
+    emitPutVirtualRegister(dst, JSValueRegs(regT1, regT0));
+#endif
+}
+
+void JIT::emit_op_save(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_save);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_resume(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_resume);
     slowPathCall.call();
 }
 

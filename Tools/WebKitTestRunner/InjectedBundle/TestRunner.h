@@ -27,19 +27,24 @@
 #define TestRunner_h
 
 #include "JSWrappable.h"
+#include "StringFunctions.h"
 #include <JavaScriptCore/JSRetainPtr.h>
 #include <WebKit/WKBundleScriptWorld.h>
 #include <WebKit/WKRetainPtr.h>
 #include <string>
 #include <wtf/PassRefPtr.h>
+#include <wtf/text/WTFString.h>
 
 #if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 #include <CoreFoundation/CFRunLoop.h>
 typedef RetainPtr<CFRunLoopTimerRef> PlatformTimerRef;
 #elif PLATFORM(GTK)
-#include <wtf/glib/GMainLoopSource.h>
-typedef GMainLoopSource PlatformTimerRef;
+#include <wtf/RunLoop.h>
+namespace WTR {
+class TestRunner;
+typedef RunLoop::Timer<TestRunner> PlatformTimerRef;
+}
 #elif PLATFORM(EFL)
 typedef Ecore_Timer* PlatformTimerRef;
 #endif
@@ -207,6 +212,8 @@ public:
     void setWillSendRequestReturnsNull(bool f) { m_willSendRequestReturnsNull = f; }
     bool willSendRequestReturnsNullOnRedirect() const { return m_willSendRequestReturnsNullOnRedirect; }
     void setWillSendRequestReturnsNullOnRedirect(bool f) { m_willSendRequestReturnsNullOnRedirect = f; }
+    void setWillSendRequestAddsHTTPBody(JSStringRef body) { m_willSendRequestHTTPBody = toWTFString(toWK(body)); }
+    String willSendRequestHTTPBody() const { return m_willSendRequestHTTPBody; }
 
     void setTextDirection(JSStringRef);
 
@@ -261,6 +268,7 @@ public:
 
     // MediaStream
     void setUserMediaPermission(bool);
+    void setUserMediaPermissionForOrigin(bool permission, JSStringRef url);
 
     void setPageVisibility(JSStringRef state);
     void resetPageVisibility();
@@ -340,6 +348,7 @@ private:
     bool m_willSendRequestReturnsNull;
     bool m_willSendRequestReturnsNullOnRedirect;
     bool m_shouldStopProvisionalFrameLoads;
+    String m_willSendRequestHTTPBody;
 
     bool m_policyDelegateEnabled;
     bool m_policyDelegatePermissive;

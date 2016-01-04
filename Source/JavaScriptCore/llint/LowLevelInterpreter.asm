@@ -333,8 +333,7 @@ const FinalObjectType = 22
 
 # Type flags constants.
 const MasqueradesAsUndefined = 1
-const ImplementsHasInstance = 2
-const ImplementsDefaultHasInstance = 8
+const ImplementsDefaultHasInstance = 2
 
 # Bytecode operand constants.
 const FirstConstantRegisterIndex = 0x40000000
@@ -697,7 +696,7 @@ macro vmEntryRecord(entryFramePointer, resultReg)
 end
 
 macro getFrameRegisterSizeForCodeBlock(codeBlock, size)
-    loadi CodeBlock::m_numCalleeRegisters[codeBlock], size
+    loadi CodeBlock::m_numCalleeLocals[codeBlock], size
     lshiftp 3, size
     addp maxFrameExtentForSlowPathCall, size
 end
@@ -1227,6 +1226,12 @@ _llint_op_new_func:
     dispatch(4)
 
 
+_llint_op_new_generator_func:
+    traceExecution()
+    callSlowPath(_llint_slow_path_new_generator_func)
+    dispatch(4)
+
+
 _llint_op_new_array:
     traceExecution()
     callSlowPath(_llint_slow_path_new_array)
@@ -1432,12 +1437,17 @@ _llint_op_jngreatereq:
 
 _llint_op_loop_hint:
     traceExecution()
+    checkSwitchToJITForLoop()
+    dispatch(1)
+
+
+_llint_op_watchdog:
+    traceExecution()
     loadp CodeBlock[cfr], t1
     loadp CodeBlock::m_vm[t1], t1
-    loadp VM::watchdog[t1], t0
+    loadp VM::m_watchdog[t1], t0
     btpnz t0, .handleWatchdogTimer
 .afterWatchdogTimerCheck:
-    checkSwitchToJITForLoop()
     dispatch(1)
 .handleWatchdogTimer:
     loadb Watchdog::m_timerDidFire[t0], t0
@@ -1446,6 +1456,7 @@ _llint_op_loop_hint:
     jmp .afterWatchdogTimerCheck
 .throwHandler:
     jmp _llint_throw_from_slow_path_trampoline
+
 
 _llint_op_switch_string:
     traceExecution()
@@ -1458,10 +1469,15 @@ _llint_op_new_func_exp:
     callSlowPath(_llint_slow_path_new_func_exp)
     dispatch(4)
 
+_llint_op_new_generator_func_exp:
+    traceExecution()
+    callSlowPath(_llint_slow_path_new_generator_func_exp)
+    dispatch(4)
+
 _llint_op_new_arrow_func_exp:
     traceExecution()
     callSlowPath(_llint_slow_path_new_arrow_func_exp)
-    dispatch(5)
+    dispatch(4)
 
 _llint_op_call:
     traceExecution()
@@ -1573,6 +1589,18 @@ _llint_op_assert:
     dispatch(3)
 
 
+_llint_op_save:
+    traceExecution()
+    callSlowPath(_slow_path_save)
+    dispatch(4)
+
+
+_llint_op_resume:
+    traceExecution()
+    callSlowPath(_slow_path_resume)
+    dispatch(3)
+
+
 _llint_op_create_lexical_environment:
     traceExecution()
     callSlowPath(_slow_path_create_lexical_environment)
@@ -1678,7 +1706,7 @@ _llint_op_to_index_string:
 _llint_op_copy_rest:
     traceExecution()
     callSlowPath(_slow_path_copy_rest)
-    dispatch(3)
+    dispatch(4)
 
 
 # Lastly, make sure that we can link even though we don't support all opcodes.

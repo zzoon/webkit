@@ -123,14 +123,19 @@ void IDBConnectionToClient::didCommitTransaction(const IDBResourceIdentifier& tr
     m_delegate->didCommitTransaction(transactionIdentifier, error);
 }
 
-void IDBConnectionToClient::fireVersionChangeEvent(UniqueIDBDatabaseConnection& connection, uint64_t requestedVersion)
+void IDBConnectionToClient::fireVersionChangeEvent(UniqueIDBDatabaseConnection& connection, const IDBResourceIdentifier& requestIdentifier, uint64_t requestedVersion)
 {
-    m_delegate->fireVersionChangeEvent(connection, requestedVersion);
+    m_delegate->fireVersionChangeEvent(connection, requestIdentifier, requestedVersion);
 }
 
 void IDBConnectionToClient::didStartTransaction(const IDBResourceIdentifier& transactionIdentifier, const IDBError& error)
 {
     m_delegate->didStartTransaction(transactionIdentifier, error);
+}
+
+void IDBConnectionToClient::notifyOpenDBRequestBlocked(const IDBResourceIdentifier& requestIdentifier, uint64_t oldVersion, uint64_t newVersion)
+{
+    m_delegate->notifyOpenDBRequestBlocked(requestIdentifier, oldVersion, newVersion);
 }
 
 } // namespace IDBServer

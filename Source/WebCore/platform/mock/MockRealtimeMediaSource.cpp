@@ -36,7 +36,7 @@
 #include "MediaConstraints.h"
 #include "MediaStreamTrackSourcesRequestClient.h"
 #include "NotImplemented.h"
-#include "RealtimeMediaSourceStates.h"
+#include "RealtimeMediaSourceSettings.h"
 #include <math.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/NeverDestroyed.h>
@@ -73,10 +73,10 @@ RefPtr<TrackSourceInfo> MockRealtimeMediaSource::trackSourceWithUID(const String
     // FIXME: validate constraints.
 
     if (mockAudioSourcePersistentID() == id)
-        return TrackSourceInfo::create(mockAudioSourcePersistentID(), TrackSourceInfo::Audio, "Mock audio device");
+        return TrackSourceInfo::create(mockAudioSourcePersistentID(), id, TrackSourceInfo::Audio, "Mock audio device");
 
     if (mockVideoSourcePersistentID() == id)
-        return TrackSourceInfo::create(mockVideoSourcePersistentID(), TrackSourceInfo::Video, "Mock video device");
+        return TrackSourceInfo::create(mockVideoSourcePersistentID(), id, TrackSourceInfo::Video, "Mock video device");
     
     return nullptr;
 }
@@ -92,21 +92,38 @@ MockRealtimeMediaSource::MockRealtimeMediaSource(const String& id, RealtimeMedia
 
 RefPtr<RealtimeMediaSourceCapabilities> MockRealtimeMediaSource::capabilities()
 {
-    if (!m_capabilities) {
-        m_capabilities = RealtimeMediaSourceCapabilities::create();
-        m_capabilities->setSourceId(id());
-        initializeCapabilities(*m_capabilities.get());
-    }
+    if (m_capabilities)
+        return m_capabilities;
+
+    m_capabilities = RealtimeMediaSourceCapabilities::create(supportedConstraints());
+    m_capabilities->setDeviceId(id());
+    initializeCapabilities(*m_capabilities.get());
+
     return m_capabilities;
 }
 
-const RealtimeMediaSourceStates& MockRealtimeMediaSource::states()
+const RealtimeMediaSourceSettings& MockRealtimeMediaSource::settings()
 {
-    m_currentStates.setSourceId(id());
-    updateStates();
+    if (m_currentSettings.deviceId().isEmpty()) {
+        m_currentSettings.setSupportedConstraits(supportedConstraints());
+        m_currentSettings.setDeviceId(id());
+    }
 
-    return m_currentStates;
+    updateSettings(m_currentSettings);
+    return m_currentSettings;
 }
+
+RealtimeMediaSourceSupportedConstraints& MockRealtimeMediaSource::supportedConstraints()
+{
+    if (m_supportedConstraints.supportsDeviceId())
+        return m_supportedConstraints;
+
+    m_supportedConstraints.setSupportsDeviceId(true);
+    initializeSupportedConstraints(m_supportedConstraints);
+
+    return m_supportedConstraints;
+}
+
 
 } // namespace WebCore
 

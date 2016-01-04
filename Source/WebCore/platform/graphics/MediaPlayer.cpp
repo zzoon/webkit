@@ -540,9 +540,9 @@ MediaPlayer::MediaKeyException MediaPlayer::cancelKeyRequest(const String& keySy
 #endif
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
-std::unique_ptr<CDMSession> MediaPlayer::createSession(const String& keySystem)
+std::unique_ptr<CDMSession> MediaPlayer::createSession(const String& keySystem, CDMSessionClient* client)
 {
-    return m_private->createSession(keySystem);
+    return m_private->createSession(keySystem, client);
 }
 
 void MediaPlayer::setCDMSession(CDMSession* session)
@@ -935,7 +935,7 @@ bool MediaPlayer::canPlayToWirelessPlaybackTarget() const
 
 void MediaPlayer::setWirelessPlaybackTarget(Ref<MediaPlaybackTarget>&& device)
 {
-    m_private->setWirelessPlaybackTarget(WTF::move(device));
+    m_private->setWirelessPlaybackTarget(WTFMove(device));
 }
 
 void MediaPlayer::setShouldPlayToPlaybackTarget(bool shouldPlay)
@@ -1237,7 +1237,7 @@ CachedResourceLoader* MediaPlayer::cachedResourceLoader()
 
 PassRefPtr<PlatformMediaResourceLoader> MediaPlayer::createResourceLoader(std::unique_ptr<PlatformMediaResourceLoaderClient> client)
 {
-    return m_client.mediaPlayerCreateResourceLoader(WTF::move(client));
+    return m_client.mediaPlayerCreateResourceLoader(WTFMove(client));
 }
 
 #if ENABLE(VIDEO_TRACK)

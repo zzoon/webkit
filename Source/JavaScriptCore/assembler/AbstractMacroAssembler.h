@@ -67,6 +67,15 @@ inline bool isX86()
 #endif
 }
 
+inline bool isX86_64()
+{
+#if CPU(X86_64)
+    return true;
+#else
+    return false;
+#endif
+}
+
 inline bool optimizeForARMv7IDIVSupported()
 {
     return isARMv7IDIVSupported() && Options::useArchitectureSpecificOptimizations();
@@ -82,6 +91,13 @@ inline bool optimizeForX86()
     return isX86() && Options::useArchitectureSpecificOptimizations();
 }
 
+inline bool optimizeForX86_64()
+{
+    return isX86_64() && Options::useArchitectureSpecificOptimizations();
+}
+
+class AllowMacroScratchRegisterUsage;
+class DisallowMacroScratchRegisterUsage;
 class LinkBuffer;
 class Watchpoint;
 namespace DFG {
@@ -1014,11 +1030,6 @@ public:
         AssemblerType::replaceWithAddressComputation(label.dataLocation());
     }
 
-    void addLinkTask(RefPtr<SharedTask<void(LinkBuffer&)>> task)
-    {
-        m_linkTasks.append(task);
-    }
-
     template<typename Functor>
     void addLinkTask(const Functor& functor)
     {
@@ -1118,7 +1129,10 @@ protected:
         m_tempRegistersValidBits |= registerMask;
     }
 
+    friend class AllowMacroScratchRegisterUsage;
+    friend class DisallowMacroScratchRegisterUsage;
     unsigned m_tempRegistersValidBits;
+    bool m_allowScratchRegister { true };
 
     Vector<RefPtr<SharedTask<void(LinkBuffer&)>>> m_linkTasks;
 

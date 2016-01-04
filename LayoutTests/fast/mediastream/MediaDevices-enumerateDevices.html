@@ -9,6 +9,7 @@
         <script>
             var captureDevices;
             var captureDevice;
+            var havePermission;
 
             description("Tests MediaDevices.enumerateDevices()");
             window.jsTestIsAsync = true;
@@ -17,25 +18,67 @@
             shouldBeType("navigator.mediaDevices.enumerateDevices", "Function");
             debug("");
 
-            navigator.mediaDevices.enumerateDevices()
-                .then(function(devices) {
-                    captureDevices = devices;
-                    shouldBeNonZero("captureDevices.length");
-                    debug("");
-                    devices.forEach(function(device) {
-                        captureDevice = device;
-                        shouldBeNonNull("captureDevice.kind");
-                        shouldBeNonNull("captureDevice.deviceId");
-                        shouldBeNonNull("captureDevice.label");
-                        shouldBeNonNull("captureDevice.groupId");
+            function enumerate(next)
+            {
+                navigator.mediaDevices.enumerateDevices()
+                    .then(function(devices) {
+                        captureDevices = devices;
+                        shouldBeNonZero("captureDevices.length");
                         debug("");
+                        devices.forEach(function(device) {
+                            captureDevice = device;
+                            shouldBeNonNull("captureDevice.kind");
+                            shouldBeNonNull("captureDevice.deviceId");
+                            shouldBeNonNull("captureDevice.label");
+                            if (havePermission)
+                                shouldNotBeEqualToString("captureDevice.label", "");
+                            else
+                                shouldBeEmptyString("captureDevice.label");
+                            shouldBeNonNull("captureDevice.groupId");
+                            debug("");
+                        });
+                        if (next)
+                            next();
+                        else
+                            finishJSTest();
+                    })
+                    .catch(function(err) {
+                        testFailed(err.name + ": " + err.message);
                     });
+            }
+            
+            function createStream()
+            {
+                if (window.testRunner) {
+                    testRunner.setUserMediaPermission(true);
+                    testRunner.setUserMediaPermissionForOrigin(false, document.location.href);
+                }
 
-                    finishJSTest();
-                })
-                .catch(function(err) {
-                    testFailed(err.name + ": " + err.message);
-                });
+                navigator.mediaDevices
+                    .getUserMedia({audio:{}, video:{}})
+                    .then(function(stream) {
+                        debug(`<br>*** Calling mediaDevices.enumerateDevices without persistent access, with a media stream track<br>`);
+                        havePermission = true;
+                        enumerate(null);                        
+                    })
+                    .catch(function(err) {
+                        testFailed(`mediaDevices.getUserMedia() failed with ${err.name}: ${err.message}`);
+                    });
+            }
+            
+            function grantPermission()
+            {
+                if (window.testRunner)
+                    testRunner.setUserMediaPermissionForOrigin(true, document.location.href);
+
+                debug(`<br>*** Calling mediaDevices.enumerateDevices without persistent access, and without a media stream track<br>`);
+                havePermission = true;
+                enumerate(createStream);
+            }
+
+            havePermission = false;
+            debug(`<br>*** Calling mediaDevices.enumerateDevices without persistent access, and without a media stream track<br>`);
+            enumerate(grantPermission);
 
             window.successfullyParsed = true;
         </script>

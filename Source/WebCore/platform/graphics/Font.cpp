@@ -55,7 +55,7 @@ Font::Font(const FontPlatformData& platformData, std::unique_ptr<SVGData>&& svgD
     : m_maxCharWidth(-1)
     , m_avgCharWidth(-1)
     , m_platformData(platformData)
-    , m_svgData(WTF::move(svgData))
+    , m_svgData(WTFMove(svgData))
     , m_mathData(nullptr)
     , m_treatAsFixedPitch(false)
     , m_isCustomFont(isCustomFont)
@@ -64,9 +64,6 @@ Font::Font(const FontPlatformData& platformData, std::unique_ptr<SVGData>&& svgD
     , m_isBrokenIdeographFallback(false)
     , m_hasVerticalGlyphs(false)
     , m_isUsedInSystemFallbackCache(false)
-#if PLATFORM(COCOA) || PLATFORM(WIN)
-    , m_isSystemFont(false)
-#endif
 #if PLATFORM(IOS)
     , m_shouldNotBeUsedForArabic(false)
 #endif
@@ -88,7 +85,7 @@ Font::Font(const FontPlatformData& platformData, bool isCustomFont, bool isLoadi
 }
 
 Font::Font(std::unique_ptr<SVGData> svgData, float fontSize, bool syntheticBold, bool syntheticItalic)
-    : Font(FontPlatformData(fontSize, syntheticBold, syntheticItalic), WTF::move(svgData), true, false, false)
+    : Font(FontPlatformData(fontSize, syntheticBold, syntheticItalic), WTFMove(svgData), true, false, false)
 {
     m_svgData->initializeFont(this, fontSize);
 }
@@ -155,7 +152,7 @@ static bool fillGlyphPage(GlyphPage& pageToFill, UChar* buffer, unsigned bufferL
     if (auto* svgData = font.svgData())
         return svgData->fillSVGGlyphPage(&pageToFill, buffer, bufferLength);
 #endif
-    bool hasGlyphs = pageToFill.fill(buffer, bufferLength, &font);
+    bool hasGlyphs = pageToFill.fill(buffer, bufferLength);
 #if ENABLE(OPENTYPE_VERTICAL)
     if (hasGlyphs && font.verticalData())
         font.verticalData()->substituteWithVerticalGlyphs(&font, &pageToFill);
@@ -232,7 +229,7 @@ static RefPtr<GlyphPage> createAndFillGlyphPage(unsigned pageNumber, const Font&
     if (!haveGlyphs)
         return nullptr;
 
-    return WTF::move(glyphPage);
+    return WTFMove(glyphPage);
 }
 
 const GlyphPage* Font::glyphPage(unsigned pageNumber) const
@@ -297,6 +294,18 @@ const Font* Font::smallCapsFont(const FontDescription& fontDescription) const
     ASSERT(m_derivedFontData->smallCaps != this);
     return m_derivedFontData->smallCaps.get();
 }
+
+#if PLATFORM(COCOA)
+const Font& Font::noSynthesizableFeaturesFont() const
+{
+    if (!m_derivedFontData)
+        m_derivedFontData = std::make_unique<DerivedFontData>(isCustomFont());
+    if (!m_derivedFontData->noSynthesizableFeatures)
+        m_derivedFontData->noSynthesizableFeatures = createFontWithoutSynthesizableFeatures();
+    ASSERT(m_derivedFontData->noSynthesizableFeatures != this);
+    return *m_derivedFontData->noSynthesizableFeatures;
+}
+#endif
 
 const Font* Font::emphasisMarkFont(const FontDescription& fontDescription) const
 {
@@ -429,7 +438,7 @@ struct CharacterFallbackMapKeyHash {
         IntegerHasher hasher;
         hasher.add(key.character);
         hasher.add(key.isForPlatformFont);
-        hasher.add(key.locale.isNull() ? 0 : key.locale.impl()->existingHash());
+        hasher.add(key.locale.existingHash());
         return hasher.hash();
     }
 
@@ -462,7 +471,7 @@ RefPtr<Font> Font::systemFallbackFontForCharacter(UChar32 character, const FontD
     }
 
     auto key = CharacterFallbackMapKey(description.locale(), character, isForPlatformFont);
-    auto characterAddResult = fontAddResult.iterator->value.add(WTF::move(key), nullptr);
+    auto characterAddResult = fontAddResult.iterator->value.add(WTFMove(key), nullptr);
 
     Font*& fallbackFont = characterAddResult.iterator->value;
 

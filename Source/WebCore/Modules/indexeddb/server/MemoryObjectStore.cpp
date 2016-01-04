@@ -35,6 +35,7 @@
 #include "IndexKey.h"
 #include "Logging.h"
 #include "MemoryBackingStoreTransaction.h"
+#include "UniqueIDBDatabase.h"
 
 #include <wtf/NeverDestroyed.h>
 
@@ -55,7 +56,7 @@ MemoryObjectStore::MemoryObjectStore(const IDBObjectStoreInfo& info)
 
 MemoryObjectStore::~MemoryObjectStore()
 {
-    ASSERT(!m_writeTransaction);
+    m_writeTransaction = nullptr;
 }
 
 MemoryIndex* MemoryObjectStore::indexForIdentifier(uint64_t identifier)
@@ -85,7 +86,7 @@ IDBError MemoryObjectStore::createIndex(MemoryBackingStoreTransaction& transacti
     LOG(IndexedDB, "MemoryObjectStore::createIndex");
 
     if (!m_writeTransaction || !m_writeTransaction->isVersionChange() || m_writeTransaction != &transaction)
-        return IDBError(IDBExceptionCode::ConstraintError);
+        return IDBError(IDBDatabaseException::ConstraintError);
 
     ASSERT(!m_indexesByIdentifier.contains(info.identifier()));
     auto index = MemoryIndex::create(info, *this);
@@ -97,7 +98,7 @@ IDBError MemoryObjectStore::createIndex(MemoryBackingStoreTransaction& transacti
 
     m_info.addExistingIndex(info);
     transaction.addNewIndex(*index);
-    registerIndex(WTF::move(index));
+    registerIndex(WTFMove(index));
 
     return { };
 }
@@ -122,7 +123,7 @@ void MemoryObjectStore::maybeRestoreDeletedIndex(std::unique_ptr<MemoryIndex> in
     // repopulate the index with the object store's pre-transaction records.
     ASSERT_UNUSED(error, error.isNull());
 
-    registerIndex(WTF::move(index));
+    registerIndex(WTFMove(index));
 }
 
 std::unique_ptr<MemoryIndex> MemoryObjectStore::takeIndexByName(const String& name)
@@ -142,15 +143,15 @@ IDBError MemoryObjectStore::deleteIndex(MemoryBackingStoreTransaction& transacti
     LOG(IndexedDB, "MemoryObjectStore::deleteIndex");
 
     if (!m_writeTransaction || !m_writeTransaction->isVersionChange() || m_writeTransaction != &transaction)
-        return IDBError(IDBExceptionCode::ConstraintError);
+        return IDBError(IDBDatabaseException::ConstraintError);
     
     auto index = takeIndexByName(indexName);
     ASSERT(index);
     if (!index)
-        return IDBError(IDBExceptionCode::ConstraintError);
+        return IDBError(IDBDatabaseException::ConstraintError);
 
     m_info.deleteIndex(indexName);
-    transaction.indexDeleted(WTF::move(index));
+    transaction.indexDeleted(WTFMove(index));
 
     return { };
 }
@@ -168,7 +169,7 @@ void MemoryObjectStore::clear()
     LOG(IndexedDB, "MemoryObjectStore::clear");
     ASSERT(m_writeTransaction);
 
-    m_writeTransaction->objectStoreCleared(*this, WTF::move(m_keyValueStore), WTF::move(m_orderedKeys));
+    m_writeTransaction->objectStoreCleared(*this, WTFMove(m_keyValueStore), WTFMove(m_orderedKeys));
     for (auto& index : m_indexesByIdentifier.values())
         index->objectStoreCleared();
 
@@ -181,8 +182,8 @@ void MemoryObjectStore::replaceKeyValueStore(std::unique_ptr<KeyValueMap>&& stor
     ASSERT(m_writeTransaction);
     ASSERT(m_writeTransaction->isAborting());
 
-    m_keyValueStore = WTF::move(store);
-    m_orderedKeys = WTF::move(orderedKeys);
+    m_keyValueStore = WTFMove(store);
+    m_orderedKeys = WTFMove(orderedKeys);
 }
 
 void MemoryObjectStore::deleteRecord(const IDBKeyData& key)
@@ -267,27 +268,6 @@ IDBError MemoryObjectStore::addRecord(MemoryBackingStoreTransaction& transaction
     return error;
 }
 
-static VM& indexVM()
-{
-    ASSERT(!isMainThread());
-    static NeverDestroyed<RefPtr<VM>> vm = VM::create();
-    return *vm.get();
-}
-
-static ExecState& indexGlobalExec()
-{
-    ASSERT(!isMainThread());
-    static NeverDestroyed<Strong<JSGlobalObject>> globalObject;
-    static bool initialized = false;
-    if (!initialized) {
-        globalObject.get().set(indexVM(), JSGlobalObject::create(indexVM(), JSGlobalObject::createStructure(indexVM(), jsNull())));
-        initialized = true;
-    }
-
-    RELEASE_ASSERT(globalObject.get()->globalExec());
-    return *globalObject.get()->globalExec();
-}
-
 void MemoryObjectStore::updateCursorsForPutRecord(std::set<IDBKeyData>::iterator iterator)
 {
     for (auto& cursor : m_cursors.values())
@@ -308,9 +288,9 @@ void MemoryObjectStore::updateIndexesForDeleteRecord(const IDBKeyData& value)
 
 IDBError MemoryObjectStore::updateIndexesForPutRecord(const IDBKeyData& key, const ThreadSafeDataBuffer& value)
 {
-    JSLockHolder locker(indexVM());
+    JSLockHolder locker(UniqueIDBDatabase::databaseThreadVM());
 
-    auto jsValue = idbValueDataToJSValue(indexGlobalExec(), value);
+    auto jsValue = idbValueDataToJSValue(UniqueIDBDatabase::databaseThreadExecState(), value);
     if (jsValue.isUndefinedOrNull())
         return { };
 
@@ -319,7 +299,7 @@ IDBError MemoryObjectStore::updateIndexesForPutRecord(const IDBKeyData& key, con
 
     for (auto* index : m_indexesByName.values()) {
         IndexKey indexKey;
-        generateIndexKeyForValue(indexGlobalExec(), index->info(), jsValue, indexKey);
+        generateIndexKeyForValue(UniqueIDBDatabase::databaseThreadExecState(), index->info(), jsValue, indexKey);
 
         if (indexKey.isNull())
             continue;
@@ -340,21 +320,20 @@ IDBError MemoryObjectStore::updateIndexesForPutRecord(const IDBKeyData& key, con
     return error;
 }
 
-
 IDBError MemoryObjectStore::populateIndexWithExistingRecords(MemoryIndex& index)
 {
     if (!m_keyValueStore)
         return { };
 
-    JSLockHolder locker(indexVM());
+    JSLockHolder locker(UniqueIDBDatabase::databaseThreadVM());
 
     for (auto iterator : *m_keyValueStore) {
-        auto jsValue = idbValueDataToJSValue(indexGlobalExec(), iterator.value);
+        auto jsValue = idbValueDataToJSValue(UniqueIDBDatabase::databaseThreadExecState(), iterator.value);
         if (jsValue.isUndefinedOrNull())
             return { };
 
         IndexKey indexKey;
-        generateIndexKeyForValue(indexGlobalExec(), index.info(), jsValue, indexKey);
+        generateIndexKeyForValue(UniqueIDBDatabase::databaseThreadExecState(), index.info(), jsValue, indexKey);
 
         if (indexKey.isNull())
             continue;
@@ -462,7 +441,7 @@ void MemoryObjectStore::registerIndex(std::unique_ptr<MemoryIndex>&& index)
     ASSERT(!m_indexesByName.contains(index->info().name()));
 
     m_indexesByName.set(index->info().name(), index.get());
-    m_indexesByIdentifier.set(index->info().identifier(), WTF::move(index));
+    m_indexesByIdentifier.set(index->info().identifier(), WTFMove(index));
 }
 
 void MemoryObjectStore::unregisterIndex(MemoryIndex& index)
@@ -480,7 +459,7 @@ MemoryObjectStoreCursor* MemoryObjectStore::maybeOpenCursor(const IDBCursorInfo&
     if (!result.isNewEntry)
         return nullptr;
 
-    result.iterator->value = MemoryObjectStoreCursor::create(*this, info);
+    result.iterator->value = std::make_unique<MemoryObjectStoreCursor>(*this, info);
     return result.iterator->value.get();
 }
 

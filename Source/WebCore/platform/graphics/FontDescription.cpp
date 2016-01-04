@@ -52,7 +52,6 @@ FontDescription::FontDescription()
     , m_nonCJKGlyphOrientation(static_cast<unsigned>(NonCJKGlyphOrientation::Mixed))
     , m_widthVariant(RegularWidth)
     , m_italic(FontItalicOff)
-    , m_smallCaps(FontSmallCapsOff)
     , m_weight(FontWeightNormal)
     , m_renderingMode(static_cast<unsigned>(FontRenderingMode::Normal))
     , m_textRendering(AutoTextRendering)
@@ -79,7 +78,6 @@ FontDescription::FontDescription()
 FontTraitsMask FontDescription::traitsMask() const
 {
     return static_cast<FontTraitsMask>((m_italic ? FontStyleItalicMask : FontStyleNormalMask)
-        | (m_smallCaps ? FontVariantSmallCapsMask : FontVariantNormalMask)
         | (FontWeight100Mask << (m_weight - FontWeight100)));
     
 }

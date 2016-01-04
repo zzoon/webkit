@@ -56,6 +56,7 @@ WebView::WebView(WebProcessPool* context, API::PageConfiguration& pageConfigurat
 {
     // Need to call createWebPage after other data members, specifically m_visible, are initialized.
     m_page = context->createWebPage(*this, pageConfiguration.copy());
+    m_page->initializeWebPage();
 
     m_page->pageGroup().preferences().setAcceleratedCompositingEnabled(true);
     m_page->pageGroup().preferences().setForceCompositingMode(true);
@@ -72,12 +73,6 @@ WebView::~WebView()
         return;
 
     m_page->close();
-}
-
-void WebView::initialize()
-{
-    m_page->initializeWebPage();
-    setActive(true);
 }
 
 void WebView::setContentScaleFactor(float scaleFactor)
@@ -227,7 +222,7 @@ void WebView::didFindZoomableArea(const WebCore::IntPoint& target, const WebCore
 
 AffineTransform WebView::transformFromScene() const
 {
-    return transformToScene().inverse();
+    return transformToScene().inverse().valueOr(AffineTransform());
 }
 
 AffineTransform WebView::transformToScene() const

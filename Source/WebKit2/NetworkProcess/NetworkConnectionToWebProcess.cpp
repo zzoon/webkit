@@ -26,8 +26,6 @@
 #include "config.h"
 #include "NetworkConnectionToWebProcess.h"
 
-#if ENABLE(NETWORK_PROCESS)
-
 #include "NetworkBlobRegistry.h"
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "NetworkLoad.h"
@@ -125,7 +123,7 @@ void NetworkConnectionToWebProcess::scheduleResourceLoad(const NetworkResourceLo
 
 void NetworkConnectionToWebProcess::performSynchronousLoad(const NetworkResourceLoadParameters& loadParameters, RefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>&& reply)
 {
-    auto loader = NetworkResourceLoader::create(loadParameters, *this, WTF::move(reply));
+    auto loader = NetworkResourceLoader::create(loadParameters, *this, WTFMove(reply));
     m_networkResourceLoaders.add(loadParameters.identifier, loader.ptr());
     loader->start();
 }
@@ -179,12 +177,12 @@ static NetworkStorageSession& storageSession(SessionID sessionID)
     return NetworkStorageSession::defaultStorageSession();
 }
 
-void NetworkConnectionToWebProcess::startDownload(SessionID sessionID, uint64_t downloadID, const ResourceRequest& request)
+void NetworkConnectionToWebProcess::startDownload(SessionID sessionID, DownloadID downloadID, const ResourceRequest& request)
 {
     NetworkProcess::singleton().downloadManager().startDownload(sessionID, downloadID, request);
 }
 
-void NetworkConnectionToWebProcess::convertMainResourceLoadToDownload(WebCore::SessionID sessionID, uint64_t mainResourceLoadIdentifier, uint64_t downloadID, const ResourceRequest& request, const ResourceResponse& response)
+void NetworkConnectionToWebProcess::convertMainResourceLoadToDownload(SessionID sessionID, uint64_t mainResourceLoadIdentifier, DownloadID downloadID, const ResourceRequest& request, const ResourceResponse& response)
 {
     auto& networkProcess = NetworkProcess::singleton();
     if (!mainResourceLoadIdentifier) {
@@ -199,15 +197,14 @@ void NetworkConnectionToWebProcess::convertMainResourceLoadToDownload(WebCore::S
     }
 
 #if USE(NETWORK_SESSION)
-    // FIXME: Do something here.
-    notImplemented();
+    loader->networkLoad()->convertTaskToDownload();
 #else
     networkProcess.downloadManager().convertHandleToDownload(downloadID, loader->networkLoad()->handle(), request, response);
 
     // Unblock the URL connection operation queue.
     loader->networkLoad()->handle()->continueDidReceiveResponse();
     
-    loader->didConvertHandleToDownload();
+    loader->didConvertToDownload();
 #endif
 }
 
@@ -250,7 +247,7 @@ void NetworkConnectionToWebProcess::registerFileBlobURL(const URL& url, const St
 
 void NetworkConnectionToWebProcess::registerBlobURL(const URL& url, Vector<BlobPart> blobParts, const String& contentType)
 {
-    NetworkBlobRegistry::singleton().registerBlobURL(this, url, WTF::move(blobParts), contentType);
+    NetworkBlobRegistry::singleton().registerBlobURL(this, url, WTFMove(blobParts), contentType);
 }
 
 void NetworkConnectionToWebProcess::registerBlobURLFromURL(const URL& url, const URL& srcURL)
@@ -274,5 +271,3 @@ void NetworkConnectionToWebProcess::blobSize(const URL& url, uint64_t& resultSiz
 }
 
 } // namespace WebKit
-
-#endif // ENABLE(NETWORK_PROCESS)

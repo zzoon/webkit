@@ -315,6 +315,10 @@ public:
 
     void drawPattern(Image&, const FloatRect& srcRect, const AffineTransform&, const FloatPoint& phase, const FloatSize& spacing, CompositeOperator, const FloatRect& destRect, BlendMode = BlendModeNormal);
 
+    WEBCORE_EXPORT void drawConsumingImageBuffer(std::unique_ptr<ImageBuffer>, const FloatPoint& destination, const ImagePaintingOptions& = ImagePaintingOptions());
+    void drawConsumingImageBuffer(std::unique_ptr<ImageBuffer>, const FloatRect& destination, const ImagePaintingOptions& = ImagePaintingOptions());
+    void drawConsumingImageBuffer(std::unique_ptr<ImageBuffer>, const FloatRect& destination, const FloatRect& source, const ImagePaintingOptions& = ImagePaintingOptions());
+
     WEBCORE_EXPORT void setImageInterpolationQuality(InterpolationQuality);
     InterpolationQuality imageInterpolationQuality() const { return m_state.imageInterpolationQuality; }
 
@@ -385,10 +389,10 @@ public:
     bool mustUseShadowBlur() const;
 #endif
 
-    void drawFocusRing(const Vector<IntRect>&, int width, int offset, const Color&);
-    void drawFocusRing(const Path&, int width, int offset, const Color&);
+    void drawFocusRing(const Vector<IntRect>&, float width, float offset, const Color&);
+    void drawFocusRing(const Path&, float width, float offset, const Color&);
 #if PLATFORM(MAC)
-    void drawFocusRing(const Vector<IntRect>&, int width, int offset, double timeOffset, bool& needsRedraw);
+    void drawFocusRing(const Vector<IntRect>&, float width, float offset, double timeOffset, bool& needsRedraw);
 #endif
 
     void setLineCap(LineCap);

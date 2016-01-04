@@ -41,17 +41,19 @@ namespace WebCore {
 
 RefPtr<MediaDevicesRequest> MediaDevicesRequest::create(Document* document, MediaDevices::EnumerateDevicesPromise&& promise, ExceptionCode&)
 {
-    return adoptRef(*new MediaDevicesRequest(document, WTF::move(promise)));
+    return adoptRef(*new MediaDevicesRequest(document, WTFMove(promise)));
 }
 
 MediaDevicesRequest::MediaDevicesRequest(ScriptExecutionContext* context, MediaDevices::EnumerateDevicesPromise&& promise)
     : ContextDestructionObserver(context)
-    , m_promise(WTF::move(promise))
+    , m_promise(WTFMove(promise))
 {
 }
 
 MediaDevicesRequest::~MediaDevicesRequest()
 {
+    if (m_permissionCheck)
+        m_permissionCheck->setClient(nullptr);
 }
 
 SecurityOrigin* MediaDevicesRequest::securityOrigin() const
@@ -65,28 +67,59 @@ SecurityOrigin* MediaDevicesRequest::securityOrigin() const
 void MediaDevicesRequest::contextDestroyed()
 {
     ContextDestructionObserver::contextDestroyed();
+    if (m_permissionCheck) {
+        m_permissionCheck->setClient(nullptr);
+        m_permissionCheck = nullptr;
+    }
     m_protector = nullptr;
 }
 
 void MediaDevicesRequest::start()
 {
     m_protector = this;
-    RealtimeMediaSourceCenter::singleton().getMediaStreamTrackSources(this);
+
+    if (Document* document = downcast<Document>(scriptExecutionContext())) {
+        m_canShowLabels = document->hasHadActiveMediaStreamTrack();
+        if (m_canShowLabels) {
+            getTrackSources();
+            return;
+        }
+    }
+
+    m_permissionCheck = UserMediaPermissionCheck::create(*downcast<Document>(scriptExecutionContext()), *this);
+    m_permissionCheck->start();
+}
+
+void MediaDevicesRequest::didCompleteCheck(bool canAccess)
+{
+    m_permissionCheck->setClient(nullptr);
+    m_permissionCheck = nullptr;
+
+    m_canShowLabels = canAccess;
+    getTrackSources();
+}
+
+void MediaDevicesRequest::getTrackSources()
+{
+    callOnMainThread([this] {
+        RealtimeMediaSourceCenter::singleton().getMediaStreamTrackSources(this);
+    });
 }
 
 void MediaDevicesRequest::didCompleteRequest(const TrackSourceInfoVector& capturedDevices)
 {
-    if (!m_scriptExecutionContext)
+    if (!m_scriptExecutionContext) {
+        m_protector = nullptr;
         return;
+    }
 
     Vector<RefPtr<MediaDeviceInfo>> deviceInfo;
     for (auto device : capturedDevices) {
         TrackSourceInfo* trackInfo = device.get();
         String deviceType = trackInfo->kind() == TrackSourceInfo::SourceKind::Audio ? MediaDeviceInfo::audioInputType() : MediaDeviceInfo::videoInputType();
 
-        // FIXME: label is supposed to be empty unless a device is attached to an active MediaStreamTrack in the current browsing context, or
-        // persistent permission to access these local devices has been granted to the page's origin.
-        deviceInfo.append(MediaDeviceInfo::create(m_scriptExecutionContext, trackInfo->label(), trackInfo->id(), trackInfo->groupId(), deviceType));
+        AtomicString label = m_canShowLabels ? trackInfo->label() : emptyAtom;
+        deviceInfo.append(MediaDeviceInfo::create(m_scriptExecutionContext, label, trackInfo->id(), trackInfo->groupId(), deviceType));
     }
 
     RefPtr<MediaDevicesRequest> protectedThis(this);

@@ -35,13 +35,16 @@
 #include "InlineTextBox.h"
 #include "PaintInfo.h"
 #include "RenderBlockFlow.h"
+#include "RenderIterator.h"
 #include "RenderStyle.h"
 #include "RenderText.h"
 #include "RenderView.h"
 #include "Settings.h"
 #include "SimpleLineLayoutResolver.h"
 #include "Text.h"
+#include "TextDecorationPainter.h"
 #include "TextPaintStyle.h"
+#include "TextPainter.h"
 
 #if ENABLE(TREE_DEBUGGING)
 #include <stdio.h>
@@ -73,12 +76,20 @@ void paintFlow(const RenderBlockFlow& flow, const Layout& layout, PaintInfo& pai
 
     bool debugBordersEnabled = flow.frame().settings().simpleLineLayoutDebugBordersEnabled();
 
-    GraphicsContext& context = paintInfo.context();
-    const FontCascade& font = style.fontCascade();
-    TextPaintStyle textPaintStyle = computeTextPaintStyle(flow.frame(), style, paintInfo);
-    GraphicsContextStateSaver stateSaver(context, textPaintStyle.strokeWidth > 0);
+    TextPainter textPainter(paintInfo.context());
+    textPainter.setFont(style.fontCascade());
+    textPainter.setTextPaintStyle(computeTextPaintStyle(flow.frame(), style, paintInfo));
 
-    updateGraphicsContext(context, textPaintStyle);
+    Optional<TextDecorationPainter> textDecorationPainter;
+    if (style.textDecorationsInEffect() != TextDecorationNone) {
+        const RenderText* textRenderer = childrenOfType<RenderText>(flow).first();
+        if (textRenderer) {
+            textDecorationPainter = TextDecorationPainter(paintInfo.context(), style.textDecorationsInEffect(), *textRenderer, false);
+            textDecorationPainter->setFont(style.fontCascade());
+            textDecorationPainter->setBaseline(style.fontMetrics().ascent());
+        }
+    }
+
     LayoutRect paintRect = paintInfo.rect;
     paintRect.moveBy(-paintOffset);
 
@@ -90,8 +101,9 @@ void paintFlow(const RenderBlockFlow& flow, const Layout& layout, PaintInfo& pai
             continue;
 
         FloatRect rect = run.rect();
-        rect.inflate(strokeOverflow);
-        if (paintRect.y() > rect.maxY() || paintRect.maxY() < rect.y())
+        FloatRect visualOverflowRect = rect;
+        visualOverflowRect.inflate(strokeOverflow);
+        if (paintRect.y() > visualOverflowRect.maxY() || paintRect.maxY() < visualOverflowRect.y())
             continue;
 
         TextRun textRun(run.text());
@@ -99,9 +111,13 @@ void paintFlow(const RenderBlockFlow& flow, const Layout& layout, PaintInfo& pai
         // x position indicates the line offset from the rootbox. It's always 0 in case of simple line layout.
         textRun.setXPos(0);
         FloatPoint textOrigin = FloatPoint(rect.x() + paintOffset.x(), roundToDevicePixel(run.baselinePosition() + paintOffset.y(), deviceScaleFactor));
-        context.drawText(font, textRun, textOrigin);
+        textPainter.paintText(textRun, textRun.length(), rect, textOrigin);
+        if (textDecorationPainter) {
+            textDecorationPainter->setWidth(rect.width());
+            textDecorationPainter->paintTextDecoration(textRun, textOrigin, rect.location() + paintOffset);
+        }
         if (debugBordersEnabled)
-            paintDebugBorders(context, LayoutRect(run.rect()), paintOffset);
+            paintDebugBorders(paintInfo.context(), LayoutRect(run.rect()), paintOffset);
     }
 }
 

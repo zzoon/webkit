@@ -193,8 +193,8 @@ struct FontCascadeCacheEntry {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     FontCascadeCacheEntry(FontCascadeCacheKey&& key, Ref<FontCascadeFonts>&& fonts)
-        : key(WTF::move(key))
-        , fonts(WTF::move(fonts))
+        : key(WTFMove(key))
+        , fonts(WTFMove(fonts))
     { }
     FontCascadeCacheKey key;
     Ref<FontCascadeFonts> fonts;
@@ -283,7 +283,7 @@ static Ref<FontCascadeFonts> retrieveOrAddCachedFonts(const FontCascadeDescripti
         return addResult.iterator->value->fonts.get();
 
     auto& newEntry = addResult.iterator->value;
-    newEntry = std::make_unique<FontCascadeCacheEntry>(WTF::move(key), FontCascadeFonts::create(WTF::move(fontSelector)));
+    newEntry = std::make_unique<FontCascadeCacheEntry>(WTFMove(key), FontCascadeFonts::create(WTFMove(fontSelector)));
     Ref<FontCascadeFonts> glyphs = newEntry->fonts.get();
 
     static const unsigned unreferencedPruneInterval = 50;
@@ -300,10 +300,17 @@ static Ref<FontCascadeFonts> retrieveOrAddCachedFonts(const FontCascadeDescripti
 
 void FontCascade::update(RefPtr<FontSelector>&& fontSelector) const
 {
-    m_fonts = retrieveOrAddCachedFonts(m_fontDescription, WTF::move(fontSelector));
+    m_fonts = retrieveOrAddCachedFonts(m_fontDescription, WTFMove(fontSelector));
     m_useBackslashAsYenSymbol = useBackslashAsYenSignForFamily(firstFamily());
     m_enableKerning = computeEnableKerning();
     m_requiresShaping = computeRequiresShaping();
+}
+
+float FontCascade::glyphBufferForTextRun(CodePath codePathToUse, const TextRun& run, int from, int to, GlyphBuffer& glyphBuffer) const
+{
+    if (codePathToUse != Complex)
+        return getGlyphsAndAdvancesForSimpleText(run, from, to, glyphBuffer);
+    return getGlyphsAndAdvancesForComplexText(run, from, to, glyphBuffer);
 }
 
 float FontCascade::drawText(GraphicsContext& context, const TextRun& run, const FloatPoint& point, int from, int to, CustomFontNotReadyAction customFontNotReadyAction) const
@@ -321,10 +328,15 @@ float FontCascade::drawText(GraphicsContext& context, const TextRun& run, const 
     if (codePathToUse != Complex && (enableKerning() || requiresShaping()) && (from || static_cast<unsigned>(to) != run.length()) && !isDrawnWithSVGFont(run))
         codePathToUse = Complex;
 
-    if (codePathToUse != Complex)
-        return drawSimpleText(context, run, point, from, to);
-
-    return drawComplexText(context, run, point, from, to);
+    GlyphBuffer glyphBuffer;
+    float startX = point.x() + glyphBufferForTextRun(codePathToUse, run, from, to, glyphBuffer);
+    // We couldn't generate any glyphs for the run. Give up.
+    if (glyphBuffer.isEmpty())
+        return 0;
+    // Draw the glyph buffer now at the starting point returned in startX.
+    FloatPoint startPoint(startX, point.y());
+    drawGlyphBuffer(context, run, glyphBuffer, startPoint);
+    return startPoint.x() - startX;
 }
 
 void FontCascade::drawEmphasisMarks(GraphicsContext& context, const TextRun& run, const AtomicString& mark, const FloatPoint& point, int from, int to) const
@@ -393,7 +405,7 @@ float FontCascade::width(const TextRun& run, int& charsConsumed, String& glyphNa
 GlyphData FontCascade::glyphDataForCharacter(UChar32 c, bool mirror, FontVariant variant) const
 {
     if (variant == AutoVariant) {
-        if (m_fontDescription.smallCaps() && !primaryFont().isSVGFont()) {
+        if (m_fontDescription.variantCaps() == FontVariantCaps::Small && !primaryFont().isSVGFont()) {
             UChar32 upperC = u_toupper(c);
             if (upperC != c) {
                 c = upperC;
@@ -594,12 +606,14 @@ FontCascade::CodePath FontCascade::codePath(const TextRun& run) const
         return Simple;
 #endif
 
+#if PLATFORM(COCOA)
     // Because Font::applyTransforms() doesn't know which features to enable/disable in the simple code path, it can't properly handle feature or variant settings.
     // FIXME: https://bugs.webkit.org/show_bug.cgi?id=150791: @font-face features should also cause this to be complex.
     if (m_fontDescription.featureSettings().size() > 0 || !m_fontDescription.variantSettings().isAllNormal())
         return Complex;
 
-#if !PLATFORM(COCOA)
+#else
+
     if (run.length() > 1 && (enableKerning() || requiresShaping()))
         return Complex;
 #endif
@@ -1154,6 +1168,7 @@ GlyphToPathTranslator::GlyphUnderlineType computeUnderlineType(const TextRun& te
 
     if (offsetInString == GlyphBuffer::noOffset || offsetInString >= textRun.length()) {
         // We have no idea which character spawned this glyph. Bail.
+        ASSERT_WITH_SECURITY_IMPLICATION(offsetInString < textRun.length());
         return GlyphToPathTranslator::GlyphUnderlineType::DrawOverGlyph;
     }
     
@@ -1287,22 +1302,6 @@ float FontCascade::getGlyphsAndAdvancesForSimpleText(const TextRun& run, int fro
         glyphBuffer.reverse(0, glyphBuffer.size());
 
     return initialAdvance;
-}
-
-float FontCascade::drawSimpleText(GraphicsContext& context, const TextRun& run, const FloatPoint& point, int from, int to) const
-{
-    // This glyph buffer holds our glyphs+advances+font data for each glyph.
-    GlyphBuffer glyphBuffer;
-
-    float startX = point.x() + getGlyphsAndAdvancesForSimpleText(run, from, to, glyphBuffer);
-
-    if (glyphBuffer.isEmpty())
-        return 0;
-
-    FloatPoint startPoint(startX, point.y());
-    drawGlyphBuffer(context, run, glyphBuffer, startPoint);
-
-    return startPoint.x() - startX;
 }
 
 void FontCascade::drawEmphasisMarksForSimpleText(GraphicsContext& context, const TextRun& run, const AtomicString& mark, const FloatPoint& point, int from, int to) const

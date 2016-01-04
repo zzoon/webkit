@@ -131,7 +131,7 @@ void InspectorFrontendClientLocal::Settings::setProperty(const String&, const St
 InspectorFrontendClientLocal::InspectorFrontendClientLocal(InspectorController* inspectedPageController, Page* frontendPage, std::unique_ptr<Settings> settings)
     : m_inspectedPageController(inspectedPageController)
     , m_frontendPage(frontendPage)
-    , m_settings(WTF::move(settings))
+    , m_settings(WTFMove(settings))
     , m_dockSide(DockSide::Undocked)
     , m_dispatchTask(InspectorBackendDispatchTask::create(inspectedPageController))
 {
@@ -185,7 +185,7 @@ void InspectorFrontendClientLocal::requestSetDockSide(DockSide dockSide)
 bool InspectorFrontendClientLocal::canAttachWindow()
 {
     // Don't allow attaching to another inspector -- two inspectors in one window is too much!
-    bool isInspectorPage = m_inspectedPageController->hasInspectorFrontendClient();
+    bool isInspectorPage = m_inspectedPageController->inspectionLevel() > 0;
     if (isInspectorPage)
         return false;
 
@@ -357,6 +357,11 @@ bool InspectorFrontendClientLocal::isUnderTest()
     return m_inspectedPageController->isUnderTest();
 }
 
+unsigned InspectorFrontendClientLocal::inspectionLevel() const
+{
+    return m_inspectedPageController->inspectionLevel() + 1;
+}
+
 bool InspectorFrontendClientLocal::evaluateAsBoolean(const String& expression)
 {
     Deprecated::ScriptValue value = m_frontendPage->mainFrame().script().executeScript(expression);
@@ -366,7 +371,7 @@ bool InspectorFrontendClientLocal::evaluateAsBoolean(const String& expression)
 void InspectorFrontendClientLocal::evaluateOnLoad(const String& expression)
 {
     if (m_frontendLoaded)
-        m_frontendPage->mainFrame().script().executeScript("InspectorFrontendAPI.dispatch(" + expression + ")");
+        m_frontendPage->mainFrame().script().executeScript("if (InspectorFrontendAPI) InspectorFrontendAPI.dispatch(" + expression + ")");
     else
         m_evaluateOnLoad.append(expression);
 }

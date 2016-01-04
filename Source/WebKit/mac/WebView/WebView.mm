@@ -95,6 +95,7 @@
 #import "WebPreferenceKeysPrivate.h"
 #import "WebPreferencesPrivate.h"
 #import "WebProgressTrackerClient.h"
+#import "WebResourceLoadScheduler.h"
 #import "WebScriptDebugDelegate.h"
 #import "WebScriptWorldInternal.h"
 #import "WebSelectionServiceController.h"
@@ -167,7 +168,6 @@
 #import <WebCore/RenderView.h>
 #import <WebCore/RenderWidget.h>
 #import <WebCore/ResourceHandle.h>
-#import <WebCore/ResourceLoadScheduler.h>
 #import <WebCore/ResourceRequest.h>
 #import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/RuntimeEnabledFeatures.h>
@@ -192,7 +192,6 @@
 #import <WebKitSystemInterface.h>
 #import <bindings/ScriptValue.h>
 #import <mach-o/dyld.h>
-#import <objc/objc-auto.h>
 #import <objc/runtime.h>
 #import <runtime/ArrayPrototype.h>
 #import <runtime/DateInstance.h>
@@ -264,6 +263,7 @@
 #import <WebCore/WebCoreThreadRun.h>
 #import <WebCore/WebEvent.h>
 #import <WebCore/WebVideoFullscreenControllerAVKit.h>
+#import <libkern/OSAtomic.h>
 #import <wtf/FastMalloc.h>
 #endif // !PLATFORM(IOS)
 
@@ -761,7 +761,7 @@ static bool shouldRestrictWindowFocus()
 
 - (void)_dispatchPendingLoadRequests
 {
-    resourceLoadScheduler()->servePendingRequests();
+    webResourceLoadScheduler().servePendingRequests();
 }
 
 #if !PLATFORM(IOS)
@@ -902,7 +902,7 @@ static void WebKitInitializeGamepadProviderIfNecessary()
     [self addSubview:frameView];
     [frameView release];
 
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+#if PLATFORM(MAC)
     if (Class gestureClass = NSClassFromString(@"NSImmediateActionGestureRecognizer")) {
         RetainPtr<NSImmediateActionGestureRecognizer> recognizer = adoptNS([(NSImmediateActionGestureRecognizer *)[gestureClass alloc] init]);
         _private->immediateActionController = [[WebImmediateActionController alloc] initWithWebView:self recognizer:recognizer.get()];
@@ -910,6 +910,8 @@ static void WebKitInitializeGamepadProviderIfNecessary()
         [recognizer setDelaysPrimaryMouseButtonEvents:NO];
     }
 #endif
+
+    [self updateWebViewAdditions];
 
 #if !PLATFORM(IOS)
     static bool didOneTimeInitialization = false;
@@ -1024,14 +1026,16 @@ static void WebKitInitializeGamepadProviderIfNecessary()
 
     [WebFrame _createMainFrameWithPage:_private->page frameName:frameName frameView:frameView];
 
-#if !PLATFORM(IOS)
+#if PLATFORM(IOS)
+    NSRunLoop *runLoop = WebThreadNSRunLoop();
+#else
     NSRunLoop *runLoop = [NSRunLoop mainRunLoop];
+#endif
 
     if (WebKitLinkedOnOrAfter(WEBKIT_FIRST_VERSION_WITH_LOADING_DURING_COMMON_RUNLOOP_MODES))
         [self scheduleInRunLoop:runLoop forMode:(NSString *)kCFRunLoopCommonModes];
     else
         [self scheduleInRunLoop:runLoop forMode:NSDefaultRunLoopMode];
-#endif
 
     [self _addToAllWebViewsSet];
     
@@ -1616,9 +1620,9 @@ static NSMutableSet *knownPluginMIMETypes()
 - (void)_setResourceLoadSchedulerSuspended:(BOOL)suspend
 {
     if (suspend)
-        resourceLoadScheduler()->suspendPendingRequests();
+        webResourceLoadScheduler().suspendPendingRequests();
     else
-        resourceLoadScheduler()->resumePendingRequests();
+        webResourceLoadScheduler().resumePendingRequests();
 }
 
 + (void)_setAllowCookies:(BOOL)allow
@@ -1758,7 +1762,7 @@ static bool fastDocumentTeardownEnabled()
 
     [_private->inspector inspectedWebViewClosed];
 #endif
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+#if PLATFORM(MAC)
     [_private->immediateActionController webViewClosed];
 #endif
 
@@ -2034,7 +2038,7 @@ static bool fastDocumentTeardownEnabled()
         Ref<HistoryItem> newItem = otherBackForward.itemAtIndex(i)->copy();
         if (i == 0) 
             newItemToGoTo = newItem.ptr();
-        backForward.client()->addItem(WTF::move(newItem));
+        backForward.client()->addItem(WTFMove(newItem));
     }
 
     ASSERT(newItemToGoTo);
@@ -2306,6 +2310,7 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings.setAudioPlaybackRequiresUserGesture([preferences audioPlaybackRequiresUserGesture]);
     settings.setAllowsInlineMediaPlayback([preferences mediaPlaybackAllowsInline]);
     settings.setInlineMediaPlaybackRequiresPlaysInlineAttribute([preferences inlineMediaPlaybackRequiresPlaysInlineAttribute]);
+    settings.setInvisibleAutoplayNotPermitted([preferences invisibleAutoplayNotPermitted]);
     settings.setAllowsPictureInPictureMediaPlayback([preferences allowsPictureInPictureMediaPlayback] && shouldAllowPictureInPictureMediaPlayback());
     settings.setMediaControlsScaleWithPageZoom([preferences mediaControlsScaleWithPageZoom]);
     settings.setSuppressesIncrementalRendering([preferences suppressesIncrementalRendering]);
@@ -2343,7 +2348,7 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings.setHttpEquivEnabled([preferences httpEquivEnabled]);
 
     settings.setFixedPositionCreatesStackingContext(true);
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+#if PLATFORM(MAC)
     settings.setAcceleratedCompositingForFixedPositionEnabled(true);
 #endif
 
@@ -2422,6 +2427,10 @@ static bool needsSelfRetainWhileLoadingQuirk()
 
 #if USE(AVFOUNDATION)
     settings.setAVFoundationEnabled([preferences isAVFoundationEnabled]);
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+    settings.setMockCaptureDevicesEnabled([preferences mockCaptureDevicesEnabled]);
 #endif
 
 #if ENABLE(WEB_AUDIO)
@@ -3730,26 +3739,27 @@ static inline IMP getMethod(id o, SEL s)
 
     NSMutableArray *eventRegionArray = [[[NSMutableArray alloc] initWithCapacity:rects.size()] autorelease];
 
+    NSView <WebDocumentView> *documentView = [[[self mainFrame] frameView] documentView];
     Vector<IntRect>::const_iterator end = rects.end();
     for (Vector<IntRect>::const_iterator it = rects.begin(); it != end; ++it) {
         const IntRect& rect = *it;
         if (rect.isEmpty())
             continue;
 
-        // Note that these rectangles are in the coordinate system of the document (inside the WebHTMLView), which is not
-        // the same as the coordinate system of the WebView. If you want to do comparisons with locations in the WebView,
-        // you must convert between the two using WAKView's convertRect:toView: selector. This will take care of scaling
-        // and translations (which are relevant for right-to-left column layout).
+        // The touch rectangles are in the coordinate system of the document (inside the WebHTMLView), which is not
+        // the same as the coordinate system of the WebView. UIWebView currently expects view coordinates, so we'll
+        // convert them here now.
+        IntRect viewRect = IntRect([documentView convertRect:rect toView:self]);
 
         // The event region wants this points in this order:
         //  p2------p3
         //  |       |
         //  p1------p4
         //
-        WebEventRegion *eventRegion = [[WebEventRegion alloc] initWithPoints:FloatPoint(rect.x(), rect.maxY())
-                                                                            :FloatPoint(rect.x(), rect.y())
-                                                                            :FloatPoint(rect.maxX(), rect.y())
-                                                                            :FloatPoint(rect.maxX(), rect.maxY())];
+        WebEventRegion *eventRegion = [[WebEventRegion alloc] initWithPoints:FloatPoint(viewRect.x(), viewRect.maxY())
+                                                                            :FloatPoint(viewRect.x(), viewRect.y())
+                                                                            :FloatPoint(viewRect.maxX(), viewRect.y())
+                                                                            :FloatPoint(viewRect.maxX(), viewRect.maxY())];
         if (eventRegion) {
             [eventRegionArray addObject:eventRegion];
             [eventRegion release];
@@ -4049,7 +4059,7 @@ static Vector<String> toStringVector(NSArray* patterns)
         return;
 
     auto userScript = std::make_unique<UserScript>(source, url, toStringVector(whitelist), toStringVector(blacklist), injectionTime == WebInjectAtDocumentStart ? InjectAtDocumentStart : InjectAtDocumentEnd, injectedFrames == WebInjectInAllFrames ? InjectInAllFrames : InjectInTopFrameOnly);
-    viewGroup->userContentController().addUserScript(*core(world), WTF::move(userScript));
+    viewGroup->userContentController().addUserScript(*core(world), WTFMove(userScript));
 }
 
 + (void)_addUserStyleSheetToGroup:(NSString *)groupName world:(WebScriptWorld *)world source:(NSString *)source url:(NSURL *)url
@@ -4074,7 +4084,7 @@ static Vector<String> toStringVector(NSArray* patterns)
         return;
 
     auto styleSheet = std::make_unique<UserStyleSheet>(source, url, toStringVector(whitelist), toStringVector(blacklist), injectedFrames == WebInjectInAllFrames ? InjectInAllFrames : InjectInTopFrameOnly, UserStyleUserLevel);
-    viewGroup->userContentController().addUserStyleSheet(*core(world), WTF::move(styleSheet), InjectInExistingDocuments);
+    viewGroup->userContentController().addUserStyleSheet(*core(world), WTFMove(styleSheet), InjectInExistingDocuments);
 }
 
 + (void)_removeUserScriptFromGroup:(NSString *)groupName world:(WebScriptWorld *)world url:(NSURL *)url
@@ -4482,7 +4492,8 @@ static Vector<String> toStringVector(NSArray* patterns)
 + (void)_setLoadResourcesSerially:(BOOL)serialize 
 {
     WebPlatformStrategies::initializeIfNecessary();
-    resourceLoadScheduler()->setSerialLoadingEnabled(serialize);
+
+    webResourceLoadScheduler().setSerialLoadingEnabled(serialize);
 }
 
 + (BOOL)_HTTPPipeliningEnabled
@@ -5148,15 +5159,6 @@ static bool needsWebViewInitThreadWorkaround()
     [super dealloc];
 }
 
-- (void)finalize
-{
-    ASSERT(_private->closed);
-
-    --WebViewCount;
-
-    [super finalize];
-}
-
 - (void)close
 {
     // _close existed first, and some clients might be calling or overriding it, so call through.
@@ -5293,7 +5295,7 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     _private->page->setDeviceScaleFactor([self _deviceScaleFactor]);
 #endif
 
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
+#if PLATFORM(MAC)
     if (_private->immediateActionController) {
         NSImmediateActionGestureRecognizer *recognizer = [_private->immediateActionController immediateActionRecognizer];
         if ([self window]) {
@@ -6604,9 +6606,20 @@ static WebFrame *incrementFrame(WebFrame *frame, WebFindOptions options = 0)
 
 @end
 
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 && USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/WebViewAdditions.mm>
+#else
+@implementation WebView (WebUpdateWebViewAdditions)
+
+- (void)updateWebViewAdditions
+{
+}
+
+@end
+#endif // PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 && USE(APPLE_INTERNAL_SDK)
+
 @implementation WebView (WebPendingPublic)
 
-#if !PLATFORM(IOS)
 - (void)scheduleInRunLoop:(NSRunLoop *)runLoop forMode:(NSString *)mode
 {
 #if USE(CFNETWORK)
@@ -6628,7 +6641,6 @@ static WebFrame *incrementFrame(WebFrame *frame, WebFindOptions options = 0)
     if (runLoop && mode)
         core(self)->removeSchedulePair(SchedulePair::create(schedulePairRunLoop, (CFStringRef)mode));
 }
-#endif
 
 static BOOL findString(NSView <WebDocumentSearching> *searchView, NSString *string, WebFindOptions options)
 {

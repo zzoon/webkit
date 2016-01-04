@@ -115,6 +115,7 @@ class HTMLIFrameElement;
 class HTMLImageElement;
 class HTMLMapElement;
 class HTMLMediaElement;
+class HTMLPictureElement;
 class HTMLScriptElement;
 class HitTestRequest;
 class HitTestResult;
@@ -511,7 +512,7 @@ public:
 
     void notifyRemovePendingSheetIfNeeded();
 
-    bool haveStylesheetsLoaded() const;
+    WEBCORE_EXPORT bool haveStylesheetsLoaded() const;
 
     // This is a DOM function.
     StyleSheetList& styleSheets();
@@ -602,6 +603,9 @@ public:
     virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) override final;
     virtual void resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) override final;
     virtual void stopActiveDOMObjects() override final;
+
+    void suspendDeviceMotionAndOrientationUpdates();
+    void resumeDeviceMotionAndOrientationUpdates();
 
     RenderView* renderView() const { return m_renderView.get(); }
 
@@ -1002,14 +1006,14 @@ public:
     bool inPageCache() const { return m_inPageCache; }
     void setInPageCache(bool flag);
 
-    // Elements can register themselves for the "documentWillSuspendForPageCache()" and  
-    // "documentDidResumeFromPageCache()" callbacks
-    void registerForPageCacheSuspensionCallbacks(Element*);
-    void unregisterForPageCacheSuspensionCallbacks(Element*);
+    // Elements can register themselves for the "suspend()" and
+    // "resume()" callbacks
+    void registerForDocumentSuspensionCallbacks(Element*);
+    void unregisterForDocumentSuspensionCallbacks(Element*);
 
     void documentWillBecomeInactive();
-    void documentWillSuspendForPageCache();
-    void documentDidResumeFromPageCache();
+    void suspend();
+    void resume();
 
     void registerForMediaVolumeCallbacks(Element*);
     void unregisterForMediaVolumeCallbacks(Element*);
@@ -1305,6 +1309,14 @@ public:
     bool shouldEnforceContentDispositionAttachmentSandbox() const;
     void applyContentDispositionAttachmentSandbox();
 
+    void addViewportDependentPicture(HTMLPictureElement&);
+    void removeViewportDependentPicture(HTMLPictureElement&);
+
+#if ENABLE(MEDIA_STREAM)
+    void setHasActiveMediaStreamTrack() { m_hasHadActiveMediaStreamTrack = true; }
+    bool hasHadActiveMediaStreamTrack() const { return m_hasHadActiveMediaStreamTrack; }
+#endif
+
 protected:
     enum ConstructionFlags { Synthesized = 1, NonRenderedPlaceholder = 1 << 1 };
     Document(Frame*, const URL&, unsigned = DefaultDocumentClass, unsigned constructionFlags = 0);
@@ -1401,6 +1413,8 @@ private:
     bool isDOMCookieCacheValid() const { return m_cookieCacheExpiryTimer.isActive(); }
     void invalidateDOMCookieCache();
     virtual void didLoadResourceSynchronously(const ResourceRequest&) override final;
+
+    void checkViewportDependentPictures();
 
     unsigned m_referencingNodeCount;
 
@@ -1626,6 +1640,8 @@ private:
     RefPtr<RenderStyle> m_savedPlaceholderRenderStyle;
 #endif
 
+    HashSet<HTMLPictureElement*> m_viewportDependentPictures;
+
     int m_loadEventDelayCount;
     Timer m_loadEventDelayTimer;
 
@@ -1753,6 +1769,7 @@ private:
 
     bool m_hasStyleWithViewportUnits;
     bool m_isTimerThrottlingEnabled { false };
+    bool m_isSuspended { false };
 
     HashSet<MediaProducer*> m_audioProducers;
     MediaProducer::MediaStateFlags m_mediaState { MediaProducer::IsNotPlaying };
@@ -1766,6 +1783,11 @@ private:
 
 #if ENABLE(MEDIA_SESSION)
     RefPtr<MediaSession> m_defaultMediaSession;
+#endif
+    bool m_areDeviceMotionAndOrientationUpdatesSuspended { false };
+
+#if ENABLE(MEDIA_STREAM)
+    bool m_hasHadActiveMediaStreamTrack { false };
 #endif
 };
 

@@ -274,24 +274,24 @@ void GraphicsContext::setAntialiasedFontDilationEnabled(bool antialiasedFontDila
 void GraphicsContext::setStrokePattern(Ref<Pattern>&& pattern)
 {
     m_state.strokeGradient = nullptr;
-    m_state.strokePattern = WTF::move(pattern);
+    m_state.strokePattern = WTFMove(pattern);
 }
 
 void GraphicsContext::setFillPattern(Ref<Pattern>&& pattern)
 {
     m_state.fillGradient = nullptr;
-    m_state.fillPattern = WTF::move(pattern);
+    m_state.fillPattern = WTFMove(pattern);
 }
 
 void GraphicsContext::setStrokeGradient(Ref<Gradient>&& gradient)
 {
-    m_state.strokeGradient = WTF::move(gradient);
+    m_state.strokeGradient = WTFMove(gradient);
     m_state.strokePattern = nullptr;
 }
 
 void GraphicsContext::setFillGradient(Ref<Gradient>&& gradient)
 {
-    m_state.fillGradient = WTF::move(gradient);
+    m_state.fillGradient = WTFMove(gradient);
     m_state.fillPattern = nullptr;
 }
 
@@ -441,6 +441,33 @@ void GraphicsContext::drawImageBuffer(ImageBuffer& image, const FloatRect& desti
     // FIXME (49002): Should be InterpolationLow
     InterpolationQualityMaintainer interpolationQualityForThisScope(*this, imagePaintingOptions.m_useLowQualityScale ? InterpolationNone : imageInterpolationQuality());
     image.draw(*this, destination, source, imagePaintingOptions.m_compositeOperator, imagePaintingOptions.m_blendMode, imagePaintingOptions.m_useLowQualityScale);
+}
+
+void GraphicsContext::drawConsumingImageBuffer(std::unique_ptr<ImageBuffer> image, const FloatPoint& destination, const ImagePaintingOptions& imagePaintingOptions)
+{
+    if (!image)
+        return;
+    IntSize imageLogicalSize = image->logicalSize();
+    drawConsumingImageBuffer(WTFMove(image), FloatRect(destination, imageLogicalSize), FloatRect(FloatPoint(), imageLogicalSize), imagePaintingOptions);
+}
+
+void GraphicsContext::drawConsumingImageBuffer(std::unique_ptr<ImageBuffer> image, const FloatRect& destination, const ImagePaintingOptions& imagePaintingOptions)
+{
+    if (!image)
+        return;
+    IntSize imageLogicalSize = image->logicalSize();
+    drawConsumingImageBuffer(WTFMove(image), destination, FloatRect(FloatPoint(), FloatSize(imageLogicalSize)), imagePaintingOptions);
+}
+
+void GraphicsContext::drawConsumingImageBuffer(std::unique_ptr<ImageBuffer> image, const FloatRect& destination, const FloatRect& source, const ImagePaintingOptions& imagePaintingOptions)
+{
+    if (paintingDisabled() || !image)
+        return;
+    
+    // FIXME (49002): Should be InterpolationLow
+    InterpolationQualityMaintainer interpolationQualityForThisScope(*this, imagePaintingOptions.m_useLowQualityScale ? InterpolationNone : imageInterpolationQuality());
+
+    ImageBuffer::drawConsuming(WTFMove(image), *this, destination, source, imagePaintingOptions.m_compositeOperator, imagePaintingOptions.m_blendMode, imagePaintingOptions.m_useLowQualityScale);
 }
 
 void GraphicsContext::clip(const IntRect& rect)
@@ -705,13 +732,11 @@ void GraphicsContext::platformStrokeEllipse(const FloatRect& ellipse)
 
 FloatRect GraphicsContext::computeLineBoundsAndAntialiasingModeForText(const FloatPoint& point, float width, bool printing, bool& shouldAntialias, Color& color)
 {
-    FloatPoint origin;
+    FloatPoint origin = point;
     float thickness = std::max(strokeThickness(), 0.5f);
 
     shouldAntialias = true;
-    if (printing)
-        origin = point;
-    else {
+    if (!printing) {
         AffineTransform transform = getCTM(GraphicsContext::DefinitelyIncludeDeviceScale);
         if (transform.preservesAxisAlignment())
             shouldAntialias = false;
@@ -731,7 +756,8 @@ FloatRect GraphicsContext::computeLineBoundsAndAntialiasingModeForText(const Flo
 
         FloatPoint devicePoint = transform.mapPoint(point);
         FloatPoint deviceOrigin = FloatPoint(roundf(devicePoint.x()), ceilf(devicePoint.y()));
-        origin = transform.inverse().mapPoint(deviceOrigin);
+        if (auto inverse = transform.inverse())
+            origin = inverse.value().mapPoint(deviceOrigin);
     }
     return FloatRect(origin.x(), origin.y(), width, thickness);
 }

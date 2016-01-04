@@ -65,7 +65,7 @@ RefPtr<RTCPeerConnection> RTCPeerConnection::create(ScriptExecutionContext& cont
     if (ec)
         return nullptr;
 
-    RefPtr<RTCPeerConnection> peerConnection = adoptRef(new RTCPeerConnection(context, WTF::move(configuration), ec));
+    RefPtr<RTCPeerConnection> peerConnection = adoptRef(new RTCPeerConnection(context, WTFMove(configuration), ec));
     peerConnection->suspendIfNeeded();
     if (ec)
         return nullptr;
@@ -78,7 +78,7 @@ RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, RefPtr<RTC
     , m_signalingState(SignalingState::Stable)
     , m_iceGatheringState(IceGatheringState::New)
     , m_iceConnectionState(IceConnectionState::New)
-    , m_configuration(WTF::move(configuration))
+    , m_configuration(WTFmove(configuration))
 {
     Document& document = downcast<Document>(context);
 
@@ -131,7 +131,7 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
     for (auto stream : streams)
         mediaStreamIds.append(stream->id());
 
-    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTF::move(track), WTF::move(mediaStreamIds), *this);
+    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFmove(track), WTF::move(mediaStreamIds), *this);
     m_senderSet.append(sender);
 
     m_backend->markAsNeedingNegotiation();
@@ -174,7 +174,7 @@ void RTCPeerConnection::queuedCreateOffer(const Dictionary& offerOptions, Sessio
     }
     ASSERT(options);
 
-    m_backend->createOffer(*options, WTF::move(promise));
+    m_backend->createOffer(*options, WTFMove(promise));
 }
 
 void RTCPeerConnection::queuedCreateAnswer(const Dictionary& answerOptions, SessionDescriptionPromise&& promise)
@@ -191,7 +191,7 @@ void RTCPeerConnection::queuedCreateAnswer(const Dictionary& answerOptions, Sess
         return;
     }
 
-    m_backend->createAnswer(*options, WTF::move(promise));
+    m_backend->createAnswer(*options, WTFMove(promise));
 }
 
 void RTCPeerConnection::queuedSetLocalDescription(RTCSessionDescription* description, PeerConnection::VoidPromise&& promise)
@@ -202,7 +202,7 @@ void RTCPeerConnection::queuedSetLocalDescription(RTCSessionDescription* descrip
     }
 
     ASSERT(description);
-    m_backend->setLocalDescription(*description, WTF::move(promise));
+    m_backend->setLocalDescription(*description, WTFMove(promise));
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::localDescription() const
@@ -228,7 +228,7 @@ void RTCPeerConnection::queuedSetRemoteDescription(RTCSessionDescription* descri
     }
 
     ASSERT(description);
-    m_backend->setRemoteDescription(*description, WTF::move(promise));
+    m_backend->setRemoteDescription(*description, WTFMove(promise));
 }
 
 RefPtr<RTCSessionDescription> RTCPeerConnection::remoteDescription() const
@@ -254,7 +254,7 @@ void RTCPeerConnection::queuedAddIceCandidate(RTCIceCandidate* rtcCandidate, Voi
     }
 
     ASSERT(rtcCandidate);
-    m_backend->addIceCandidate(*rtcCandidate, WTF::move(promise));
+    m_backend->addIceCandidate(*rtcCandidate, WTFMove(promise));
 }
 
 String RTCPeerConnection::signalingState() const
@@ -337,18 +337,18 @@ void RTCPeerConnection::setConfiguration(const Dictionary& configuration, Except
     if (ec)
         return;
 
-    m_configuration = WTF::move(newConfiguration);
+    m_configuration = WTFMove(newConfiguration);
     m_backend->setConfiguration(*m_configuration);
 }
 
 void RTCPeerConnection::privateGetStats(MediaStreamTrack* selector, PeerConnection::StatsPromise&& promise)
 {
-    m_backend->getStats(selector, WTF::move(promise));
+    m_backend->getStats(selector, WTFMove(promise));
 }
 
 void RTCPeerConnection::privateGetStats(PeerConnection::StatsPromise&& promise)
 {
-    privateGetStats(nullptr, WTF::move(promise));
+    privateGetStats(nullptr, WTFMove(promise));
 }
 
 RefPtr<RTCDataChannel> RTCPeerConnection::createDataChannel(String, const Dictionary&, ExceptionCode& ec)
@@ -385,7 +385,7 @@ const char* RTCPeerConnection::activeDOMObjectName() const
     return "RTCPeerConnection";
 }
 
-bool RTCPeerConnection::canSuspendForPageCache() const
+bool RTCPeerConnection::canSuspendForDocumentSuspension() const
 {
     // FIXME: We should try and do better here.
     return false;

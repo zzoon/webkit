@@ -26,6 +26,8 @@
 #import "config.h"
 #import "WebProcessPool.h"
 
+#import "NetworkProcessCreationParameters.h"
+#import "NetworkProcessProxy.h"
 #import "PluginProcessManager.h"
 #import "SandboxUtilities.h"
 #import "TextChecker.h"
@@ -46,11 +48,6 @@
 #import <WebCore/SharedBuffer.h>
 #import <WebCore/RuntimeApplicationChecks.h>
 #import <sys/param.h>
-
-#if ENABLE(NETWORK_PROCESS)
-#import "NetworkProcessCreationParameters.h"
-#import "NetworkProcessProxy.h"
-#endif
 
 #if PLATFORM(IOS)
 #import "ArgumentCodersCF.h"
@@ -76,10 +73,8 @@ static NSString *WebKitApplicationDidChangeAccessibilityEnhancedUserInterfaceNot
 // FIXME: <rdar://problem/9138817> - After this "backwards compatibility" radar is removed, this code should be removed to only return an empty String.
 NSString *WebIconDatabaseDirectoryDefaultsKey = @"WebIconDatabaseDirectoryDefaultsKey";
 
-#if ENABLE(NETWORK_PROCESS)
 static NSString * const WebKit2HTTPProxyDefaultsKey = @"WebKit2HTTPProxy";
 static NSString * const WebKit2HTTPSProxyDefaultsKey = @"WebKit2HTTPSProxy";
-#endif
 
 #if ENABLE(NETWORK_CACHE)
 static NSString * const WebKitNetworkCacheEnabledDefaultsKey = @"WebKitNetworkCacheEnabled";
@@ -87,6 +82,10 @@ static NSString * const WebKitNetworkCacheEfficacyLoggingEnabledDefaultsKey = @"
 #if ENABLE(NETWORK_CACHE_SPECULATIVE_REVALIDATION)
 static NSString * const WebKitNetworkCacheSpeculativeRevalidationEnabledDefaultsKey = @"WebKitNetworkCacheResourceRevalidationEnabled";
 #endif
+#endif
+
+#if PLATFORM(MAC)
+NSString *WebKitTabSuspension = @"WebKitTabSuspension";
 #endif
 
 namespace WebKit {
@@ -106,6 +105,10 @@ static void registerUserDefaultsIfNeeded()
     [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitJSCJITEnabledDefaultsKey];
     [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitJSCFTLJITEnabledDefaultsKey];
 
+#if PLATFORM(MAC)
+    [registrationDictionary setObject:[NSNumber numberWithBool:NO] forKey:WebKitTabSuspension];
+#endif
+
 #if ENABLE(NETWORK_CACHE)
     [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitNetworkCacheEnabledDefaultsKey];
     [registrationDictionary setObject:[NSNumber numberWithBool:NO] forKey:WebKitNetworkCacheEfficacyLoggingEnabledDefaultsKey];
@@ -119,10 +122,8 @@ static void registerUserDefaultsIfNeeded()
 
 void WebProcessPool::updateProcessSuppressionState()
 {
-#if ENABLE(NETWORK_PROCESS)
-    if (usesNetworkProcess() && m_networkProcess)
+    if (m_networkProcess)
         m_networkProcess->setProcessSuppressionEnabled(processSuppressionEnabled());
-#endif
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     if (!m_processSuppressionDisabledForPageCounter.value())
@@ -177,6 +178,10 @@ void WebProcessPool::platformInitializeWebProcess(WebProcessCreationParameters& 
     parameters.accessibilityEnhancedUserInterfaceEnabled = false;
 #endif
 
+#if PLATFORM(MAC)
+    parameters.shouldEnableTabSuspension = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitTabSuspension];
+#endif
+
     parameters.shouldEnableJIT = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitJSCJITEnabledDefaultsKey];
     parameters.shouldEnableFTLJIT = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitJSCFTLJITEnabledDefaultsKey];
     parameters.shouldEnableMemoryPressureReliefLogging = [[NSUserDefaults standardUserDefaults] boolForKey:@"LogMemoryJetsamDetails"];
@@ -196,15 +201,6 @@ void WebProcessPool::platformInitializeWebProcess(WebProcessCreationParameters& 
     SandboxExtension::createHandle(parameters.uiProcessBundleResourcePath, SandboxExtension::ReadOnly, parameters.uiProcessBundleResourcePathExtensionHandle);
 
     parameters.uiProcessBundleIdentifier = String([[NSBundle mainBundle] bundleIdentifier]);
-
-#if ENABLE(NETWORK_PROCESS)
-    if (!usesNetworkProcess()) {
-#endif
-        for (const auto& scheme : globalURLSchemesWithCustomProtocolHandlers())
-            parameters.urlSchemesRegisteredForCustomProtocols.append(scheme);
-#if ENABLE(NETWORK_PROCESS)
-    }
-#endif
 
     parameters.fontWhitelist = m_fontWhitelist;
 
@@ -236,7 +232,6 @@ void WebProcessPool::platformInitializeWebProcess(WebProcessCreationParameters& 
 #endif
 }
 
-#if ENABLE(NETWORK_PROCESS)
 void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationParameters& parameters)
 {
     NSURLCache *urlCache = [NSURLCache sharedURLCache];
@@ -271,7 +266,6 @@ void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationPara
     parameters.uiProcessCookieStorageIdentifier.append(CFDataGetBytePtr(cookieStorageData.get()), CFDataGetLength(cookieStorageData.get()));
 #endif
 }
-#endif
 
 void WebProcessPool::platformInvalidateContext()
 {
@@ -514,12 +508,10 @@ void WebProcessPool::resetHSTSHosts()
 
 void WebProcessPool::resetHSTSHostsAddedAfterDate(double startDateIntervalSince1970)
 {
-#if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000)
     NSDate *startDate = [NSDate dateWithTimeIntervalSince1970:startDateIntervalSince1970];
     _CFNetworkResetHSTSHostsSinceDate(nullptr, (__bridge CFDateRef)startDate);
 #if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
     _CFNetworkResetHSTSHostsSinceDate(privateBrowsingSession(), (__bridge CFDateRef)startDate);
-#endif
 #endif
 }
 

@@ -39,6 +39,7 @@
     macro(Error) \
     macro(EvalError) \
     macro(Function) \
+    macro(GeneratorFunction) \
     macro(Infinity) \
     macro(Intl) \
     macro(JSON) \
@@ -85,6 +86,7 @@
     macro(bytecodeIndex) \
     macro(bytecodes) \
     macro(bytecodesID) \
+    macro(calendar) \
     macro(callee) \
     macro(caller) \
     macro(caseFirst) \
@@ -100,6 +102,7 @@
     macro(constructor) \
     macro(count) \
     macro(counters) \
+    macro(day) \
     macro(defineProperty) \
     macro(description) \
     macro(descriptions) \
@@ -108,6 +111,7 @@
     macro(done) \
     macro(entries) \
     macro(enumerable) \
+    macro(era) \
     macro(eval) \
     macro(exec) \
     macro(executionCount) \
@@ -115,6 +119,7 @@
     macro(flags) \
     macro(focus) \
     macro(forEach) \
+    macro(formatMatcher) \
     macro(forward) \
     macro(from) \
     macro(fromCharCode) \
@@ -125,6 +130,8 @@
     macro(hasOwnProperty) \
     macro(hash) \
     macro(header) \
+    macro(hour) \
+    macro(hour12) \
     macro(href) \
     macro(id) \
     macro(ignoreCase) \
@@ -148,10 +155,13 @@
     macro(locale) \
     macro(localeMatcher) \
     macro(message) \
+    macro(minute) \
+    macro(month) \
     macro(multiline) \
     macro(name) \
     macro(next) \
     macro(now) \
+    macro(numberingSystem) \
     macro(numInlinedCalls) \
     macro(numInlinedGetByIds) \
     macro(numInlinedPutByIds) \
@@ -171,6 +181,7 @@
     macro(reload) \
     macro(replace) \
     macro(resolve) \
+    macro(second) \
     macro(sensitivity) \
     macro(set) \
     macro(showModalDialog) \
@@ -184,6 +195,8 @@
     macro(target) \
     macro(test) \
     macro(then) \
+    macro(timeZone) \
+    macro(timeZoneName) \
     macro(toExponential) \
     macro(toFixed) \
     macro(toISOString) \
@@ -197,8 +210,10 @@
     macro(values) \
     macro(webkit) \
     macro(webkitIndexedDB) \
+    macro(weekday) \
     macro(window) \
-    macro(writable)
+    macro(writable) \
+    macro(year)
 
 #define JSC_COMMON_IDENTIFIERS_EACH_KEYWORD(macro) \
     macro(break) \
@@ -249,7 +264,6 @@
     macro(yield)
 
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL_NOT_IMPLEMENTED_YET(macro)\
-    macro(hasInstance) \
     macro(isConcatSpreadable) \
     macro(match) \
     macro(replace) \
@@ -259,6 +273,7 @@
     macro(toPrimitive)
 
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL(macro) \
+    macro(hasInstance) \
     macro(iterator) \
     macro(unscopables) \
     macro(toStringTag)
@@ -297,6 +312,7 @@
     macro(abs) \
     macro(floor) \
     macro(isFinite) \
+    macro(isNaN) \
     macro(getPrototypeOf) \
     macro(getOwnPropertyNames) \
     macro(RangeError) \
@@ -314,11 +330,13 @@
     macro(promiseFulfillReactions) \
     macro(promiseRejectReactions) \
     macro(promiseResult) \
+    macro(push) \
     macro(capabilities) \
     macro(starDefault) \
     macro(InspectorInstrumentation) \
     macro(get) \
     macro(set) \
+    macro(shift) \
     macro(allocateTypedArray) \
     macro(Int8Array) \
     macro(Int16Array) \
@@ -329,6 +347,21 @@
     macro(Uint32Array) \
     macro(Float32Array) \
     macro(Float64Array) \
+    macro(generator) \
+    macro(generatorNext) \
+    macro(generatorState) \
+    macro(generatorFrame) \
+    macro(generatorValue) \
+    macro(generatorThis) \
+    macro(generatorResumeMode) \
+    macro(Collator) \
+    macro(DateTimeFormat) \
+    macro(NumberFormat) \
+    macro(newTargetLocal) \
+    macro(derivedConstructor) \
+    macro(isBoundFunction) \
+    macro(hasInstanceBoundFunction) \
+    macro(instanceOf) \
 
 
 namespace JSC {

@@ -543,7 +543,7 @@ static Ref<CSSBorderImageSliceValue> valueForNinePieceImageSlice(const NinePiece
     quad->setBottom(bottom.release());
     quad->setLeft(left.release());
 
-    return CSSBorderImageSliceValue::create(CSSValuePool::singleton().createValue(WTF::move(quad)), image.fill());
+    return CSSBorderImageSliceValue::create(CSSValuePool::singleton().createValue(WTFMove(quad)), image.fill());
 }
 
 static Ref<CSSPrimitiveValue> valueForNinePieceImageQuad(const LengthBox& box)
@@ -596,7 +596,7 @@ static Ref<CSSPrimitiveValue> valueForNinePieceImageQuad(const LengthBox& box)
     quad->setBottom(bottom);
     quad->setLeft(left);
 
-    return cssValuePool.createValue(WTF::move(quad));
+    return cssValuePool.createValue(WTFMove(quad));
 }
 
 static Ref<CSSValue> valueForNinePieceImageRepeat(const NinePieceImage& image)
@@ -884,7 +884,7 @@ static Ref<CSSValue> computedTransform(RenderObject* renderer, const RenderStyle
     // FIXME: Need to print out individual functions (https://bugs.webkit.org/show_bug.cgi?id=23924)
     auto list = CSSValueList::createSpaceSeparated();
     list.get().append(matrixTransformValue(transform, style));
-    return WTF::move(list);
+    return WTFMove(list);
 }
 
 static inline Ref<CSSPrimitiveValue> adjustLengthForZoom(double length, const RenderStyle& style, AdjustPixelValuesForComputedStyle adjust)
@@ -913,7 +913,7 @@ Ref<CSSValue> ComputedStyleExtractor::valueForShadow(const ShadowData* shadow, C
         RefPtr<CSSPrimitiveValue> color = cssValuePool.createColorValue(currShadowData->color().rgb());
         list.get().prepend(CSSShadowValue::create(x.release(), y.release(), blur.release(), spread.release(), style.release(), color.release()));
     }
-    return WTF::move(list);
+    return WTFMove(list);
 }
 
 Ref<CSSValue> ComputedStyleExtractor::valueForFilter(const RenderStyle& style, const FilterOperations& filterOperations, AdjustPixelValuesForComputedStyle adjust)
@@ -1005,7 +1005,7 @@ Ref<CSSValue> ComputedStyleExtractor::valueForFilter(const RenderStyle& style, c
         list.get().append(filterValue.releaseNonNull());
     }
 
-    return WTF::move(list);
+    return WTFMove(list);
 }
 
 #if ENABLE(CSS_GRID_LAYOUT)
@@ -1095,7 +1095,7 @@ static Ref<CSSValue> valueForGridTrackList(GridTrackSizingDirection direction, R
 
     // Those are the trailing <ident>* allowed in the syntax.
     addValuesForNamedGridLinesAtIndex(orderedNamedGridLines, insertionIndex, list.get());
-    return WTF::move(list);
+    return WTFMove(list);
 }
 
 static Ref<CSSValue> valueForGridPosition(const GridPosition& position)
@@ -1116,7 +1116,7 @@ static Ref<CSSValue> valueForGridPosition(const GridPosition& position)
 
     if (!position.namedGridLine().isNull())
         list.get().append(cssValuePool.createValue(position.namedGridLine(), CSSPrimitiveValue::CSS_STRING));
-    return WTF::move(list);
+    return WTFMove(list);
 }
 #endif
 
@@ -1161,7 +1161,7 @@ static Ref<CSSValue> scrollSnapPoints(RenderStyle& style, const ScrollSnapPoints
         list.get().append(zoomAdjustedPixelValueForLength(point, style));
     if (points->hasRepeat)
         list.get().append(CSSValuePool::singleton().createValue(LengthRepeat::create(zoomAdjustedPixelValueForLength(points->repeatOffset, style))));
-    return WTF::move(list);
+    return WTFMove(list);
 }
 
 static Ref<CSSValue> scrollSnapCoordinates(RenderStyle& style, const Vector<LengthSize>& coordinates)
@@ -1175,10 +1175,10 @@ static Ref<CSSValue> scrollSnapCoordinates(RenderStyle& style, const Vector<Leng
         auto pair = CSSValueList::createSpaceSeparated();
         pair.get().append(zoomAdjustedPixelValueForLength(coordinate.width(), style));
         pair.get().append(zoomAdjustedPixelValueForLength(coordinate.height(), style));
-        list.get().append(WTF::move(pair));
+        list.get().append(WTFMove(pair));
     }
 
-    return WTF::move(list);
+    return WTFMove(list);
 }
 #endif
 
@@ -1207,7 +1207,7 @@ static Ref<CSSValue> getWillChangePropertyValue(const WillChangeData* willChange
         }
     }
 
-    return WTF::move(list);
+    return WTFMove(list);
 }
 
 static inline void appendLigaturesValue(CSSValueList& list, FontVariantLigatures value, CSSValueID yesValue, CSSValueID noValue)
@@ -1238,7 +1238,7 @@ static Ref<CSSValue> fontVariantLigaturesPropertyValue(FontVariantLigatures comm
     appendLigaturesValue(valueList, discretionary, CSSValueDiscretionaryLigatures, CSSValueNoDiscretionaryLigatures);
     appendLigaturesValue(valueList, historical, CSSValueHistoricalLigatures, CSSValueNoHistoricalLigatures);
     appendLigaturesValue(valueList, contextualAlternates, CSSValueContextual, CSSValueNoContextual);
-    return WTF::move(valueList);
+    return WTFMove(valueList);
 }
 
 static Ref<CSSValue> fontVariantPositionPropertyValue(FontVariantPosition position)
@@ -1332,7 +1332,7 @@ static Ref<CSSValue> fontVariantNumericPropertyValue(FontVariantNumericFigure fi
     if (slashedZero == FontVariantNumericSlashedZero::Yes)
         valueList->append(cssValuePool.createIdentifierValue(CSSValueSlashedZero));
 
-    return WTF::move(valueList);
+    return WTFMove(valueList);
 }
 
 static Ref<CSSValue> fontVariantAlternatesPropertyValue(FontVariantAlternates alternates)
@@ -1382,10 +1382,10 @@ static Ref<CSSValue> fontVariantEastAsianPropertyValue(FontVariantEastAsianVaria
     switch (width) {
     case FontVariantEastAsianWidth::Normal:
         break;
-    case FontVariantEastAsianWidth::FullWidth:
+    case FontVariantEastAsianWidth::Full:
         valueList->append(cssValuePool.createIdentifierValue(CSSValueFullWidth));
         break;
-    case FontVariantEastAsianWidth::ProportionalWidth:
+    case FontVariantEastAsianWidth::Proportional:
         valueList->append(cssValuePool.createIdentifierValue(CSSValueProportionalWidth));
         break;
     }
@@ -1393,7 +1393,7 @@ static Ref<CSSValue> fontVariantEastAsianPropertyValue(FontVariantEastAsianVaria
     if (ruby == FontVariantEastAsianRuby::Yes)
         valueList->append(cssValuePool.createIdentifierValue(CSSValueRuby));
 
-    return WTF::move(valueList);
+    return WTFMove(valueList);
 }
 
 static Ref<CSSValueList> getDelayValue(const AnimationList* animList)
@@ -1710,7 +1710,7 @@ static Ref<CSSValue> fillRepeatToCSSValue(EFillRepeat xRepeat, EFillRepeat yRepe
     auto list = CSSValueList::createSpaceSeparated();
     list.get().append(cssValuePool.createValue(xRepeat));
     list.get().append(cssValuePool.createValue(yRepeat));
-    return WTF::move(list);
+    return WTFMove(list);
 }
 
 static Ref<CSSValue> fillSourceTypeToCSSValue(EMaskSourceType type)
@@ -1738,7 +1738,7 @@ static Ref<CSSValue> fillSizeToCSSValue(const FillSize& fillSize, const RenderSt
     auto list = CSSValueList::createSpaceSeparated();
     list.get().append(zoomAdjustedPixelValueForLength(fillSize.size.width(), style));
     list.get().append(zoomAdjustedPixelValueForLength(fillSize.size.height(), style));
-    return WTF::move(list);
+    return WTFMove(list);
 }
 
 static Ref<CSSValue> altTextToCSSValue(const RenderStyle* style)
@@ -1823,11 +1823,191 @@ static Ref<CSSPrimitiveValue> fontStyleFromStyle(RenderStyle* style)
     return CSSValuePool::singleton().createIdentifierValue(CSSValueNormal);
 }
 
-static Ref<CSSPrimitiveValue> fontVariantFromStyle(RenderStyle* style)
+static Ref<CSSValue> fontVariantFromStyle(RenderStyle* style)
 {
-    if (style->fontDescription().smallCaps())
-        return CSSValuePool::singleton().createIdentifierValue(CSSValueSmallCaps);
-    return CSSValuePool::singleton().createIdentifierValue(CSSValueNormal);
+    if (style->fontDescription().variantSettings().isAllNormal())
+        return CSSValuePool::singleton().createIdentifierValue(CSSValueNormal);
+
+    auto list = CSSValueList::createSpaceSeparated();
+
+    switch (style->fontDescription().variantCommonLigatures()) {
+    case FontVariantLigatures::Normal:
+        break;
+    case FontVariantLigatures::Yes:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueCommonLigatures));
+        break;
+    case FontVariantLigatures::No:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueNoCommonLigatures));
+        break;
+    }
+
+    switch (style->fontDescription().variantDiscretionaryLigatures()) {
+    case FontVariantLigatures::Normal:
+        break;
+    case FontVariantLigatures::Yes:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueDiscretionaryLigatures));
+        break;
+    case FontVariantLigatures::No:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueNoDiscretionaryLigatures));
+        break;
+    }
+
+    switch (style->fontDescription().variantHistoricalLigatures()) {
+    case FontVariantLigatures::Normal:
+        break;
+    case FontVariantLigatures::Yes:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueHistoricalLigatures));
+        break;
+    case FontVariantLigatures::No:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueNoHistoricalLigatures));
+        break;
+    }
+
+    switch (style->fontDescription().variantContextualAlternates()) {
+    case FontVariantLigatures::Normal:
+        break;
+    case FontVariantLigatures::Yes:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueContextual));
+        break;
+    case FontVariantLigatures::No:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueNoContextual));
+        break;
+    }
+
+    switch (style->fontDescription().variantPosition()) {
+    case FontVariantPosition::Normal:
+        break;
+    case FontVariantPosition::Subscript:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueSub));
+        break;
+    case FontVariantPosition::Superscript:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueSuper));
+        break;
+    }
+
+    switch (style->fontDescription().variantCaps()) {
+    case FontVariantCaps::Normal:
+        break;
+    case FontVariantCaps::Small:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueSmallCaps));
+        break;
+    case FontVariantCaps::AllSmall:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueAllSmallCaps));
+        break;
+    case FontVariantCaps::Petite:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValuePetiteCaps));
+        break;
+    case FontVariantCaps::AllPetite:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueAllPetiteCaps));
+        break;
+    case FontVariantCaps::Unicase:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueUnicase));
+        break;
+    case FontVariantCaps::Titling:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueTitlingCaps));
+        break;
+    }
+
+    switch (style->fontDescription().variantNumericFigure()) {
+    case FontVariantNumericFigure::Normal:
+        break;
+    case FontVariantNumericFigure::LiningNumbers:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueLiningNums));
+        break;
+    case FontVariantNumericFigure::OldStyleNumbers:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueOldstyleNums));
+        break;
+    }
+
+    switch (style->fontDescription().variantNumericSpacing()) {
+    case FontVariantNumericSpacing::Normal:
+        break;
+    case FontVariantNumericSpacing::ProportionalNumbers:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueProportionalNums));
+        break;
+    case FontVariantNumericSpacing::TabularNumbers:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueTabularNums));
+        break;
+    }
+
+    switch (style->fontDescription().variantNumericFraction()) {
+    case FontVariantNumericFraction::Normal:
+        break;
+    case FontVariantNumericFraction::DiagonalFractions:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueDiagonalFractions));
+        break;
+    case FontVariantNumericFraction::StackedFractions:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueStackedFractions));
+        break;
+    }
+
+    switch (style->fontDescription().variantNumericOrdinal()) {
+    case FontVariantNumericOrdinal::Normal:
+        break;
+    case FontVariantNumericOrdinal::Yes:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueOrdinal));
+        break;
+    }
+
+    switch (style->fontDescription().variantNumericSlashedZero()) {
+    case FontVariantNumericSlashedZero::Normal:
+        break;
+    case FontVariantNumericSlashedZero::Yes:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueSlashedZero));
+        break;
+    }
+
+    switch (style->fontDescription().variantAlternates()) {
+    case FontVariantAlternates::Normal:
+        break;
+    case FontVariantAlternates::HistoricalForms:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueHistoricalForms));
+        break;
+    }
+
+    switch (style->fontDescription().variantEastAsianVariant()) {
+    case FontVariantEastAsianVariant::Normal:
+        break;
+    case FontVariantEastAsianVariant::Jis78:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueJis78));
+        break;
+    case FontVariantEastAsianVariant::Jis83:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueJis83));
+        break;
+    case FontVariantEastAsianVariant::Jis90:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueJis90));
+        break;
+    case FontVariantEastAsianVariant::Jis04:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueJis04));
+        break;
+    case FontVariantEastAsianVariant::Simplified:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueSimplified));
+        break;
+    case FontVariantEastAsianVariant::Traditional:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueTraditional));
+        break;
+    }
+
+    switch (style->fontDescription().variantEastAsianWidth()) {
+    case FontVariantEastAsianWidth::Normal:
+        break;
+    case FontVariantEastAsianWidth::Full:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueFullWidth));
+        break;
+    case FontVariantEastAsianWidth::Proportional:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueProportionalWidth));
+        break;
+    }
+
+    switch (style->fontDescription().variantEastAsianRuby()) {
+    case FontVariantEastAsianRuby::Normal:
+        break;
+    case FontVariantEastAsianRuby::Yes:
+        list.get().append(CSSValuePool::singleton().createIdentifierValue(CSSValueRuby));
+        break;
+    }
+
+    return WTFMove(list);
 }
 
 static Ref<CSSPrimitiveValue> fontWeightFromStyle(RenderStyle* style)
@@ -2454,10 +2634,10 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
             }
             auto value = cssValuePool.createValue(style->cursor());
             if (list) {
-                list->append(WTF::move(value));
+                list->append(WTFMove(value));
                 return list;
             }
-            return WTF::move(value);
+            return WTFMove(value);
         }
 #if ENABLE(CURSOR_VISIBILITY)
         case CSSPropertyWebkitCursorVisibility:
@@ -2518,7 +2698,10 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
         case CSSPropertyFont: {
             RefPtr<CSSFontValue> computedFont = CSSFontValue::create();
             computedFont->style = fontStyleFromStyle(style.get());
-            computedFont->variant = fontVariantFromStyle(style.get());
+            if (style->fontDescription().variantCaps() == FontVariantCaps::Small)
+                computedFont->variant = CSSValuePool::singleton().createIdentifierValue(CSSValueSmallCaps);
+            else
+                computedFont->variant = CSSValuePool::singleton().createIdentifierValue(CSSValueNormal);
             computedFont->weight = fontWeightFromStyle(style.get());
             computedFont->size = fontSizeFromStyle(*style);
             computedFont->lineHeight = lineHeightFromStyle(*style);
@@ -3002,7 +3185,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
                     firstRegion = region.copyRef();
                 previousRegion = region.ptr();
             }
-            return cssValuePool.createValue(WTF::move(firstRegion));
+            return cssValuePool.createValue(WTFMove(firstRegion));
         }
 #endif
         case CSSPropertyAnimationDelay:
@@ -3220,7 +3403,7 @@ RefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propertyID,
             rect->setRight(autoOrZoomAdjustedValue(style->clip().right(), *style));
             rect->setBottom(autoOrZoomAdjustedValue(style->clip().bottom(), *style));
             rect->setLeft(autoOrZoomAdjustedValue(style->clip().left(), *style));
-            return cssValuePool.createValue(WTF::move(rect));
+            return cssValuePool.createValue(WTFMove(rect));
         }
         case CSSPropertySpeak:
             return cssValuePool.createValue(style->speak());

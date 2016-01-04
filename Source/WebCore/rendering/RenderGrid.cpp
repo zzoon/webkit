@@ -242,7 +242,7 @@ void RenderGrid::GridSizingData::setFreeSpaceForDirection(GridTrackSizingDirecti
 }
 
 RenderGrid::RenderGrid(Element& element, Ref<RenderStyle>&& style)
-    : RenderBlock(element, WTF::move(style), 0)
+    : RenderBlock(element, WTFMove(style), 0)
     , m_orderIterator(*this)
 {
     // All of our children must be block level.
@@ -328,7 +328,6 @@ LayoutUnit RenderGrid::computeTrackBasedLogicalHeight(const GridSizingData& sizi
 
 void RenderGrid::computeTrackSizesForDirection(GridTrackSizingDirection direction, GridSizingData& sizingData, LayoutUnit freeSpace)
 {
-    ASSERT(freeSpace >= 0);
     LayoutUnit totalGuttersSize = guttersSize(direction, direction == ForRows ? gridRowCount() : gridColumnCount());
     sizingData.setFreeSpaceForDirection(direction, freeSpace - totalGuttersSize);
 
@@ -377,7 +376,7 @@ void RenderGrid::layoutBlock(bool relayoutChildren, LayoutUnit)
     // The above call might have changed the grid's logical height depending on min|max height restrictions.
     // Update the sizes of the rows whose size depends on the logical height (also on definite|indefinite sizes).
     if (logicalHeightWasIndefinite)
-        computeTrackSizesForDirection(ForRows, sizingData, logicalHeight());
+        computeTrackSizesForDirection(ForRows, sizingData, contentLogicalHeight());
 
     // Grid container should have the minimum height of a line if it's editable. That does not affect track sizing though.
     if (hasLineIfEmpty()) {
@@ -651,7 +650,7 @@ double RenderGrid::computeFlexFactorUnitSize(const Vector<GridTrack>& tracks, Gr
         }
     }
     if (!validFlexFactorUnit)
-        return computeFlexFactorUnitSize(tracks, direction, flexFactorSum, leftOverSpace, flexibleTracksIndexes, WTF::move(tracksToTreatAsInflexible));
+        return computeFlexFactorUnitSize(tracks, direction, flexFactorSum, leftOverSpace, flexibleTracksIndexes, WTFMove(tracksToTreatAsInflexible));
     return hypotheticalFactorUnitSize;
 }
 
@@ -1591,7 +1590,7 @@ static inline LayoutUnit computeOverflowAlignmentOffset(OverflowAlignment overfl
         // If overflow is 'safe', we have to make sure we don't overflow the 'start'
         // edge (potentially cause some data loss as the overflow is unreachable).
         return std::max<LayoutUnit>(0, offset);
-    case OverflowAlignmentTrue:
+    case OverflowAlignmentUnsafe:
     case OverflowAlignmentDefault:
         // If we overflow our alignment container and overflow is 'true' (default), we
         // ignore the overflow and just return the value regardless (which may cause data
@@ -1689,7 +1688,7 @@ void RenderGrid::updateAutoMarginsInRowAxisIfNeeded(RenderBox& child)
 {
     ASSERT(!child.isOutOfFlowPositioned());
 
-    LayoutUnit availableAlignmentSpace = child.overrideContainingBlockContentLogicalWidth().value() - child.logicalWidth();
+    LayoutUnit availableAlignmentSpace = child.overrideContainingBlockContentLogicalWidth().value() - child.logicalWidth() - child.marginLogicalWidth();
     if (availableAlignmentSpace <= 0)
         return;
 
@@ -1711,7 +1710,7 @@ void RenderGrid::updateAutoMarginsInColumnAxisIfNeeded(RenderBox& child)
 {
     ASSERT(!child.isOutOfFlowPositioned());
 
-    LayoutUnit availableAlignmentSpace = child.overrideContainingBlockContentLogicalHeight().value() - child.logicalHeight();
+    LayoutUnit availableAlignmentSpace = child.overrideContainingBlockContentLogicalHeight().value() - child.logicalHeight() - child.marginLogicalHeight();
     if (availableAlignmentSpace <= 0)
         return;
 

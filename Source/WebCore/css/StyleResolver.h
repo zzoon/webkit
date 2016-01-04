@@ -28,7 +28,7 @@
 #include "DocumentRuleSets.h"
 #include "InspectorCSSOMWrappers.h"
 #include "LinkHash.h"
-#include "MediaQueryExp.h"
+#include "MediaQueryEvaluator.h"
 #include "RenderStyle.h"
 #include "RuleFeature.h"
 #include "RuleSet.h"
@@ -92,19 +92,6 @@ class SVGSVGElement;
 class ViewportStyleResolver;
 class WebKitCSSFilterValue;
 struct ResourceLoaderOptions;
-
-class MediaQueryResult {
-    WTF_MAKE_NONCOPYABLE(MediaQueryResult); WTF_MAKE_FAST_ALLOCATED;
-public:
-    MediaQueryResult(const MediaQueryExp& expr, bool result)
-        : m_expression(expr)
-        , m_result(result)
-    {
-    }
-
-    MediaQueryExp m_expression;
-    bool m_result;
-};
 
 enum StyleSharingBehavior {
     AllowStyleSharing,
@@ -408,7 +395,7 @@ public:
         RenderStyle* style() const { return m_style.get(); }
         Ref<RenderStyle> takeStyle() { return m_style.releaseNonNull(); }
 
-        void setParentStyle(Ref<RenderStyle>&& parentStyle) { m_parentStyle = WTF::move(parentStyle); }
+        void setParentStyle(Ref<RenderStyle>&& parentStyle) { m_parentStyle = WTFMove(parentStyle); }
         RenderStyle* parentStyle() const { return m_parentStyle.get(); }
         RenderStyle* rootElementStyle() const { return m_rootElementStyle; }
 
@@ -454,8 +441,8 @@ public:
         CascadedProperties* authorRollback() const { return m_authorRollback.get(); }
         CascadedProperties* userRollback() const { return m_userRollback.get(); }
         
-        void setAuthorRollback(std::unique_ptr<CascadedProperties>& rollback) { m_authorRollback = WTF::move(rollback); }
-        void setUserRollback(std::unique_ptr<CascadedProperties>& rollback) { m_userRollback = WTF::move(rollback); }
+        void setAuthorRollback(std::unique_ptr<CascadedProperties>& rollback) { m_authorRollback = WTFMove(rollback); }
+        void setUserRollback(std::unique_ptr<CascadedProperties>& rollback) { m_userRollback = WTFMove(rollback); }
         
     private:
         void updateConversionData();

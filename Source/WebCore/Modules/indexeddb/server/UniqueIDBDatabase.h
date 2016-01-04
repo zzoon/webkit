@@ -29,10 +29,11 @@
 #if ENABLE(INDEXED_DATABASE)
 
 #include "IDBBackingStore.h"
+#include "IDBBindingUtilities.h"
 #include "IDBDatabaseIdentifier.h"
 #include "IDBDatabaseInfo.h"
 #include "IDBGetResult.h"
-#include "IDBServerOperation.h"
+#include "ServerOpenDBRequest.h"
 #include "ThreadSafeDataBuffer.h"
 #include "Timer.h"
 #include "UniqueIDBDatabaseConnection.h"
@@ -70,10 +71,13 @@ public:
         return adoptRef(*new UniqueIDBDatabase(server, identifier));
     }
 
+    ~UniqueIDBDatabase();
+
     void openDatabaseConnection(IDBConnectionToClient&, const IDBRequestData&);
 
     const IDBDatabaseInfo& info() const;
     IDBServer& server() { return m_server; }
+    const IDBDatabaseIdentifier& identifier() const { return m_identifier; }
 
     void createObjectStore(UniqueIDBDatabaseTransaction&, const IDBObjectStoreInfo&, ErrorCallback);
     void deleteObjectStore(UniqueIDBDatabaseTransaction&, const String& objectStoreName, ErrorCallback);
@@ -88,25 +92,39 @@ public:
     void iterateCursor(const IDBRequestData&, const IDBKeyData&, unsigned long count, GetResultCallback);
     void commitTransaction(UniqueIDBDatabaseTransaction&, ErrorCallback);
     void abortTransaction(UniqueIDBDatabaseTransaction&, ErrorCallback);
+    void didFinishHandlingVersionChange(UniqueIDBDatabaseTransaction&);
     void transactionDestroyed(UniqueIDBDatabaseTransaction&);
     void connectionClosedFromClient(UniqueIDBDatabaseConnection&);
+    void didFireVersionChangeEvent(UniqueIDBDatabaseConnection&, const IDBResourceIdentifier& requestIdentifier);
 
     void enqueueTransaction(Ref<UniqueIDBDatabaseTransaction>&&);
+
+    void handleDelete(IDBConnectionToClient&, const IDBRequestData&);
+    bool deletePending() const { return m_deletePending; }
+
+    static JSC::VM& databaseThreadVM();
+    static JSC::ExecState& databaseThreadExecState();
 
 private:
     UniqueIDBDatabase(IDBServer&, const IDBDatabaseIdentifier&);
     
-    void handleOpenDatabaseOperations();
+    void handleDatabaseOperations();
+    void handleCurrentOperation();
+    void performCurrentOpenOperation();
+    void performCurrentDeleteOperation();
     void addOpenDatabaseConnection(Ref<UniqueIDBDatabaseConnection>&&);
     bool hasAnyOpenConnections() const;
 
     void startVersionChangeTransaction();
-    void notifyConnectionsOfVersionChange();
+    void maybeNotifyConnectionsOfVersionChange();
+    void notifyCurrentRequestConnectionClosedOrFiredVersionChangeEvent(uint64_t connectionIdentifier);
+    bool isVersionChangeInProgress();
 
     void activateTransactionInBackingStore(UniqueIDBDatabaseTransaction&);
     void inProgressTransactionCompleted(const IDBResourceIdentifier&);
 
     // Database thread operations
+    void deleteBackingStore();
     void openBackingStore(const IDBDatabaseIdentifier&);
     void performCommitTransaction(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier);
     void performAbortTransaction(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier);
@@ -126,6 +144,7 @@ private:
     void performActivateTransactionInBackingStore(uint64_t callbackIdentifier, const IDBTransactionInfo&);
 
     // Main thread callbacks
+    void didDeleteBackingStore();
     void didOpenBackingStore(const IDBDatabaseInfo&);
     void didPerformCreateObjectStore(uint64_t callbackIdentifier, const IDBError&, const IDBObjectStoreInfo&);
     void didPerformDeleteObjectStore(uint64_t callbackIdentifier, const IDBError&, const String& objectStoreName);
@@ -152,22 +171,25 @@ private:
     void performGetResultCallback(uint64_t callbackIdentifier, const IDBError&, const IDBGetResult&);
     void performCountCallback(uint64_t callbackIdentifier, const IDBError&, uint64_t);
 
-    void invokeTransactionScheduler();
-    void transactionSchedulingTimerFired();
+    bool hasAnyPendingCallbacks() const;
+
+    void invokeOperationAndTransactionTimer();
+    void operationAndTransactionTimerFired();
     RefPtr<UniqueIDBDatabaseTransaction> takeNextRunnableTransaction(bool& hadDeferredTransactions);
 
     IDBServer& m_server;
     IDBDatabaseIdentifier m_identifier;
     
-    Deque<Ref<IDBServerOperation>> m_pendingOpenDatabaseOperations;
+    Deque<Ref<ServerOpenDBRequest>> m_pendingOpenDBRequests;
+    RefPtr<ServerOpenDBRequest> m_currentOpenDBRequest;
 
     HashSet<RefPtr<UniqueIDBDatabaseConnection>> m_openDatabaseConnections;
     HashSet<RefPtr<UniqueIDBDatabaseConnection>> m_closePendingDatabaseConnections;
 
-    RefPtr<IDBServerOperation> m_versionChangeOperation;
     RefPtr<UniqueIDBDatabaseConnection> m_versionChangeDatabaseConnection;
-    UniqueIDBDatabaseTransaction* m_versionChangeTransaction { nullptr };
+    RefPtr<UniqueIDBDatabaseTransaction> m_versionChangeTransaction;
 
+    bool m_isOpeningBackingStore { false };
     std::unique_ptr<IDBBackingStore> m_backingStore;
     std::unique_ptr<IDBDatabaseInfo> m_databaseInfo;
 
@@ -176,7 +198,7 @@ private:
     HashMap<uint64_t, GetResultCallback> m_getResultCallbacks;
     HashMap<uint64_t, CountCallback> m_countCallbacks;
 
-    Timer m_transactionSchedulingTimer;
+    Timer m_operationAndTransactionTimer;
 
     Deque<RefPtr<UniqueIDBDatabaseTransaction>> m_pendingTransactions;
     HashMap<IDBResourceIdentifier, RefPtr<UniqueIDBDatabaseTransaction>> m_inProgressTransactions;
@@ -186,6 +208,9 @@ private:
     // This helps make sure opening narrowly scoped transactions (one or two object stores)
     // doesn't continuously block widely scoped write transactions.
     HashCountedSet<uint64_t> m_objectStoreTransactionCounts;
+
+    bool m_deletePending { false };
+    bool m_deleteBackingStoreInProgress { false };
 };
 
 } // namespace IDBServer

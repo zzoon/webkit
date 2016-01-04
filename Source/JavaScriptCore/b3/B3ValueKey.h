@@ -62,6 +62,8 @@ public:
 
     ValueKey(Opcode, Type, Value* left, Value* right);
 
+    ValueKey(Opcode, Type, Value* a, Value* b, Value* c);
+
     ValueKey(Opcode opcode, Type type, int64_t value)
         : m_opcode(opcode)
         , m_type(type)
@@ -76,12 +78,20 @@ public:
         u.doubleValue = value;
     }
 
+    ValueKey(Opcode opcode, Type type, float value)
+        : m_opcode(opcode)
+        , m_type(type)
+    {
+        u.floatValue = value;
+    }
+
     Opcode opcode() const { return m_opcode; }
     Type type() const { return m_type; }
     unsigned childIndex(unsigned index) const { return u.indices[index]; }
     Value* child(Procedure&, unsigned index) const;
     int64_t value() const { return u.value; }
     double doubleValue() const { return u.doubleValue; }
+    double floatValue() const { return u.floatValue; }
 
     bool operator==(const ValueKey& other) const
     {
@@ -97,7 +107,7 @@ public:
 
     unsigned hash() const
     {
-        return m_opcode + m_type + WTF::IntHash<int64_t>::hash(u.value);
+        return m_opcode + m_type + WTF::IntHash<int32_t>::hash(u.indices[0]) + u.indices[1] + u.indices[2];
     }
 
     explicit operator bool() const { return *this != ValueKey(); }
@@ -116,6 +126,11 @@ public:
         default:
             return true;
         }
+    }
+
+    bool isConstant() const
+    {
+        return B3::isConstant(opcode());
     }
 
     // Attempts to materialize the Value for this ValueKey. May return nullptr if the value cannot
@@ -137,18 +152,23 @@ private:
     Opcode m_opcode { Oops };
     Type m_type { Void };
     union U {
-        unsigned indices[2];
+        unsigned indices[3];
         int64_t value;
         double doubleValue;
+        float floatValue;
 
         U()
         {
-            value = 0;
+            indices[0] = 0;
+            indices[1] = 0;
+            indices[2] = 0;
         }
 
         bool operator==(const U& other) const
         {
-            return value == other.value;
+            return indices[0] == other.indices[0]
+                && indices[1] == other.indices[1]
+                && indices[2] == other.indices[2];
         }
     } u;
 };

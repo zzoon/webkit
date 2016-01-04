@@ -585,8 +585,18 @@ struct Node {
 
     void convertToPhantomNewFunction()
     {
-        ASSERT(m_op == NewFunction || m_op == NewArrowFunction);
+        ASSERT(m_op == NewFunction || m_op == NewArrowFunction || m_op == NewGeneratorFunction);
         m_op = PhantomNewFunction;
+        m_flags |= NodeMustGenerate;
+        m_opInfo = 0;
+        m_opInfo2 = 0;
+        children = AdjacencyList();
+    }
+
+    void convertToPhantomNewGeneratorFunction()
+    {
+        ASSERT(m_op == NewGeneratorFunction);
+        m_op = PhantomNewGeneratorFunction;
         m_flags |= NodeMustGenerate;
         m_opInfo = 0;
         m_opInfo2 = 0;
@@ -949,7 +959,15 @@ struct Node {
             return false;
         }
     }
-    
+
+    // Return the indexing type that an array allocation *wants* to use. It may end up using a different
+    // type if we're having a bad time. You can determine the actual indexing type by asking the global
+    // object:
+    //
+    //     m_graph.globalObjectFor(node->origin.semantic)->arrayStructureForIndexingTypeDuringAllocation(node->indexingType())
+    //
+    // This will give you a Structure*, and that will have some indexing type that may be different from
+    // the this one.
     IndexingType indexingType()
     {
         ASSERT(hasIndexingType());
@@ -1346,8 +1364,10 @@ struct Node {
     {
         switch (op()) {
         case CheckCell:
+        case OverridesHasInstance:
         case NewFunction:
         case NewArrowFunction:
+        case NewGeneratorFunction:
         case CreateActivation:
         case MaterializeCreateActivation:
             return true;
@@ -1405,6 +1425,17 @@ struct Node {
     {
         ASSERT(hasUidOperand());
         return reinterpret_cast<UniquedStringImpl*>(m_opInfo);
+    }
+
+    bool hasTypeInfoOperand()
+    {
+        return op() == CheckTypeInfoFlags;
+    }
+
+    unsigned typeInfoOperand()
+    {
+        ASSERT(hasTypeInfoOperand() && m_opInfo <= UCHAR_MAX);
+        return static_cast<unsigned>(m_opInfo);
     }
 
     bool hasTransition()
@@ -1566,6 +1597,7 @@ struct Node {
         switch (op()) {
         case NewArrowFunction:
         case NewFunction:
+        case NewGeneratorFunction:
             return true;
         default:
             return false;
@@ -1576,6 +1608,7 @@ struct Node {
     {
         switch (op()) {
         case PhantomNewFunction:
+        case PhantomNewGeneratorFunction:
             return true;
         default:
             return false;
@@ -1589,6 +1622,7 @@ struct Node {
         case PhantomDirectArguments:
         case PhantomClonedArguments:
         case PhantomNewFunction:
+        case PhantomNewGeneratorFunction:
         case PhantomCreateActivation:
             return true;
         default:
@@ -2025,6 +2059,16 @@ struct Node {
         return op1->shouldSpeculateUntypedForArithmetic() || op2->shouldSpeculateUntypedForArithmetic();
     }
     
+    bool shouldSpeculateUntypedForBitOps()
+    {
+        return isUntypedSpeculationForBitOps(prediction());
+    }
+    
+    static bool shouldSpeculateUntypedForBitOps(Node* op1, Node* op2)
+    {
+        return op1->shouldSpeculateUntypedForBitOps() || op2->shouldSpeculateUntypedForBitOps();
+    }
+    
     static bool shouldSpeculateBoolean(Node* op1, Node* op2)
     {
         return op1->shouldSpeculateBoolean() && op2->shouldSpeculateBoolean();
@@ -2161,7 +2205,7 @@ struct Node {
 
     unsigned numberOfArgumentsToSkip()
     {
-        ASSERT(op() == CopyRest);
+        ASSERT(op() == CopyRest || op() == GetRestLength);
         return static_cast<unsigned>(m_opInfo);
     }
 

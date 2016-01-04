@@ -311,8 +311,12 @@ void GraphicsContext::drawLine(const FloatPoint& point1, const FloatPoint& point
         }
         const double dashedLine[2] = { static_cast<double>(patternWidth), static_cast<double>(patternWidth) };
         cairo_set_dash(cairoContext, dashedLine, 2, patternOffset);
-    } else
+    } else {
         setSourceRGBAFromColor(cairoContext, strokeColor);
+        if (thickness < 1)
+            cairo_set_line_width(cairoContext, 1);
+    }
+
 
     FloatPoint p1 = point1;
     FloatPoint p2 = point2;
@@ -518,7 +522,7 @@ static inline void adjustFocusRingColor(Color& color)
 #endif
 }
 
-static inline void adjustFocusRingLineWidth(int& width)
+static inline void adjustFocusRingLineWidth(float& width)
 {
 #if PLATFORM(GTK)
     width = 2;
@@ -536,7 +540,7 @@ static inline StrokeStyle focusRingStrokeStyle()
 #endif
 }
 
-void GraphicsContext::drawFocusRing(const Path& path, int width, int /* offset */, const Color& color)
+void GraphicsContext::drawFocusRing(const Path& path, float width, float /* offset */, const Color& color)
 {
     // FIXME: We should draw paths that describe a rectangle with rounded corners
     // so as to be consistent with how we draw rectangular focus rings.
@@ -554,7 +558,7 @@ void GraphicsContext::drawFocusRing(const Path& path, int width, int /* offset *
     cairo_restore(cr);
 }
 
-void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int width, int /* offset */, const Color& color)
+void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, float width, float /* offset */, const Color& color)
 {
     if (paintingDisabled())
         return;

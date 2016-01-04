@@ -404,6 +404,7 @@ namespace JSC {
         void emitPutVirtualRegister(int dst, JSValueRegs src);
 
         int32_t getOperandConstantInt(int src);
+        double getOperandConstantDouble(int src);
 
 #if USE(JSVALUE32_64)
         bool getOperandConstantInt(int op1, int op2, int& op, int32_t& constant);
@@ -462,7 +463,6 @@ namespace JSC {
         void emitJumpSlowCaseIfNotInt(RegisterID, RegisterID, RegisterID scratch);
 
         void emitTagBool(RegisterID);
-        void compileBinaryArithOpSlowCase(Instruction*, OpcodeID, Vector<SlowCaseEntry>::iterator&, int dst, int src1, int src2, OperandTypes, bool op1HasImmediateIntFastCase, bool op2HasImmediateIntFastCase);
 
         void compileGetByIdHotPath(int baseVReg, const Identifier*);
 
@@ -491,15 +491,17 @@ namespace JSC {
         void emit_op_create_scoped_arguments(Instruction*);
         void emit_op_create_out_of_band_arguments(Instruction*);
         void emit_op_copy_rest(Instruction*);
+        void emit_op_get_rest_length(Instruction*);
         void emit_op_check_tdz(Instruction*);
         void emit_op_assert(Instruction*);
+        void emit_op_save(Instruction*);
+        void emit_op_resume(Instruction*);
         void emit_op_debug(Instruction*);
         void emit_op_del_by_id(Instruction*);
         void emit_op_div(Instruction*);
         void emit_op_end(Instruction*);
         void emit_op_enter(Instruction*);
         void emit_op_get_scope(Instruction*);
-        void emit_op_load_arrowfunction_this(Instruction*);
         void emit_op_eq(Instruction*);
         void emit_op_eq_null(Instruction*);
         void emit_op_get_by_id(Instruction*);
@@ -507,8 +509,9 @@ namespace JSC {
         void emit_op_get_by_val(Instruction*);
         void emit_op_get_argument_by_val(Instruction*);
         void emit_op_init_lazy_reg(Instruction*);
-        void emit_op_check_has_instance(Instruction*);
+        void emit_op_overrides_has_instance(Instruction*);
         void emit_op_instanceof(Instruction*);
+        void emit_op_instanceof_custom(Instruction*);
         void emit_op_is_undefined(Instruction*);
         void emit_op_is_boolean(Instruction*);
         void emit_op_is_number(Instruction*);
@@ -529,6 +532,7 @@ namespace JSC {
         void emit_op_jngreatereq(Instruction*);
         void emit_op_jtrue(Instruction*);
         void emit_op_loop_hint(Instruction*);
+        void emit_op_watchdog(Instruction*);
         void emit_op_lshift(Instruction*);
         void emit_op_mod(Instruction*);
         void emit_op_mov(Instruction*);
@@ -541,6 +545,8 @@ namespace JSC {
         void emit_op_new_array_buffer(Instruction*);
         void emit_op_new_func(Instruction*);
         void emit_op_new_func_exp(Instruction*);
+        void emit_op_new_generator_func(Instruction*);
+        void emit_op_new_generator_func_exp(Instruction*);
         void emit_op_new_arrow_func_exp(Instruction*);
         void emit_op_new_object(Instruction*);
         void emit_op_new_regexp(Instruction*);
@@ -611,8 +617,8 @@ namespace JSC {
         void emitSlow_op_get_arguments_length(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_get_by_val(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_get_argument_by_val(Instruction*, Vector<SlowCaseEntry>::iterator&);
-        void emitSlow_op_check_has_instance(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_instanceof(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_instanceof_custom(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_jfalse(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_jless(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_jlesseq(Instruction*, Vector<SlowCaseEntry>::iterator&);
@@ -624,6 +630,7 @@ namespace JSC {
         void emitSlow_op_jngreatereq(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_jtrue(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_loop_hint(Instruction*, Vector<SlowCaseEntry>::iterator&);
+        void emitSlow_op_watchdog(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_lshift(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_mod(Instruction*, Vector<SlowCaseEntry>::iterator&);
         void emitSlow_op_mul(Instruction*, Vector<SlowCaseEntry>::iterator&);
@@ -660,6 +667,7 @@ namespace JSC {
         void emitRightShift(Instruction*, bool isUnsigned);
         void emitRightShiftSlowCase(Instruction*, Vector<SlowCaseEntry>::iterator&, bool isUnsigned);
 
+        void emitNewFuncCommon(Instruction*);
         void emitNewFuncExprCommon(Instruction*);
         void emitVarInjectionCheck(bool needsVarInjectionChecks);
         void emitResolveClosure(int dst, int scope, bool needsVarInjectionChecks, unsigned depth);
@@ -737,6 +745,7 @@ namespace JSC {
         MacroAssembler::Call callOperation(J_JITOperation_EJJ, int, GPRReg, GPRReg);
         MacroAssembler::Call callOperation(J_JITOperation_EJJAp, int, GPRReg, GPRReg, ArrayProfile*);
         MacroAssembler::Call callOperation(J_JITOperation_EJJBy, int, GPRReg, GPRReg, ByValInfo*);
+        MacroAssembler::Call callOperation(Z_JITOperation_EJOJ, GPRReg, GPRReg, GPRReg);
         MacroAssembler::Call callOperation(C_JITOperation_EJsc, GPRReg);
         MacroAssembler::Call callOperation(J_JITOperation_EJscC, int, GPRReg, JSCell*);
         MacroAssembler::Call callOperation(J_JITOperation_EJscCJ, int, GPRReg, JSCell*, GPRReg);
@@ -804,6 +813,7 @@ namespace JSC {
         MacroAssembler::Call callOperation(J_JITOperation_EJ, int, GPRReg, GPRReg);
         MacroAssembler::Call callOperation(J_JITOperation_EJIdc, int, GPRReg, GPRReg, const Identifier*);
         MacroAssembler::Call callOperation(J_JITOperation_EJJ, int, GPRReg, GPRReg, GPRReg, GPRReg);
+        MacroAssembler::Call callOperation(Z_JITOperation_EJOJ, GPRReg, GPRReg, GPRReg, GPRReg, GPRReg);
         MacroAssembler::Call callOperation(J_JITOperation_EJJAp, int, GPRReg, GPRReg, GPRReg, GPRReg, ArrayProfile*);
         MacroAssembler::Call callOperation(J_JITOperation_EJJBy, int, GPRReg, GPRReg, GPRReg, GPRReg, ByValInfo*);
         MacroAssembler::Call callOperation(P_JITOperation_EJS, GPRReg, GPRReg, size_t);
@@ -819,6 +829,11 @@ namespace JSC {
         MacroAssembler::Call callOperation(V_JITOperation_EZJ, int32_t, RegisterID, RegisterID);
         MacroAssembler::Call callOperation(J_JITOperation_EJscCJ, int, GPRReg, JSCell*, GPRReg, GPRReg);
 #endif
+
+        template<typename SnippetGenerator>
+        void emitBitBinaryOpFastPath(Instruction* currentInstruction);
+
+        void emitRightShiftFastPath(Instruction* currentInstruction, OpcodeID);
 
         Jump checkStructure(RegisterID reg, Structure* structure);
 

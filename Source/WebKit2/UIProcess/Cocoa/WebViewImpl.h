@@ -95,15 +95,6 @@ typedef id <NSValidatedUserInterfaceItem> ValidationItem;
 typedef Vector<RetainPtr<ValidationItem>> ValidationVector;
 typedef HashMap<String, ValidationVector> ValidationMap;
 
-#if !USE(ASYNC_NSTEXTINPUTCLIENT)
-struct WKViewInterpretKeyEventsParameters {
-    bool eventInterpretationHadSideEffects;
-    bool consumedByIM;
-    bool executingSavedKeypressCommands;
-    Vector<WebCore::KeypressCommand>* commands;
-};
-#endif
-
 class WebViewImpl {
     WTF_MAKE_FAST_ALLOCATED;
     WTF_MAKE_NONCOPYABLE(WebViewImpl);
@@ -147,8 +138,6 @@ public:
     std::unique_ptr<DrawingAreaProxy> createDrawingAreaProxy();
     bool isUsingUISideCompositing() const;
     void setDrawingAreaSize(CGSize);
-    void forceAsyncDrawingAreaSizeUpdate(CGSize);
-    void waitForAsyncDrawingAreaSizeUpdate();
     void updateLayer();
     static bool wantsUpdateLayer() { return true; }
 
@@ -419,10 +408,17 @@ public:
     void rotateWithEvent(NSEvent *);
     void smartMagnifyWithEvent(NSEvent *);
 
+    void touchesBeganWithEvent(NSEvent *);
+    void touchesMovedWithEvent(NSEvent *);
+    void touchesEndedWithEvent(NSEvent *);
+    void touchesCancelledWithEvent(NSEvent *);
+
     void setLastMouseDownEvent(NSEvent *);
 
     void gestureEventWasNotHandledByWebCore(NSEvent *);
     void gestureEventWasNotHandledByWebCoreFromViewOnly(NSEvent *);
+
+    void didRestoreScrollPosition();
 
     void setTotalHeightOfBanners(CGFloat totalHeightOfBanners) { m_totalHeightOfBanners = totalHeightOfBanners; }
     CGFloat totalHeightOfBanners() const { return m_totalHeightOfBanners; }
@@ -450,14 +446,12 @@ public:
     // support them via the key bindings mechanism.
     static bool wantsKeyDownForEvent(NSEvent *) { return true; }
 
-#if USE(ASYNC_NSTEXTINPUTCLIENT)
     void selectedRangeWithCompletionHandler(void(^)(NSRange));
     void hasMarkedTextWithCompletionHandler(void(^)(BOOL hasMarkedText));
     void markedRangeWithCompletionHandler(void(^)(NSRange));
     void attributedSubstringForProposedRange(NSRange, void(^)(NSAttributedString *attrString, NSRange actualRange));
     void firstRectForCharacterRange(NSRange, void(^)(NSRect firstRect, NSRange actualRange));
     void characterIndexForPoint(NSPoint, void(^)(NSUInteger));
-#endif // USE(ASYNC_NSTEXTINPUTCLIENT)
 
     void mouseMoved(NSEvent *);
     void mouseDown(NSEvent *);
@@ -491,18 +485,18 @@ private:
 
     void setUserInterfaceItemState(NSString *commandName, bool enabled, int state);
 
-#if USE(ASYNC_NSTEXTINPUTCLIENT)
     Vector<WebCore::KeypressCommand> collectKeyboardLayoutCommandsForEvent(NSEvent *);
     void interpretKeyEvent(NSEvent *, void(^completionHandler)(BOOL handled, const Vector<WebCore::KeypressCommand>&));
-#else
-    void executeSavedKeypressCommands();
-    bool interpretKeyEvent(NSEvent *, Vector<WebCore::KeypressCommand>&);
-#endif
 
     void mouseMovedInternal(NSEvent *);
     void mouseDownInternal(NSEvent *);
     void mouseUpInternal(NSEvent *);
     void mouseDraggedInternal(NSEvent *);
+
+    bool mightBeginDragWhileInactive();
+    bool mightBeginScrollWhileInactive();
+
+    Vector<NSTouch *> touchesOrderedByAge();
 
     NSView <WebViewImplDelegate> *m_view;
     std::unique_ptr<PageClient> m_pageClient;
@@ -569,10 +563,8 @@ private:
     bool m_ignoresAllEvents { false };
     bool m_ignoresMouseDraggedEvents { false };
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
     RetainPtr<WKImmediateActionController> m_immediateActionController;
     RetainPtr<NSImmediateActionGestureRecognizer> m_immediateActionGestureRecognizer;
-#endif
 
     bool m_allowsLinkPreview { true };
     bool m_didRegisterForLookupPopoverCloseNotifications { false };
@@ -614,11 +606,10 @@ private:
     // the application to distinguish the case of a new event from one
     // that has been already sent to WebCore.
     RetainPtr<NSEvent> m_keyDownEventBeingResent;
-#if USE(ASYNC_NSTEXTINPUTCLIENT)
     Vector<WebCore::KeypressCommand>* m_collectedKeypressCommands { nullptr };
-#else
-    WKViewInterpretKeyEventsParameters* m_interpretKeyEventsParameters { nullptr };
-#endif
+
+    Vector<RetainPtr<id <NSObject, NSCopying>>> m_activeTouchIdentities;
+    RetainPtr<NSArray> m_lastTouches;
 };
     
 } // namespace WebKit

@@ -41,8 +41,10 @@
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "Comment.h"
+#include "CompositionEvent.h"
 #include "ContentSecurityPolicy.h"
 #include "CookieJar.h"
+#include "CustomEvent.h"
 #include "DOMImplementation.h"
 #include "DOMNamedFlowCollection.h"
 #include "DOMWindow.h"
@@ -56,7 +58,6 @@
 #include "Editor.h"
 #include "ElementIterator.h"
 #include "EntityReference.h"
-#include "EventFactory.h"
 #include "EventHandler.h"
 #include "ExtensionStyleSheets.h"
 #include "FocusController.h"
@@ -83,6 +84,7 @@
 #include "HTMLMediaElement.h"
 #include "HTMLNameCollection.h"
 #include "HTMLParserIdioms.h"
+#include "HTMLPictureElement.h"
 #include "HTMLPlugInElement.h"
 #include "HTMLScriptElement.h"
 #include "HTMLStyleElement.h"
@@ -97,6 +99,7 @@
 #include "InspectorInstrumentation.h"
 #include "JSLazyEventListener.h"
 #include "JSModuleLoader.h"
+#include "KeyboardEvent.h"
 #include "Language.h"
 #include "LoaderStrategy.h"
 #include "Logging.h"
@@ -105,12 +108,15 @@
 #include "MediaProducer.h"
 #include "MediaQueryList.h"
 #include "MediaQueryMatcher.h"
+#include "MessageEvent.h"
 #include "MouseEventWithHitTestResults.h"
+#include "MutationEvent.h"
 #include "NameNodeList.h"
 #include "NestingLevelIncrementer.h"
 #include "NodeIterator.h"
 #include "NodeRareData.h"
 #include "NodeWithIndex.h"
+#include "OverflowEvent.h"
 #include "PageConsoleClient.h"
 #include "PageGroup.h"
 #include "PageTransitionEvent.h"
@@ -126,13 +132,13 @@
 #include "RenderLayerCompositor.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
-#include "ResourceLoadScheduler.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SVGDocumentExtensions.h"
 #include "SVGElement.h"
 #include "SVGElementFactory.h"
 #include "SVGNames.h"
 #include "SVGTitleElement.h"
+#include "SVGZoomEvent.h"
 #include "SchemeRegistry.h"
 #include "ScopedEventQueue.h"
 #include "ScriptController.h"
@@ -146,15 +152,18 @@
 #include "SelectorQuery.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
+#include "StorageEvent.h"
 #include "StyleProperties.h"
 #include "StyleResolver.h"
 #include "StyleSheetContents.h"
 #include "StyleSheetList.h"
 #include "SubresourceLoader.h"
+#include "TextEvent.h"
 #include "TextNodeTraversal.h"
 #include "TransformSource.h"
 #include "TreeWalker.h"
 #include "VisitedLinkState.h"
+#include "WheelEvent.h"
 #include "XMLDocumentParser.h"
 #include "XMLNSNames.h"
 #include "XMLNames.h"
@@ -171,13 +180,17 @@
 #include <wtf/text/StringBuffer.h>
 #include <yarr/RegularExpression.h>
 
-#if ENABLE(XSLT)
-#include "XSLTProcessor.h"
+#if ENABLE(CSP_NEXT)
+#include "DOMSecurityPolicy.h"
 #endif
 
+#if ENABLE(DEVICE_ORIENTATION)
+#include "DeviceMotionEvent.h"
+#include "DeviceOrientationEvent.h"
+#endif
 
-#if ENABLE(TOUCH_EVENTS)
-#include "TouchList.h"
+#if ENABLE(FULLSCREEN_API)
+#include "RenderFullScreen.h"
 #endif
 
 #if PLATFORM(IOS)
@@ -197,14 +210,18 @@
 #include "GestureEvent.h"
 #endif
 
+#if ENABLE(IOS_TEXT_AUTOSIZING)
+#include "TextAutoSizing.h"
+#endif
+
 #if ENABLE(MATHML)
 #include "MathMLElement.h"
 #include "MathMLElementFactory.h"
 #include "MathMLNames.h"
 #endif
 
-#if ENABLE(FULLSCREEN_API)
-#include "RenderFullScreen.h"
+#if ENABLE(MEDIA_SESSION)
+#include "MediaSession.h"
 #endif
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
@@ -212,16 +229,13 @@
 #include "ScriptedAnimationController.h"
 #endif
 
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-#include "TextAutoSizing.h"
-#endif
-
 #if ENABLE(TEXT_AUTOSIZING)
 #include "TextAutosizer.h"
 #endif
 
-#if ENABLE(CSP_NEXT)
-#include "DOMSecurityPolicy.h"
+#if ENABLE(TOUCH_EVENTS)
+#include "TouchEvent.h"
+#include "TouchList.h"
 #endif
 
 #if ENABLE(VIDEO_TRACK)
@@ -238,8 +252,8 @@
 #include "MediaPlaybackTargetClient.h"
 #endif
 
-#if ENABLE(MEDIA_SESSION)
-#include "MediaSession.h"
+#if ENABLE(XSLT)
+#include "XSLTProcessor.h"
 #endif
 
 using namespace WTF;
@@ -604,7 +618,7 @@ Document::~Document()
 
     // FIXME: Should we reset m_domWindow when we detach from the Frame?
     if (m_domWindow)
-        m_domWindow->resetUnlessSuspendedForPageCache();
+        m_domWindow->resetUnlessSuspendedForDocumentSuspension();
 
     m_scriptRunner = nullptr;
     m_moduleLoader = nullptr;
@@ -1701,7 +1715,7 @@ Ref<Range> Document::createRange()
 
 RefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, bool, ExceptionCode& ec)
 {
-    return createNodeIterator(root, whatToShow, WTF::move(filter), ec);
+    return createNodeIterator(root, whatToShow, WTFMove(filter), ec);
 }
 
 RefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, ExceptionCode& ec)
@@ -1710,7 +1724,7 @@ RefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned long what
         ec = TypeError;
         return nullptr;
     }
-    return NodeIterator::create(root, whatToShow, WTF::move(filter));
+    return NodeIterator::create(root, whatToShow, WTFMove(filter));
 }
 
 RefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned long whatToShow, ExceptionCode& ec)
@@ -1725,7 +1739,7 @@ RefPtr<NodeIterator> Document::createNodeIterator(Node* root, ExceptionCode& ec)
 
 RefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, bool, ExceptionCode& ec)
 {
-    return createTreeWalker(root, whatToShow, WTF::move(filter), ec);
+    return createTreeWalker(root, whatToShow, WTFMove(filter), ec);
 }
 
 RefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned long whatToShow, RefPtr<NodeFilter>&& filter, ExceptionCode& ec)
@@ -1734,7 +1748,7 @@ RefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned long whatToSh
         ec = TypeError;
         return nullptr;
     }
-    return TreeWalker::create(root, whatToShow, WTF::move(filter));
+    return TreeWalker::create(*root, whatToShow, WTFMove(filter));
 }
 
 RefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned long whatToShow, ExceptionCode& ec)
@@ -1959,7 +1973,7 @@ Ref<RenderStyle> Document::styleForElementIgnoringPendingStylesheets(Element& el
     ASSERT(&element.document() == this);
 
     // On iOS request delegates called during styleForElement may result in re-entering WebKit and killing the style resolver.
-    ResourceLoadScheduler::Suspender suspender(*platformStrategies()->loaderStrategy()->resourceLoadScheduler());
+    ResourceLoadSuspender suspender;
 
     TemporaryChange<bool> change(m_ignorePendingStylesheets, true);
     return element.resolveStyle(parentStyle);
@@ -2207,21 +2221,15 @@ void Document::didBecomeCurrentDocumentInFrame()
         page()->chrome().client().needTouchEvents(true);
 #endif
 
-#if PLATFORM(IOS)
-    // Ensure that document scheduled task state matches frame timer state. It can be out of sync
-    // if timers state changed while the document was not in the frame (possibly in page cache,
-    // or simply newly created).
-    // FIXME: How does this interact with cross-platform code below?
-    if (m_frame->timersPaused())
-        suspendScheduledTasks(ActiveDOMObject::DocumentWillBePaused);
-    else
-        resumeScheduledTasks(ActiveDOMObject::DocumentWillBePaused);
-#endif
-
+    // Ensure that the scheduled task state of the document matches the DOM suspension state of the frame. It can
+    // be out of sync if the DOM suspension state changed while the document was not in the frame (possibly in the
+    // page cache, or simply newly created).
     if (m_frame->activeDOMObjectsAndAnimationsSuspended()) {
-        suspendScriptedAnimationControllerCallbacks();
         m_frame->animation().suspendAnimationsForDocument(this);
-        suspendActiveDOMObjects(ActiveDOMObject::PageWillBeSuspended);
+        suspendScheduledTasks(ActiveDOMObject::PageWillBeSuspended);
+    } else {
+        resumeScheduledTasks(ActiveDOMObject::PageWillBeSuspended);
+        m_frame->animation().resumeAnimationsForDocument(this);
     }
 }
 
@@ -2351,16 +2359,35 @@ void Document::removeAllEventListeners()
         node->removeAllEventListeners();
 }
 
-void Document::platformSuspendOrStopActiveDOMObjects()
+void Document::suspendDeviceMotionAndOrientationUpdates()
 {
-#if PLATFORM(IOS)
-#if ENABLE(DEVICE_ORIENTATION)
+    if (m_areDeviceMotionAndOrientationUpdatesSuspended)
+        return;
+    m_areDeviceMotionAndOrientationUpdatesSuspended = true;
+#if ENABLE(DEVICE_ORIENTATION) && PLATFORM(IOS)
     if (m_deviceMotionController)
         m_deviceMotionController->suspendUpdates();
     if (m_deviceOrientationController)
         m_deviceOrientationController->suspendUpdates();
 #endif
+}
 
+void Document::resumeDeviceMotionAndOrientationUpdates()
+{
+    if (!m_areDeviceMotionAndOrientationUpdatesSuspended)
+        return;
+    m_areDeviceMotionAndOrientationUpdatesSuspended = false;
+#if ENABLE(DEVICE_ORIENTATION) && PLATFORM(IOS)
+    if (m_deviceMotionController)
+        m_deviceMotionController->resumeUpdates();
+    if (m_deviceOrientationController)
+        m_deviceOrientationController->resumeUpdates();
+#endif
+}
+
+void Document::platformSuspendOrStopActiveDOMObjects()
+{
+#if PLATFORM(IOS)
     if (WebThreadCountOfObservedContentModifiers() > 0) {
         Frame* frame = this->frame();
         if (Page* page = frame ? frame->page() : nullptr)
@@ -2372,19 +2399,14 @@ void Document::platformSuspendOrStopActiveDOMObjects()
 void Document::suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension why)
 {
     ScriptExecutionContext::suspendActiveDOMObjects(why);
+    suspendDeviceMotionAndOrientationUpdates();
     platformSuspendOrStopActiveDOMObjects();
 }
 
 void Document::resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension why)
 {
     ScriptExecutionContext::resumeActiveDOMObjects(why);
-
-#if ENABLE(DEVICE_ORIENTATION) && PLATFORM(IOS)
-    if (m_deviceMotionController)
-        m_deviceMotionController->resumeUpdates();
-    if (m_deviceOrientationController)
-        m_deviceOrientationController->resumeUpdates();
-#endif
+    resumeDeviceMotionAndOrientationUpdates();
     // FIXME: For iOS, do we need to add content change observers that were removed in Document::suspendActiveDOMObjects()?
 }
 
@@ -2861,7 +2883,7 @@ EventTarget* Document::errorEventTarget()
 
 void Document::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, RefPtr<Inspector::ScriptCallStack>&& callStack)
 {
-    addMessage(MessageSource::JS, MessageLevel::Error, errorMessage, sourceURL, lineNumber, columnNumber, WTF::move(callStack));
+    addMessage(MessageSource::JS, MessageLevel::Error, errorMessage, sourceURL, lineNumber, columnNumber, WTFMove(callStack));
 }
 
 void Document::setURL(const URL& url)
@@ -3317,6 +3339,11 @@ void Document::processReferrerPolicy(const String& policy)
 {
     ASSERT(!policy.isNull());
 
+    // Documents in a Content-Disposition: attachment sandbox should never send a Referer header,
+    // even if the document has a meta tag saying otherwise.
+    if (shouldEnforceContentDispositionAttachmentSandbox())
+        return;
+
     // Note that we're supporting both the standard and legacy keywords for referrer
     // policies, as defined by http://www.w3.org/TR/referrer-policy/#referrer-policy-delivery-meta
     if (equalIgnoringCase(policy, "no-referrer") || equalIgnoringCase(policy, "never"))
@@ -3452,7 +3479,7 @@ Ref<Node> Document::cloneNodeInternal(Document&, CloningOperation type)
         cloneChildNodes(clone);
         break;
     }
-    return WTF::move(clone);
+    return WTFMove(clone);
 }
 
 Ref<Document> Document::cloneDocumentWithoutChildren() const
@@ -3500,6 +3527,20 @@ void Document::evaluateMediaQueryList()
 {
     if (m_mediaQueryMatcher)
         m_mediaQueryMatcher->styleResolverChanged();
+    
+    checkViewportDependentPictures();
+}
+
+void Document::checkViewportDependentPictures()
+{
+    Vector<HTMLPictureElement*, 16> changedPictures;
+    HashSet<HTMLPictureElement*>::iterator end = m_viewportDependentPictures.end();
+    for (HashSet<HTMLPictureElement*>::iterator it = m_viewportDependentPictures.begin(); it != end; ++it) {
+        if ((*it)->viewportChangeAffectedPicture())
+            changedPictures.append(*it);
+    }
+    for (auto* picture : changedPictures)
+        picture->sourcesChanged();
 }
 
 void Document::optimizedStyleSheetUpdateTimerFired()
@@ -4071,25 +4112,86 @@ void Document::dispatchWindowLoadEvent()
 void Document::enqueueWindowEvent(Ref<Event>&& event)
 {
     event->setTarget(m_domWindow.get());
-    m_eventQueue.enqueueEvent(WTF::move(event));
+    m_eventQueue.enqueueEvent(WTFMove(event));
 }
 
 void Document::enqueueDocumentEvent(Ref<Event>&& event)
 {
     event->setTarget(this);
-    m_eventQueue.enqueueEvent(WTF::move(event));
+    m_eventQueue.enqueueEvent(WTFMove(event));
 }
 
 void Document::enqueueOverflowEvent(Ref<Event>&& event)
 {
-    m_eventQueue.enqueueEvent(WTF::move(event));
+    m_eventQueue.enqueueEvent(WTFMove(event));
 }
 
-RefPtr<Event> Document::createEvent(const String& eventType, ExceptionCode& ec)
+RefPtr<Event> Document::createEvent(const String& type, ExceptionCode& ec)
 {
-    RefPtr<Event> event = EventFactory::create(eventType);
-    if (event)
-        return event.release();
+    // Please do *not* add new event classes to this function unless they are
+    // required for compatibility of some actual legacy web content.
+
+    // This mechanism is superceded by use of event constructors.
+    // That is what we should use for any new event classes.
+
+    // The following strings are the ones from the DOM specification
+    // <https://dom.spec.whatwg.org/#dom-document-createevent>.
+
+    if (equalIgnoringASCIICase(type, "customevent"))
+        return CustomEvent::create();
+    if (equalIgnoringASCIICase(type, "event") || equalIgnoringASCIICase(type, "events") || equalIgnoringASCIICase(type, "htmlevents"))
+        return Event::create();
+    if (equalIgnoringASCIICase(type, "keyboardevent") || equalIgnoringASCIICase(type, "keyboardevents"))
+        return KeyboardEvent::create();
+    if (equalIgnoringASCIICase(type, "messageevent"))
+        return MessageEvent::create();
+    if (equalIgnoringASCIICase(type, "mouseevent") || equalIgnoringASCIICase(type, "mouseevents"))
+        return MouseEvent::create();
+    if (equalIgnoringASCIICase(type, "uievent") || equalIgnoringASCIICase(type, "uievents"))
+        return UIEvent::create();
+
+#if ENABLE(TOUCH_EVENTS)
+    if (equalIgnoringASCIICase(type, "touchevent"))
+        return TouchEvent::create();
+#endif
+
+    // The following string comes from the SVG specifications
+    // <http://www.w3.org/TR/SVG/script.html#InterfaceSVGZoomEvent>
+    // <http://www.w3.org/TR/SVG2/interact.html#InterfaceSVGZoomEvent>.
+    // However, since there is no provision for initializing the event once it is created,
+    // there is no practical value in this feature.
+
+    if (equalIgnoringASCIICase(type, "svgzoomevents"))
+        return SVGZoomEvent::create();
+
+    // The following strings are for event classes where WebKit supplies an init function.
+    // These strings are not part of the DOM specification and we would like to eliminate them.
+    // However, we currently include these because we have concerns about backward compatibility.
+
+    // FIXME: For each of the strings below, prove there is no content depending on it and remove
+    // both the string and the corresponding init function for that class.
+
+    if (equalIgnoringASCIICase(type, "compositionevent"))
+        return CompositionEvent::create();
+    if (equalIgnoringASCIICase(type, "hashchangeevent"))
+        return HashChangeEvent::create();
+    if (equalIgnoringASCIICase(type, "mutationevent") || equalIgnoringASCIICase(type, "mutationevents"))
+        return MutationEvent::create();
+    if (equalIgnoringASCIICase(type, "overflowevent"))
+        return OverflowEvent::create();
+    if (equalIgnoringASCIICase(type, "storageevent"))
+        return StorageEvent::create();
+    if (equalIgnoringASCIICase(type, "textevent"))
+        return TextEvent::create();
+    if (equalIgnoringASCIICase(type, "wheelevent"))
+        return WheelEvent::create();
+
+#if ENABLE(DEVICE_ORIENTATION)
+    if (equalIgnoringASCIICase(type, "devicemotionevent"))
+        return DeviceMotionEvent::create();
+    if (equalIgnoringASCIICase(type, "deviceorientationevent"))
+        return DeviceOrientationEvent::create();
+#endif
 
     ec = NOT_SUPPORTED_ERR;
     return nullptr;
@@ -4471,9 +4573,6 @@ void Document::setInPageCache(bool flag)
     FrameView* v = view();
     Page* page = this->page();
 
-    if (page)
-        page->lockAllOverlayScrollbarsToHidden(flag);
-
     if (flag) {
         if (v) {
             // FIXME: There is some scrolling related work that needs to happen whenever a page goes into the
@@ -4504,12 +4603,15 @@ void Document::documentWillBecomeInactive()
         renderView()->setIsInWindow(false);
 }
 
-void Document::documentWillSuspendForPageCache()
+void Document::suspend()
 {
+    if (m_isSuspended)
+        return;
+
     documentWillBecomeInactive();
 
     for (auto* element : m_documentSuspensionCallbackElements)
-        element->documentWillSuspendForPageCache();
+        element->prepareForDocumentSuspension();
 
 #ifndef NDEBUG
     // Clear the update flag to be able to check if the viewport arguments update
@@ -4517,18 +4619,35 @@ void Document::documentWillSuspendForPageCache()
     m_didDispatchViewportPropertiesChanged = false;
 #endif
 
+    ASSERT(page());
+    page()->lockAllOverlayScrollbarsToHidden(true);
+
     if (RenderView* view = renderView()) {
         if (view->usesCompositing())
             view->compositor().cancelCompositingLayerUpdate();
     }
+
+    suspendScriptedAnimationControllerCallbacks();
+    suspendActiveDOMObjects(ActiveDOMObject::PageCache);
+
+    ASSERT(m_frame);
+    m_frame->clearTimers();
+
+    m_visualUpdatesAllowed = false;
+    m_visualUpdatesSuppressionTimer.stop();
+
+    m_isSuspended = true;
 }
 
-void Document::documentDidResumeFromPageCache() 
+void Document::resume()
 {
+    if (!m_isSuspended)
+        return;
+
     Vector<Element*> elements;
     copyToVector(m_documentSuspensionCallbackElements, elements);
     for (auto* element : elements)
-        element->documentDidResumeFromPageCache();
+        element->resumeFromDocumentSuspension();
 
     if (renderView())
         renderView()->setIsInWindow(true);
@@ -4538,14 +4657,22 @@ void Document::documentDidResumeFromPageCache()
 
     ASSERT(m_frame);
     m_frame->loader().client().dispatchDidBecomeFrameset(isFrameSet());
+    m_frame->animation().resumeAnimationsForDocument(this);
+
+    resumeActiveDOMObjects(ActiveDOMObject::PageWillBeSuspended);
+    resumeScriptedAnimationControllerCallbacks();
+
+    m_visualUpdatesAllowed = true;
+
+    m_isSuspended = false;
 }
 
-void Document::registerForPageCacheSuspensionCallbacks(Element* e)
+void Document::registerForDocumentSuspensionCallbacks(Element* e)
 {
     m_documentSuspensionCallbackElements.add(e);
 }
 
-void Document::unregisterForPageCacheSuspensionCallbacks(Element* e)
+void Document::unregisterForDocumentSuspensionCallbacks(Element* e)
 {
     m_documentSuspensionCallbackElements.remove(e);
 }
@@ -4712,7 +4839,7 @@ void Document::applyXSLTransform(ProcessingInstruction* pi)
 
 void Document::setTransformSource(std::unique_ptr<TransformSource> source)
 {
-    m_transformSource = WTF::move(source);
+    m_transformSource = WTFMove(source);
 }
 
 #endif
@@ -5215,7 +5342,7 @@ void Document::addMessage(MessageSource source, MessageLevel level, const String
     }
 
     if (Page* page = this->page())
-        page->console().addMessage(source, level, message, sourceURL, lineNumber, columnNumber, WTF::move(callStack), state, requestIdentifier);
+        page->console().addMessage(source, level, message, sourceURL, lineNumber, columnNumber, WTFMove(callStack), state, requestIdentifier);
 }
 
 SecurityOrigin* Document::topOrigin() const
@@ -5225,7 +5352,7 @@ SecurityOrigin* Document::topOrigin() const
 
 void Document::postTask(Task task)
 {
-    Task* taskPtr = std::make_unique<Task>(WTF::move(task)).release();
+    Task* taskPtr = std::make_unique<Task>(WTFMove(task)).release();
     WeakPtr<Document> documentReference(m_weakFactory.createWeakPtr());
 
     callOnMainThread([=] {
@@ -5238,7 +5365,7 @@ void Document::postTask(Task task)
 
         Page* page = document->page();
         if ((page && page->defersLoading() && document->activeDOMObjectsAreSuspended()) || !document->m_pendingTasks.isEmpty())
-            document->m_pendingTasks.append(WTF::move(*task.release()));
+            document->m_pendingTasks.append(WTFMove(*task.release()));
         else
             task->performTask(*document);
     });
@@ -5246,21 +5373,20 @@ void Document::postTask(Task task)
 
 void Document::pendingTasksTimerFired()
 {
-    Vector<Task> pendingTasks = WTF::move(m_pendingTasks);
+    Vector<Task> pendingTasks = WTFMove(m_pendingTasks);
     for (auto& task : pendingTasks)
         task.performTask(*this);
 }
 
 void Document::suspendScheduledTasks(ActiveDOMObject::ReasonForSuspension reason)
 {
-#if PLATFORM(IOS)
     if (m_scheduledTasksAreSuspended) {
-        ASSERT(reasonForSuspendingActiveDOMObjects() == ActiveDOMObject::DocumentWillBePaused);
+        // A page may subsequently suspend DOM objects, say as part of handling a scroll or zoom gesture, after the
+        // embedding client requested the page be suspended. We ignore such requests so long as the embedding client
+        // requested the suspension first. See <rdar://problem/13754896> for more details.
+        ASSERT(reasonForSuspendingActiveDOMObjects() == ActiveDOMObject::PageWillBeSuspended);
         return;
     }
-#endif
-
-    ASSERT(!m_scheduledTasksAreSuspended);
 
     suspendScriptedAnimationControllerCallbacks();
     suspendActiveDOMObjects(reason);
@@ -5972,7 +6098,7 @@ void Document::sendWillRevealEdgeEventsIfNeeded(const IntPoint& oldPosition, con
     // that this is the first moment that we know we crossed the magic line).
     
 #if ENABLE(WILL_REVEAL_EDGE_EVENTS)
-    
+    // FIXME: broken in RTL documents.
     int willRevealBottomNotificationPoint = std::max(0, contentsSize.height() - 2 *  visibleRect.height());
     int willRevealTopNotificationPoint = visibleRect.height();
 
@@ -5981,10 +6107,10 @@ void Document::sendWillRevealEdgeEventsIfNeeded(const IntPoint& oldPosition, con
         && willRevealBottomNotificationPoint >= oldPosition.y()) {
         Ref<Event> willRevealEvent = Event::create(eventNames().webkitwillrevealbottomEvent, false, false);
         if (!target)
-            enqueueWindowEvent(WTF::move(willRevealEvent));
+            enqueueWindowEvent(WTFMove(willRevealEvent));
         else {
             willRevealEvent->setTarget(target);
-            m_eventQueue.enqueueEvent(WTF::move(willRevealEvent));
+            m_eventQueue.enqueueEvent(WTFMove(willRevealEvent));
         }
     }
 
@@ -5993,10 +6119,10 @@ void Document::sendWillRevealEdgeEventsIfNeeded(const IntPoint& oldPosition, con
         && willRevealTopNotificationPoint <= oldPosition.y()) {
         Ref<Event> willRevealEvent = Event::create(eventNames().webkitwillrevealtopEvent, false, false);
         if (!target)
-            enqueueWindowEvent(WTF::move(willRevealEvent));
+            enqueueWindowEvent(WTFMove(willRevealEvent));
         else {
             willRevealEvent->setTarget(target);
-            m_eventQueue.enqueueEvent(WTF::move(willRevealEvent));
+            m_eventQueue.enqueueEvent(WTFMove(willRevealEvent));
         }
     }
 
@@ -6008,10 +6134,10 @@ void Document::sendWillRevealEdgeEventsIfNeeded(const IntPoint& oldPosition, con
         && willRevealRightNotificationPoint >= oldPosition.x()) {
         Ref<Event> willRevealEvent = Event::create(eventNames().webkitwillrevealrightEvent, false, false);
         if (!target)
-            enqueueWindowEvent(WTF::move(willRevealEvent));
+            enqueueWindowEvent(WTFMove(willRevealEvent));
         else {
             willRevealEvent->setTarget(target);
-            m_eventQueue.enqueueEvent(WTF::move(willRevealEvent));
+            m_eventQueue.enqueueEvent(WTFMove(willRevealEvent));
         }
     }
 
@@ -6020,10 +6146,10 @@ void Document::sendWillRevealEdgeEventsIfNeeded(const IntPoint& oldPosition, con
         && willRevealLeftNotificationPoint <= oldPosition.x()) {
         Ref<Event> willRevealEvent = Event::create(eventNames().webkitwillrevealleftEvent, false, false);
         if (!target)
-            enqueueWindowEvent(WTF::move(willRevealEvent));
+            enqueueWindowEvent(WTFMove(willRevealEvent));
         else {
             willRevealEvent->setTarget(target);
-            m_eventQueue.enqueueEvent(WTF::move(willRevealEvent));
+            m_eventQueue.enqueueEvent(WTFMove(willRevealEvent));
         }
     }
 #else
@@ -6775,10 +6901,21 @@ void Document::applyContentDispositionAttachmentSandbox()
 {
     ASSERT(shouldEnforceContentDispositionAttachmentSandbox());
 
+    setReferrerPolicy(ReferrerPolicyNever);
     if (!isMediaDocument())
         enforceSandboxFlags(SandboxAll);
     else
         enforceSandboxFlags(SandboxOrigin);
+}
+
+void Document::addViewportDependentPicture(HTMLPictureElement& picture)
+{
+    m_viewportDependentPictures.add(&picture);
+}
+
+void Document::removeViewportDependentPicture(HTMLPictureElement& picture)
+{
+    m_viewportDependentPictures.remove(&picture);
 }
 
 } // namespace WebCore

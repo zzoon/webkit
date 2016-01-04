@@ -31,11 +31,19 @@
 namespace WebCore {
 namespace IDBClient {
 
-IDBVersionChangeEvent::IDBVersionChangeEvent(uint64_t oldVersion, uint64_t newVersion, const AtomicString& eventType)
+IDBVersionChangeEvent::IDBVersionChangeEvent(const IDBResourceIdentifier& requestIdentifier, uint64_t oldVersion, uint64_t newVersion, const AtomicString& eventType)
     : WebCore::IDBVersionChangeEvent(eventType)
+    , m_requestIdentifier(requestIdentifier)
     , m_oldVersion(oldVersion)
     , m_newVersion(newVersion)
 {
+}
+
+Optional<uint64_t> IDBVersionChangeEvent::newVersion() const
+{
+    if (!m_newVersion)
+        return Nullopt;
+    return m_newVersion;
 }
 
 EventInterface IDBVersionChangeEvent::eventInterface() const

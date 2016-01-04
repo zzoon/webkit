@@ -56,6 +56,10 @@
 #include "QuickLook.h"
 #endif
 
+#if PLATFORM(COCOA) && !USE(CFNETWORK)
+#include <wtf/SchedulePair.h>
+#endif
+
 namespace WebCore {
 
     class ApplicationCacheHost;
@@ -144,7 +148,7 @@ namespace WebCore {
         WEBCORE_EXPORT void setTitle(const StringWithDirection&);
         const String& overrideEncoding() const { return m_overrideEncoding; }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA) && !USE(CFNETWORK)
         void schedule(SchedulePair&);
         void unschedule(SchedulePair&);
 #endif
@@ -161,7 +165,7 @@ namespace WebCore {
         void scheduleSubstituteResourceLoad(ResourceLoader&, SubstituteResource&);
 
         // Return the ArchiveResource for the URL only when loading an Archive
-        ArchiveResource* archiveResourceForURL(const URL&) const;
+        WEBCORE_EXPORT ArchiveResource* archiveResourceForURL(const URL&) const;
 
         WEBCORE_EXPORT PassRefPtr<ArchiveResource> mainResource() const;
 
@@ -269,7 +273,7 @@ namespace WebCore {
         URL documentURL() const;
 
 #if USE(QUICK_LOOK)
-        void setQuickLookHandle(std::unique_ptr<QuickLookHandle> quickLookHandle) { m_quickLookHandle = WTF::move(quickLookHandle); }
+        void setQuickLookHandle(std::unique_ptr<QuickLookHandle> quickLookHandle) { m_quickLookHandle = WTFMove(quickLookHandle); }
         QuickLookHandle* quickLookHandle() const { return m_quickLookHandle.get(); }
 #endif
 

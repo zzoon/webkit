@@ -17,7 +17,6 @@
 
 import sys
 import os
-import platform
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../jhbuild") )
 import jhbuildrc_common
@@ -27,9 +26,6 @@ __gtk_tools_directory = os.path.abspath(os.path.dirname(__file__))
 sys.path = [__gtk_tools_directory] + sys.path
 import common
 
-# GTK+ 3.0.12 misses the -lm flag when linking the tests.
-module_makeargs['gtk+'] = 'LDFLAGS="-lm" ' + makeargs
-
 # We always enable introspection so that we can sniff out problems with our
 # annotations sooner rather than later.
 autogenargs='--enable-introspection'
@@ -38,10 +34,4 @@ autogenargs='--enable-introspection'
 # for a module, so we do it here globally since it's a good idea for all other modules as well.
 buildroot = os.path.join(os.path.dirname(checkoutroot), "Build")
 
-if use_lib64:
-    os.environ['LLVMPIPE_LIBGL_PATH'] = os.path.abspath(os.path.join(buildroot, 'Mesa', 'lib64', 'gallium'))
-else:
-    os.environ['LLVMPIPE_LIBGL_PATH'] = os.path.abspath(os.path.join(buildroot, 'Mesa', 'lib', 'gallium'))
-
-if 'x86_64' in platform.machine():
-    conditions.add('x86_64')
+os.environ['LLVMPIPE_LIBGL_PATH'] = os.path.abspath(os.path.join(buildroot, 'Mesa', 'lib', 'gallium'))

@@ -26,8 +26,6 @@
 #ifndef NetworkResourceLoader_h
 #define NetworkResourceLoader_h
 
-#if ENABLE(NETWORK_PROCESS)
-
 #include "MessageSender.h"
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "NetworkLoadClient.h"
@@ -55,17 +53,13 @@ class NetworkResourceLoader final : public RefCounted<NetworkResourceLoader>, pu
 public:
     static Ref<NetworkResourceLoader> create(const NetworkResourceLoadParameters& parameters, NetworkConnectionToWebProcess& connection, RefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>&& reply = nullptr)
     {
-        return adoptRef(*new NetworkResourceLoader(parameters, connection, WTF::move(reply)));
+        return adoptRef(*new NetworkResourceLoader(parameters, connection, WTFMove(reply)));
     }
     virtual ~NetworkResourceLoader();
 
     const WebCore::ResourceRequest& originalRequest() const { return m_parameters.request; }
 
     NetworkLoad* networkLoad() const { return m_networkLoad.get(); }
-
-#if !USE(NETWORK_SESSION)
-    void didConvertHandleToDownload();
-#endif
 
     void start();
     void abort();
@@ -103,11 +97,12 @@ public:
     virtual void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent) override;
     virtual void canAuthenticateAgainstProtectionSpaceAsync(const WebCore::ProtectionSpace&) override;
     virtual bool isSynchronous() const override;
-    virtual void willSendRedirectedRequest(const WebCore::ResourceRequest&, const WebCore::ResourceResponse& redirectResponse) override;
+    virtual void willSendRedirectedRequest(const WebCore::ResourceRequest&, const WebCore::ResourceRequest& redirectRequest, const WebCore::ResourceResponse& redirectResponse) override;
     virtual ShouldContinueDidReceiveResponse didReceiveResponse(const WebCore::ResourceResponse&) override;
     virtual void didReceiveBuffer(RefPtr<WebCore::SharedBuffer>&&, int reportedEncodedDataLength) override;
     virtual void didFinishLoading(double finishTime) override;
     virtual void didFailLoading(const WebCore::ResourceError&) override;
+    virtual void didConvertToDownload() override;
 
 private:
     NetworkResourceLoader(const NetworkResourceLoadParameters&, NetworkConnectionToWebProcess&, RefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>&&);
@@ -117,11 +112,17 @@ private:
     virtual uint64_t messageSenderDestinationID() override { return m_parameters.identifier; }
 
 #if ENABLE(NETWORK_CACHE)
+    bool canUseCache(const WebCore::ResourceRequest&) const;
+    bool canUseCachedRedirect(const WebCore::ResourceRequest&) const;
+
+    void tryStoreAsCacheEntry();
+    void retrieveCacheEntry(const WebCore::ResourceRequest&);
     void didRetrieveCacheEntry(std::unique_ptr<NetworkCache::Entry>);
     void validateCacheEntry(std::unique_ptr<NetworkCache::Entry>);
+    void dispatchWillSendRequestForCacheEntry(std::unique_ptr<NetworkCache::Entry>);
 #endif
 
-    void startNetworkLoad(const Optional<WebCore::ResourceRequest>& updatedRequest = { });
+    void startNetworkLoad(const WebCore::ResourceRequest&);
     void continueDidReceiveResponse();
 
     void cleanup();
@@ -148,13 +149,12 @@ private:
     size_t m_bytesReceived { 0 };
     size_t m_bufferedDataEncodedDataLength { 0 };
     RefPtr<WebCore::SharedBuffer> m_bufferedData;
+    unsigned m_redirectCount { 0 };
 
     std::unique_ptr<SynchronousLoadData> m_synchronousLoadData;
     Vector<RefPtr<WebCore::BlobDataFileReference>> m_fileReferences;
 
-#if !USE(NETWORK_SESSION)
-    bool m_didConvertHandleToDownload { false };
-#endif
+    bool m_didConvertToDownload { false };
     bool m_didConsumeSandboxExtensions { false };
     bool m_defersLoading { false };
 
@@ -162,13 +162,10 @@ private:
 #if ENABLE(NETWORK_CACHE)
     RefPtr<WebCore::SharedBuffer> m_bufferedDataForCache;
     std::unique_ptr<NetworkCache::Entry> m_cacheEntryForValidation;
-
-    WebCore::RedirectChainCacheStatus m_redirectChainCacheStatus;
+    bool m_isWaitingContinueWillSendRequestForCachedRedirect { false };
 #endif
 };
 
 } // namespace WebKit
-
-#endif // ENABLE(NETWORK_PROCESS)
 
 #endif // NetworkResourceLoader_h

@@ -98,8 +98,8 @@ public:
     virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint& accumulatedOffset) const override;
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const override;
 
-    void setMaximalOutlineSize(int);
-    int maximalOutlineSize() const { return m_maximalOutlineSize; }
+    void setMaximalOutlineSize(float);
+    float maximalOutlineSize() const { return m_maximalOutlineSize; }
 
     LayoutRect viewRect() const;
 
@@ -225,6 +225,9 @@ public:
     void didCreateRenderer() { ++m_rendererCount; }
     void didDestroyRenderer() { --m_rendererCount; }
 
+    void updateVisibleViewportRect(const IntRect&);
+    void registerForVisibleInViewportCallback(RenderElement&);
+    void unregisterForVisibleInViewportCallback(RenderElement&);
     void resumePausedImageAnimationsIfNeeded(IntRect visibleRect);
     void addRendererWithPausedImageAnimations(RenderElement&);
     void removeRendererWithPausedImageAnimations(RenderElement&);
@@ -272,7 +275,7 @@ private:
         // We push LayoutState even if layoutState is disabled because it stores layoutDelta too.
         if (!doingFullRepaint() || m_layoutState->isPaginated() || renderer.flowThreadContainingBlock()
             || m_layoutState->lineGrid() || (renderer.style().lineGrid() != RenderStyle::initialLineGrid() && renderer.isRenderBlockFlow())) {
-            m_layoutState = std::make_unique<LayoutState>(WTF::move(m_layoutState), &renderer, offset, pageHeight, pageHeightChanged);
+            m_layoutState = std::make_unique<LayoutState>(WTFMove(m_layoutState), &renderer, offset, pageHeight, pageHeightChanged);
             pushLayoutStateForCurrentFlowThread(renderer);
             return true;
         }
@@ -282,7 +285,7 @@ private:
     void popLayoutState()
     {
         popLayoutStateForCurrentFlowThread();
-        m_layoutState = WTF::move(m_layoutState->m_next);
+        m_layoutState = WTFMove(m_layoutState->m_next);
     }
 
     // Suspends the LayoutState optimization. Used under transforms that cannot be represented by
@@ -348,7 +351,7 @@ private:
     // End deprecated members.
 
     // Used to inflate compositing layers and repaint rects.
-    int m_maximalOutlineSize { 0 };
+    float m_maximalOutlineSize { 0 };
 
     bool shouldUsePrintingLayout() const;
 
@@ -374,6 +377,7 @@ private:
     bool m_usesFirstLetterRules { false };
 
     HashSet<RenderElement*> m_renderersWithPausedImageAnimation;
+    HashSet<RenderElement*> m_visibleInViewportRenderers;
     Vector<RefPtr<RenderWidget>> m_protectedRenderWidgets;
 
 #if ENABLE(SERVICE_CONTROLS)

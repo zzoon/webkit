@@ -65,7 +65,6 @@
 #include <glib/gi18n-lib.h>
 #include <memory>
 #include <wtf/HashMap.h>
-#include <wtf/glib/GMainLoopSource.h>
 #include <wtf/glib/GRefPtr.h>
 #include <wtf/text/CString.h>
 
@@ -149,6 +148,19 @@ typedef HashMap<GtkWidget*, IntRect> WebKitWebViewChildrenMap;
 typedef HashMap<uint32_t, GUniquePtr<GdkEvent>> TouchEventsMap;
 
 struct _WebKitWebViewBasePrivate {
+#if USE(REDIRECTED_XCOMPOSITE_WINDOW)
+    _WebKitWebViewBasePrivate()
+        : clearRedirectedWindowSoonTimer(RunLoop::main(), this, &_WebKitWebViewBasePrivate::clearRedirectedWindowSoonTimerFired)
+    {
+    }
+
+    void clearRedirectedWindowSoonTimerFired()
+    {
+        if (redirectedWindow)
+            redirectedWindow->resize(IntSize());
+    }
+#endif
+
     WebKitWebViewChildrenMap children;
     std::unique_ptr<PageClientImpl> pageClient;
     RefPtr<WebPageProxy> pageProxy;
@@ -190,7 +202,7 @@ struct _WebKitWebViewBasePrivate {
 
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
     std::unique_ptr<RedirectedXCompositeWindow> redirectedWindow;
-    GMainLoopSource clearRedirectedWindowSoon;
+    RunLoop::Timer<WebKitWebViewBasePrivate> clearRedirectedWindowSoonTimer;
 #endif
 
 #if ENABLE(DRAG_SUPPORT)
@@ -856,7 +868,7 @@ static gboolean webkitWebViewBaseTouchEvent(GtkWidget* widget, GdkEventTouch* ev
     case GDK_TOUCH_BEGIN: {
         ASSERT(!priv->touchEvents.contains(sequence));
         GUniquePtr<GdkEvent> event(gdk_event_copy(touchEvent));
-        priv->touchEvents.add(sequence, WTF::move(event));
+        priv->touchEvents.add(sequence, WTFMove(event));
         break;
     }
     case GDK_TOUCH_UPDATE: {
@@ -875,7 +887,7 @@ static gboolean webkitWebViewBaseTouchEvent(GtkWidget* widget, GdkEventTouch* ev
 
     Vector<WebPlatformTouchPoint> touchPoints;
     webkitWebViewBaseGetTouchPointsForEvent(webViewBase, touchEvent, touchPoints);
-    priv->pageProxy->handleTouchEvent(NativeWebTouchEvent(reinterpret_cast<GdkEvent*>(event), WTF::move(touchPoints)));
+    priv->pageProxy->handleTouchEvent(NativeWebTouchEvent(reinterpret_cast<GdkEvent*>(event), WTFMove(touchPoints)));
 
     return TRUE;
 }
@@ -1090,7 +1102,7 @@ void webkitWebViewBaseCreateWebPage(WebKitWebViewBase* webkitWebViewBase, Ref<AP
 {
     WebKitWebViewBasePrivate* priv = webkitWebViewBase->priv;
     WebProcessPool* context = configuration->processPool();
-    priv->pageProxy = context->createWebPage(*priv->pageClient, WTF::move(configuration));
+    priv->pageProxy = context->createWebPage(*priv->pageClient, WTFMove(configuration));
     priv->pageProxy->initializeWebPage();
 
     priv->inputMethodFilter.setPage(priv->pageProxy.get());
@@ -1158,11 +1170,15 @@ static void webkitWebViewBaseSendInhibitMessageToScreenSaver(WebKitWebViewBase* 
 
 static void screenSaverProxyCreatedCallback(GObject*, GAsyncResult* result, WebKitWebViewBase* webViewBase)
 {
-    WebKitWebViewBasePrivate* priv = webViewBase->priv;
-    priv->screenSaverProxy = adoptGRef(g_dbus_proxy_new_for_bus_finish(result, nullptr));
-    if (!priv->screenSaverProxy)
+    // WebKitWebViewBase cancels the proxy creation on dispose, which means this could be called
+    // after the web view has been destroyed and g_dbus_proxy_new_for_bus_finish will return nullptr.
+    // So, make sure we don't use the web view unless we have a valid proxy.
+    // See https://bugs.webkit.org/show_bug.cgi?id=151653.
+    GRefPtr<GDBusProxy> proxy = adoptGRef(g_dbus_proxy_new_for_bus_finish(result, nullptr));
+    if (!proxy)
         return;
 
+    webViewBase->priv->screenSaverProxy = proxy;
     webkitWebViewBaseSendInhibitMessageToScreenSaver(webViewBase);
 }
 
@@ -1358,12 +1374,8 @@ void webkitWebViewBaseResetClickCounter(WebKitWebViewBase* webkitWebViewBase)
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
 static void webkitWebViewBaseClearRedirectedWindowSoon(WebKitWebViewBase* webkitWebViewBase)
 {
-    WebKitWebViewBasePrivate* priv = webkitWebViewBase->priv;
-    static const std::chrono::seconds clearRedirectedWindowSoonDelay = 2_s;
-    priv->clearRedirectedWindowSoon.scheduleAfterDelay("[WebKit] Clear RedirectedWindow soon", [priv]() {
-        if (priv->redirectedWindow)
-            priv->redirectedWindow->resize(IntSize());
-    }, clearRedirectedWindowSoonDelay);
+    static const double clearRedirectedWindowSoonDelay = 2;
+    webkitWebViewBase->priv->clearRedirectedWindowSoonTimer.startOneShot(clearRedirectedWindowSoonDelay);
 }
 #endif
 
@@ -1390,7 +1402,7 @@ void webkitWebViewBaseWillEnterAcceleratedCompositingMode(WebKitWebViewBase* web
 void webkitWebViewBaseEnterAcceleratedCompositingMode(WebKitWebViewBase* webkitWebViewBase)
 {
 #if USE(REDIRECTED_XCOMPOSITE_WINDOW)
-    webkitWebViewBase->priv->clearRedirectedWindowSoon.cancel();
+    webkitWebViewBase->priv->clearRedirectedWindowSoonTimer.stop();
 #else
     UNUSED_PARAM(webkitWebViewBase);
 #endif

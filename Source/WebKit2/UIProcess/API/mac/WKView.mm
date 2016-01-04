@@ -630,8 +630,6 @@ Some other editing-related methods still unimplemented:
     return _data->_impl->firstRectForCharacterRange(theRange, actualRange);
 }
 
-#if USE(ASYNC_NSTEXTINPUTCLIENT)
-
 - (void)selectedRangeWithCompletionHandler:(void(^)(NSRange selectedRange))completionHandlerPtr
 {
     _data->_impl->selectedRangeWithCompletionHandler(completionHandlerPtr);
@@ -661,8 +659,6 @@ Some other editing-related methods still unimplemented:
 {
     _data->_impl->characterIndexForPoint(thePoint, completionHandlerPtr);
 }
-
-#endif // USE(ASYNC_NSTEXTINPUTCLIENT)
 
 - (NSArray *)validAttributesForMarkedText
 {
@@ -846,6 +842,26 @@ Some other editing-related methods still unimplemented:
     return _data->_impl->namesOfPromisedFilesDroppedAtDestination(dropDestination);
 }
 
+- (void)touchesBeganWithEvent:(NSEvent *)event
+{
+    _data->_impl->touchesBeganWithEvent(event);
+}
+
+- (void)touchesMovedWithEvent:(NSEvent *)event
+{
+    _data->_impl->touchesMovedWithEvent(event);
+}
+
+- (void)touchesEndedWithEvent:(NSEvent *)event
+{
+    _data->_impl->touchesEndedWithEvent(event);
+}
+
+- (void)touchesCancelledWithEvent:(NSEvent *)event
+{
+    _data->_impl->touchesCancelledWithEvent(event);
+}
+
 - (instancetype)initWithFrame:(NSRect)frame processPool:(WebProcessPool&)processPool configuration:(Ref<API::PageConfiguration>&&)configuration webView:(WKWebView *)webView
 {
     self = [super initWithFrame:frame];
@@ -855,7 +871,7 @@ Some other editing-related methods still unimplemented:
     InitializeWebKit2();
 
     _data = [[WKViewData alloc] init];
-    _data->_impl = std::make_unique<WebViewImpl>(self, webView, processPool, WTF::move(configuration));
+    _data->_impl = std::make_unique<WebViewImpl>(self, webView, processPool, WTFMove(configuration));
 
     return self;
 }
@@ -998,7 +1014,7 @@ Some other editing-related methods still unimplemented:
     configuration->setPageGroup(toImpl(pageGroupRef));
     configuration->setRelatedPage(toImpl(relatedPage));
 
-    return [self initWithFrame:frame processPool:*toImpl(contextRef) configuration:WTF::move(configuration) webView:nil];
+    return [self initWithFrame:frame processPool:*toImpl(contextRef) configuration:WTFMove(configuration) webView:nil];
 }
 
 - (id)initWithFrame:(NSRect)frame configurationRef:(WKPageConfigurationRef)configurationRef
@@ -1006,7 +1022,7 @@ Some other editing-related methods still unimplemented:
     Ref<API::PageConfiguration> configuration = toImpl(configurationRef)->copy();
     auto& processPool = *configuration->processPool();
 
-    return [self initWithFrame:frame processPool:processPool configuration:WTF::move(configuration) webView:nil];
+    return [self initWithFrame:frame processPool:processPool configuration:WTFMove(configuration) webView:nil];
 }
 
 - (BOOL)wantsUpdateLayer
@@ -1316,16 +1332,6 @@ static _WKOverlayScrollbarStyle toAPIScrollbarStyle(WTF::Optional<WebCore::Scrol
     return _data->_impl->pageExtendedBackgroundColor();
 }
 
-- (void)forceAsyncDrawingAreaSizeUpdate:(NSSize)size
-{
-    _data->_impl->forceAsyncDrawingAreaSizeUpdate(NSSizeToCGSize(size));
-}
-
-- (void)waitForAsyncDrawingAreaSizeUpdate
-{
-    _data->_impl->waitForAsyncDrawingAreaSizeUpdate();
-}
-
 - (BOOL)isUsingUISideCompositing
 {
     return _data->_impl->isUsingUISideCompositing();
@@ -1429,8 +1435,6 @@ static _WKOverlayScrollbarStyle toAPIScrollbarStyle(WTF::Optional<WebCore::Scrol
     _data->_impl->dismissContentRelativeChildWindowsWithAnimationFromViewOnly(withAnimation);
 }
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
-
 - (void)_setAutomaticallyAdjustsContentInsets:(BOOL)automaticallyAdjustsContentInsets
 {
     _data->_impl->setAutomaticallyAdjustsContentInsets(automaticallyAdjustsContentInsets);
@@ -1440,8 +1444,6 @@ static _WKOverlayScrollbarStyle toAPIScrollbarStyle(WTF::Optional<WebCore::Scrol
 {
     return _data->_impl->automaticallyAdjustsContentInsets();
 }
-
-#endif
 
 @end
 

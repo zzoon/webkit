@@ -60,7 +60,7 @@ WebInspector.VisualStyleDetailsPanel = class VisualStyleDetailsPanel extends Web
         this._selectorSection = new WebInspector.VisualStyleSelectorSection(this);
         this._selectorSection.addEventListener(WebInspector.VisualStyleSelectorSection.Event.SelectorChanged, this._updateSections, this);
         this._selectorSection.addEventListener(WebInspector.VisualStyleSelectorSection.Event.StyleTextChanged, this._prepareForChange, this);
-        this._element.appendChild(this._selectorSection.element);
+        this.element.appendChild(this._selectorSection.element);
 
         // Layout Section
         this._generateSection("display", WebInspector.UIString("Display"));
@@ -73,7 +73,7 @@ WebInspector.VisualStyleDetailsPanel = class VisualStyleDetailsPanel extends Web
         this._generateSection("alignment", WebInspector.UIString("Alignment"));
 
         this._sections.layout = new WebInspector.DetailsSection("layout", WebInspector.UIString("Layout"), [this._groups.display.section, this._groups.position.section, this._groups.float.section, this._groups.dimensions.section, this._groups.margin.section, this._groups.padding.section, this._groups.flexbox.section, this._groups.alignment.section]);
-        this._element.appendChild(this._sections.layout.element);
+        this.element.appendChild(this._sections.layout.element);
 
         // Text Section
         this._generateSection("text-style", WebInspector.UIString("Style"));
@@ -82,22 +82,23 @@ WebInspector.VisualStyleDetailsPanel = class VisualStyleDetailsPanel extends Web
         this._generateSection("text-shadow", WebInspector.UIString("Shadow"));
 
         this._sections.text = new WebInspector.DetailsSection("text", WebInspector.UIString("Text"), [this._groups.textStyle.section, this._groups.font.section, this._groups.textSpacing.section, this._groups.textShadow.section]);
-        this._element.appendChild(this._sections.text.element);
+        this.element.appendChild(this._sections.text.element);
 
         // Background Section
         this._generateSection("background-style", WebInspector.UIString("Style"));
         this._generateSection("border", WebInspector.UIString("Border"));
         this._generateSection("outline", WebInspector.UIString("Outline"));
-        this._generateSection("box-shadow", WebInspector.UIString("Shadow"));
+        this._generateSection("box-shadow", WebInspector.UIString("Box Shadow"));
+        this._generateSection("list-style", WebInspector.UIString("List Styles"));
 
-        this._sections.background = new WebInspector.DetailsSection("background", WebInspector.UIString("Background"), [this._groups.backgroundStyle.section, this._groups.border.section, this._groups.outline.section, this._groups.boxShadow.section]);
-        this._element.appendChild(this._sections.background.element);
+        this._sections.background = new WebInspector.DetailsSection("background", WebInspector.UIString("Background"), [this._groups.backgroundStyle.section, this._groups.border.section, this._groups.outline.section, this._groups.boxShadow.section, this._groups.listStyle.section]);
+        this.element.appendChild(this._sections.background.element);
 
         // Animation Section
         this._generateSection("transition", WebInspector.UIString("Transition"));
 
         this._sections.animation = new WebInspector.DetailsSection("animation", WebInspector.UIString("Animation"), [this._groups.transition.section]);
-        this._element.appendChild(this._sections.animation.element);
+        this.element.appendChild(this._sections.animation.element);
     }
 
     // Public
@@ -155,7 +156,7 @@ WebInspector.VisualStyleDetailsPanel = class VisualStyleDetailsPanel extends Web
             return;
 
         let disabled = this._currentStyle[WebInspector.VisualStyleDetailsPanel.StyleDisabledSymbol];
-        this._element.classList.toggle("disabled", !!disabled);
+        this.element.classList.toggle("disabled", !!disabled);
         if (disabled)
             return;
 
@@ -790,7 +791,7 @@ WebInspector.VisualStyleDetailsPanel = class VisualStyleDetailsPanel extends Web
 
         let backgroundImageRow = new WebInspector.DetailsSectionRow;
 
-        let backgroundImage = new WebInspector.VisualStyleURLInput("background-image", WebInspector.UIString("Image"), this._keywords.defaults.concat(["None"]));
+        let backgroundImage = new WebInspector.VisualStyleBackgroundPicker("background-image", WebInspector.UIString("Type"), this._keywords.defaults.concat(["None"]));
 
         backgroundImageRow.element.appendChild(backgroundImage.element);
 
@@ -1042,6 +1043,33 @@ WebInspector.VisualStyleDetailsPanel = class VisualStyleDetailsPanel extends Web
 
         let boxShadow = new WebInspector.DetailsSectionGroup([boxShadowRow, boxShadowHRow, boxShadowVRow, boxShadowBlurRow, boxShadowColorRow]);
         this._populateSection(group, [boxShadow]);
+    }
+
+    _populateListStyleSection()
+    {
+        let group = this._groups.listStyle;
+        let properties = group.properties;
+
+        let listStyleTypeRow = new WebInspector.DetailsSectionRow;
+
+        properties.listStyleType = new WebInspector.VisualStyleKeywordPicker("list-style-type", WebInspector.UIString("Type"), {
+            basic: this._keywords.defaults.concat(["None", "Circle", "Disc", "Square", "Decimal", "Lower Alpha", "Upper Alpha", "Lower Roman", "Upper Roman"]),
+            advanced: ["Decimal Leading Zero", "Asterisks", "Footnotes", "Binary", "Octal", "Lower Hexadecimal", "Upper Hexadecimal", "Lower Latin", "Upper Latin", "Lower Greek", "Upper Greek", "Arabic Indic", "Hebrew", "Hiragana", "Katakana", "Hiragana Iroha", "Katakana Iroha", "CJK Earthly Branch", "CJK Heavenly Stem", "CJK Ideographic", "Bengali", "Cambodian", "Khmer", "Devanagari", "Gujarati", "Gurmukhi", "Kannada", "Lao", "Malayalam", "Mongolian", "Myanmar", "Oriya", "Persian", "Urdu", "Telugu", "Armenian", "Lower Armenian", "Upper Armenian", "Georgian", "Tibetan", "Thai", "Afar", "Hangul Consonant", "Hangul", "Lower Norwegian", "Upper Norwegian", "Ethiopic", "Ethiopic Halehame Gez", "Ethiopic Halehame Aa Et", "Ethiopic Halehame Aa Er", "Oromo", "Ethiopic Halehame Om Et", "Sidama", "Ethiopic Halehame Sid Et", "Somali", "Ethiopic Halehame So Et", "Amharic", "Ethiopic Halehame Am Et", "Tigre", "Ethiopic Halehame Tig", "Tigrinya Er", "Ethiopic Halehame Ti Er", "Tigrinya Et", "Ethiopic Halehame Ti Et", "Ethiopic Abegede", "Ethiopic Abegede Gez", "Amharic Abegede", "Ethiopic Abegede Am Et", "Tigrinya Er Abegede", "Ethiopic Abegede Ti Er", "Tigrinya Et Abegede", "Ethiopic Abegede Ti Et"]
+        });
+
+        properties.listStylePosition = new WebInspector.VisualStyleKeywordIconList("list-style-position", WebInspector.UIString("Position"), ["Outside", "Inside", "Initial"]);
+
+        listStyleTypeRow.element.appendChild(properties.listStyleType.element);
+        listStyleTypeRow.element.appendChild(properties.listStylePosition.element);
+
+        let listStyleImageRow = new WebInspector.DetailsSectionRow;
+
+        properties.listStyleImage = new WebInspector.VisualStyleURLInput("list-style-image", WebInspector.UIString("Image"), this._keywords.defaults.concat(["None"]));
+
+        listStyleImageRow.element.appendChild(properties.listStyleImage.element);
+
+        let listStyle = new WebInspector.DetailsSectionGroup([listStyleTypeRow, listStyleImageRow]);
+        this._populateSection(group, [listStyle]);
     }
 
     _populateTransitionSection()

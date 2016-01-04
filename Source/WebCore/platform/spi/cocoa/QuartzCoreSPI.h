@@ -70,12 +70,10 @@ extern "C" {
 - (uint32_t)createImageSlot:(CGSize)size hasAlpha:(BOOL)flag;
 - (void)deleteSlot:(uint32_t)name;
 - (void)invalidate;
-#if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 - (mach_port_t)createFencePort;
 - (void)setFencePort:(mach_port_t)port;
 - (void)setFencePort:(mach_port_t)port commitHandler:(void(^)(void))block;
-#endif
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
+#if PLATFORM(MAC)
 @property BOOL colorMatchUntaggedContent;
 #endif
 @property (readonly) uint32_t contextId;
@@ -196,10 +194,10 @@ EXTERN_C NSString * const kCAContextDisplayName;
 EXTERN_C NSString * const kCAContextDisplayId;
 EXTERN_C NSString * const kCAContextIgnoresHitTest;
 
-#if (PLATFORM(APPLETV) && __TV_OS_VERSION_MAX_ALLOWED < 100000) \
-    || (PLATFORM(WATCHOS) && __WATCH_OS_VERSION_MAX_ALLOWED < 30000) \
-    || (PLATFORM(IOS) && TARGET_OS_IOS && __IPHONE_OS_VERSION_MAX_ALLOWED < 100000) \
-    || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MAX_ALLOWED < 101200)
+#if (PLATFORM(APPLETV) && __TV_OS_VERSION_MIN_REQUIRED < 100000) \
+    || (PLATFORM(WATCHOS) && __WATCH_OS_VERSION_MIN_REQUIRED < 30000) \
+    || (PLATFORM(IOS) && TARGET_OS_IOS && __IPHONE_OS_VERSION_MIN_REQUIRED < 100000) \
+    || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED < 101200)
 @protocol CALayerDelegate <NSObject>
 @end
 

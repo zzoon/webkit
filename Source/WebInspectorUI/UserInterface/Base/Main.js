@@ -76,6 +76,8 @@ WebInspector.loaded = function()
         InspectorBackend.registerDOMStorageDispatcher(new WebInspector.DOMStorageObserver);
     if (InspectorBackend.registerApplicationCacheDispatcher)
         InspectorBackend.registerApplicationCacheDispatcher(new WebInspector.ApplicationCacheObserver);
+    if (InspectorBackend.registerScriptProfilerDispatcher)
+        InspectorBackend.registerScriptProfilerDispatcher(new WebInspector.ScriptProfilerObserver);
     if (InspectorBackend.registerTimelineDispatcher)
         InspectorBackend.registerTimelineDispatcher(new WebInspector.TimelineObserver);
     if (InspectorBackend.registerCSSDispatcher)
@@ -175,6 +177,11 @@ WebInspector.loaded = function()
 
 WebInspector.contentLoaded = function()
 {
+    // If there was an uncaught exception earlier during loading, then
+    // abort loading more content. We could be in an inconsistent state.
+    if (window.__uncaughtExceptions)
+        return;
+
     // Register for global events.
     document.addEventListener("beforecopy", this._beforecopy.bind(this));
     document.addEventListener("copy", this._copy.bind(this));
@@ -190,6 +197,7 @@ WebInspector.contentLoaded = function()
     window.addEventListener("keyup", this._windowKeyUp.bind(this));
     window.addEventListener("mousemove", this._mouseMoved.bind(this), true);
     window.addEventListener("pagehide", this._pageHidden.bind(this));
+    window.addEventListener("contextmenu", this._contextMenuRequested.bind(this));
 
     // Add platform style classes so the UI can be tweaked per-platform.
     document.body.classList.add(WebInspector.Platform.name + "-platform");
@@ -244,11 +252,14 @@ WebInspector.contentLoaded = function()
     this._saveKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, "S", this._save.bind(this));
     this._saveAsKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.Shift | WebInspector.KeyboardShortcut.Modifier.CommandOrControl, "S", this._saveAs.bind(this));
 
-    this.navigationSidebarKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, "0", this.toggleNavigationSidebar.bind(this));
-    this.detailsSidebarKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl | WebInspector.KeyboardShortcut.Modifier.Option, "0", this.toggleDetailsSidebar.bind(this));
+    this.navigationSidebarKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl | WebInspector.KeyboardShortcut.Modifier.Option, "L", this.toggleNavigationSidebar.bind(this));
+    this.detailsSidebarKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl | WebInspector.KeyboardShortcut.Modifier.Option, "R", this.toggleDetailsSidebar.bind(this));
 
     this._increaseZoomKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, WebInspector.KeyboardShortcut.Key.Plus, this._increaseZoom.bind(this));
     this._decreaseZoomKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, WebInspector.KeyboardShortcut.Key.Minus, this._decreaseZoom.bind(this));
+    this._resetZoomKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, "0", this._resetZoom.bind(this));
+
+    this._showTabAtIndexKeyboardShortcuts = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, `${i}`, this._showTabAtIndex.bind(this, i)));
 
     this.tabBrowser = new WebInspector.TabBrowser(document.getElementById("tab-browser"), this.tabBar, this.navigationSidebar, this.detailsSidebar);
     this.tabBrowser.addEventListener(WebInspector.TabBrowser.Event.SelectedTabContentViewDidChange, this._tabBrowserSelectedTabContentViewDidChange, this);
@@ -258,6 +269,7 @@ WebInspector.contentLoaded = function()
 
     this._reloadPageKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, "R", this._reloadPage.bind(this));
     this._reloadPageIgnoringCacheKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl | WebInspector.KeyboardShortcut.Modifier.Shift, "R", this._reloadPageIgnoringCache.bind(this));
+    this._reloadPageKeyboardShortcut.implicitlyPreventsDefault = this._reloadPageIgnoringCacheKeyboardShortcut = false;
 
     this._consoleTabKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.Option | WebInspector.KeyboardShortcut.Modifier.CommandOrControl, "C", this._showConsoleTab.bind(this));
     this._quickConsoleKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.Control, WebInspector.KeyboardShortcut.Key.Apostrophe, this._focusConsolePrompt.bind(this));
@@ -354,8 +366,27 @@ WebInspector.contentLoaded = function()
     this._dockingAvailable = false;
 
     this._updateDockNavigationItems();
-    this._updateToolbarHeight();
     this._setupViewHierarchy();
+
+    // These tabs are always available for selecting, modulo isTabAllowed().
+    // Other tabs may be engineering-only or toggled at runtime if incomplete.
+    let productionTabClasses = [
+        WebInspector.ConsoleTabContentView,
+        WebInspector.DebuggerTabContentView,
+        WebInspector.ElementsTabContentView,
+        WebInspector.NetworkTabContentView,
+        WebInspector.NewTabContentView,
+        WebInspector.ResourcesTabContentView,
+        WebInspector.SearchTabContentView,
+        WebInspector.StorageTabContentView,
+        WebInspector.TimelineTabContentView,
+    ];
+
+    this._knownTabClassesByType = new Map;
+    // Set tab classes directly. The public API triggers other updates and
+    // notifications that won't work or have no listeners at this point.
+    for (let tabClass of productionTabClasses)
+        this._knownTabClassesByType.set(tabClass.Type, tabClass);
 
     this._pendingOpenTabs = [];
 
@@ -368,7 +399,7 @@ WebInspector.contentLoaded = function()
             continue;
         }
 
-        let tabContentView = this._tabContentViewForType(tabType);
+        let tabContentView = this._createTabContentViewForType(tabType);
         if (!tabContentView)
             continue;
         this.tabBrowser.addTabForContentView(tabContentView, true);
@@ -401,7 +432,8 @@ WebInspector.contentLoaded = function()
     if (this._showingSplitConsoleSetting.value)
         this.showSplitConsole();
 
-    this._contentLoaded = true;
+    // Store this on the window in case the WebInspector global gets corrupted.
+    window.__frontendCompletedLoad = true;
 
     if (this.runBootstrapOperations)
         this.runBootstrapOperations();
@@ -409,57 +441,39 @@ WebInspector.contentLoaded = function()
 
 WebInspector.isTabTypeAllowed = function(tabType)
 {
-    switch (tabType) {
-    case WebInspector.ElementsTabContentView.Type:
-        return !!window.DOMAgent;
-    case WebInspector.NetworkTabContentView.Type:
-        return !!window.NetworkAgent && !!window.PageAgent;
-    case WebInspector.StorageTabContentView.Type:
-        return !!window.DOMStorageAgent || !!window.DatabaseAgent || !!window.IndexedDBAgent;
-    case WebInspector.TimelineTabContentView.Type:
-        return !!window.TimelineAgent;
-    }
+    let tabClass = this._knownTabClassesByType.get(tabType);
+    if (!tabClass)
+        return false;
 
-    return true;
+    return tabClass.isTabAllowed();
 };
 
-WebInspector._tabContentViewForType = function(tabType)
+WebInspector.knownTabClasses = function()
 {
-    switch (tabType) {
-    case WebInspector.ConsoleTabContentView.Type:
-        return new WebInspector.ConsoleTabContentView;
-    case WebInspector.DebuggerTabContentView.Type:
-        return new WebInspector.DebuggerTabContentView;
-    case WebInspector.ElementsTabContentView.Type:
-        return new WebInspector.ElementsTabContentView;
-    case WebInspector.NetworkTabContentView.Type:
-        return new WebInspector.NetworkTabContentView;
-    case WebInspector.NewTabContentView.Type:
-        return new WebInspector.NewTabContentView;
-    case WebInspector.ResourcesTabContentView.Type:
-        return new WebInspector.ResourcesTabContentView;
-    case WebInspector.SearchTabContentView.Type:
-        return new WebInspector.SearchTabContentView;
-    case WebInspector.StorageTabContentView.Type:
-        return new WebInspector.StorageTabContentView;
-    case WebInspector.TimelineTabContentView.Type:
-        return new WebInspector.TimelineTabContentView;
-    default:
+    return new Set(this._knownTabClassesByType.values());
+}
+
+WebInspector._createTabContentViewForType = function(tabType)
+{
+    let tabClass = this._knownTabClassesByType.get(tabType);
+    if (!tabClass) {
         console.error("Unknown tab type", tabType);
+        return null;
     }
 
-    return null;
+    console.assert(WebInspector.TabContentView.isPrototypeOf(tabClass));
+    return new tabClass;
 };
 
 WebInspector._rememberOpenTabs = function()
 {
-    var openTabs = [];
+    let openTabs = [];
 
-    for (var tabBarItem of this.tabBar.tabBarItems) {
-        var tabContentView = tabBarItem.representedObject;
+    for (let tabBarItem of this.tabBar.tabBarItems) {
+        let tabContentView = tabBarItem.representedObject;
         if (!(tabContentView instanceof WebInspector.TabContentView))
             continue;
-        if (tabContentView instanceof WebInspector.SettingsTabContentView || tabContentView instanceof WebInspector.NewTabContentView)
+        if (!tabContentView.constructor.shouldSaveTab())
             continue;
         console.assert(tabContentView.type, "Tab type can't be null, undefined, or empty string", tabContentView.type, tabContentView);
         openTabs.push(tabContentView.type);
@@ -474,11 +488,14 @@ WebInspector._rememberOpenTabs = function()
 
 WebInspector._updateNewTabButtonState = function(event)
 {
-    var newTabAllowed = this.isNewTabWithTypeAllowed(WebInspector.ConsoleTabContentView.Type) || this.isNewTabWithTypeAllowed(WebInspector.ElementsTabContentView.Type)
-        || this.isNewTabWithTypeAllowed(WebInspector.ResourcesTabContentView.Type) || this.isNewTabWithTypeAllowed(WebInspector.StorageTabContentView.Type)
-        || this.isNewTabWithTypeAllowed(WebInspector.TimelineTabContentView.Type) || this.isNewTabWithTypeAllowed(WebInspector.DebuggerTabContentView.Type)
-        || this.isNewTabWithTypeAllowed(WebInspector.NetworkTabContentView.Type);
-    this.tabBar.newTabItem.disabled = !newTabAllowed;
+    let allTabs = [...this._knownTabClassesByType.values()];
+    let addableTabs = allTabs.filter((tabClass) => !tabClass.isEphemeral());
+
+    // FIXME: Use arrow functions once http://webkit.org/b/152497 is resolved.
+    let canMakeNewTab = addableTabs.some(function(tabClass) {
+        return this.isNewTabWithTypeAllowed(tabClass.Type);
+    }.bind(this));
+    this.tabBar.newTabItem.disabled = !canMakeNewTab;
 };
 
 WebInspector._newTabItemClicked = function(event)
@@ -492,9 +509,32 @@ WebInspector._openDefaultTab = function(event)
     this.showNewTabTab();
 };
 
+WebInspector._tryToRestorePendingTabs = function()
+{
+    let stillPendingOpenTabs = [];
+    for (let {tabType, index} of this._pendingOpenTabs) {
+        if (!this.isTabTypeAllowed(tabType)) {
+            stillPendingOpenTabs.push({tabType, index});
+            continue;
+        }
+
+        let tabContentView = this._createTabContentViewForType(tabType);
+        if (!tabContentView)
+            continue;
+
+        this.tabBrowser.addTabForContentView(tabContentView, true, index);
+
+        tabContentView.restoreStateFromCookie(WebInspector.StateRestorationType.Load);
+    }
+
+    this._pendingOpenTabs = stillPendingOpenTabs;
+
+    this._updateNewTabButtonState();
+}
+
 WebInspector.showNewTabTab = function(shouldAnimate)
 {
-    var tabContentView = this.tabBrowser.bestTabContentViewForClass(WebInspector.NewTabContentView);
+    let tabContentView = this.tabBrowser.bestTabContentViewForClass(WebInspector.NewTabContentView);
     if (!tabContentView)
         tabContentView = new WebInspector.NewTabContentView;
     this.tabBrowser.showTabForContentView(tabContentView, !shouldAnimate);
@@ -502,15 +542,16 @@ WebInspector.showNewTabTab = function(shouldAnimate)
 
 WebInspector.isNewTabWithTypeAllowed = function(tabType)
 {
-    if (!this.isTabTypeAllowed(tabType))
+    let tabClass = this._knownTabClassesByType.get(tabType);
+    if (!tabClass || !tabClass.isTabAllowed())
         return false;
 
     // Only allow one tab per class for now.
-    for (var tabBarItem of this.tabBar.tabBarItems) {
-        var tabContentView = tabBarItem.representedObject;
+    for (let tabBarItem of this.tabBar.tabBarItems) {
+        let tabContentView = tabBarItem.representedObject;
         if (!(tabContentView instanceof WebInspector.TabContentView))
             continue;
-        if (tabContentView.type === tabType)
+        if (tabContentView.constructor === tabClass)
             return false;
     }
 
@@ -525,7 +566,7 @@ WebInspector.createNewTabWithType = function(tabType, options = {})
     console.assert(!referencedView || referencedView instanceof WebInspector.TabContentView, referencedView);
     console.assert(!shouldReplaceTab || referencedView, "Must provide a reference view to replace a tab.");
 
-    let tabContentView = this._tabContentViewForType(tabType);
+    let tabContentView = this._createTabContentViewForType(tabType);
     const suppressAnimations = true;
     let insertionIndex = referencedView ? this.tabBar.tabBarItems.indexOf(referencedView.tabBarItem) : undefined;
     this.tabBrowser.addTabForContentView(tabContentView, suppressAnimations, insertionIndex);
@@ -536,6 +577,21 @@ WebInspector.createNewTabWithType = function(tabType, options = {})
     if (shouldShowNewTab)
         this.tabBrowser.showTabForContentView(tabContentView);
 };
+
+WebInspector.registerTabClass = function(tabClass)
+{
+    console.assert(WebInspector.TabContentView.isPrototypeOf(tabClass));
+    if (!WebInspector.TabContentView.isPrototypeOf(tabClass))
+        return;
+
+    if (this._knownTabClassesByType.has(tabClass.Type))
+        return;
+
+    this._knownTabClassesByType.set(tabClass.Type, tabClass);
+
+    this._tryToRestorePendingTabs();
+    this.notifications.dispatchEventToListeners(WebInspector.Notification.TabTypesChanged);
+}
 
 WebInspector.activateExtraDomains = function(domains)
 {
@@ -553,26 +609,7 @@ WebInspector.activateExtraDomains = function(domains)
 
     this._updateReloadToolbarButton();
     this._updateDownloadToolbarButton();
-
-    let stillPendingOpenTabs = [];
-    for (let {tabType, index} of this._pendingOpenTabs) {
-        if (!this.isTabTypeAllowed(tabType)) {
-            stillPendingOpenTabs.push({tabType, index});
-            continue;
-        }
-
-        let tabContentView = this._tabContentViewForType(tabType);
-        if (!tabContentView)
-            continue;
-
-        this.tabBrowser.addTabForContentView(tabContentView, true, index);
-
-        tabContentView.restoreStateFromCookie(WebInspector.StateRestorationType.Load);
-    }
-
-    this._pendingOpenTabs = stillPendingOpenTabs;
-
-    this._updateNewTabButtonState();
+    this._tryToRestorePendingTabs();
 };
 
 WebInspector.contentBrowserTreeElementForRepresentedObject = function(contentBrowser, representedObject)
@@ -878,6 +915,14 @@ WebInspector.showTimelineTab = function()
         tabContentView = new WebInspector.TimelineTabContentView;
     this.tabBrowser.showTabForContentView(tabContentView);
 };
+
+WebInspector.unlocalizedString = function(string)
+{
+    // Intentionally do nothing, since this is for engineering builds
+    // (such as in Debug UI) or in text that is standardized in English.
+    // For example, CSS property names and values are never localized.
+    return string;
+}
 
 WebInspector.UIString = function(string, vararg)
 {
@@ -1322,6 +1367,31 @@ WebInspector._pageHidden = function(event)
     this._saveCookieForOpenTabs();
 };
 
+WebInspector._contextMenuRequested = function(event)
+{
+    let proposedContextMenu;
+
+    // This is setting is only defined in engineering builds.
+    if (WebInspector.isDebugUIEnabled()) {
+        proposedContextMenu = WebInspector.ContextMenu.createFromEvent(event);
+        proposedContextMenu.appendSeparator();
+        proposedContextMenu.appendItem(WebInspector.unlocalizedString("Reload Web Inspector"), () => {
+            window.location.reload();
+        });
+    } else {
+        const onlyExisting = true;
+        proposedContextMenu = WebInspector.ContextMenu.createFromEvent(event, onlyExisting);
+    }
+
+    if (proposedContextMenu)
+        proposedContextMenu.show();
+};
+
+WebInspector.isDebugUIEnabled = function()
+{
+    return WebInspector.showDebugUISetting && WebInspector.showDebugUISetting.value;
+}
+
 WebInspector._undock = function(event)
 {
     InspectorFrontendHost.requestSetDockSide("undocked");
@@ -1369,15 +1439,9 @@ WebInspector._sidebarWidthDidChange = function(event)
     this._tabBrowserSizeDidChange();
 };
 
-WebInspector._updateToolbarHeight = function()
-{
-    if (WebInspector.Platform.name === "mac" && WebInspector.Platform.version.release < 10)
-        InspectorFrontendHost.setToolbarHeight(this.toolbar.element.offsetHeight);
-};
-
 WebInspector._setupViewHierarchy = function()
 {
-    let rootView = new WebInspector.View(document.body);
+    let rootView = WebInspector.View.rootView();
     rootView.addSubview(this.toolbar);
     rootView.addSubview(this.tabBar);
     rootView.addSubview(this.navigationSidebar);
@@ -1385,8 +1449,6 @@ WebInspector._setupViewHierarchy = function()
     rootView.addSubview(this.splitContentBrowser);
     rootView.addSubview(this.quickConsole);
     rootView.addSubview(this.detailsSidebar);
-
-    rootView.makeRootView();
 };
 
 WebInspector._tabBrowserSelectedTabContentViewDidChange = function(event)
@@ -1525,7 +1587,10 @@ WebInspector._dockedResizerMouseDown = function(event)
         if (delta < 0 && clientPosition > firstClientPosition)
             return;
 
-        var dimension = Math.max(0, window[windowProperty] - delta);
+        let dimension = Math.max(0, window[windowProperty] - delta);
+        // If zoomed in/out, there be greater/fewer document pixels shown, but the inspector's
+        // width or height should be the same in device pixels regardless of the document zoom.
+        dimension *= InspectorFrontendHost.zoomFactor();
 
         if (this._dockSide === "bottom")
             InspectorFrontendHost.setAttachedWindowHeight(dimension);
@@ -1634,7 +1699,11 @@ WebInspector._downloadWebArchive = function(event)
 
 WebInspector._reloadPage = function(event)
 {
+    if (!window.PageAgent)
+        return;
+
     PageAgent.reload();
+    event.preventDefault();
 };
 
 WebInspector._reloadPageClicked = function(event)
@@ -1645,7 +1714,11 @@ WebInspector._reloadPageClicked = function(event)
 
 WebInspector._reloadPageIgnoringCache = function(event)
 {
+    if (!window.PageAgent)
+        return;
+
     PageAgent.reload(true);
+    event.preventDefault();
 };
 
 WebInspector._updateReloadToolbarButton = function()
@@ -1844,6 +1917,18 @@ WebInspector._decreaseZoom = function(event) {
     InspectorFrontendHost.setZoomFactor(currentZoom - 0.2);
     event.preventDefault();
 };
+
+WebInspector._resetZoom = function(event) {
+    InspectorFrontendHost.setZoomFactor(1);
+    event.preventDefault();
+};
+
+WebInspector._showTabAtIndex = function(i, event) {
+    if (i <= WebInspector.tabBar.tabBarItems.length)
+        WebInspector.tabBar.selectedTabBarItem = i - 1;
+
+    event.preventDefault();
+}
 
 WebInspector.elementDragStart = function(element, dividerDrag, elementDragEnd, event, cursor, eventTarget)
 {
@@ -2057,6 +2142,24 @@ WebInspector.linkifyStringAsFragment = function(string)
 
     return WebInspector.linkifyStringAsFragmentWithCustomLinkifier(string, linkifier);
 };
+
+WebInspector.createResourceLink = function(resource, className)
+{
+    function handleClick(event)
+    {
+        event.stopPropagation();
+        event.preventDefault();
+
+        WebInspector.showRepresentedObject(resource);
+    }
+
+    let linkNode = document.createElement("a");
+    linkNode.classList.add("resource-link", className);
+    linkNode.title = resource.url;
+    linkNode.textContent = (resource.urlComponents.lastPathComponent || resource.url).insertWordBreakCharacters();
+    linkNode.addEventListener("click", handleClick.bind(this));
+    return linkNode;
+}
 
 WebInspector._undoKeyboardShortcut = function(event)
 {

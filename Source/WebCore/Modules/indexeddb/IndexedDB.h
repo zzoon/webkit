@@ -79,6 +79,7 @@ enum class KeyPathType {
 
 enum class ObjectStoreOverwriteMode {
     Overwrite,
+    OverwriteForCursor,
     NoOverwrite,
 };
 
@@ -96,6 +97,12 @@ enum KeyType {
     Date,
     Number,
     Min,
+};
+
+enum class RequestType {
+    Open,
+    Delete,
+    Other,
 };
 
 } // namespace IndexedDB

@@ -76,9 +76,9 @@ void HistoryController::saveScrollPositionAndViewStateToItem(HistoryItem* item)
         return;
 
     if (m_frame.document()->inPageCache())
-        item->setScrollPoint(frameView->cachedScrollPosition());
+        item->setScrollPosition(frameView->cachedScrollPosition());
     else
-        item->setScrollPoint(frameView->scrollPosition());
+        item->setScrollPosition(frameView->scrollPosition());
 #if PLATFORM(IOS)
     item->setExposedContentRect(frameView->exposedContentRect());
     item->setUnobscuredContentRect(frameView->unobscuredContentRect());
@@ -100,7 +100,7 @@ void HistoryController::clearScrollPositionAndViewState()
     if (!m_currentItem)
         return;
 
-    m_currentItem->clearScrollPoint();
+    m_currentItem->clearScrollPosition();
     m_currentItem->setPageScaleFactor(0);
 }
 
@@ -153,10 +153,20 @@ void HistoryController::restoreScrollPositionAndViewState()
     // Don't restore scroll point on iOS as FrameLoaderClient::restoreViewState() does that.
     if (view && !view->wasScrolledByUser()) {
         Page* page = m_frame.page();
+        auto desiredScrollPosition = m_currentItem->scrollPosition();
+
         if (page && m_frame.isMainFrame() && m_currentItem->pageScaleFactor())
-            page->setPageScaleFactor(m_currentItem->pageScaleFactor() * page->viewScaleFactor(), m_currentItem->scrollPoint());
+            page->setPageScaleFactor(m_currentItem->pageScaleFactor() * page->viewScaleFactor(), desiredScrollPosition);
         else
-            view->setScrollPosition(m_currentItem->scrollPoint());
+            view->setScrollPosition(desiredScrollPosition);
+
+        // If the scroll position doesn't have to be clamped, consider it successfully restored.
+        if (m_frame.isMainFrame()) {
+            auto adjustedDesiredScrollPosition = view->adjustScrollPositionWithinRange(desiredScrollPosition);
+            if (desiredScrollPosition == adjustedDesiredScrollPosition)
+                m_frame.loader().client().didRestoreScrollPosition();
+        }
+
     }
 #endif
 }
@@ -439,7 +449,7 @@ void HistoryController::updateForClientRedirect()
     // webcore has closed the URL and saved away the form state.
     if (m_currentItem) {
         m_currentItem->clearDocumentState();
-        m_currentItem->clearScrollPoint();
+        m_currentItem->clearScrollPosition();
     }
 
     bool needPrivacy = m_frame.page()->usesEphemeralSession();
@@ -803,7 +813,7 @@ void HistoryController::updateBackForwardListClippedAtTarget(bool doClip)
     Ref<HistoryItem> topItem = frameLoader.history().createItemTree(m_frame, doClip);
     LOG(History, "HistoryController %p updateBackForwardListClippedAtTarget: Adding backforward item %p in frame %p (main frame %d) %s", this, topItem.ptr(), &m_frame, m_frame.isMainFrame(), m_frame.loader().documentLoader()->url().string().utf8().data());
 
-    page->backForward().addItem(WTF::move(topItem));
+    page->backForward().addItem(WTFMove(topItem));
 }
 
 void HistoryController::updateCurrentItem()
@@ -850,7 +860,7 @@ void HistoryController::pushState(PassRefPtr<SerializedScriptValue> stateObject,
 
     LOG(History, "HistoryController %p pushState: Adding top item %p, setting url of current item %p to %s", this, topItem.ptr(), m_currentItem.get(), urlString.ascii().data());
 
-    page->backForward().addItem(WTF::move(topItem));
+    page->backForward().addItem(WTFMove(topItem));
 
     if (m_frame.page()->usesEphemeralSession())
         return;

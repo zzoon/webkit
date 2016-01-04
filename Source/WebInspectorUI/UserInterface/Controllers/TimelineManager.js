@@ -42,7 +42,28 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         this._autoCapturingMainResource = null;
         this._boundStopCapturing = this.stopCapturing.bind(this);
 
+        this._scriptProfileRecords = null;
+
         this.reset();
+    }
+
+    // Static
+
+    static defaultInstruments()
+    {
+        if (WebInspector.debuggableType === WebInspector.DebuggableType.JavaScript)
+            return [new WebInspector.ScriptInstrument];
+
+        let defaults = [
+            new WebInspector.NetworkInstrument,
+            new WebInspector.LayoutInstrument,
+            new WebInspector.ScriptInstrument,
+        ];
+
+        if (WebInspector.FPSInstrument.supported())
+            defaults.push(new WebInspector.FPSInstrument);
+
+        return defaults;
     }
 
     // Public
@@ -103,21 +124,14 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         if (!this._activeRecording || shouldCreateRecording)
             this._loadNewRecording();
 
-        var result = TimelineAgent.start();
-
-        // COMPATIBILITY (iOS 7): recordingStarted event did not exist yet. Start explicitly.
-        if (!TimelineAgent.hasEvent("recordingStarted")) {
-            result.then(function() {
-                WebInspector.timelineManager.capturingStarted();
-            });
-        }
+        this._activeRecording.start();
     }
 
     stopCapturing()
     {
         console.assert(this._isCapturing, "TimelineManager is not capturing.");
 
-        TimelineAgent.stop();
+        this._activeRecording.stop();
 
         // NOTE: Always stop immediately instead of waiting for a Timeline.recordingStopped event.
         // This way the UI feels as responsive to a stop as possible.
@@ -142,6 +156,11 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
             return 0;
 
         return this._activeRecording.computeElapsedTime(timestamp);
+    }
+
+    scriptProfilerIsTracking()
+    {
+        return this._scriptProfileRecords !== null;
     }
 
     // Protected
@@ -445,8 +464,11 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         if (this._activeRecording && this._activeRecording.isEmpty())
             return;
 
+        // FIXME: Move the list of instruments for a new recording to a Setting when new Instruments are supported.
+        let instruments = WebInspector.TimelineManager.defaultInstruments();
+
         var identifier = this._nextRecordingIdentifier++;
-        var newRecording = new WebInspector.TimelineRecording(identifier, WebInspector.UIString("Timeline Recording %d").format(identifier));
+        var newRecording = new WebInspector.TimelineRecording(identifier, WebInspector.UIString("Timeline Recording %d").format(identifier), instruments);
 
         this._recordings.push(newRecording);
         this.dispatchEventToListeners(WebInspector.TimelineManager.Event.RecordingCreated, {recording: newRecording});
@@ -487,7 +509,7 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         this._activeRecording.addRecord(record);
 
         // Only worry about dead time after the load event.
-        if (!isNaN(WebInspector.frameResourceManager.mainFrame.loadEventTimestamp))
+        if (WebInspector.frameResourceManager.mainFrame && isNaN(WebInspector.frameResourceManager.mainFrame.loadEventTimestamp))
             this._resetAutoRecordingDeadTimeTimeout();
     }
 
@@ -597,6 +619,36 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
 
         let collection = event.data.collection;
         this._addRecord(new WebInspector.ScriptTimelineRecord(WebInspector.ScriptTimelineRecord.EventType.GarbageCollected, collection.startTime, collection.endTime, null, null, collection));
+    }
+
+    scriptProfilerTrackingStarted(timestamp)
+    {
+        this._scriptProfileRecords = [];
+
+        this.capturingStarted(timestamp);
+    }
+
+    scriptProfilerTrackingUpdated(event)
+    {
+        let {startTime, endTime, type} = event;
+        let scriptRecordType = type === ScriptProfilerAgent.EventType.Microtask ? WebInspector.ScriptTimelineRecord.EventType.MicrotaskDispatched : WebInspector.ScriptTimelineRecord.EventType.ScriptEvaluated;
+        let record = new WebInspector.ScriptTimelineRecord(scriptRecordType, startTime, endTime, null, null, null, null);
+        this._scriptProfileRecords.push(record);
+        this._addRecord(record);
+    }
+
+    scriptProfilerTrackingCompleted(profiles)
+    {
+        if (profiles) {
+            console.assert(this._scriptProfileRecords.length === profiles.length, this._scriptProfileRecords.length, profiles.length);
+            for (let i = 0; i < this._scriptProfileRecords.length; ++i)
+                this._scriptProfileRecords[i].setProfilePayload(profiles[i]);
+        }
+
+        this._scriptProfileRecords = null;
+
+        let timeline = this.activeRecording.timelineForRecordType(WebInspector.TimelineRecord.Type.Script);
+        timeline.refresh();
     }
 };
 

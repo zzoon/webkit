@@ -131,13 +131,15 @@ Intrinsic NativeExecutable::intrinsic() const
 
 const ClassInfo ScriptExecutable::s_info = { "ScriptExecutable", &ExecutableBase::s_info, 0, CREATE_METHOD_TABLE(ScriptExecutable) };
 
-ScriptExecutable::ScriptExecutable(Structure* structure, VM& vm, const SourceCode& source, bool isInStrictContext)
+ScriptExecutable::ScriptExecutable(Structure* structure, VM& vm, const SourceCode& source, bool isInStrictContext, DerivedContextType derivedContextType, bool isInArrowFunctionContext)
     : ExecutableBase(vm, structure, NUM_PARAMETERS_NOT_COMPILED)
     , m_source(source)
     , m_features(isInStrictContext ? StrictModeFeature : 0)
     , m_hasCapturedVariables(false)
     , m_neverInline(false)
     , m_didTryToEnterInLoop(false)
+    , m_derivedContextType(derivedContextType)
+    , m_isArrowFunctionContext(isInArrowFunctionContext)
     , m_overrideLineNumber(-1)
     , m_firstLine(-1)
     , m_lastLine(-1)
@@ -299,7 +301,7 @@ CodeBlock* ScriptExecutable::newCodeBlockFor(
     UnlinkedFunctionCodeBlock* unlinkedCodeBlock = 
         executable->m_unlinkedExecutable->unlinkedCodeBlockFor(
             *vm, executable->m_source, kind, debuggerMode, profilerMode, error, 
-            executable->isArrowFunction());
+            executable->parseMode());
     recordParse(
         executable->m_unlinkedExecutable->features(), 
         executable->m_unlinkedExecutable->hasCapturedVariables(), firstLine(), 
@@ -412,7 +414,7 @@ JSObject* ScriptExecutable::prepareForExecutionImpl(
 
 const ClassInfo EvalExecutable::s_info = { "EvalExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(EvalExecutable) };
 
-EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source, bool isInStrictContext, ThisTDZMode thisTDZMode, const VariableEnvironment* variablesUnderTDZ)
+EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source, bool isInStrictContext, ThisTDZMode thisTDZMode, DerivedContextType derivedContextType, bool isArrowFunctionContext, const VariableEnvironment* variablesUnderTDZ)
 {
     JSGlobalObject* globalObject = exec->lexicalGlobalObject();
     if (!globalObject->evalEnabled()) {
@@ -420,10 +422,10 @@ EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source
         return 0;
     }
 
-    EvalExecutable* executable = new (NotNull, allocateCell<EvalExecutable>(*exec->heap())) EvalExecutable(exec, source, isInStrictContext);
+    EvalExecutable* executable = new (NotNull, allocateCell<EvalExecutable>(*exec->heap())) EvalExecutable(exec, source, isInStrictContext, derivedContextType, isArrowFunctionContext);
     executable->finishCreation(exec->vm());
 
-    UnlinkedEvalCodeBlock* unlinkedEvalCode = globalObject->createEvalCodeBlock(exec, executable, thisTDZMode, variablesUnderTDZ);
+    UnlinkedEvalCodeBlock* unlinkedEvalCode = globalObject->createEvalCodeBlock(exec, executable, thisTDZMode, isArrowFunctionContext, variablesUnderTDZ);
     if (!unlinkedEvalCode)
         return 0;
 
@@ -432,8 +434,8 @@ EvalExecutable* EvalExecutable::create(ExecState* exec, const SourceCode& source
     return executable;
 }
 
-EvalExecutable::EvalExecutable(ExecState* exec, const SourceCode& source, bool inStrictContext)
-    : ScriptExecutable(exec->vm().evalExecutableStructure.get(), exec->vm(), source, inStrictContext)
+EvalExecutable::EvalExecutable(ExecState* exec, const SourceCode& source, bool inStrictContext, DerivedContextType derivedContextType, bool isArrowFunctionContext)
+    : ScriptExecutable(exec->vm().evalExecutableStructure.get(), exec->vm(), source, inStrictContext, derivedContextType, isArrowFunctionContext)
 {
 }
 
@@ -445,7 +447,7 @@ void EvalExecutable::destroy(JSCell* cell)
 const ClassInfo ProgramExecutable::s_info = { "ProgramExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(ProgramExecutable) };
 
 ProgramExecutable::ProgramExecutable(ExecState* exec, const SourceCode& source)
-    : ScriptExecutable(exec->vm().programExecutableStructure.get(), exec->vm(), source, false)
+    : ScriptExecutable(exec->vm().programExecutableStructure.get(), exec->vm(), source, false, DerivedContextType::None, false)
 {
     m_typeProfilingStartOffset = 0;
     m_typeProfilingEndOffset = source.length() - 1;
@@ -461,7 +463,7 @@ void ProgramExecutable::destroy(JSCell* cell)
 const ClassInfo ModuleProgramExecutable::s_info = { "ModuleProgramExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(ModuleProgramExecutable) };
 
 ModuleProgramExecutable::ModuleProgramExecutable(ExecState* exec, const SourceCode& source)
-    : ScriptExecutable(exec->vm().moduleProgramExecutableStructure.get(), exec->vm(), source, false)
+    : ScriptExecutable(exec->vm().moduleProgramExecutableStructure.get(), exec->vm(), source, false, DerivedContextType::None, false)
 {
     m_typeProfilingStartOffset = 0;
     m_typeProfilingEndOffset = source.length() - 1;
@@ -492,10 +494,8 @@ void ModuleProgramExecutable::destroy(JSCell* cell)
 
 const ClassInfo FunctionExecutable::s_info = { "FunctionExecutable", &ScriptExecutable::s_info, 0, CREATE_METHOD_TABLE(FunctionExecutable) };
 
-FunctionExecutable::FunctionExecutable(VM& vm, const SourceCode& source, 
-    UnlinkedFunctionExecutable* unlinkedExecutable, unsigned firstLine, 
-    unsigned lastLine, unsigned startColumn, unsigned endColumn)
-    : ScriptExecutable(vm.functionExecutableStructure.get(), vm, source, unlinkedExecutable->isInStrictContext())
+FunctionExecutable::FunctionExecutable(VM& vm, const SourceCode& source, UnlinkedFunctionExecutable* unlinkedExecutable, unsigned firstLine, unsigned lastLine, unsigned startColumn, unsigned endColumn)
+    : ScriptExecutable(vm.functionExecutableStructure.get(), vm, source, unlinkedExecutable->isInStrictContext(), unlinkedExecutable->derivedContextType(), false)
     , m_unlinkedExecutable(vm, this, unlinkedExecutable)
 {
     RELEASE_ASSERT(!source.isNull());
@@ -556,7 +556,7 @@ JSObject* ProgramExecutable::checkSyntax(ExecState* exec)
     JSGlobalObject* lexicalGlobalObject = exec->lexicalGlobalObject();
     std::unique_ptr<ProgramNode> programNode = parse<ProgramNode>(
         vm, m_source, Identifier(), JSParserBuiltinMode::NotBuiltin, 
-        JSParserStrictMode::NotStrict, SourceParseMode::ProgramMode, error);
+        JSParserStrictMode::NotStrict, SourceParseMode::ProgramMode, SuperBinding::NotNeeded, error);
     if (programNode)
         return 0;
     ASSERT(error.isValid());

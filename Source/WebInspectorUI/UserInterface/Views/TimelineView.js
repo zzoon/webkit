@@ -39,8 +39,7 @@ WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
         this._timelineSidebarPanel = extraArguments.timelineSidebarPanel;
 
         this._contentTreeOutline = this._timelineSidebarPanel.createContentTreeOutline();
-        this._contentTreeOutline.onselect = this.treeElementSelected.bind(this);
-        this._contentTreeOutline.ondeselect = this.treeElementDeselected.bind(this);
+        this._contentTreeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
         this._contentTreeOutline.__canShowContentViewForTreeElement = this.canShowContentViewForTreeElement.bind(this);
 
         this.element.classList.add("timeline-view");
@@ -91,10 +90,12 @@ WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
 
     set zeroTime(x)
     {
+        x = x || 0;
+
         if (this._zeroTime === x)
             return;
 
-        this._zeroTime = x || 0;
+        this._zeroTime = x;
 
         this.needsLayout();
     }
@@ -106,10 +107,12 @@ WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
 
     set startTime(x)
     {
+        x = x || 0;
+
         if (this._startTime === x)
             return;
 
-        this._startTime = x || 0;
+        this._startTime = x;
 
         this.needsLayout();
     }
@@ -121,10 +124,12 @@ WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
 
     set endTime(x)
     {
+        x = x || 0;
+
         if (this._endTime === x)
             return;
 
-        this._endTime = x || 0;
+        this._endTime = x;
 
         this.needsLayout();
     }
@@ -136,12 +141,14 @@ WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
 
     set currentTime(x)
     {
+        x = x || 0;
+
         if (this._currentTime === x)
             return;
 
-        var oldCurrentTime = this._currentTime;
+        let oldCurrentTime = this._currentTime;
 
-        this._currentTime = x || 0;
+        this._currentTime = x;
 
         function checkIfLayoutIsNeeded(currentTime)
         {
@@ -229,8 +236,6 @@ WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
     {
         // Implemented by sub-classes if needed.
 
-        this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
-
         if (!this._timelineSidebarPanel.canShowDifferentContentView())
             return;
 
@@ -238,5 +243,16 @@ WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
             return;
 
         this.showContentViewForTreeElement(treeElement);
+    }
+
+    // Private
+
+    _treeSelectionDidChange(event)
+    {
+        if (event.data.deselectedElement)
+            this.treeElementDeselected(event.data.deselectedElement);
+
+        if (event.data.selectedElement)
+            this.treeElementSelected(event.data.selectedElement, event.data.selectedByUser);
     }
 };

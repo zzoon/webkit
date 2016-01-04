@@ -55,7 +55,7 @@ template<> struct ForEach<StackSlot*> {
     static void forEach(Inst& inst, const Functor& functor)
     {
         inst.forEachArg(
-            [&] (Arg& arg, Arg::Role role, Arg::Type type) {
+            [&] (Arg& arg, Arg::Role role, Arg::Type type, Arg::Width width) {
                 if (!arg.isStack())
                     return;
                 StackSlot* stackSlot = arg.stackSlot();
@@ -66,7 +66,7 @@ template<> struct ForEach<StackSlot*> {
                 // semantics of "Anonymous".
                 // https://bugs.webkit.org/show_bug.cgi?id=151128
                 
-                functor(stackSlot, role, type);
+                functor(stackSlot, role, type, width);
                 arg = Arg::stack(stackSlot, arg.offset());
             });
     }
@@ -89,24 +89,30 @@ inline const RegisterSet& Inst::extraClobberedRegs()
     return args[0].special()->extraClobberedRegs(*this);
 }
 
-template<typename Functor>
-inline void Inst::forEachDefAndExtraClobberedTmp(Arg::Type type, const Functor& functor)
+inline const RegisterSet& Inst::extraEarlyClobberedRegs()
 {
-    forEachTmp([&] (Tmp& tmpArg, Arg::Role role, Arg::Type argType) {
-        if (argType == type && Arg::isDef(role))
-            functor(tmpArg);
-    });
+    ASSERT(hasSpecial());
+    return args[0].special()->extraEarlyClobberedRegs(*this);
+}
 
-    if (!hasSpecial())
-        return;
+template<typename Functor>
+inline void Inst::forEachTmpWithExtraClobberedRegs(Inst* nextInst, const Functor& functor)
+{
+    forEachTmp(
+        [&] (Tmp& tmpArg, Arg::Role role, Arg::Type argType, Arg::Width argWidth) {
+            functor(tmpArg, role, argType, argWidth);
+        });
 
-    const RegisterSet& clobberedRegisters = extraClobberedRegs();
-    clobberedRegisters.forEach([functor, type] (Reg reg) {
-        if (reg.isGPR() == (type == Arg::GP)) {
-            Tmp registerTmp(reg);
-            functor(registerTmp);
-        }
-    });
+    auto reportReg = [&] (Reg reg) {
+        Arg::Type type = reg.isGPR() ? Arg::GP : Arg::FP;
+        functor(Tmp(reg), Arg::Def, type, Arg::conservativeWidth(type));
+    };
+
+    if (hasSpecial())
+        extraClobberedRegs().forEach(reportReg);
+
+    if (nextInst && nextInst->hasSpecial())
+        nextInst->extraEarlyClobberedRegs().forEach(reportReg);
 }
 
 inline void Inst::reportUsedRegisters(const RegisterSet& usedRegisters)
@@ -161,6 +167,7 @@ inline bool isX86DivHelperValid(const Inst& inst)
     return inst.args[0] == Tmp(X86Registers::eax)
         && inst.args[1] == Tmp(X86Registers::edx);
 #else
+    UNUSED_PARAM(inst);
     return false;
 #endif
 }

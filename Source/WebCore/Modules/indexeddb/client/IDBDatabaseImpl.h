@@ -53,11 +53,11 @@ public:
     virtual uint64_t version() const override final;
     virtual RefPtr<DOMStringList> objectStoreNames() const override final;
 
-    virtual RefPtr<WebCore::IDBObjectStore> createObjectStore(const String& name, const Dictionary&, ExceptionCode&) override final;
-    virtual RefPtr<WebCore::IDBObjectStore> createObjectStore(const String& name, const IDBKeyPath&, bool autoIncrement, ExceptionCode&) override final;
-    virtual RefPtr<WebCore::IDBTransaction> transaction(ScriptExecutionContext*, const Vector<String>&, const String& mode, ExceptionCode&) override final;
-    virtual RefPtr<WebCore::IDBTransaction> transaction(ScriptExecutionContext*, const String&, const String& mode, ExceptionCode&) override final;
-    virtual void deleteObjectStore(const String& name, ExceptionCode&) override final;
+    virtual RefPtr<WebCore::IDBObjectStore> createObjectStore(const String& name, const Dictionary&, ExceptionCodeWithMessage&) override final;
+    virtual RefPtr<WebCore::IDBObjectStore> createObjectStore(const String& name, const IDBKeyPath&, bool autoIncrement, ExceptionCodeWithMessage&) override final;
+    virtual RefPtr<WebCore::IDBTransaction> transaction(ScriptExecutionContext*, const Vector<String>&, const String& mode, ExceptionCodeWithMessage&) override final;
+    virtual RefPtr<WebCore::IDBTransaction> transaction(ScriptExecutionContext*, const String&, const String& mode, ExceptionCodeWithMessage&) override final;
+    virtual void deleteObjectStore(const String& name, ExceptionCodeWithMessage&) override final;
     virtual void close() override final;
 
     // EventTarget
@@ -67,12 +67,12 @@ public:
     virtual void derefEventTarget() override final { deref(); }
 
     virtual const char* activeDOMObjectName() const override final;
-    virtual bool canSuspendForPageCache() const override final;
+    virtual bool canSuspendForDocumentSuspension() const override final;
 
     const IDBDatabaseInfo& info() const { return m_info; }
     uint64_t databaseConnectionIdentifier() const { return m_databaseConnectionIdentifier; }
 
-    Ref<IDBTransaction> startVersionChangeTransaction(const IDBTransactionInfo&);
+    Ref<IDBTransaction> startVersionChangeTransaction(const IDBTransactionInfo&, IDBOpenDBRequest&);
     void didStartTransaction(IDBTransaction&);
 
     void willCommitTransaction(IDBTransaction&);
@@ -80,12 +80,16 @@ public:
     void willAbortTransaction(IDBTransaction&);
     void didAbortTransaction(IDBTransaction&);
 
-    void fireVersionChangeEvent(uint64_t requestedVersion);
+    void fireVersionChangeEvent(const IDBResourceIdentifier& requestIdentifier, uint64_t requestedVersion);
 
     IDBConnectionToServer& serverConnection() { return m_serverConnection.get(); }
 
     void didCreateIndexInfo(const IDBIndexInfo&);
     void didDeleteIndexInfo(const IDBIndexInfo&);
+
+    bool isClosingOrClosed() const { return m_closePending || m_closedInServer; }
+
+    bool dispatchEvent(Event&) override final;
 
 private:
     IDBDatabase(ScriptExecutionContext&, IDBConnectionToServer&, const IDBResultData&);
@@ -93,6 +97,8 @@ private:
     void didCommitOrAbortTransaction(IDBTransaction&);
 
     void maybeCloseInServer();
+
+    virtual bool hasPendingActivity() const override final;
 
     Ref<IDBConnectionToServer> m_serverConnection;
     IDBDatabaseInfo m_info;

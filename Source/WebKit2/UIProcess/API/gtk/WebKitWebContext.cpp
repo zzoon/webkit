@@ -179,6 +179,8 @@ struct _WebKitWebContextPrivate {
 
     CString faviconDatabaseDirectory;
     WebKitTLSErrorsPolicy tlsErrorsPolicy;
+    WebKitProcessModel processModel;
+    unsigned processCountLimit;
 
     HashMap<uint64_t, WebKitWebView*> webViews;
 
@@ -186,38 +188,11 @@ struct _WebKitWebContextPrivate {
     GRefPtr<GVariant> webExtensionsInitializationUserData;
 
     CString localStorageDirectory;
-    CString indexedDBDirectory;
 };
 
 static guint signals[LAST_SIGNAL] = { 0, };
 
 WEBKIT_DEFINE_TYPE(WebKitWebContext, webkit_web_context, G_TYPE_OBJECT)
-
-static inline WebKit::ProcessModel toProcessModel(WebKitProcessModel webKitProcessModel)
-{
-    switch (webKitProcessModel) {
-    case WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS:
-        return ProcessModelSharedSecondaryProcess;
-    case WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES:
-        return ProcessModelMultipleSecondaryProcesses;
-    default:
-        ASSERT_NOT_REACHED();
-        return ProcessModelSharedSecondaryProcess;
-    }
-}
-
-static inline WebKitProcessModel toWebKitProcessModel(WebKit::ProcessModel processModel)
-{
-    switch (processModel) {
-    case ProcessModelSharedSecondaryProcess:
-        return WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS;
-    case ProcessModelMultipleSecondaryProcesses:
-        return WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES;
-    default:
-        ASSERT_NOT_REACHED();
-        return WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS;
-    }
-}
 
 static const char* injectedBundleDirectory()
 {
@@ -285,8 +260,7 @@ static void webkitWebContextConstructed(GObject* object)
 
     API::ProcessPoolConfiguration configuration;
     configuration.setInjectedBundlePath(WebCore::filenameToString(bundleFilename.get()));
-    configuration.setProcessModel(ProcessModelSharedSecondaryProcess);
-    configuration.setUseNetworkProcess(false);
+    configuration.setMaximumProcessCount(1);
 
     WebKitWebContext* webContext = WEBKIT_WEB_CONTEXT(object);
     WebKitWebContextPrivate* priv = webContext->priv;
@@ -1115,7 +1089,7 @@ void webkit_web_context_prefetch_dns(WebKitWebContext* context, const char* host
 
     API::Dictionary::MapType message;
     message.set(String::fromUTF8("Hostname"), API::String::create(String::fromUTF8(hostname)));
-    context->priv->context->postMessageToInjectedBundle(String::fromUTF8("PrefetchDNS"), API::Dictionary::create(WTF::move(message)).ptr());
+    context->priv->context->postMessageToInjectedBundle(String::fromUTF8("PrefetchDNS"), API::Dictionary::create(WTFMove(message)).ptr());
 }
 
 /**
@@ -1169,13 +1143,18 @@ void webkit_web_context_set_process_model(WebKitWebContext* context, WebKitProce
 {
     g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
 
-    ProcessModel newProcessModel(toProcessModel(processModel));
-
-    if (newProcessModel == context->priv->context->processModel())
+    if (processModel == context->priv->processModel)
         return;
 
-    context->priv->context->setUsesNetworkProcess(newProcessModel == ProcessModelMultipleSecondaryProcesses);
-    context->priv->context->setProcessModel(newProcessModel);
+    context->priv->processModel = processModel;
+    switch (context->priv->processModel) {
+    case WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS:
+        context->priv->context->setMaximumNumberOfProcesses(1);
+        break;
+    case WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES:
+        context->priv->context->setMaximumNumberOfProcesses(context->priv->processCountLimit);
+        break;
+    }
 }
 
 /**
@@ -1193,7 +1172,7 @@ WebKitProcessModel webkit_web_context_get_process_model(WebKitWebContext* contex
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS);
 
-    return toWebKitProcessModel(context->priv->context->processModel());
+    return context->priv->processModel;
 }
 
 /**
@@ -1214,10 +1193,12 @@ void webkit_web_context_set_web_process_count_limit(WebKitWebContext* context, g
 {
     g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
 
-    if (limit == context->priv->context->configuration().maximumProcessCount())
+    if (context->priv->processCountLimit == limit)
         return;
 
-    context->priv->context->setMaximumNumberOfProcesses(limit);
+    context->priv->processCountLimit = limit;
+    if (context->priv->processModel != WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS)
+        context->priv->context->setMaximumNumberOfProcesses(limit);
 }
 
 /**
@@ -1234,7 +1215,7 @@ guint webkit_web_context_get_web_process_count_limit(WebKitWebContext* context)
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), 0);
 
-    return context->priv->context->configuration().maximumProcessCount();
+    return context->priv->processCountLimit;
 }
 
 WebKitDownload* webkitWebContextGetOrCreateDownload(DownloadProxy* downloadProxy)
@@ -1313,6 +1294,11 @@ void webkitWebContextDidFinishLoadingCustomProtocol(WebKitWebContext* context, u
     context->priv->uriSchemeRequests.remove(customProtocolID);
 }
 
+bool webkitWebContextIsLoadingCustomProtocol(WebKitWebContext* context, uint64_t customProtocolID)
+{
+    return context->priv->uriSchemeRequests.get(customProtocolID);
+}
+
 void webkitWebContextCreatePageForWebView(WebKitWebContext* context, WebKitWebView* webView, WebKitUserContentManager* userContentManager, WebKitWebView* relatedView)
 {
     WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(webView);
@@ -1324,7 +1310,7 @@ void webkitWebContextCreatePageForWebView(WebKitWebContext* context, WebKitWebVi
     pageConfiguration->setUserContentController(userContentManager ? webkitUserContentManagerGetUserContentControllerProxy(userContentManager) : nullptr);
     pageConfiguration->setWebsiteDataStore(&webkitWebsiteDataManagerGetDataStore(context->priv->websiteDataManager.get()));
     pageConfiguration->setSessionID(pageConfiguration->websiteDataStore()->websiteDataStore().sessionID());
-    webkitWebViewBaseCreateWebPage(webViewBase, WTF::move(pageConfiguration));
+    webkitWebViewBaseCreateWebPage(webViewBase, WTFMove(pageConfiguration));
 
     WebPageProxy* page = webkitWebViewBaseGetPage(webViewBase);
     context->priv->webViews.set(page->pageID(), webView);

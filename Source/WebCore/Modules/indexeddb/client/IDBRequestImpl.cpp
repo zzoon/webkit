@@ -32,6 +32,7 @@
 #include "EventQueue.h"
 #include "IDBBindingUtilities.h"
 #include "IDBCursorImpl.h"
+#include "IDBDatabaseException.h"
 #include "IDBEventDispatcher.h"
 #include "IDBKeyData.h"
 #include "IDBResultData.h"
@@ -86,16 +87,12 @@ IDBRequest::IDBRequest(ScriptExecutionContext& context, IDBCursor& cursor, IDBTr
     , m_transaction(&transaction)
     , m_connection(transaction.serverConnection())
     , m_resourceIdentifier(transaction.serverConnection())
+    , m_source(cursor.source())
     , m_pendingCursor(&cursor)
 {
     suspendIfNeeded();
 
     cursor.setRequest(*this);
-
-    auto* cursorSource = cursor.source();
-    ASSERT(cursorSource);
-    ASSERT(cursorSource->type() == IDBAny::Type::IDBObjectStore || cursorSource->type() == IDBAny::Type::IDBIndex);
-    m_source = cursorSource;
 }
 
 IDBRequest::IDBRequest(ScriptExecutionContext& context, IDBIndex& index, IDBTransaction& transaction)
@@ -123,9 +120,14 @@ IDBRequest::~IDBRequest()
     }
 }
 
-RefPtr<WebCore::IDBAny> IDBRequest::result(ExceptionCode&) const
+RefPtr<WebCore::IDBAny> IDBRequest::result(ExceptionCodeWithMessage& ec) const
 {
-    return m_result;
+    if (m_readyState == IDBRequestReadyState::Done)
+        return m_result;
+
+    ec.code = IDBDatabaseException::InvalidStateError;
+    ec.message = ASCIILiteral("Failed to read the 'result' property from 'IDBRequest': The request has not finished.");
+    return nullptr;
 }
 
 unsigned short IDBRequest::errorCode(ExceptionCode&) const
@@ -133,9 +135,14 @@ unsigned short IDBRequest::errorCode(ExceptionCode&) const
     return 0;
 }
 
-RefPtr<DOMError> IDBRequest::error(ExceptionCode&) const
+RefPtr<DOMError> IDBRequest::error(ExceptionCodeWithMessage& ec) const
 {
-    return m_domError;
+    if (m_readyState == IDBRequestReadyState::Done)
+        return m_domError;
+
+    ec.code = IDBDatabaseException::InvalidStateError;
+    ec.message = ASCIILiteral("Failed to read the 'error' property from 'IDBRequest': The request has not finished.");
+    return nullptr;
 }
 
 RefPtr<WebCore::IDBAny> IDBRequest::source() const
@@ -143,15 +150,38 @@ RefPtr<WebCore::IDBAny> IDBRequest::source() const
     return m_source;
 }
 
+void IDBRequest::setSource(IDBCursor& cursor)
+{
+    m_source = IDBAny::create(cursor);
+}
+
+void IDBRequest::setVersionChangeTransaction(IDBTransaction& transaction)
+{
+    ASSERT(!m_transaction);
+    ASSERT(transaction.isVersionChange());
+    ASSERT(!transaction.isFinishedOrFinishing());
+
+    m_transaction = &transaction;
+}
+
 RefPtr<WebCore::IDBTransaction> IDBRequest::transaction() const
 {
-    return m_transaction;
+    return m_shouldExposeTransactionToDOM ? m_transaction : nullptr;
 }
 
 const String& IDBRequest::readyState() const
 {
-    static WTF::NeverDestroyed<String> readyState;
-    return readyState;
+    static WTF::NeverDestroyed<String> pendingString("pending");
+    static WTF::NeverDestroyed<String> doneString("done");
+
+    switch (m_readyState) {
+    case IDBRequestReadyState::Pending:
+        return pendingString;
+    case IDBRequestReadyState::Done:
+        return doneString;
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+    }
 }
 
 uint64_t IDBRequest::sourceObjectStoreIdentifier() const
@@ -206,7 +236,7 @@ const char* IDBRequest::activeDOMObjectName() const
     return "IDBRequest";
 }
 
-bool IDBRequest::canSuspendForPageCache() const
+bool IDBRequest::canSuspendForDocumentSuspension() const
 {
     return false;
 }
@@ -216,18 +246,27 @@ bool IDBRequest::hasPendingActivity() const
     return m_hasPendingActivity;
 }
 
+void IDBRequest::stop()
+{
+    ASSERT(!m_contextStopped);
+    m_contextStopped = true;
+}
+
 void IDBRequest::enqueueEvent(Ref<Event>&& event)
 {
-    if (!scriptExecutionContext())
+    if (!scriptExecutionContext() || m_contextStopped)
         return;
 
     event->setTarget(this);
-    scriptExecutionContext()->eventQueue().enqueueEvent(WTF::move(event));
+    scriptExecutionContext()->eventQueue().enqueueEvent(WTFMove(event));
 }
 
 bool IDBRequest::dispatchEvent(Event& event)
 {
     LOG(IndexedDB, "IDBRequest::dispatchEvent - %s (%p)", event.type().characters8(), this);
+
+    ASSERT(m_hasPendingActivity);
+    ASSERT(!m_contextStopped);
 
     if (event.type() != eventNames().blockedEvent)
         m_readyState = IDBRequestReadyState::Done;
@@ -236,9 +275,13 @@ bool IDBRequest::dispatchEvent(Event& event)
     targets.append(this);
 
     if (m_transaction) {
-        targets.append(m_transaction);
-        targets.append(m_transaction->db());
+        if (!m_transaction->isFinished())
+            targets.append(m_transaction);
+        if (!m_transaction->database().isClosingOrClosed())
+            targets.append(m_transaction->db());
     }
+
+    m_hasPendingActivity = false;
 
     bool dontPreventDefault;
     {
@@ -246,12 +289,29 @@ bool IDBRequest::dispatchEvent(Event& event)
         dontPreventDefault = IDBEventDispatcher::dispatch(event, targets);
     }
 
-    if (m_transaction && !m_pendingCursor) {
+    // IDBEventDispatcher::dispatch() might have set the pending activity flag back to true, suggesting the request will be reused.
+    // We might also re-use the request if this event was the upgradeneeded event for an IDBOpenDBRequest.
+    if (!m_hasPendingActivity)
+        m_hasPendingActivity = isOpenDBRequest() && (event.type() == eventNames().upgradeneededEvent || event.type() == eventNames().blockedEvent);
+
+    // The request should only remain in the transaction's request list if it represents a pending cursor operation, or this is an open request that was blocked.
+    if (m_transaction && !m_pendingCursor && event.type() != eventNames().blockedEvent)
         m_transaction->removeRequest(*this);
-        m_hasPendingActivity = false;
+
+    if (dontPreventDefault && event.type() == eventNames().errorEvent && m_transaction && !m_transaction->isFinishedOrFinishing()) {
+        ASSERT(m_domError);
+        m_transaction->abortDueToFailedRequest(*m_domError);
     }
 
     return dontPreventDefault;
+}
+
+void IDBRequest::uncaughtExceptionInEventHandler()
+{
+    LOG(IndexedDB, "IDBRequest::uncaughtExceptionInEventHandler");
+
+    if (m_transaction && m_idbError.code() != IDBDatabaseException::AbortError)
+        m_transaction->abortDueToFailedRequest(DOMError::create(IDBDatabaseException::getErrorName(IDBDatabaseException::AbortError)));
 }
 
 void IDBRequest::setResult(const IDBKeyData* keyData)
@@ -262,7 +322,7 @@ void IDBRequest::setResult(const IDBKeyData* keyData)
     }
 
     Deprecated::ScriptValue value = idbKeyDataToScriptValue(scriptExecutionContext(), *keyData);
-    m_result = IDBAny::create(WTF::move(value));
+    m_result = IDBAny::create(WTFMove(value));
 }
 
 void IDBRequest::setResult(uint64_t number)
@@ -280,7 +340,7 @@ void IDBRequest::setResultToStructuredClone(const ThreadSafeDataBuffer& valueDat
         return;
 
     Deprecated::ScriptValue value = deserializeIDBValueData(*context, valueData);
-    m_result = IDBAny::create(WTF::move(value));
+    m_result = IDBAny::create(WTFMove(value));
 }
 
 void IDBRequest::setResultToUndefined()
@@ -306,6 +366,7 @@ void IDBRequest::willIterateCursor(IDBCursor& cursor)
     ASSERT(&cursor == resultCursor());
 
     m_pendingCursor = &cursor;
+    m_hasPendingActivity = true;
     m_result = nullptr;
     m_readyState = IDBRequestReadyState::Pending;
     m_domError = nullptr;
@@ -315,10 +376,14 @@ void IDBRequest::willIterateCursor(IDBCursor& cursor)
 void IDBRequest::didOpenOrIterateCursor(const IDBResultData& resultData)
 {
     ASSERT(m_pendingCursor);
-    if (resultData.type() == IDBResultType::IterateCursorSuccess || resultData.type() == IDBResultType::OpenCursorSuccess)
-        m_pendingCursor->setGetResult(*this, resultData.getResult());
+    m_result = nullptr;
 
-    m_result = IDBAny::create(*m_pendingCursor);
+    if (resultData.type() == IDBResultType::IterateCursorSuccess || resultData.type() == IDBResultType::OpenCursorSuccess) {
+        m_pendingCursor->setGetResult(*this, resultData.getResult());
+        if (resultData.getResult().isDefined())
+            m_result = IDBAny::create(*m_pendingCursor);
+    }
+
     m_pendingCursor = nullptr;
 
     requestCompleted(resultData);

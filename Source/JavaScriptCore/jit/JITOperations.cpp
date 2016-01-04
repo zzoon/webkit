@@ -45,6 +45,7 @@
 #include "JITToDFGDeferredCompilationCallback.h"
 #include "JSArrowFunction.h"
 #include "JSCInlines.h"
+#include "JSGeneratorFunction.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSLexicalEnvironment.h"
 #include "JSPropertyNameEnumerator.h"
@@ -247,7 +248,7 @@ void JIT_OPERATION operationPutByIdStrict(ExecState* exec, StructureStubInfo* st
     
     Identifier ident = Identifier::fromUid(vm, uid);
     PutPropertySlot slot(JSValue::decode(encodedBase), true, exec->codeBlock()->putByIdContext());
-    JSValue::decode(encodedBase).put(exec, ident, JSValue::decode(encodedValue), slot);
+    JSValue::decode(encodedBase).putInline(exec, ident, JSValue::decode(encodedValue), slot);
 }
 
 void JIT_OPERATION operationPutByIdNonStrict(ExecState* exec, StructureStubInfo* stubInfo, EncodedJSValue encodedValue, EncodedJSValue encodedBase, UniquedStringImpl* uid)
@@ -259,7 +260,7 @@ void JIT_OPERATION operationPutByIdNonStrict(ExecState* exec, StructureStubInfo*
     
     Identifier ident = Identifier::fromUid(vm, uid);
     PutPropertySlot slot(JSValue::decode(encodedBase), false, exec->codeBlock()->putByIdContext());
-    JSValue::decode(encodedBase).put(exec, ident, JSValue::decode(encodedValue), slot);
+    JSValue::decode(encodedBase).putInline(exec, ident, JSValue::decode(encodedValue), slot);
 }
 
 void JIT_OPERATION operationPutByIdDirectStrict(ExecState* exec, StructureStubInfo* stubInfo, EncodedJSValue encodedValue, EncodedJSValue encodedBase, UniquedStringImpl* uid)
@@ -299,7 +300,7 @@ void JIT_OPERATION operationPutByIdStrictOptimize(ExecState* exec, StructureStub
     PutPropertySlot slot(baseValue, true, exec->codeBlock()->putByIdContext());
 
     Structure* structure = baseValue.isCell() ? baseValue.asCell()->structure(*vm) : nullptr;
-    baseValue.put(exec, ident, value, slot);
+    baseValue.putInline(exec, ident, value, slot);
     
     if (accessType != static_cast<AccessType>(stubInfo->accessType))
         return;
@@ -321,7 +322,7 @@ void JIT_OPERATION operationPutByIdNonStrictOptimize(ExecState* exec, StructureS
     PutPropertySlot slot(baseValue, false, exec->codeBlock()->putByIdContext());
 
     Structure* structure = baseValue.isCell() ? baseValue.asCell()->structure(*vm) : nullptr;    
-    baseValue.put(exec, ident, value, slot);
+    baseValue.putInline(exec, ident, value, slot);
     
     if (accessType != static_cast<AccessType>(stubInfo->accessType))
         return;
@@ -421,7 +422,7 @@ static void putByVal(CallFrame* callFrame, JSValue baseValue, JSValue subscript,
         byValInfo->tookSlowPath = true;
 
     PutPropertySlot slot(baseValue, callFrame->codeBlock()->isStrictMode());
-    baseValue.put(callFrame, property, value, slot);
+    baseValue.putInline(callFrame, property, value, slot);
 }
 
 static void directPutByVal(CallFrame* callFrame, JSObject* baseObject, JSValue subscript, JSValue value, ByValInfo* byValInfo)
@@ -987,23 +988,42 @@ EncodedJSValue JIT_OPERATION operationNewArrayWithSizeAndProfile(ExecState* exec
     return JSValue::encode(constructArrayWithSizeQuirk(exec, profile, exec->lexicalGlobalObject(), sizeValue));
 }
 
-EncodedJSValue JIT_OPERATION operationNewFunction(ExecState* exec, JSScope* scope, JSCell* functionExecutable)
+}
+
+template<typename FunctionType>
+static EncodedJSValue operationNewFunctionCommon(ExecState* exec, JSScope* scope, JSCell* functionExecutable, bool isInvalidated)
 {
     ASSERT(functionExecutable->inherits(FunctionExecutable::info()));
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
-    return JSValue::encode(JSFunction::create(vm, static_cast<FunctionExecutable*>(functionExecutable), scope));
+    if (isInvalidated)
+        return JSValue::encode(FunctionType::createWithInvalidatedReallocationWatchpoint(vm, static_cast<FunctionExecutable*>(functionExecutable), scope));
+    return JSValue::encode(FunctionType::create(vm, static_cast<FunctionExecutable*>(functionExecutable), scope));
+}
+
+extern "C" {
+
+EncodedJSValue JIT_OPERATION operationNewFunction(ExecState* exec, JSScope* scope, JSCell* functionExecutable)
+{
+    return operationNewFunctionCommon<JSFunction>(exec, scope, functionExecutable, false);
 }
 
 EncodedJSValue JIT_OPERATION operationNewFunctionWithInvalidatedReallocationWatchpoint(ExecState* exec, JSScope* scope, JSCell* functionExecutable)
 {
-    ASSERT(functionExecutable->inherits(FunctionExecutable::info()));
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-    return JSValue::encode(JSFunction::createWithInvalidatedReallocationWatchpoint(vm, static_cast<FunctionExecutable*>(functionExecutable), scope));
+    return operationNewFunctionCommon<JSFunction>(exec, scope, functionExecutable, true);
 }
 
-EncodedJSValue static operationNewFunctionCommon(ExecState* exec, JSScope* scope, JSCell* functionExecutable, EncodedJSValue thisValue, bool isInvalidated)
+EncodedJSValue JIT_OPERATION operationNewGeneratorFunction(ExecState* exec, JSScope* scope, JSCell* functionExecutable)
+{
+    return operationNewFunctionCommon<JSGeneratorFunction>(exec, scope, functionExecutable, false);
+}
+
+EncodedJSValue JIT_OPERATION operationNewGeneratorFunctionWithInvalidatedReallocationWatchpoint(ExecState* exec, JSScope* scope, JSCell* functionExecutable)
+{
+    return operationNewFunctionCommon<JSGeneratorFunction>(exec, scope, functionExecutable, true);
+}
+
+EncodedJSValue static operationNewArrowFunctionCommon(ExecState* exec, JSScope* scope, JSCell* functionExecutable, EncodedJSValue thisValue, bool isInvalidated)
 {
     ASSERT(functionExecutable->inherits(FunctionExecutable::info()));
     FunctionExecutable* executable = static_cast<FunctionExecutable*>(functionExecutable);
@@ -1019,12 +1039,12 @@ EncodedJSValue static operationNewFunctionCommon(ExecState* exec, JSScope* scope
     
 EncodedJSValue JIT_OPERATION operationNewArrowFunctionWithInvalidatedReallocationWatchpoint(ExecState* exec, JSScope* scope, JSCell* functionExecutable, EncodedJSValue thisValue)
 {
-    return operationNewFunctionCommon(exec, scope, functionExecutable, thisValue, true);
+    return operationNewArrowFunctionCommon(exec, scope, functionExecutable, thisValue, true);
 }
     
 EncodedJSValue JIT_OPERATION operationNewArrowFunction(ExecState* exec, JSScope* scope, JSCell* functionExecutable, EncodedJSValue thisValue)
 {
-    return operationNewFunctionCommon(exec, scope, functionExecutable, thisValue, false);
+    return operationNewArrowFunctionCommon(exec, scope, functionExecutable, thisValue, false);
 }
 
 JSCell* JIT_OPERATION operationNewObject(ExecState* exec, Structure* structure)
@@ -1467,25 +1487,19 @@ void JIT_OPERATION operationProfileWillCall(ExecState* exec, EncodedJSValue enco
         profiler->willExecute(exec, JSValue::decode(encodedValue));
 }
 
-EncodedJSValue JIT_OPERATION operationCheckHasInstance(ExecState* exec, EncodedJSValue encodedValue, EncodedJSValue encodedBaseVal)
+int32_t JIT_OPERATION operationInstanceOfCustom(ExecState* exec, EncodedJSValue encodedValue, JSObject* constructor, EncodedJSValue encodedHasInstance)
 {
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
     JSValue value = JSValue::decode(encodedValue);
-    JSValue baseVal = JSValue::decode(encodedBaseVal);
+    JSValue hasInstanceValue = JSValue::decode(encodedHasInstance);
 
-    if (baseVal.isObject()) {
-        JSObject* baseObject = asObject(baseVal);
-        ASSERT(!baseObject->structure(vm)->typeInfo().implementsDefaultHasInstance());
-        if (baseObject->structure(vm)->typeInfo().implementsHasInstance()) {
-            bool result = baseObject->methodTable(vm)->customHasInstance(baseObject, exec, value);
-            return JSValue::encode(jsBoolean(result));
-        }
-    }
+    ASSERT(hasInstanceValue != exec->lexicalGlobalObject()->functionProtoHasInstanceSymbolFunction() || !constructor->structure()->typeInfo().implementsDefaultHasInstance());
 
-    vm.throwException(exec, createInvalidInstanceofParameterError(exec, baseVal));
-    return JSValue::encode(JSValue());
+    if (constructor->hasInstance(exec, value, hasInstanceValue))
+        return 1;
+    return 0;
 }
 
 }

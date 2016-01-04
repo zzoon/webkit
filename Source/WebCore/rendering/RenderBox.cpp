@@ -117,8 +117,8 @@ static bool skipBodyBackground(const RenderBox* bodyElementRenderer)
         && (documentElementRenderer == bodyElementRenderer->parent());
 }
 
-RenderBox::RenderBox(Element& element, Ref<RenderStyle>&& style, unsigned baseTypeFlags)
-    : RenderBoxModelObject(element, WTF::move(style), baseTypeFlags)
+RenderBox::RenderBox(Element& element, Ref<RenderStyle>&& style, BaseTypeFlags baseTypeFlags)
+    : RenderBoxModelObject(element, WTFMove(style), baseTypeFlags)
     , m_minPreferredLogicalWidth(-1)
     , m_maxPreferredLogicalWidth(-1)
     , m_inlineBoxWrapper(nullptr)
@@ -126,8 +126,8 @@ RenderBox::RenderBox(Element& element, Ref<RenderStyle>&& style, unsigned baseTy
     setIsBox();
 }
 
-RenderBox::RenderBox(Document& document, Ref<RenderStyle>&& style, unsigned baseTypeFlags)
-    : RenderBoxModelObject(document, WTF::move(style), baseTypeFlags)
+RenderBox::RenderBox(Document& document, Ref<RenderStyle>&& style, BaseTypeFlags baseTypeFlags)
+    : RenderBoxModelObject(document, WTFMove(style), baseTypeFlags)
     , m_minPreferredLogicalWidth(-1)
     , m_maxPreferredLogicalWidth(-1)
     , m_inlineBoxWrapper(nullptr)
@@ -356,11 +356,11 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
     // If our zoom factor changes and we have a defined scrollLeft/Top, we need to adjust that value into the
     // new zoomed coordinate space.
     if (hasOverflowClip() && layer() && oldStyle && oldStyle->effectiveZoom() != newStyle.effectiveZoom()) {
-        if (int left = layer()->scrollXOffset()) {
+        if (int left = layer()->scrollOffset().x()) {
             left = (left / oldStyle->effectiveZoom()) * newStyle.effectiveZoom();
             layer()->scrollToXOffset(left);
         }
-        if (int top = layer()->scrollYOffset()) {
+        if (int top = layer()->scrollOffset().y()) {
             top = (top / oldStyle->effectiveZoom()) * newStyle.effectiveZoom();
             layer()->scrollToYOffset(top);
         }
@@ -578,12 +578,12 @@ int RenderBox::scrollHeight() const
 
 int RenderBox::scrollLeft() const
 {
-    return hasOverflowClip() && layer() ? layer()->scrollXOffset() : 0;
+    return hasOverflowClip() && layer() ? layer()->scrollPosition().x() : 0;
 }
 
 int RenderBox::scrollTop() const
 {
-    return hasOverflowClip() && layer() ? layer()->scrollYOffset() : 0;
+    return hasOverflowClip() && layer() ? layer()->scrollPosition().y() : 0;
 }
 
 static void setupWheelEventTestTrigger(RenderLayer& layer, Frame* frame)
@@ -603,7 +603,7 @@ void RenderBox::setScrollLeft(int newLeft)
     if (!hasOverflowClip() || !layer())
         return;
     setupWheelEventTestTrigger(*layer(), document().frame());
-    layer()->scrollToXOffset(newLeft, RenderLayer::ScrollOffsetClamped);
+    layer()->scrollToXPosition(newLeft, RenderLayer::ScrollOffsetClamped);
 }
 
 void RenderBox::setScrollTop(int newTop)
@@ -611,7 +611,7 @@ void RenderBox::setScrollTop(int newTop)
     if (!hasOverflowClip() || !layer())
         return;
     setupWheelEventTestTrigger(*layer(), document().frame());
-    layer()->scrollToYOffset(newTop, RenderLayer::ScrollOffsetClamped);
+    layer()->scrollToYPosition(newTop, RenderLayer::ScrollOffsetClamped);
 }
 
 void RenderBox::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
@@ -867,7 +867,7 @@ bool RenderBox::logicalScroll(ScrollLogicalDirection direction, ScrollGranularit
 
 bool RenderBox::canBeScrolledAndHasScrollableArea() const
 {
-    return canBeProgramaticallyScrolled() && (scrollHeight() != roundToInt(clientHeight()) || scrollWidth() != roundToInt(clientWidth()));
+    return canBeProgramaticallyScrolled() && (hasHorizontalOverflow() || hasVerticalOverflow());
 }
 
 bool RenderBox::isScrollableOrRubberbandableBox() const
@@ -875,6 +875,7 @@ bool RenderBox::isScrollableOrRubberbandableBox() const
     return canBeScrolledAndHasScrollableArea();
 }
 
+// FIXME: This is badly named. overflow:hidden can be programmatically scrolled, yet this returns false in that case.
 bool RenderBox::canBeProgramaticallyScrolled() const
 {
     if (isRenderView())
@@ -883,8 +884,7 @@ bool RenderBox::canBeProgramaticallyScrolled() const
     if (!hasOverflowClip())
         return false;
 
-    bool hasScrollableOverflow = hasScrollableOverflowX() || hasScrollableOverflowY();
-    if (scrollsOverflow() && hasScrollableOverflow)
+    if (hasScrollableOverflowX() || hasScrollableOverflowY())
         return true;
 
     return element() && element()->hasEditableStyle();
@@ -919,7 +919,7 @@ bool RenderBox::canAutoscroll() const
 IntSize RenderBox::calculateAutoscrollDirection(const IntPoint& windowPoint) const
 {
     IntRect box(absoluteBoundingBoxRect());
-    box.move(view().frameView().scrollOffset());
+    box.moveBy(view().frameView().scrollPosition());
     IntRect windowBox = view().frameView().contentsToWindow(box);
 
     IntPoint windowAutoscrollPoint = windowPoint;
@@ -978,6 +978,7 @@ IntSize RenderBox::scrolledContentOffset() const
         return IntSize();
 
     ASSERT(hasLayer());
+    // FIXME: Renderer code needs scrollOffset/scrollPosition disambiguation.
     return layer()->scrolledContentOffset();
 }
 
@@ -2786,7 +2787,7 @@ void RenderBox::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logica
             if (parent()->isRenderGrid() && style().logicalHeight().isAuto() && style().logicalMinHeight().isAuto() && style().overflowX() == OVISIBLE) {
                 LayoutUnit intrinsicContentHeight = computedValues.m_extent - borderAndPaddingLogicalHeight();
                 if (auto minContentHeight = computeContentLogicalHeight(MinSize, Length(MinContent), intrinsicContentHeight))
-                    contentHeight = std::max(contentHeight, constrainLogicalHeightByMinMax(minContentHeight.value(), intrinsicContentHeight));
+                    contentHeight = std::max(contentHeight, constrainContentBoxLogicalHeightByMinMax(minContentHeight.value(), intrinsicContentHeight));
             }
 #endif
             h = Length(contentHeight, Fixed);

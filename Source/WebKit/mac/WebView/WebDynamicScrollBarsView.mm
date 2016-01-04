@@ -131,12 +131,6 @@ static Class customScrollerClass;
     [super dealloc];
 }
 
-- (void)finalize
-{
-    delete _private;
-    [super finalize];
-}
-
 - (void)setAllowsHorizontalScrolling:(BOOL)flag
 {
     if (_private->hScrollModeLocked)
@@ -624,12 +618,10 @@ static const unsigned cMaxUpdateScrollbarsPass = 2;
     return _private->inProgrammaticScroll;
 }
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
 - (void)setContentInsets:(NSEdgeInsets)edgeInsets
 {
     [super setContentInsets:edgeInsets];
     [self tile];
 }
-#endif
 
 @end

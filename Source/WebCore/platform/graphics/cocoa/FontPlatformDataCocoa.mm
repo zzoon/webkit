@@ -47,6 +47,11 @@ FontPlatformData::FontPlatformData(CTFontRef font, float size, bool syntheticBol
     ASSERT_ARG(font, font);
     m_font = font;
     m_isColorBitmapFont = CTFontGetSymbolicTraits(font) & kCTFontTraitColorGlyphs;
+    m_isSystemFont = CTFontDescriptorIsSystemUIFont(adoptCF(CTFontCopyFontDescriptor(m_font.get())).get());
+
+#if PLATFORM(IOS)
+    m_isEmoji = CTFontIsAppleColorEmoji(m_font.get());
+#endif
 }
 
 FontPlatformData::~FontPlatformData()
@@ -59,6 +64,10 @@ void FontPlatformData::platformDataInit(const FontPlatformData& f)
 
     m_cgFont = f.m_cgFont;
     m_ctFont = f.m_ctFont;
+
+#if PLATFORM(IOS)
+    m_isEmoji = f.m_isEmoji;
+#endif
 }
 
 const FontPlatformData& FontPlatformData::platformDataAssign(const FontPlatformData& f)
@@ -68,6 +77,10 @@ const FontPlatformData& FontPlatformData::platformDataAssign(const FontPlatformD
         return *this;
     m_font = f.m_font;
     m_ctFont = f.m_ctFont;
+
+#if PLATFORM(IOS)
+    m_isEmoji = f.m_isEmoji;
+#endif
 
     return *this;
 }
@@ -89,7 +102,7 @@ bool FontPlatformData::platformIsEqual(const FontPlatformData& other) const
 CTFontRef FontPlatformData::registeredFont() const
 {
     CTFontRef platformFont = font();
-    ASSERT(!CORETEXT_WEB_FONTS || platformFont);
+    ASSERT(platformFont);
     if (platformFont && adoptCF(CTFontCopyAttribute(platformFont, kCTFontURLAttribute)))
         return platformFont;
     return nullptr;
@@ -108,6 +121,11 @@ void FontPlatformData::setFont(CTFontRef font)
 
     CTFontSymbolicTraits traits = CTFontGetSymbolicTraits(m_font.get());
     m_isColorBitmapFont = traits & kCTFontTraitColorGlyphs;
+    m_isSystemFont = CTFontDescriptorIsSystemUIFont(adoptCF(CTFontCopyFontDescriptor(m_font.get())).get());
+
+#if PLATFORM(IOS)
+    m_isEmoji = CTFontIsAppleColorEmoji(m_font.get());
+#endif
     
     m_ctFont = nullptr;
 }
@@ -157,19 +175,13 @@ CTFontRef FontPlatformData::ctFont() const
     if (m_ctFont)
         return m_ctFont.get();
 
-    ASSERT(m_cgFont.get());
+    ASSERT(m_font);
+    ASSERT(m_cgFont);
     m_ctFont = m_font;
-    if (m_ctFont) {
-        CTFontDescriptorRef fontDescriptor;
-        RetainPtr<CFStringRef> postScriptName = adoptCF(CTFontCopyPostScriptName(m_ctFont.get()));
-        fontDescriptor = cascadeToLastResortFontDescriptor();
-        m_ctFont = adoptCF(CTFontCreateCopyWithAttributes(m_ctFont.get(), m_size, 0, fontDescriptor));
-    } else {
-#if CORETEXT_WEB_FONTS
-        ASSERT_NOT_REACHED();
-#endif
-        m_ctFont = adoptCF(CTFontCreateWithGraphicsFont(m_cgFont.get(), m_size, 0, cascadeToLastResortFontDescriptor()));
-    }
+    CTFontDescriptorRef fontDescriptor;
+    RetainPtr<CFStringRef> postScriptName = adoptCF(CTFontCopyPostScriptName(m_ctFont.get()));
+    fontDescriptor = cascadeToLastResortFontDescriptor();
+    m_ctFont = adoptCF(CTFontCreateCopyWithAttributes(m_ctFont.get(), m_size, 0, fontDescriptor));
 
     if (m_widthVariant != RegularWidth) {
         int featureTypeValue = kTextSpacingType;

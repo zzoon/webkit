@@ -51,6 +51,8 @@
 #include <WebKit/WKPreferencesRefPrivate.h>
 #include <WebKit/WKProtectionSpace.h>
 #include <WebKit/WKRetainPtr.h>
+#include <WebKit/WKSecurityOriginRef.h>
+#include <WebKit/WKUserMediaPermissionCheck.h>
 #include <algorithm>
 #include <cstdio>
 #include <ctype.h>
@@ -201,9 +203,14 @@ static void decidePolicyForGeolocationPermissionRequest(WKPageRef, WKFrameRef, W
     TestController::singleton().handleGeolocationPermissionRequest(permissionRequest);
 }
 
-static void decidePolicyForUserMediaPermissionRequest(WKPageRef, WKFrameRef, WKSecurityOriginRef, WKUserMediaPermissionRequestRef permissionRequest, const void* clientInfo)
+static void decidePolicyForUserMediaPermissionRequest(WKPageRef, WKFrameRef, WKSecurityOriginRef origin, WKUserMediaPermissionRequestRef permissionRequest, const void* clientInfo)
 {
-    TestController::singleton().handleUserMediaPermissionRequest(permissionRequest);
+    TestController::singleton().handleUserMediaPermissionRequest(origin, permissionRequest);
+}
+
+static void checkUserMediaPermissionForOrigin(WKPageRef, WKFrameRef, WKSecurityOriginRef origin, WKUserMediaPermissionCheckRef checkRequest, const void*)
+{
+    TestController::singleton().handleCheckOfUserMediaPermissionForOrigin(origin, checkRequest);
 }
 
 WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKPageConfigurationRef configuration, WKNavigationActionRef navigationAction, WKWindowFeaturesRef windowFeatures, const void *clientInfo)
@@ -275,6 +282,10 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKPageConfiguration
         0, // runJavaScriptPrompt
         0, // mediaSessionMetadataDidChange
         createOtherPage,
+        0, // runJavaScriptAlert
+        0, // runJavaScriptConfirm
+        0, // runJavaScriptPrompt
+        checkUserMediaPermissionForOrigin,
     };
     WKPageSetPageUIClient(newPage, &otherPageUIClient.base);
     
@@ -399,11 +410,6 @@ WKRetainPtr<WKPageConfigurationRef> TestController::generatePageConfiguration(WK
     m_context = platformAdjustContext(adoptWK(WKContextCreateWithConfiguration(configuration)).get(), configuration);
 
     m_geolocationProvider = std::make_unique<GeolocationProviderMock>(m_context.get());
-
-#if PLATFORM(EFL)
-    WKContextSetUsesNetworkProcess(m_context.get(), false);
-    WKContextSetProcessModel(m_context.get(), kWKProcessModelSharedSecondaryProcess);
-#endif
 
     if (const char* dumpRenderTreeTemp = libraryPathForTesting()) {
         String temporaryFolder = String::fromUTF8(dumpRenderTreeTemp);
@@ -539,6 +545,10 @@ void TestController::createWebViewWithOptions(const TestOptions& options)
         0, // runJavaScriptPrompt
         0, // mediaSessionMetadataDidChange
         createOtherPage,
+        0, // runJavaScriptAlert
+        0, // runJavaScriptConfirm
+        0, // runJavaScriptPrompt
+        checkUserMediaPermissionForOrigin,
     };
     WKPageSetPageUIClient(m_mainWebView->page(), &pageUIClient.base);
 
@@ -743,6 +753,7 @@ bool TestController::resetStateToConsistentValues()
 
     // Reset UserMedia permissions.
     m_userMediaPermissionRequests.clear();
+    m_userMediaOriginPermissions = nullptr;
     m_isUserMediaPermissionSet = false;
     m_isUserMediaPermissionAllowed = false;
 
@@ -1634,6 +1645,21 @@ bool TestController::isGeolocationProviderActive() const
     return m_geolocationProvider->isActive();
 }
 
+static WKStringRef originUserVisibleName(WKSecurityOriginRef origin)
+{
+    std::string host = toSTD(adoptWK(WKSecurityOriginCopyHost(origin))).c_str();
+    std::string protocol = toSTD(adoptWK(WKSecurityOriginCopyProtocol(origin))).c_str();
+    unsigned short port = WKSecurityOriginGetPort(origin);
+
+    String userVisibleName;
+    if (port)
+        userVisibleName = String::format("%s://%s:%d", protocol.c_str(), host.c_str(), port);
+    else
+        userVisibleName = String::format("%s://%s", protocol.c_str(), host.c_str());
+
+    return WKStringCreateWithUTF8CString(userVisibleName.utf8().data());
+}
+
 void TestController::setUserMediaPermission(bool enabled)
 {
     m_isUserMediaPermissionSet = true;
@@ -1641,9 +1667,32 @@ void TestController::setUserMediaPermission(bool enabled)
     decidePolicyForUserMediaPermissionRequestIfPossible();
 }
 
-void TestController::handleUserMediaPermissionRequest(WKUserMediaPermissionRequestRef userMediaPermissionRequest)
+void TestController::setUserMediaPermissionForOrigin(bool permission, WKStringRef originString)
 {
-    m_userMediaPermissionRequests.append(userMediaPermissionRequest);
+    if (!m_userMediaOriginPermissions)
+        m_userMediaOriginPermissions = adoptWK(WKMutableDictionaryCreate());
+    WKRetainPtr<WKBooleanRef> allowed = adoptWK(WKBooleanCreate(permission));
+    WKRetainPtr<WKSecurityOriginRef> origin = adoptWK(WKSecurityOriginCreateFromString(originString));
+    WKDictionarySetItem(m_userMediaOriginPermissions.get(), originUserVisibleName(origin.get()), allowed.get());
+}
+
+void TestController::handleCheckOfUserMediaPermissionForOrigin(WKSecurityOriginRef origin, const WKUserMediaPermissionCheckRef& checkRequest)
+{
+    bool allowed = false;
+
+    if (m_userMediaOriginPermissions) {
+        WKRetainPtr<WKStringRef> originString = originUserVisibleName(origin);
+        WKBooleanRef value = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(m_userMediaOriginPermissions.get(), originString.get()));
+        if (value && WKGetTypeID(value) == WKBooleanGetTypeID())
+            allowed = WKBooleanGetValue(value);
+    }
+
+    WKUserMediaPermissionCheckSetHasPersistentPermission(checkRequest, allowed);
+}
+
+void TestController::handleUserMediaPermissionRequest(WKSecurityOriginRef origin, WKUserMediaPermissionRequestRef request)
+{
+    m_userMediaPermissionRequests.append(std::make_pair(origin, request));
     decidePolicyForUserMediaPermissionRequestIfPossible();
 }
 
@@ -1652,9 +1701,10 @@ void TestController::decidePolicyForUserMediaPermissionRequestIfPossible()
     if (!m_isUserMediaPermissionSet)
         return;
 
-    for (auto& request : m_userMediaPermissionRequests) {
-        WKRetainPtr<WKArrayRef> audioDeviceUIDs = WKUserMediaPermissionRequestAudioDeviceUIDs(request.get());
-        WKRetainPtr<WKArrayRef> videoDeviceUIDs = WKUserMediaPermissionRequestVideoDeviceUIDs(request.get());
+    for (auto& pair : m_userMediaPermissionRequests) {
+        auto request = pair.second.get();
+        WKRetainPtr<WKArrayRef> audioDeviceUIDs = WKUserMediaPermissionRequestAudioDeviceUIDs(request);
+        WKRetainPtr<WKArrayRef> videoDeviceUIDs = WKUserMediaPermissionRequestVideoDeviceUIDs(request);
 
         if (m_isUserMediaPermissionAllowed && (WKArrayGetSize(videoDeviceUIDs.get()) || WKArrayGetSize(audioDeviceUIDs.get()))) {
             WKRetainPtr<WKStringRef> videoDeviceUID;
@@ -1669,10 +1719,10 @@ void TestController::decidePolicyForUserMediaPermissionRequestIfPossible()
             else
                 audioDeviceUID = WKStringCreateWithUTF8CString("");
 
-            WKUserMediaPermissionRequestAllow(request.get(), audioDeviceUID.get(), videoDeviceUID.get());
+            WKUserMediaPermissionRequestAllow(request, audioDeviceUID.get(), videoDeviceUID.get());
 
         } else
-            WKUserMediaPermissionRequestDeny(request.get());
+            WKUserMediaPermissionRequestDeny(request);
     }
     m_userMediaPermissionRequests.clear();
 }

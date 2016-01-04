@@ -1468,7 +1468,7 @@ bool ArgumentCoder<UserStyleSheet>::decode(ArgumentDecoder& decoder, UserStyleSh
     if (!decoder.decodeEnum(level))
         return false;
 
-    userStyleSheet = UserStyleSheet(source, url, WTF::move(whitelist), WTF::move(blacklist), injectedFrames, level);
+    userStyleSheet = UserStyleSheet(source, url, WTFMove(whitelist), WTFMove(blacklist), injectedFrames, level);
     return true;
 }
 
@@ -1534,7 +1534,7 @@ bool ArgumentCoder<UserScript>::decode(ArgumentDecoder& decoder, UserScript& use
     if (!decoder.decodeEnum(injectedFrames))
         return false;
 
-    userScript = UserScript(source, url, WTF::move(whitelist), WTF::move(blacklist), injectionTime, injectedFrames);
+    userScript = UserScript(source, url, WTFMove(whitelist), WTFMove(blacklist), injectionTime, injectedFrames);
     return true;
 }
 
@@ -1816,7 +1816,7 @@ bool ArgumentCoder<FilterOperations>::decode(ArgumentDecoder& decoder, FilterOpe
         RefPtr<FilterOperation> filter;
         if (!decodeFilterOperation(decoder, filter))
             return false;
-        filters.operations().append(WTF::move(filter));
+        filters.operations().append(WTFMove(filter));
     }
 
     return true;
@@ -1827,13 +1827,13 @@ bool ArgumentCoder<FilterOperations>::decode(ArgumentDecoder& decoder, FilterOpe
 
 void ArgumentCoder<IDBGetResult>::encode(ArgumentEncoder& encoder, const IDBGetResult& result)
 {
-    bool nullData = !result.valueBuffer.data();
+    bool nullData = !result.valueBuffer().data();
     encoder << nullData;
 
     if (!nullData)
-        encoder << DataReference(result.valueBuffer.data()->data(), result.valueBuffer.data()->size());
+        encoder << DataReference(result.valueBuffer().data()->data(), result.valueBuffer().data()->size());
 
-    encoder << result.keyData << result.keyPath;
+    encoder << result.keyData() << result.keyPath();
 }
 
 bool ArgumentCoder<IDBGetResult>::decode(ArgumentDecoder& decoder, IDBGetResult& result)
@@ -1843,7 +1843,7 @@ bool ArgumentCoder<IDBGetResult>::decode(ArgumentDecoder& decoder, IDBGetResult&
         return false;
 
     if (nullData)
-        result.valueBuffer = { };
+        result.setValueBuffer({ });
     else {
         DataReference data;
         if (!decoder.decode(data))
@@ -1851,14 +1851,20 @@ bool ArgumentCoder<IDBGetResult>::decode(ArgumentDecoder& decoder, IDBGetResult&
 
         Vector<uint8_t> vector(data.size());
         memcpy(vector.data(), data.data(), data.size());
-        result.valueBuffer = ThreadSafeDataBuffer::adoptVector(vector);
+        result.setValueBuffer(ThreadSafeDataBuffer::adoptVector(vector));
     }
 
-    if (!decoder.decode(result.keyData))
+    IDBKeyData keyData;
+    if (!decoder.decode(keyData))
         return false;
 
-    if (!decoder.decode(result.keyPath))
+    result.setKeyData(keyData);
+
+    IDBKeyPath keyPath;
+    if (!decoder.decode(keyPath))
         return false;
+
+    result.setKeyPath(keyPath);
 
     return true;
 }
@@ -1905,7 +1911,7 @@ bool ArgumentCoder<BlobPart>::decode(ArgumentDecoder& decoder, BlobPart& blobPar
         Vector<char> data;
         if (!decoder.decode(data))
             return false;
-        blobPart = BlobPart(WTF::move(data));
+        blobPart = BlobPart(WTFMove(data));
         break;
     }
     case BlobPart::Blob: {

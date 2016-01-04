@@ -128,7 +128,6 @@ public:
 
     void setAttachedWindowHeight(unsigned);
     void setAttachedWindowWidth(unsigned);
-    void setToolbarHeight(unsigned height) { platformSetToolbarHeight(height); }
 
     void startWindowDrag();
 
@@ -176,7 +175,6 @@ private:
     void platformDetach();
     void platformSetAttachedWindowHeight(unsigned);
     void platformSetAttachedWindowWidth(unsigned);
-    void platformSetToolbarHeight(unsigned);
     void platformStartWindowDrag();
     void platformSave(const String& filename, const String& content, bool base64Encoded, bool forceSaveAs);
     void platformAppend(const String& filename, const String& content);
@@ -208,9 +206,10 @@ private:
 
     void open();
 
-    // The inspector level is used to give different preferences to each inspector
-    // level by setting a per-level page group identifier.
-    unsigned inspectorLevel() const;
+    // The inspection level is used to give different preferences to each inspector
+    // by setting a per-level page group identifier. Local storage settings in the frontend
+    // also use the inspection level in the key prefix to disambiguate persistent view state.
+    unsigned inspectionLevel() const;
     String inspectorPageGroupIdentifier() const;
     WebPreferences& inspectorPagePreferences() const;
 
