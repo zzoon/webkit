@@ -384,9 +384,9 @@
   </autotools>
 
   <autotools id="gst-plugins-bad" autogenargs="--disable-examples --disable-gtk-doc --enable-openh264 --enable-opus --enable-srtp -- PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$JHBUILD_PREFIX/lib/pkgconfig">
+    <makeargs value="CFLAGS+=-Wno-error CXXFLAGS+=-Wno-error OBJCFLAGS+=-Wno-error"/>
     <if condition-set="macos">
       <autogenargs value="--disable-introspection"/>
-      <makeargs value="CFLAGS+=-Wno-error CXXFLAGS+=-Wno-error OBJCFLAGS+=-Wno-error"/>
     </if>
     <dependencies>
       <dep package="gst-plugins-base"/>
@@ -468,7 +468,7 @@
   </autotools>
 
   <autotools id="libvpx" supports-non-srcdir-builds="no"
-	autogen-template="./configure --prefix=%(prefix)s --libdir=%(libdir)s --enable-shared --enable-pic --as=yasm --disable-unit-tests ">
+	autogen-template="./configure --prefix=%(prefix)s --enable-shared --enable-pic --as=yasm --disable-unit-tests ">
 	<branch repo="github.com" module="webmproject/libvpx.git" checkoutdir="libvpx" tag="v1.4.0"/>
   </autotools>
 
