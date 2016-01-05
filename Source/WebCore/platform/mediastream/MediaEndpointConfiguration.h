@@ -53,7 +53,7 @@ public:
     void setSessionVersion(unsigned sessionVersion) { m_sessionVersion = sessionVersion; }
 
     const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions() const { return m_mediaDescriptions; }
-    void addMediaDescription(RefPtr<PeerMediaDescription>&& description) { m_mediaDescriptions.append(WTF::move(description)); }
+    void addMediaDescription(RefPtr<PeerMediaDescription>&& description) { m_mediaDescriptions.append(WTFMove(description)); }
 
     RefPtr<MediaEndpointConfiguration> clone() const
     {

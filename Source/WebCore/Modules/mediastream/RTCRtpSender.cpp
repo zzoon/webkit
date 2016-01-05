@@ -40,8 +40,8 @@
 namespace WebCore {
 
 RTCRtpSender::RTCRtpSender(RefPtr<MediaStreamTrack>&& track, Vector<String>&& mediaStreamIds, RTCRtpSenderClient& client)
-    : RTCRtpSenderReceiverBase(WTFmove(track))
-    , m_mediaStreamIds(WTFmove(mediaStreamIds))
+    : RTCRtpSenderReceiverBase(WTFMove(track))
+    , m_mediaStreamIds(WTFMove(mediaStreamIds))
     , m_client(&client)
 {
     // The original track id is always used in negotiation even if the track is replaced.
@@ -65,7 +65,7 @@ void RTCRtpSender::replaceTrack(MediaStreamTrack* withTrack, PeerConnection::Voi
         return;
     }
 
-    m_client->replaceTrack(*this, *withTrack, WTF::move(promise));
+    m_client->replaceTrack(*this, *withTrack, WTFMove(promise));
 }
 
 

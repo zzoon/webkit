@@ -69,14 +69,14 @@ class WrappedSessionDescriptionPromise : public RefCounted<WrappedSessionDescrip
 public:
     static Ref<WrappedSessionDescriptionPromise> create(SessionDescriptionPromise&& promise)
     {
-        return *adoptRef(new WrappedSessionDescriptionPromise(WTF::move(promise)));
+        return *adoptRef(new WrappedSessionDescriptionPromise(WTFMove(promise)));
     }
 
     SessionDescriptionPromise& promise() { return m_promise; }
 
 private:
     WrappedSessionDescriptionPromise(SessionDescriptionPromise&& promise)
-        : m_promise(WTF::move(promise))
+        : m_promise(WTFMove(promise))
     { }
 
     SessionDescriptionPromise m_promise;
@@ -86,14 +86,14 @@ class WrappedVoidPromise : public RefCounted<WrappedVoidPromise> {
 public:
     static Ref<WrappedVoidPromise> create(VoidPromise&& promise)
     {
-        return *adoptRef(new WrappedVoidPromise(WTF::move(promise)));
+        return *adoptRef(new WrappedVoidPromise(WTFMove(promise)));
     }
 
     VoidPromise& promise() { return m_promise; }
 
 private:
     WrappedVoidPromise(VoidPromise&& promise)
-        : m_promise(WTF::move(promise))
+        : m_promise(WTFMove(promise))
     { }
 
     VoidPromise m_promise;
@@ -226,7 +226,7 @@ void MediaEndpointPeerConnection::startRunningTasks()
 void MediaEndpointPeerConnection::createOffer(RTCOfferOptions& options, SessionDescriptionPromise&& promise)
 {
     const RefPtr<RTCOfferOptions> protectedOptions = &options;
-    RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTF::move(promise));
+    RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTFMove(promise));
 
     runTask([this, protectedOptions, wrappedPromise]() {
         createOfferTask(*protectedOptions, wrappedPromise->promise());
@@ -266,7 +266,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         mediaDescription->setIceUfrag(m_iceUfrag);
         mediaDescription->setIcePassword(m_icePassword);
 
-        configurationSnapshot->addMediaDescription(WTF::move(mediaDescription));
+        configurationSnapshot->addMediaDescription(WTFMove(mediaDescription));
     }
 
     String sdpString;
@@ -280,7 +280,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
 void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, SessionDescriptionPromise&& promise)
 {
     const RefPtr<RTCAnswerOptions> protectedOptions = &options;
-    RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTF::move(promise));
+    RefPtr<WrappedSessionDescriptionPromise> wrappedPromise = WrappedSessionDescriptionPromise::create(WTFMove(promise));
 
     runTask([this, protectedOptions, wrappedPromise]() {
         createAnswerTask(*protectedOptions, wrappedPromise->promise());
@@ -349,7 +349,7 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
 void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& description, VoidPromise&& promise)
 {
     RefPtr<RTCSessionDescription> protectedDescription = &description;
-    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
+    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
 
     runTask([this, protectedDescription, wrappedPromise]() {
         setLocalDescriptionTask(*protectedDescription, wrappedPromise->promise());
@@ -435,7 +435,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     if (allSendersRepresented(m_client->getSenders(), parsedConfiguration->mediaDescriptions()))
         clearNegotiationNeededState();
 
-    RefPtr<SessionDescription> newDescription = SessionDescription::create(descriptionType, WTF::move(parsedConfiguration));
+    RefPtr<SessionDescription> newDescription = SessionDescription::create(descriptionType, WTFMove(parsedConfiguration));
     SignalingState newSignalingState;
 
     // Update state and local descriptions according to setLocal/RemoteDescription processing model
@@ -526,7 +526,7 @@ static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayl
 void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription& description, VoidPromise&& promise)
 {
     RefPtr<RTCSessionDescription> protectedDescription = &description;
-    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
+    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
 
     runTask([this, protectedDescription, wrappedPromise]() {
         setRemoteDescriptionTask(*protectedDescription, wrappedPromise->promise());
@@ -572,7 +572,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
         return;
     }
 
-    RefPtr<SessionDescription> newDescription = SessionDescription::create(descriptionType, WTF::move(parsedConfiguration));
+    RefPtr<SessionDescription> newDescription = SessionDescription::create(descriptionType, WTFMove(parsedConfiguration));
     SignalingState newSignalingState;
 
     // Update state and local descriptions according to setLocal/RemoteDescription processing model
@@ -637,7 +637,7 @@ void MediaEndpointPeerConnection::setConfiguration(RTCConfiguration& configurati
 void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate& rtcCandidate, PeerConnection::VoidPromise&& promise)
 {
     RefPtr<RTCIceCandidate> protectedCandidate = &rtcCandidate;
-    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
+    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
 
     runTask([this, protectedCandidate, wrappedPromise]() {
         addIceCandidateTask(*protectedCandidate, wrappedPromise->promise());
@@ -686,7 +686,7 @@ void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, MediaStream
 {
     RefPtr<RTCRtpSender> protectedSender = &sender;
     RefPtr<MediaStreamTrack> protectedTrack = &withTrack;
-    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTF::move(promise));
+    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
 
     runTask([this, protectedSender, protectedTrack, wrappedPromise]() {
         replaceTrackTask(*protectedSender, *protectedTrack, wrappedPromise->promise());
@@ -856,7 +856,7 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
 
     RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateLine, "", mdescIndex);
 
-    m_client->fireEvent(RTCIceCandidateEvent::create(false, false, WTF::move(iceCandidate)));
+    m_client->fireEvent(RTCIceCandidateEvent::create(false, false, WTFMove(iceCandidate)));
 }
 
 void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
@@ -899,12 +899,12 @@ void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<Re
     // FIXME: track should be set to muted (not supported yet)
     // FIXME: MediaStream handling not implemented
 
-    RefPtr<MediaStreamTrackPrivate> trackPrivate = MediaStreamTrackPrivate::create(WTF::move(source), trackId);
+    RefPtr<MediaStreamTrackPrivate> trackPrivate = MediaStreamTrackPrivate::create(WTFMove(source), trackId);
     RefPtr<MediaStreamTrack> track = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *trackPrivate);
     RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create(track.copyRef());
 
     m_client->addReceiver(*receiver);
-    m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false, WTF::move(receiver), WTF::move(track)));
+    m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false, WTFMove(receiver), WTFMove(track)));
 }
 
 } // namespace WebCore

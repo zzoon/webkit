@@ -51,7 +51,7 @@ public:
 
     static RefPtr<SessionDescription> create(Type type, RefPtr<MediaEndpointConfiguration>&& configuration)
     {
-        return adoptRef(new SessionDescription(type, WTF::move(configuration)));
+        return adoptRef(new SessionDescription(type, WTFMove(configuration)));
     }
     virtual ~SessionDescription() { }
 

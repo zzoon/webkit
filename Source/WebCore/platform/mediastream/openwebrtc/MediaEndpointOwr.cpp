@@ -163,7 +163,7 @@ MediaEndpointPrepareResult MediaEndpointOwr::prepareToReceive(MediaEndpointConfi
         SessionConfig config;
         config.type = SessionTypeMedia;
         config.isDtlsClient = configuration->mediaDescriptions()[i]->dtlsSetup() == "active";
-        sessionConfigs.append(WTF::move(config));
+        sessionConfigs.append(WTFMove(config));
     }
 
     ensureTransportAgentAndSessions(isInitiator, sessionConfigs);
@@ -196,7 +196,7 @@ MediaEndpointPrepareResult MediaEndpointOwr::prepareToSend(MediaEndpointConfigur
         SessionConfig config;
         config.type = SessionTypeMedia;
         config.isDtlsClient = configuration->mediaDescriptions()[i]->dtlsSetup() != "active";
-        sessionConfigs.append(WTF::move(config));
+        sessionConfigs.append(WTFMove(config));
     }
 
     ensureTransportAgentAndSessions(isInitiator, sessionConfigs);
@@ -292,7 +292,7 @@ unsigned MediaEndpointOwr::sessionIndex(OwrSession* session) const
 
 void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate)
 {
-    m_client->gotIceCandidate(sessionIndex, WTF::move(iceCandidate));
+    m_client->gotIceCandidate(sessionIndex, WTFMove(iceCandidate));
 }
 
 void MediaEndpointOwr::dispatchGatheringDone(unsigned sessionIndex)
@@ -310,7 +310,7 @@ void MediaEndpointOwr::dispatchDtlsFingerprint(gchar* privateKey, gchar* certifi
 
 void MediaEndpointOwr::dispatchRemoteSource(unsigned sessionIndex, RefPtr<RealtimeMediaSource>&& source)
 {
-    m_client->gotRemoteSource(sessionIndex, WTF::move(source));
+    m_client->gotRemoteSource(sessionIndex, WTFMove(source));
 }
 
 void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription* mediaDescription)
@@ -474,7 +474,7 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
         "password", g_object_get_data(G_OBJECT(session), "ice-password"),
         nullptr);
 
-    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionIndex(session), WTF::move(iceCandidate));
+    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionIndex(session), WTFMove(iceCandidate));
 
     g_free(foundation);
     g_free(address);
@@ -507,7 +507,7 @@ static void gotIncomingSource(OwrMediaSession* mediaSession, OwrMediaSource* sou
         ASSERT_NOT_REACHED();
 
     RefPtr<RealtimeMediaSourceOwr> mediaSource = adoptRef(new RealtimeMediaSourceOwr(source, id, sourceType, name));
-    mediaEndpoint->dispatchRemoteSource(mediaEndpoint->sessionIndex(OWR_SESSION(mediaSession)), WTF::move(mediaSource));
+    mediaEndpoint->dispatchRemoteSource(mediaEndpoint->sessionIndex(OWR_SESSION(mediaSession)), WTFMove(mediaSource));
 }
 
 } // namespace WebCore

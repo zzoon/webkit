@@ -62,7 +62,7 @@ public:
     void setMode(const String& mode) { m_mode = mode; }
 
     const Vector<RefPtr<MediaPayload>>& payloads() const { return m_payloads; }
-    void addPayload(RefPtr<MediaPayload>&& payload) { m_payloads.append(WTF::move(payload)); }
+    void addPayload(RefPtr<MediaPayload>&& payload) { m_payloads.append(WTFMove(payload)); }
     void setPayloads(Vector<RefPtr<MediaPayload>>&& payloads) { m_payloads = payloads; }
     void setPayloads(const Vector<RefPtr<MediaPayload>>& payloads) { m_payloads = payloads; }
 
@@ -104,7 +104,7 @@ public:
     void setIcePassword(const String& icePassword) { m_icePassword = icePassword; }
 
     const Vector<RefPtr<IceCandidate>>& iceCandidates() const { return m_iceCandidates; }
-    void addIceCandidate(RefPtr<IceCandidate>&& candidate) { m_iceCandidates.append(WTF::move(candidate)); }
+    void addIceCandidate(RefPtr<IceCandidate>&& candidate) { m_iceCandidates.append(WTFMove(candidate)); }
 
     bool iceCandidateGatheringDone() const { return m_iceCandidateGatheringDone; }
     void setIceCandidateGatheringDone(bool iceCandidateGatheringDone) { m_iceCandidateGatheringDone = iceCandidateGatheringDone; }

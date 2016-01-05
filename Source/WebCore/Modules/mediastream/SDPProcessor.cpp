@@ -203,7 +203,7 @@ static RefPtr<MediaEndpointConfiguration> configurationFromJSON(const String& js
                     payload->addParameter("rtxTime", intValue);
             }
 
-            mdesc->addPayload(WTF::move(payload));
+            mdesc->addPayload(WTFMove(payload));
         }
 
         RefPtr<InspectorObject> rtcpObject = InspectorObject::create();
@@ -266,7 +266,7 @@ static RefPtr<MediaEndpointConfiguration> configurationFromJSON(const String& js
             }
         }
 
-        configuration->addMediaDescription(WTF::move(mdesc));
+        configuration->addMediaDescription(WTFMove(mdesc));
     }
 
     return configuration;

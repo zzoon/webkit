@@ -78,7 +78,7 @@ RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, RefPtr<RTC
     , m_signalingState(SignalingState::Stable)
     , m_iceGatheringState(IceGatheringState::New)
     , m_iceConnectionState(IceConnectionState::New)
-    , m_configuration(WTFmove(configuration))
+    , m_configuration(WTFMove(configuration))
 {
     Document& document = downcast<Document>(context);
 
@@ -131,7 +131,7 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
     for (auto stream : streams)
         mediaStreamIds.append(stream->id());
 
-    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFmove(track), WTF::move(mediaStreamIds), *this);
+    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), WTFMove(mediaStreamIds), *this);
     m_senderSet.append(sender);
 
     m_backend->markAsNeedingNegotiation();
@@ -436,7 +436,7 @@ void RTCPeerConnection::fireEvent(Event& event)
 
 void RTCPeerConnection::replaceTrack(RTCRtpSender& sender, MediaStreamTrack& withTrack, PeerConnection::VoidPromise&& promise)
 {
-    m_backend->replaceTrack(sender, withTrack, WTF::move(promise));
+    m_backend->replaceTrack(sender, withTrack, WTFMove(promise));
 }
 
 } // namespace WebCore

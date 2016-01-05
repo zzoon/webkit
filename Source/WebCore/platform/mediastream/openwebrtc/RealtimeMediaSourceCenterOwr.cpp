@@ -215,10 +215,10 @@ void RealtimeMediaSourceCenterOwr::mediaSourcesAvailable(GList* sources)
 
     RefPtr<RealtimeMediaSource> audioSource = selectSource(RealtimeMediaSource::Audio);
     if (audioSource)
-        audioSources.append(WTF::move(audioSource));
+        audioSources.append(WTFMove(audioSource));
     RefPtr<RealtimeMediaSource> videoSource = selectSource(RealtimeMediaSource::Video);
     if (videoSource)
-        videoSources.append(WTF::move(videoSource));
+        videoSources.append(WTFMove(videoSource));
 
     // TODO: Make sure contraints are actually validated by checking source types.
     m_client->constraintsValidated(audioSources, videoSources);
