@@ -367,7 +367,7 @@ static void updateSendSources(const MediaDescriptionVector& localMediaDescriptio
 
         size_t index = indexOfSenderWithTrackId(senders, localMediaDescriptions[i]->mediaStreamTrackId());
         if (index != notFound)
-            remoteMediaDescriptions[i]->setSource(senders[index]->track()->source());
+            remoteMediaDescriptions[i]->setSource(&senders[index]->track()->source());
     }
 }
 
@@ -707,7 +707,7 @@ void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, MediaSt
     if (mdescIndex == notFound)
         return;
 
-    m_mediaEndpoint->replaceSendSource(*withTrack.source(), mdescIndex);
+    m_mediaEndpoint->replaceSendSource(withTrack.source(), mdescIndex);
 
     promise.resolve(nullptr);
 }
