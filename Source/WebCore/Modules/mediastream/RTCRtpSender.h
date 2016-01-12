@@ -56,7 +56,7 @@ public:
     const String& trackId() { return m_trackId; }
     const Vector<String>& mediaStreamIds() const { return m_mediaStreamIds; }
 
-    void invalidateClient() { m_client = nullptr; }
+    void stop() { m_client = nullptr; }
 
     void replaceTrack(MediaStreamTrack*, PeerConnection::VoidPromise&&, ExceptionCode&);
 

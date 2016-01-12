@@ -154,7 +154,7 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
     if (!m_senderSet.contains(sender))
         return;
 
-    sender->invalidateClient();
+    sender->stop();
 
     m_backend->markAsNeedingNegotiation();
 }
@@ -372,7 +372,7 @@ void RTCPeerConnection::close()
     m_signalingState = SignalingState::Closed;
 
     for (auto& sender : m_senderSet)
-        sender->invalidateClient();
+        sender->stop();
 }
 
 void RTCPeerConnection::stop()
