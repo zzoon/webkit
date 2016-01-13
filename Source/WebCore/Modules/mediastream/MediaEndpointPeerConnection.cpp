@@ -44,9 +44,9 @@
 #include "RTCIceCandidate.h"
 #include "RTCIceCandidateEvent.h"
 #include "RTCOfferAnswerOptions.h"
-#include "RTCSessionDescription.h"
 #include "RTCRtpReceiver.h"
 #include "RTCRtpSender.h"
+#include "RTCSessionDescription.h"
 #include "RTCTrackEvent.h"
 #include "SDPProcessor.h"
 #include "UUID.h"
@@ -202,15 +202,14 @@ static void updateMediaDescriptionsWithSenders(const MediaDescriptionVector& med
     }
 }
 
-void MediaEndpointPeerConnection::runTask(std::function<void ()> task)
+void MediaEndpointPeerConnection::runTask(std::function<void()> task)
 {
     // Don't run any tasks until the async initialization is done.
     if (m_dtlsFingerprint.isNull()) {
         // Only one task needs to be deferred since it will hold off any others until completed.
         ASSERT(!m_initialDeferredTask);
         m_initialDeferredTask = task;
-    }
-    else
+    } else
         callOnMainThread(task);
 }
 
@@ -835,13 +834,16 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
     mdesc.addIceCandidate(candidate.copyRef());
 
     // FIXME: should we still do this?
-    if (!candidate->address().contains(':')) { // not IPv6
-        if (candidate->componentId() == 1) { // RTP
+    if (!candidate->address().contains(':')) {
+        // Not IPv6
+        if (candidate->componentId() == 1) {
+            // RTP
             if (mdesc.address().isEmpty() || mdesc.address() == "0.0.0.0") {
                 mdesc.setAddress(candidate->address());
                 mdesc.setPort(candidate->port());
             }
-        } else { // RTCP
+        } else {
+            // RTCP
             if (mdesc.rtcpAddress().isEmpty() || !mdesc.rtcpPort()) {
                 mdesc.setRtcpAddress(candidate->address());
                 mdesc.setRtcpPort(candidate->port());

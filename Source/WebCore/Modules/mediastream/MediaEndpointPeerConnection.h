@@ -37,8 +37,8 @@
 #include "MediaEndpointConfiguration.h"
 #include "PeerConnectionBackend.h"
 #include "SessionDescription.h"
-#include <wtf/RefPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 
 namespace WebCore {
 
@@ -80,7 +80,7 @@ public:
     void clearNegotiationNeededState() override { m_negotiationNeeded = false; };
 
 private:
-    void runTask(std::function<void ()>);
+    void runTask(std::function<void()>);
     void startRunningTasks();
 
     void createOfferTask(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&);
@@ -110,7 +110,7 @@ private:
     PeerConnectionBackendClient* m_client;
     std::unique_ptr<MediaEndpoint> m_mediaEndpoint;
 
-    std::function<void ()> m_initialDeferredTask;
+    std::function<void()> m_initialDeferredTask;
 
     std::unique_ptr<SDPProcessor> m_sdpProcessor;
 

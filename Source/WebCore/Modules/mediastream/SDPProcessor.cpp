@@ -481,8 +481,8 @@ bool SDPProcessor::callScript(const String& functionName, const String& argument
     if (!result.isString())
         return false;
 
-     outResult = result.getString(exec);
-     return true;
+    outResult = result.getString(exec);
+    return true;
 }
 
 } // namespace WebCore

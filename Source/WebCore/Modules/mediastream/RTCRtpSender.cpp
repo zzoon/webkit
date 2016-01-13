@@ -33,8 +33,8 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "ExceptionCode.h"
 #include "DOMError.h"
+#include "ExceptionCode.h"
 #include "JSDOMError.h"
 
 namespace WebCore {
@@ -67,7 +67,6 @@ void RTCRtpSender::replaceTrack(MediaStreamTrack* withTrack, PeerConnection::Voi
 
     m_client->replaceTrack(*this, *withTrack, WTFMove(promise));
 }
-
 
 } // namespace WebCore
 

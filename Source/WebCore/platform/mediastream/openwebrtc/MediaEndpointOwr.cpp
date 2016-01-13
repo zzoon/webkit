@@ -498,12 +498,10 @@ static void gotIncomingSource(OwrMediaSession* mediaSession, OwrMediaSource* sou
     if (mediaType == OWR_MEDIA_TYPE_AUDIO) {
         sourceType = RealtimeMediaSource::Audio;
         name = "remote audio";
-    }
-    else if (mediaType == OWR_MEDIA_TYPE_VIDEO) {
+    } else if (mediaType == OWR_MEDIA_TYPE_VIDEO) {
         sourceType = RealtimeMediaSource::Video;
         name = "remote video";
-    }
-    else
+    } else
         ASSERT_NOT_REACHED();
 
     RefPtr<RealtimeMediaSourceOwr> mediaSource = adoptRef(new RealtimeMediaSourceOwr(source, id, sourceType, name));
