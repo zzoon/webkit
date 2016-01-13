@@ -61,7 +61,7 @@ void RTCRtpSender::replaceTrack(MediaStreamTrack* withTrack, PeerConnection::Voi
     }
 
     if (m_track->kind() != withTrack->kind()) {
-        promise.reject(DOMError::create("TypeError"));
+        ec = TypeError;
         return;
     }
 
