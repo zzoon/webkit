@@ -84,7 +84,7 @@ public:
     // RealtimeMediaSource::Observer implementation
     virtual void sourceStopped() override final;
     virtual void sourceMutedChanged() override final;
-    virtual void sourceStatesChanged() override final;
+    virtual void sourceSettingsChanged() override final;
     virtual bool preventSourceFromStopping() override final;
 
 protected:

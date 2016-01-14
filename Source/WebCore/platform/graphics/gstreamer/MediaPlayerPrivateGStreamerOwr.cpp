@@ -184,7 +184,7 @@ bool MediaPlayerPrivateGStreamerOwr::internalLoad()
             continue;
         }
 
-        RealtimeMediaSourceOwr* source = reinterpret_cast<RealtimeMediaSourceOwr*>(track->source());
+        RealtimeMediaSourceOwr* source = reinterpret_cast<RealtimeMediaSourceOwr*>(&track->source());
         OwrMediaSource* mediaSource = OWR_MEDIA_SOURCE(source->mediaSource());
 
         if (track->type() == RealtimeMediaSource::Audio) {
@@ -198,6 +198,7 @@ bool MediaPlayerPrivateGStreamerOwr::internalLoad()
             if (m_videoSource && (m_videoSource.get() == source))
                 g_object_set(m_videoRenderer, "disabled", FALSE, nullptr);
 
+            g_object_set(m_videoRenderer, "width", 640, "height", 480, nullptr);
             owr_media_renderer_set_source(OWR_MEDIA_RENDERER(m_videoRenderer), mediaSource);
             m_videoSource = source;
             source->addObserver(this);
@@ -283,7 +284,7 @@ void MediaPlayerPrivateGStreamerOwr::sourceStopped()
         stop();
 
     for (auto track : m_streamPrivate->tracks()) {
-        RealtimeMediaSourceOwr* source = reinterpret_cast<RealtimeMediaSourceOwr*>(track->source());
+        RealtimeMediaSourceOwr* source = reinterpret_cast<RealtimeMediaSourceOwr*>(&track->source());
         if (track->enabled())
             continue;
         if (source == m_audioSource)
@@ -298,9 +299,9 @@ void MediaPlayerPrivateGStreamerOwr::sourceMutedChanged()
     LOG_MEDIA_MESSAGE("Source muted state changed");
 }
 
-void MediaPlayerPrivateGStreamerOwr::sourceStatesChanged()
+void MediaPlayerPrivateGStreamerOwr::sourceSettingsChanged()
 {
-    LOG_MEDIA_MESSAGE("Source states changed");
+    LOG_MEDIA_MESSAGE("Source settings changed");
 }
 
 bool MediaPlayerPrivateGStreamerOwr::preventSourceFromStopping()
