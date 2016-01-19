@@ -68,16 +68,16 @@ public:
         return adoptRef(new MediaEndpointInit(iceServers, iceTransportPolicy, bundlePolicy));
     }
 
-    enum IceTransportPolicy {
-        IceTransportPolicyNone,
-        IceTransportPolicyRelay,
-        IceTransportPolicyAll
+    enum class IceTransportPolicy {
+        None,
+        Relay,
+        All
     };
 
-    enum BundlePolicy {
-        BundlePolicyBalanced,
-        BundlePolicyMaxCompat,
-        BundlePolicyMaxBundle
+    enum class BundlePolicy {
+        Balanced,
+        MaxCompat,
+        MaxBundle
     };
 
     const Vector<RefPtr<IceServerInfo>>& iceServers() const { return m_iceServers; }

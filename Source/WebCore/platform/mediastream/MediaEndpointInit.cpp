@@ -48,20 +48,20 @@ MediaEndpointInit::MediaEndpointInit(Vector<RefPtr<IceServerInfo>>& iceServers, 
     : m_iceServers(iceServers)
 {
     if (iceTransportPolicy == "none")
-        m_iceTransportPolicy = IceTransportPolicyNone;
+        m_iceTransportPolicy = IceTransportPolicy::None;
     else if (iceTransportPolicy == "relay")
-        m_iceTransportPolicy = IceTransportPolicyRelay;
+        m_iceTransportPolicy = IceTransportPolicy::Relay;
     else if (iceTransportPolicy == "all")
-        m_iceTransportPolicy = IceTransportPolicyAll;
+        m_iceTransportPolicy = IceTransportPolicy::All;
     else
         ASSERT_NOT_REACHED();
 
     if (bundlePolicy == "balanced")
-        m_bundlePolicy = BundlePolicyBalanced;
+        m_bundlePolicy = BundlePolicy::Balanced;
     else if (bundlePolicy == "max-compat")
-        m_bundlePolicy = BundlePolicyMaxCompat;
+        m_bundlePolicy = BundlePolicy::MaxCompat;
     else if (bundlePolicy == "max-bundle")
-        m_bundlePolicy = BundlePolicyMaxBundle;
+        m_bundlePolicy = BundlePolicy::MaxBundle;
     else
         ASSERT_NOT_REACHED();
 }
