@@ -35,6 +35,15 @@
 
 namespace WebCore {
 
+IceServerInfo::IceServerInfo(const Vector<String>& urls, const String& credential, const String& username)
+    : m_credential(credential)
+    , m_username(username)
+{
+    m_urls.reserveCapacity(urls.size());
+    for (auto& url : urls)
+        m_urls.append(URL(URL(), url));
+}
+
 MediaEndpointInit::MediaEndpointInit(Vector<RefPtr<IceServerInfo>>& iceServers, const String& iceTransportPolicy, const String& bundlePolicy)
     : m_iceServers(iceServers)
 {

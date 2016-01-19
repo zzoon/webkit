@@ -33,6 +33,7 @@
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "URL.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
@@ -48,18 +49,14 @@ public:
     }
     virtual ~IceServerInfo() { }
 
-    const Vector<String>& urls() const { return m_urls; }
+    const Vector<URL>& urls() const { return m_urls; }
     const String& credential() const { return m_credential; }
     const String& username() const { return m_username; }
 
 private:
-    IceServerInfo(const Vector<String>& urls, const String& credential, const String& username)
-        : m_urls(urls)
-        , m_credential(credential)
-        , m_username(username)
-    { }
+    IceServerInfo(const Vector<String>& urls, const String& credential, const String& username);
 
-    Vector<String> m_urls;
+    Vector<URL> m_urls;
     String m_credential;
     String m_username;
 };

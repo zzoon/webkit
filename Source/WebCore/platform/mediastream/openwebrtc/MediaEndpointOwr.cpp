@@ -368,9 +368,23 @@ void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const V
         m_transportAgent = owr_transport_agent_new(false);
 
         for (auto& server : m_configuration->iceServers()) {
-            // FIXME: parse url type and port
-            owr_transport_agent_add_helper_server(m_transportAgent, OWR_HELPER_SERVER_TYPE_STUN,
-                server->urls()[0].ascii().data(), 3478, nullptr, nullptr);
+            for (auto& url : server->urls()) {
+                unsigned short port = url.port() ? url.port() : 3478;
+
+                if (url.protocol() == "stun") {
+                    owr_transport_agent_add_helper_server(m_transportAgent, OWR_HELPER_SERVER_TYPE_STUN,
+                        url.host().ascii().data(), port, nullptr, nullptr);
+
+                } else if (url.protocol() == "turn") {
+                    OwrHelperServerType serverType = url.query() == "transport=tcp" ? OWR_HELPER_SERVER_TYPE_TURN_TCP
+                        : OWR_HELPER_SERVER_TYPE_TURN_UDP;
+
+                    owr_transport_agent_add_helper_server(m_transportAgent, serverType,
+                        url.host().ascii().data(), port,
+                        server->username().ascii().data(), server->credential().ascii().data());
+                } else
+                    ASSERT_NOT_REACHED();
+            }
         }
     }
 
