@@ -90,7 +90,7 @@ static void cryptoDataCallback(gchar* privateKey, gchar* certificate, gchar* fin
     mediaEndpoint->dispatchDtlsFingerprint(g_strdup(privateKey), g_strdup(certificate), String(fingerprint), String(fingerprintFunction));
 }
 
-void MediaEndpointOwr::getDtlsFingerprint()
+void MediaEndpointOwr::generateDtlsInfo()
 {
     owr_crypto_create_crypto_data(cryptoDataCallback, this);
 }

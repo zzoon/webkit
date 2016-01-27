@@ -61,7 +61,7 @@ void MockMediaEndpoint::setConfiguration(RefPtr<MediaEndpointInit>&& configurati
     UNUSED_PARAM(configuration);
 }
 
-void MockMediaEndpoint::getDtlsFingerprint()
+void MockMediaEndpoint::generateDtlsInfo()
 {
     callOnMainThread([this]() {
         m_client->gotDtlsFingerprint(String(fingerprint), String(fingerprintFunction));

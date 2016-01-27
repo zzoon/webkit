@@ -49,7 +49,7 @@ public:
 
     virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) override;
 
-    virtual void getDtlsFingerprint() override;
+    virtual void generateDtlsInfo() override;
     virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;
     virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() override;
 

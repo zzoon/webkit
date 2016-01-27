@@ -71,7 +71,7 @@ public:
     // FIMXE: look over naming
     virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) = 0;
 
-    virtual void getDtlsFingerprint() = 0;
+    virtual void generateDtlsInfo() = 0;
     virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() = 0;
     virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() = 0;
 

@@ -131,7 +131,8 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     m_defaultAudioPayloads = m_mediaEndpoint->getDefaultAudioPayloads();
     m_defaultVideoPayloads = m_mediaEndpoint->getDefaultVideoPayloads();
 
-    m_mediaEndpoint->getDtlsFingerprint();
+    // Tasks (see runTask()) will be deferred until we get the DTLS fingerprint.
+    m_mediaEndpoint->generateDtlsInfo();
 }
 
 MediaEndpointPeerConnection::~MediaEndpointPeerConnection()
@@ -204,7 +205,6 @@ static void updateMediaDescriptionsWithSenders(const MediaDescriptionVector& med
 
 void MediaEndpointPeerConnection::runTask(std::function<void()> task)
 {
-    // Don't run any tasks until the async initialization is done.
     if (m_dtlsFingerprint.isNull()) {
         // Only one task needs to be deferred since it will hold off any others until completed.
         ASSERT(!m_initialDeferredTask);
