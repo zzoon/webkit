@@ -206,6 +206,7 @@ static int forceComplexText;
 static int useAcceleratedDrawing;
 static int gcBetweenTests;
 static int showWebView = NO;
+static int printTestCount = NO;
 static BOOL printSeparators;
 static RetainPtr<CFStringRef> persistentUserStyleSheetLocation;
 static std::set<std::string> allowedHosts;
@@ -401,7 +402,6 @@ static NSSet *allowedFontFamilySet()
         @"STKaiti",
         @"STSong",
         @"Symbol",
-        @"System Font",
         @"Tahoma",
         @"Thonburi",
         @"Times New Roman",
@@ -1141,6 +1141,7 @@ static void initializeGlobalsFromCommandLineOptions(int argc, const char *argv[]
         {"no-timeout", no_argument, &useTimeoutWatchdog, NO},
         {"allowed-host", required_argument, nullptr, 'a'},
         {"show-webview", no_argument, &showWebView, YES},
+        {"print-test-count", no_argument, &printTestCount, YES},
         {nullptr, 0, nullptr, 0}
     };
     
@@ -1178,6 +1179,7 @@ static void runTestingServerLoop()
     // When DumpRenderTree run in server mode, we just wait around for file names
     // to be passed to us and read each in turn, passing the results back to the client
     char filenameBuffer[2048];
+    unsigned testCount = 0;
     while (fgets(filenameBuffer, sizeof(filenameBuffer), stdin)) {
         char *newLineCharacter = strchr(filenameBuffer, '\n');
         if (newLineCharacter)
@@ -1187,6 +1189,11 @@ static void runTestingServerLoop()
             continue;
 
         runTest(filenameBuffer);
+
+        if (printTestCount) {
+            ++testCount;
+            printf("\nServer mode has completed %u tests.\n\n", testCount);
+        }
     }
 }
 
@@ -1867,7 +1874,6 @@ static void resetWebViewToConsistentStateBeforeTesting()
     [WebView _setUsesTestModeFocusRingColor:YES];
 #endif
     [WebView _resetOriginAccessWhitelists];
-    [WebView _setAllowsRoundingHacks:NO];
 
     [[MockGeolocationProvider shared] stopTimer];
     [[MockWebNotificationProvider shared] reset];

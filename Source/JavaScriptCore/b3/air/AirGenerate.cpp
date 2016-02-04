@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,10 +31,15 @@
 #include "AirAllocateStack.h"
 #include "AirCode.h"
 #include "AirEliminateDeadCode.h"
+#include "AirFixObviousSpills.h"
 #include "AirFixPartialRegisterStalls.h"
 #include "AirGenerationContext.h"
 #include "AirHandleCalleeSaves.h"
 #include "AirIteratedRegisterCoalescing.h"
+#include "AirLogRegisterPressure.h"
+#include "AirLowerAfterRegAlloc.h"
+#include "AirLowerMacros.h"
+#include "AirOpcodeUtils.h"
 #include "AirOptimizeBlockOrder.h"
 #include "AirReportUsedRegisters.h"
 #include "AirSimplifyCFG.h"
@@ -42,6 +47,7 @@
 #include "AirValidate.h"
 #include "B3Common.h"
 #include "B3IndexMap.h"
+#include "B3Procedure.h"
 #include "B3TimingScope.h"
 #include "CCallHelpers.h"
 #include "DisallowMacroScratchRegisterUsage.h"
@@ -59,10 +65,12 @@ void prepareForGeneration(Code& code)
         validate(code);
 
     // If we're doing super verbose dumping, the phase scope of any phase will already do a dump.
-    if (shouldDumpIR() && !shouldDumpIRAtEachPhase()) {
+    if (shouldDumpIR(AirMode) && !shouldDumpIRAtEachPhase(AirMode)) {
         dataLog("Initial air:\n");
         dataLog(code);
     }
+
+    lowerMacros(code);
 
     // This is where we run our optimizations and transformations.
     // FIXME: Add Air optimizations.
@@ -78,6 +86,18 @@ void prepareForGeneration(Code& code)
         spillEverything(code);
     else
         iteratedRegisterCoalescing(code);
+
+    if (Options::logAirRegisterPressure()) {
+        dataLog("Register pressure after register allocation:\n");
+        logRegisterPressure(code);
+    }
+
+    // This replaces uses of spill slots with registers or constants if possible. It does this by
+    // minimizing the amount that we perturb the already-chosen register allocation. It may extend
+    // the live ranges of registers though.
+    fixObviousSpills(code);
+
+    lowerAfterRegAlloc(code);
 
     // Prior to this point the prologue and epilogue is implicit. This makes it explicit. It also
     // does things like identify which callee-saves we're using and saves them.
@@ -96,19 +116,21 @@ void prepareForGeneration(Code& code)
     // frequency successor is also the fall-through target.
     optimizeBlockOrder(code);
 
-    // Attempt to remove false dependencies between instructions created by partial register changes.
-    // This must be executed as late as possible as it depends on the instructions order and register use.
-    fixPartialRegisterStalls(code);
-
     // This is needed to satisfy a requirement of B3::StackmapValue.
     reportUsedRegisters(code);
+
+    // Attempt to remove false dependencies between instructions created by partial register changes.
+    // This must be executed as late as possible as it depends on the instructions order and register
+    // use. We _must_ run this after reportUsedRegisters(), since that kills variable assignments
+    // that seem dead. Luckily, this phase does not change register liveness, so that's OK.
+    fixPartialRegisterStalls(code);
 
     if (shouldValidateIR())
         validate(code);
 
     // Do a final dump of Air. Note that we have to do this even if we are doing per-phase dumping,
     // since the final generation is not a phase.
-    if (shouldDumpIR()) {
+    if (shouldDumpIR(AirMode)) {
         dataLog("Air after ", code.lastPhaseName(), ", before generation:\n");
         dataLog(code);
     }
@@ -125,6 +147,17 @@ void generate(Code& code, CCallHelpers& jit)
     if (code.frameSize())
         jit.addPtr(CCallHelpers::TrustedImm32(-code.frameSize()), MacroAssembler::stackPointerRegister);
 
+    auto argFor = [&] (const RegisterAtOffset& entry) -> CCallHelpers::Address {
+        return CCallHelpers::Address(GPRInfo::callFrameRegister, entry.offset());
+    };
+    
+    for (const RegisterAtOffset& entry : code.calleeSaveRegisters()) {
+        if (entry.reg().isGPR())
+            jit.storePtr(entry.reg().gpr(), argFor(entry));
+        else
+            jit.storeDouble(entry.reg().fpr(), argFor(entry));
+    }
+
     GenerationContext context;
     context.code = &code;
     IndexMap<BasicBlock, CCallHelpers::Label> blockLabels(code.size());
@@ -139,12 +172,23 @@ void generate(Code& code, CCallHelpers& jit)
         blockJumps[target].append(jump);
     };
 
+    PCToOriginMap& pcToOriginMap = code.proc().pcToOriginMap();
+    auto addItem = [&] (Inst& inst) {
+        if (!inst.origin) {
+            pcToOriginMap.appendItem(jit.label(), Origin());
+            return;
+        }
+        pcToOriginMap.appendItem(jit.label(), inst.origin->origin());
+    };
+
     for (BasicBlock* block : code) {
         blockJumps[block].link(&jit);
         blockLabels[block] = jit.label();
         ASSERT(block->size() >= 1);
         for (unsigned i = 0; i < block->size() - 1; ++i) {
-            CCallHelpers::Jump jump = block->at(i).generate(jit, context);
+            Inst& inst = block->at(i);
+            addItem(inst);
+            CCallHelpers::Jump jump = inst.generate(jit, context);
             ASSERT_UNUSED(jump, !jump.isSet());
         }
 
@@ -152,17 +196,26 @@ void generate(Code& code, CCallHelpers& jit)
             && block->successorBlock(0) == code.findNextBlock(block))
             continue;
 
-        if (block->last().opcode == Ret) {
+        addItem(block->last());
+
+        if (isReturn(block->last().opcode)) {
             // We currently don't represent the full prologue/epilogue in Air, so we need to
             // have this override.
-            if (code.frameSize())
+            if (code.frameSize()) {
+                for (const RegisterAtOffset& entry : code.calleeSaveRegisters()) {
+                    if (entry.reg().isGPR())
+                        jit.loadPtr(argFor(entry), entry.reg().gpr());
+                    else
+                        jit.loadDouble(argFor(entry), entry.reg().fpr());
+                }
                 jit.emitFunctionEpilogue();
-            else
+            } else
                 jit.emitFunctionEpilogueWithEmptyFrame();
             jit.ret();
+            addItem(block->last());
             continue;
         }
-        
+
         CCallHelpers::Jump jump = block->last().generate(jit, context);
         switch (block->numSuccessors()) {
         case 0:
@@ -180,10 +233,14 @@ void generate(Code& code, CCallHelpers& jit)
             RELEASE_ASSERT_NOT_REACHED();
             break;
         }
+        addItem(block->last());
     }
 
+    pcToOriginMap.appendItem(jit.label(), Origin());
+    // FIXME: Make late paths have Origins: https://bugs.webkit.org/show_bug.cgi?id=153689
     for (auto& latePath : context.latePaths)
         latePath->run(jit, context);
+    pcToOriginMap.appendItem(jit.label(), Origin());
 }
 
 } } } // namespace JSC::B3::Air

@@ -520,7 +520,7 @@ void URL::init(const URL& base, const String& relative, const TextEncoding& enco
             ++p;
         }
         if (*p == ':') {
-            if (p[1] != '/' && equalIgnoringCase(base.protocol(), String(str, p - str)) && base.isHierarchical())
+            if (p[1] != '/' && equalIgnoringASCIICase(base.protocol(), StringView(reinterpret_cast<LChar*>(str), p - str)) && base.isHierarchical())
                 str = p + 1;
             else
                 absolute = true;
@@ -789,7 +789,7 @@ bool URL::protocolIs(const char* protocol) const
 
     // JavaScript URLs are "valid" and should be executed even if URL decides they are invalid.
     // The free function protocolIsJavaScript() should be used instead. 
-    ASSERT(!equalIgnoringCase(protocol, String("javascript")));
+    ASSERT(!equalLettersIgnoringASCIICase(StringView(protocol), "javascript"));
 
     if (!m_isValid)
         return false;
@@ -1984,7 +1984,7 @@ bool protocolIsInHTTPFamily(const String& url)
 
 const URL& blankURL()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(URL, staticBlankURL, (ParsedURLString, "about:blank"));
+    static NeverDestroyed<URL> staticBlankURL(ParsedURLString, "about:blank");
     return staticBlankURL;
 }
 
@@ -1993,7 +1993,7 @@ bool URL::isBlankURL() const
     return protocolIs("about");
 }
 
-typedef HashMap<String, unsigned short, CaseFoldingHash> DefaultPortsMap;
+typedef HashMap<String, unsigned short, ASCIICaseInsensitiveHash> DefaultPortsMap;
 static const DefaultPortsMap& defaultPortsMap()
 {
     static NeverDestroyed<const DefaultPortsMap> defaultPortsMap(DefaultPortsMap({
@@ -2124,15 +2124,21 @@ bool portAllowed(const URL& url)
 String mimeTypeFromDataURL(const String& url)
 {
     ASSERT(protocolIs(url, "data"));
-    size_t index = url.find(';');
+
+    // FIXME: What's the right behavior when the URL has a comma first, but a semicolon later?
+    // Currently this code will break at the semicolon in that case. Not sure that's correct.
+    auto index = url.find(';', 5);
     if (index == notFound)
-        index = url.find(',');
-    if (index != notFound) {
-        if (index > 5)
-            return url.substring(5, index - 5).lower();
-        return "text/plain"; // Data URLs with no MIME type are considered text/plain.
+        index = url.find(',', 5);
+    if (index == notFound) {
+        // FIXME: There was an old comment here that made it sound like this should be returning text/plain.
+        // But we have been returning empty string here for some time, so not changing its behavior at this time.
+        return emptyString();
     }
-    return "";
+    if (index == 5)
+        return ASCIILiteral("text/plain");
+    ASSERT(index >= 5);
+    return url.substring(5, index - 5).convertToASCIILowercase();
 }
 
 String mimeTypeFromURL(const URL& url)

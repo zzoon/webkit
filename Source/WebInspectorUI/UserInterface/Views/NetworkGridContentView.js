@@ -61,7 +61,7 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
         columns.size.width = "8%";
         columns.size.aligned = "right";
 
-        columns.transferSize.title = WebInspector.UIString("Transfered");
+        columns.transferSize.title = WebInspector.UIString("Transferred");
         columns.transferSize.width = "8%";
         columns.transferSize.aligned = "right";
 
@@ -82,8 +82,8 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
 
         this._dataGrid = new WebInspector.TimelineDataGrid(this._contentTreeOutline, columns);
         this._dataGrid.addEventListener(WebInspector.DataGrid.Event.SelectedNodeChanged, this._dataGridNodeSelected, this);
-        this._dataGrid.sortColumnIdentifier = "requestSent";
-        this._dataGrid.sortOrder = WebInspector.DataGrid.SortOrder.Ascending;
+        this._dataGrid.sortColumnIdentifierSetting = new WebInspector.Setting("network-grid-content-view-sort", "requestSent");
+        this._dataGrid.sortOrderSetting = new WebInspector.Setting("network-grid-content-view-sort-order", WebInspector.DataGrid.SortOrder.Ascending);
 
         this.element.classList.add("network-grid");
         this.addSubview(this._dataGrid);
@@ -91,6 +91,9 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
         var networkTimeline = WebInspector.timelineManager.persistentNetworkTimeline;
         networkTimeline.addEventListener(WebInspector.Timeline.Event.RecordAdded, this._networkTimelineRecordAdded, this);
         networkTimeline.addEventListener(WebInspector.Timeline.Event.Reset, this._networkTimelineReset, this);
+
+        this._clearNetworkItemsNavigationItem = new WebInspector.ButtonNavigationItem("clear-network-items", WebInspector.UIString("Clear Network Items"), "Images/NavigationItemTrash.svg", 15, 15);
+        this._clearNetworkItemsNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._clearNetworkItems, this);
 
         this._pendingRecords = [];
     }
@@ -117,6 +120,11 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
         return WebInspector.timelineManager.persistentNetworkTimeline.startTime;
     }
 
+    get navigationItems()
+    {
+        return [this._clearNetworkItemsNavigationItem];
+    }
+
     shown()
     {
         super.shown();
@@ -134,14 +142,6 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
     closed()
     {
         this._dataGrid.closed();
-    }
-
-    needsLayout()
-    {
-        if (!this._networkSidebarPanel.visible)
-            return;
-
-        super.needsLayout();
     }
 
     reset()
@@ -221,5 +221,9 @@ WebInspector.NetworkGridContentView = class NetworkGridContentView extends WebIn
     _dataGridNodeSelected(event)
     {
         this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
+    }
+
+    _clearNetworkItems(event) {
+        this.reset();
     }
 };

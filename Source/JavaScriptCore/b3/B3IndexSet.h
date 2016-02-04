@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,6 +48,15 @@ public:
         return !m_set.set(value->index());
     }
 
+    template<typename Iterable>
+    bool addAll(const Iterable& iterable)
+    {
+        bool result = false;
+        for (T* value : iterable)
+            result |= add(value);
+        return result;
+    }
+
     bool remove(T* value)
     {
         return m_set.clear(value->index());
@@ -60,10 +69,20 @@ public:
         return m_set.get(value->index());
     }
 
+    size_t size() const
+    {
+        return m_set.bitCount();
+    }
+
+    bool isEmpty() const
+    {
+        return !size();
+    }
+
     template<typename CollectionType>
     class Iterable {
     public:
-        Iterable(const CollectionType& collection, const IndexSet& set)
+        Iterable(const CollectionType& collection, const BitVector& set)
             : m_collection(collection)
             , m_set(set)
         {
@@ -76,7 +95,7 @@ public:
             {
             }
 
-            iterator(const CollectionType& collection, BitVector::SetBitsIterable::iterator iter)
+            iterator(const CollectionType& collection, BitVector::iterator iter)
                 : m_collection(&collection)
                 , m_iter(iter)
             {
@@ -105,7 +124,7 @@ public:
 
         private:
             const CollectionType* m_collection;
-            BitVector::SetBitsIterable::iterator m_iter;
+            BitVector::iterator m_iter;
         };
 
         iterator begin() const { return iterator(m_collection, m_set.begin()); }
@@ -113,7 +132,7 @@ public:
 
     private:
         const CollectionType& m_collection;
-        const IndexSet& m_set;
+        const BitVector& m_set;
     };
 
     // For basic blocks, you do:
@@ -124,7 +143,7 @@ public:
     template<typename CollectionType>
     Iterable<CollectionType> values(const CollectionType& collection) const
     {
-        return Iterable<CollectionType>(collection);
+        return Iterable<CollectionType>(collection, indices());
     }
 
     const BitVector& indices() const { return m_set; }
@@ -132,7 +151,7 @@ public:
     void dump(PrintStream& out) const
     {
         CommaPrinter comma;
-        for (size_t index : indices().setBits())
+        for (size_t index : indices())
             out.print(comma, T::dumpPrefix, index);
     }
 

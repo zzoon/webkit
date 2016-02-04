@@ -294,7 +294,7 @@ public:
     // Media engine support.
     enum SupportsType { IsNotSupported, IsSupported, MayBeSupported };
     static MediaPlayer::SupportsType supportsType(const MediaEngineSupportParameters&, const MediaPlayerSupportsTypeClient*);
-    static void getSupportedTypes(HashSet<String>&);
+    static void getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>&);
     static bool isAvailable();
     static void getSitesInMediaCache(Vector<String>&);
     static void clearMediaCache();
@@ -308,14 +308,17 @@ public:
     bool doesHaveAttribute(const AtomicString&, AtomicString* value = nullptr) const;
     PlatformMedia platformMedia() const;
     PlatformLayer* platformLayer() const;
-#if PLATFORM(IOS)
+
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     void setVideoFullscreenLayer(PlatformLayer*);
     void setVideoFullscreenFrame(FloatRect);
     using MediaPlayerEnums::VideoGravity;
     void setVideoFullscreenGravity(VideoGravity);
     void setVideoFullscreenMode(VideoFullscreenMode);
     VideoFullscreenMode fullscreenMode() const;
+#endif
 
+#if PLATFORM(IOS)
     NSArray *timedMetadata() const;
     String accessLog() const;
     String errorLog() const;
@@ -628,7 +631,7 @@ private:
 };
 
 typedef std::function<std::unique_ptr<MediaPlayerPrivateInterface> (MediaPlayer*)> CreateMediaEnginePlayer;
-typedef void (*MediaEngineSupportedTypes)(HashSet<String>& types);
+typedef void (*MediaEngineSupportedTypes)(HashSet<String, ASCIICaseInsensitiveHash>& types);
 typedef MediaPlayer::SupportsType (*MediaEngineSupportsType)(const MediaEngineSupportParameters& parameters);
 typedef void (*MediaEngineGetSitesInMediaCache)(Vector<String>&);
 typedef void (*MediaEngineClearMediaCache)();

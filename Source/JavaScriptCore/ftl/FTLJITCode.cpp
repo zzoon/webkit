@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -168,16 +168,41 @@ void JITCode::validateReferences(const TrackedReferences& trackedReferences)
 RegisterSet JITCode::liveRegistersToPreserveAtExceptionHandlingCallSite(CodeBlock*, CallSiteIndex callSiteIndex)
 {
 #if FTL_USES_B3
-    UNUSED_PARAM(callSiteIndex);
+    for (OSRExit& exit : osrExit) {
+        if (exit.m_exceptionHandlerCallSiteIndex.bits() == callSiteIndex.bits()) {
+            RELEASE_ASSERT(exit.isExceptionHandler());
+            RELEASE_ASSERT(exit.isGenericUnwindHandler());
+            return ValueRep::usedRegisters(exit.m_valueReps);
+        }
+    }
 #else // FTL_USES_B3
     for (OSRExit& exit : osrExit) {
         if (exit.m_exceptionHandlerCallSiteIndex.bits() == callSiteIndex.bits()) {
-            RELEASE_ASSERT(exit.m_isExceptionHandler);
+            RELEASE_ASSERT(exit.isExceptionHandler());
             return stackmaps.records[exit.m_stackmapRecordIndex].usedRegisterSet();
         }
     }
 #endif // FTL_USES_B3
     return RegisterSet();
+}
+
+Optional<CodeOrigin> JITCode::findPC(CodeBlock* codeBlock, void* pc)
+{
+    for (OSRExit& exit : osrExit) {
+        if (ExecutableMemoryHandle* handle = exit.m_code.executableMemory()) {
+            if (handle->start() <= pc && pc < handle->end())
+                return Optional<CodeOrigin>(exit.m_codeOriginForExitProfile);
+        }
+    }
+
+    for (std::unique_ptr<LazySlowPath>& lazySlowPath : lazySlowPaths) {
+        if (ExecutableMemoryHandle* handle = lazySlowPath->stub().executableMemory()) {
+            if (handle->start() <= pc && pc < handle->end())
+                return Optional<CodeOrigin>(codeBlock->codeOrigin(lazySlowPath->callSiteIndex()));
+        }
+    }
+
+    return Nullopt;
 }
 
 } } // namespace JSC::FTL

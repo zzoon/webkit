@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -63,9 +63,13 @@ void SwitchValue::dumpMeta(CommaPrinter& comma, PrintStream& out) const
     out.print(comma, "fallThrough = ", fallThrough());
 }
 
-SwitchValue::SwitchValue(
-    unsigned index, Origin origin, Value* child, const FrequentedBlock& fallThrough)
-    : ControlValue(index, Switch, Void, origin, child)
+Value* SwitchValue::cloneImpl() const
+{
+    return new SwitchValue(*this);
+}
+
+SwitchValue::SwitchValue(Origin origin, Value* child, const FrequentedBlock& fallThrough)
+    : ControlValue(Switch, Void, origin, child)
 {
     m_successors.append(fallThrough);
 }

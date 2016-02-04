@@ -44,6 +44,10 @@
 #include "StorageNamespaceProvider.h"
 #include <wtf/NeverDestroyed.h>
 
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/EmptyClientsIncludes.h>
+#endif
+
 namespace WebCore {
 
 class EmptyDatabaseProvider final : public DatabaseProvider {
@@ -133,6 +137,10 @@ void fillWithEmptyClients(PageConfiguration& pageConfiguration)
     pageConfiguration.databaseProvider = adoptRef(new EmptyDatabaseProvider);
     pageConfiguration.storageNamespaceProvider = adoptRef(new EmptyStorageNamespaceProvider);
     pageConfiguration.visitedLinkStore = adoptRef(new EmptyVisitedLinkStore);
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/EmptyClientsFill.cpp>
+#endif
 }
 
 class EmptyPopupMenu : public PopupMenu {

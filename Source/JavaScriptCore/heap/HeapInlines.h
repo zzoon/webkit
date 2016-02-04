@@ -310,7 +310,7 @@ inline void Heap::unregisterWeakGCMap(void* weakGCMap)
 
 inline void Heap::didAllocateBlock(size_t capacity)
 {
-#if ENABLE(RESOURCE_USAGE_OVERLAY)
+#if ENABLE(RESOURCE_USAGE)
     m_blockBytesAllocated += capacity;
 #else
     UNUSED_PARAM(capacity);
@@ -319,11 +319,38 @@ inline void Heap::didAllocateBlock(size_t capacity)
 
 inline void Heap::didFreeBlock(size_t capacity)
 {
-#if ENABLE(RESOURCE_USAGE_OVERLAY)
+#if ENABLE(RESOURCE_USAGE)
     m_blockBytesAllocated -= capacity;
 #else
     UNUSED_PARAM(capacity);
 #endif
+}
+
+inline bool Heap::isPointerGCObject(TinyBloomFilter filter, MarkedBlockSet& markedBlockSet, void* pointer)
+{
+    MarkedBlock* candidate = MarkedBlock::blockFor(pointer);
+    if (filter.ruleOut(bitwise_cast<Bits>(candidate))) {
+        ASSERT(!candidate || !markedBlockSet.set().contains(candidate));
+        return false;
+    }
+
+    if (!MarkedBlock::isAtomAligned(pointer))
+        return false;
+
+    if (!markedBlockSet.set().contains(candidate))
+        return false;
+
+    if (!candidate->isLiveCell(pointer))
+        return false;
+
+    return true;
+}
+
+inline bool Heap::isValueGCObject(TinyBloomFilter filter, MarkedBlockSet& markedBlockSet, JSValue value)
+{
+    if (!value.isCell())
+        return false;
+    return isPointerGCObject(filter, markedBlockSet, static_cast<void*>(value.asCell()));
 }
 
 } // namespace JSC

@@ -54,6 +54,7 @@
 		1A74A28F0F4F75400082E228 /* WebTextInputWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A74A28D0F4F75400082E228 /* WebTextInputWindowController.m */; };
 		1A77B02E0EE7730500C8A1F9 /* WebPluginRequest.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A77B02C0EE7730500C8A1F9 /* WebPluginRequest.h */; };
 		1A77B02F0EE7730500C8A1F9 /* WebPluginRequest.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A77B02D0EE7730500C8A1F9 /* WebPluginRequest.m */; };
+		1A781ACB1C56FF7C00FB96DD /* WebKitAdditions.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1A781AC91C56FF7C00FB96DD /* WebKitAdditions.mm */; };
 		1A86CCD41AD48A620074BA89 /* WebApplicationCacheInternal.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A86CCD31AD48A620074BA89 /* WebApplicationCacheInternal.h */; };
 		1A8DED500EE88B8A00F25022 /* HostedNetscapePluginStream.h in Headers */ = {isa = PBXBuildFile; fileRef = 1A8DED4E0EE88B8A00F25022 /* HostedNetscapePluginStream.h */; };
 		1A8DED510EE88B8A00F25022 /* HostedNetscapePluginStream.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1A8DED4F0EE88B8A00F25022 /* HostedNetscapePluginStream.mm */; };
@@ -127,6 +128,7 @@
 		511F3FD60CECC88F00852565 /* WebDatabaseManagerPrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 511F3FD20CECC88F00852565 /* WebDatabaseManagerPrivate.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		511F3FD70CECC88F00852565 /* WebDatabaseManagerClient.h in Headers */ = {isa = PBXBuildFile; fileRef = 511F3FD30CECC88F00852565 /* WebDatabaseManagerClient.h */; };
 		511F3FD80CECC88F00852565 /* WebDatabaseManagerClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = 511F3FD40CECC88F00852565 /* WebDatabaseManagerClient.mm */; };
+		512BDB531C471591006494DF /* WebDatabaseProvider.mm in Sources */ = {isa = PBXBuildFile; fileRef = 512BDB521C471591006494DF /* WebDatabaseProvider.mm */; };
 		51494CD60C7EBDE0004178C5 /* WebIconDatabaseClient.h in Headers */ = {isa = PBXBuildFile; fileRef = 51494CD40C7EBDE0004178C5 /* WebIconDatabaseClient.h */; };
 		51494CD70C7EBDE0004178C5 /* WebIconDatabaseClient.mm in Sources */ = {isa = PBXBuildFile; fileRef = 51494CD50C7EBDE0004178C5 /* WebIconDatabaseClient.mm */; };
 		5158F6EF106D862A00AF457C /* WebHistoryDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 5158F6EE106D862A00AF457C /* WebHistoryDelegate.h */; };
@@ -511,6 +513,7 @@
 		1A74A28D0F4F75400082E228 /* WebTextInputWindowController.m */ = {isa = PBXFileReference; explicitFileType = sourcecode.c.objc; fileEncoding = 4; path = WebTextInputWindowController.m; sourceTree = "<group>"; };
 		1A77B02C0EE7730500C8A1F9 /* WebPluginRequest.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WebPluginRequest.h; sourceTree = "<group>"; };
 		1A77B02D0EE7730500C8A1F9 /* WebPluginRequest.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WebPluginRequest.m; sourceTree = "<group>"; };
+		1A781AC91C56FF7C00FB96DD /* WebKitAdditions.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = WebKitAdditions.mm; path = mac/WebKitAdditions.mm; sourceTree = "<group>"; };
 		1A86CCD31AD48A620074BA89 /* WebApplicationCacheInternal.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WebApplicationCacheInternal.h; sourceTree = "<group>"; };
 		1A8DED4E0EE88B8A00F25022 /* HostedNetscapePluginStream.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HostedNetscapePluginStream.h; sourceTree = "<group>"; };
 		1A8DED4F0EE88B8A00F25022 /* HostedNetscapePluginStream.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = HostedNetscapePluginStream.mm; sourceTree = "<group>"; };
@@ -606,6 +609,7 @@
 		511F3FD20CECC88F00852565 /* WebDatabaseManagerPrivate.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WebDatabaseManagerPrivate.h; sourceTree = "<group>"; };
 		511F3FD30CECC88F00852565 /* WebDatabaseManagerClient.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WebDatabaseManagerClient.h; sourceTree = "<group>"; };
 		511F3FD40CECC88F00852565 /* WebDatabaseManagerClient.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WebDatabaseManagerClient.mm; sourceTree = "<group>"; };
+		512BDB521C471591006494DF /* WebDatabaseProvider.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WebDatabaseProvider.mm; sourceTree = "<group>"; };
 		513D422E034CF55A00CA2ACD /* WebResourceLoadDelegate.h */ = {isa = PBXFileReference; fileEncoding = 30; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = WebResourceLoadDelegate.h; sourceTree = "<group>"; tabWidth = 8; usesTabs = 0; };
 		51443F9A0429392B00CA2D3A /* WebPolicyDelegate.h */ = {isa = PBXFileReference; fileEncoding = 30; indentWidth = 4; lastKnownFileType = sourcecode.c.h; path = WebPolicyDelegate.h; sourceTree = "<group>"; tabWidth = 8; usesTabs = 0; };
 		51443F9B0429392B00CA2D3A /* WebPolicyDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 30; indentWidth = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WebPolicyDelegate.mm; sourceTree = "<group>"; tabWidth = 8; usesTabs = 0; };
@@ -963,6 +967,7 @@
 				F5F732D202FF4D4F01A80180 /* WebKit.exp */,
 				319A3F4D1885E5FB00E0C900 /* WebKit.mac.exp */,
 				A10C1D8F1820307D0036883A /* WebKit.iOS.exp */,
+				1A781AC91C56FF7C00FB96DD /* WebKitAdditions.mm */,
 				F5C283730284676D018635CA /* WebKitPrefix.h */,
 				A182B74E199E7B8F001FD95A /* migrate-headers.sh */,
 				A182B74F199E7B8F001FD95A /* postprocess-headers.sh */,
@@ -1223,6 +1228,7 @@
 				511F3FD20CECC88F00852565 /* WebDatabaseManagerPrivate.h */,
 				1AA83F811A5C4AE400026EC6 /* WebDatabaseProvider.cpp */,
 				1AA83F821A5C4AE400026EC6 /* WebDatabaseProvider.h */,
+				512BDB521C471591006494DF /* WebDatabaseProvider.mm */,
 				A5DEFC0D11D5343E00885273 /* WebDatabaseQuotaManager.h */,
 				A5DEFC0E11D5343E00885273 /* WebDatabaseQuotaManager.mm */,
 				3AB02AF512C1319B00FBB694 /* WebStorageManager.mm */,
@@ -1894,7 +1900,6 @@
 				A10C1D3C18202FC50036883A /* WebNSStringExtrasIPhone.h in Headers */,
 				9398107E0824BF01008DF038 /* WebNSURLExtras.h in Headers */,
 				65E0F88408500917007E5CB9 /* WebNSURLRequestExtras.h in Headers */,
-				E4AEF97C1C0DF4BC00B01727 /* WebResourceLoadScheduler.h in Headers */,
 				65E0F9E608500F23007E5CB9 /* WebNSUserDefaultsExtras.h in Headers */,
 				939810240824BF01008DF038 /* WebNSViewExtras.h in Headers */,
 				939810250824BF01008DF038 /* WebNSWindowExtras.h in Headers */,
@@ -1930,6 +1935,7 @@
 				934C4AA00F0141F7009372C0 /* WebResourceInternal.h in Headers */,
 				939810600824BF01008DF038 /* WebResourceLoadDelegate.h in Headers */,
 				656D333E0AF21AE900212169 /* WebResourceLoadDelegatePrivate.h in Headers */,
+				E4AEF97C1C0DF4BC00B01727 /* WebResourceLoadScheduler.h in Headers */,
 				939810890824BF01008DF038 /* WebResourcePrivate.h in Headers */,
 				7E6FEF0808985A7200C44C3F /* WebScriptDebugDelegate.h in Headers */,
 				C0167BF80D7F5DD00028696E /* WebScriptDebugger.h in Headers */,
@@ -2243,7 +2249,6 @@
 				BC7F889F10C9D30C00D6133D /* WebGeolocationPosition.mm in Sources */,
 				A10C1D3718202FC50036883A /* WebGeolocationProviderIOS.mm in Sources */,
 				939811130824BF01008DF038 /* WebHistory.mm in Sources */,
-				E4AEF97B1C0DF4BC00B01727 /* WebResourceLoadScheduler.cpp in Sources */,
 				939810BD0824BF01008DF038 /* WebHistoryItem.mm in Sources */,
 				1AAF5FC00EDE3A92008D883D /* WebHostedNetscapePluginView.mm in Sources */,
 				939810F30824BF01008DF038 /* WebHTMLRepresentation.mm in Sources */,
@@ -2261,6 +2266,7 @@
 				37D1DCA91065928C0068F7EF /* WebJSPDFDoc.mm in Sources */,
 				939811170824BF01008DF038 /* WebKeyGenerator.mm in Sources */,
 				939811030824BF01008DF038 /* WebKitErrors.m in Sources */,
+				1A781ACB1C56FF7C00FB96DD /* WebKitAdditions.mm in Sources */,
 				CD8BFCE715531224005AFB25 /* WebKitFullScreenListener.mm in Sources */,
 				939810C30824BF01008DF038 /* WebKitLogging.m in Sources */,
 				939810C40824BF01008DF038 /* WebKitNSStringExtras.mm in Sources */,
@@ -2295,6 +2301,7 @@
 				939810C70824BF01008DF038 /* WebNSImageExtras.m in Sources */,
 				934C4A910F01406C009372C0 /* WebNSObjectExtras.mm in Sources */,
 				939810C80824BF01008DF038 /* WebNSPasteboardExtras.mm in Sources */,
+				512BDB531C471591006494DF /* WebDatabaseProvider.mm in Sources */,
 				939811190824BF01008DF038 /* WebNSPrintOperationExtras.m in Sources */,
 				A10C1D3B18202FC50036883A /* WebNSStringExtrasIOS.m in Sources */,
 				939811120824BF01008DF038 /* WebNSURLExtras.mm in Sources */,
@@ -2320,6 +2327,7 @@
 				939810F80824BF01008DF038 /* WebPreferences.mm in Sources */,
 				1A6A208D1886154600E50F5F /* WebProgressTrackerClient.mm in Sources */,
 				9398111A0824BF01008DF038 /* WebResource.mm in Sources */,
+				E4AEF97B1C0DF4BC00B01727 /* WebResourceLoadScheduler.cpp in Sources */,
 				7E6FEF0908985A7200C44C3F /* WebScriptDebugDelegate.mm in Sources */,
 				C0167BF90D7F5DD00028696E /* WebScriptDebugger.mm in Sources */,
 				C0B1F7E910AC8E3100C925D9 /* WebScriptWorld.mm in Sources */,

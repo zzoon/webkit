@@ -18,11 +18,11 @@
  *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-
 #include "config.h"
 
-#if ENABLE(MEDIA_STREAM) && USE(GSTREAMER) && USE(OPENWEBRTC)
 #include "MediaPlayerPrivateGStreamerOwr.h"
+
+#if ENABLE(MEDIA_STREAM) && USE(GSTREAMER) && USE(OPENWEBRTC)
 
 #include "GStreamerUtilities.h"
 #include "MediaPlayer.h"
@@ -43,11 +43,9 @@ namespace WebCore {
 
 MediaPlayerPrivateGStreamerOwr::MediaPlayerPrivateGStreamerOwr(MediaPlayer* player)
     : MediaPlayerPrivateGStreamerBase(player)
-    , m_paused(true)
-    , m_stopped(true)
 {
-    if (isAvailable()) {
-        LOG_MEDIA_MESSAGE("Creating Stream media player");
+    if (initializeGStreamerAndGStreamerDebugging()) {
+        LOG_MEDIA_MESSAGE("Creating MediaPlayerPrivateGStreamerOwr");
 
         createVideoSink();
         createGSTAudioSinkBin();
@@ -56,7 +54,7 @@ MediaPlayerPrivateGStreamerOwr::MediaPlayerPrivateGStreamerOwr(MediaPlayer* play
 
 MediaPlayerPrivateGStreamerOwr::~MediaPlayerPrivateGStreamerOwr()
 {
-    LOG_MEDIA_MESSAGE("Destructing");
+    LOG_MEDIA_MESSAGE("Destroying");
 
     stop();
 }
@@ -95,14 +93,14 @@ bool MediaPlayerPrivateGStreamerOwr::hasAudio() const
 float MediaPlayerPrivateGStreamerOwr::currentTime() const
 {
     gint64 position = GST_CLOCK_TIME_NONE;
-    GstQuery* query= gst_query_new_position(GST_FORMAT_TIME);
+    GstQuery* query = gst_query_new_position(GST_FORMAT_TIME);
 
     if (m_videoSource && gst_element_query(m_videoSink.get(), query))
         gst_query_parse_position(query, 0, &position);
     else if (m_audioSource && gst_element_query(m_audioSink.get(), query))
         gst_query_parse_position(query, 0, &position);
 
-    float result = 0.0f;
+    float result = 0;
     if (static_cast<GstClockTime>(position) != GST_CLOCK_TIME_NONE)
         result = static_cast<double>(position) / GST_SECOND;
 
@@ -112,7 +110,7 @@ float MediaPlayerPrivateGStreamerOwr::currentTime() const
     return result;
 }
 
-void MediaPlayerPrivateGStreamerOwr::load(const String &url)
+void MediaPlayerPrivateGStreamerOwr::load(const String &)
 {
     notImplemented();
 }
@@ -125,7 +123,7 @@ void MediaPlayerPrivateGStreamerOwr::load(MediaStreamPrivate& streamPrivate)
     LOG_MEDIA_MESSAGE("Loading MediaStreamPrivate %p", &streamPrivate);
 
     m_streamPrivate = &streamPrivate;
-    if (!m_streamPrivate || !m_streamPrivate->active()) {
+    if (!m_streamPrivate->active()) {
         loadingFailed(MediaPlayer::NetworkError);
         return;
     }
@@ -139,17 +137,15 @@ void MediaPlayerPrivateGStreamerOwr::load(MediaStreamPrivate& streamPrivate)
         return;
 
     // If the stream contains video, wait for first video frame before setting
-    // HaveEnoughData
+    // HaveEnoughData.
     if (!hasVideo())
         m_readyState = MediaPlayer::HaveEnoughData;
 
     m_player->readyStateChanged();
-
 }
 
 void MediaPlayerPrivateGStreamerOwr::loadingFailed(MediaPlayer::NetworkState error)
 {
-
     if (m_networkState != error) {
         m_networkState = error;
         m_player->networkStateChanged();
@@ -162,6 +158,7 @@ void MediaPlayerPrivateGStreamerOwr::loadingFailed(MediaPlayer::NetworkState err
 
 bool MediaPlayerPrivateGStreamerOwr::didLoadingProgress() const
 {
+    // FIXME: Implement loading progress support.
     return true;
 }
 
@@ -187,23 +184,29 @@ bool MediaPlayerPrivateGStreamerOwr::internalLoad()
         RealtimeMediaSourceOwr* source = reinterpret_cast<RealtimeMediaSourceOwr*>(&track->source());
         OwrMediaSource* mediaSource = OWR_MEDIA_SOURCE(source->mediaSource());
 
-        if (track->type() == RealtimeMediaSource::Audio) {
+        switch (track->type()) {
+        case RealtimeMediaSource::Audio:
             if (m_audioSource && (m_audioSource.get() == source))
-                g_object_set(m_audioRenderer, "disabled", FALSE, nullptr);
+                g_object_set(m_audioRenderer.get(), "disabled", FALSE, nullptr);
 
-            owr_media_renderer_set_source(OWR_MEDIA_RENDERER(m_audioRenderer), mediaSource);
+            owr_media_renderer_set_source(OWR_MEDIA_RENDERER(m_audioRenderer.get()), mediaSource);
             m_audioSource = source;
             source->addObserver(this);
-        } else if (track->type() == RealtimeMediaSource::Video) {
+            break;
+        case RealtimeMediaSource::Video:
             if (m_videoSource && (m_videoSource.get() == source))
-                g_object_set(m_videoRenderer, "disabled", FALSE, nullptr);
+                g_object_set(m_videoRenderer.get(), "disabled", FALSE, nullptr);
 
-            g_object_set(m_videoRenderer, "width", 640, "height", 480, nullptr);
-            owr_media_renderer_set_source(OWR_MEDIA_RENDERER(m_videoRenderer), mediaSource);
+            // FIXME: Remove hardcoded video dimensions when the rendering performance:
+            // https://webkit.org/b/153826.
+            g_object_set(m_videoRenderer.get(), "width", 640, "height", 480, nullptr);
+            owr_media_renderer_set_source(OWR_MEDIA_RENDERER(m_videoRenderer.get()), mediaSource);
             m_videoSource = source;
             source->addObserver(this);
-        } else
-            ASSERT_NOT_REACHED();
+            break;
+        case RealtimeMediaSource::None:
+            WARN_MEDIA_MESSAGE("Loading a track with None type");
+        }
     }
 
     m_readyState = MediaPlayer::HaveEnoughData;
@@ -219,44 +222,42 @@ void MediaPlayerPrivateGStreamerOwr::stop()
     m_stopped = true;
     if (m_audioSource) {
         LOG_MEDIA_MESSAGE("Stop: disconnecting audio");
-        g_object_set(m_audioRenderer, "disabled", TRUE, nullptr);
+        g_object_set(m_audioRenderer.get(), "disabled", TRUE, nullptr);
     }
     if (m_videoSource) {
         LOG_MEDIA_MESSAGE("Stop: disconnecting video");
-        g_object_set(m_videoRenderer, "disabled", TRUE, nullptr);
+        g_object_set(m_videoRenderer.get(), "disabled", TRUE, nullptr);
     }
 }
 
 void MediaPlayerPrivateGStreamerOwr::registerMediaEngine(MediaEngineRegistrar registrar)
 {
-    if (isAvailable()) {
+    if (initializeGStreamerAndGStreamerDebugging()) {
         registrar([](MediaPlayer* player) {
             return std::make_unique<MediaPlayerPrivateGStreamerOwr>(player);
         }, getSupportedTypes, supportsType, 0, 0, 0, 0);
     }
 }
 
-void MediaPlayerPrivateGStreamerOwr::getSupportedTypes(HashSet<String>& types)
+void MediaPlayerPrivateGStreamerOwr::getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>&)
 {
-    // FIXME
+    // Not supported in this media player.
 }
 
-MediaPlayer::SupportsType MediaPlayerPrivateGStreamerOwr::supportsType(const MediaEngineSupportParameters& parameters)
+MediaPlayer::SupportsType MediaPlayerPrivateGStreamerOwr::supportsType(const MediaEngineSupportParameters&)
 {
-    // FIXME
     return MediaPlayer::IsNotSupported;
 }
 
-bool MediaPlayerPrivateGStreamerOwr::isAvailable()
+bool MediaPlayerPrivateGStreamerOwr::initializeGStreamerAndGStreamerDebugging()
 {
     if (!initializeGStreamer())
         return false;
 
-    static bool debugRegistered = false;
-    if (!debugRegistered) {
+    static std::once_flag debugRegisteredFlag;
+    std::call_once(debugRegisteredFlag, [] {
         GST_DEBUG_CATEGORY_INIT(webkit_openwebrtc_debug, "webkitowrplayer", 0, "WebKit OpenWebRTC player");
-        debugRegistered = true;
-    }
+    });
 
     return true;
 }
@@ -265,32 +266,33 @@ void MediaPlayerPrivateGStreamerOwr::createGSTAudioSinkBin()
 {
     ASSERT(!m_audioSink);
     LOG_MEDIA_MESSAGE("Creating audio sink");
-    // FIXME: volume/mute support
+    // FIXME: volume/mute support: https://webkit.org/b/153828.
 
     GRefPtr<GstElement> sink = gst_element_factory_make("autoaudiosink", 0);
-    GstStateChangeReturn stateChangeResult = gst_element_set_state(sink.get(), GST_STATE_READY);
     GstChildProxy* childProxy = GST_CHILD_PROXY(sink.get());
     m_audioSink = adoptGRef(GST_ELEMENT(gst_child_proxy_get_child_by_index(childProxy, 0)));
     gst_element_set_state(sink.get(), GST_STATE_NULL);
 
-    m_audioRenderer = owr_gst_audio_renderer_new(m_audioSink.get());
+    m_audioRenderer = adoptGRef(owr_gst_audio_renderer_new(m_audioSink.get()));
 }
 
 void MediaPlayerPrivateGStreamerOwr::sourceStopped()
 {
     LOG_MEDIA_MESSAGE("Source stopped");
 
-    if (!m_streamPrivate || !m_streamPrivate->active())
+    if (!m_streamPrivate || !m_streamPrivate->active()) {
         stop();
+        return;
+    }
 
-    for (auto track : m_streamPrivate->tracks()) {
-        RealtimeMediaSourceOwr* source = reinterpret_cast<RealtimeMediaSourceOwr*>(&track->source());
+    for (auto& track : m_streamPrivate->tracks()) {
+        auto* source = reinterpret_cast<RealtimeMediaSourceOwr*>(&track->source());
         if (track->enabled())
             continue;
         if (source == m_audioSource)
-            g_object_set(m_audioRenderer, "disabled", TRUE, nullptr);
+            g_object_set(m_audioRenderer.get(), "disabled", TRUE, nullptr);
         else if (source == m_videoSource)
-            g_object_set(m_videoRenderer, "disabled", TRUE, nullptr);
+            g_object_set(m_videoRenderer.get(), "disabled", TRUE, nullptr);
     }
 }
 
@@ -313,8 +315,8 @@ bool MediaPlayerPrivateGStreamerOwr::preventSourceFromStopping()
 GstElement* MediaPlayerPrivateGStreamerOwr::createVideoSink()
 {
     GstElement* sink = MediaPlayerPrivateGStreamerBase::createVideoSink();
-    m_videoRenderer = owr_gst_video_renderer_new(sink);
-    return nullptr;
+    m_videoRenderer = adoptGRef(owr_gst_video_renderer_new(sink));
+    return sink;
 }
 
 } // namespace WebCore

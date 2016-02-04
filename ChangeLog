@@ -1,3 +1,255 @@
+2016-02-04  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Unreviewed non X86_64 buildfix after r196077.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+
+2016-02-03  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK][EFL] Switch FTL to B3
+        https://bugs.webkit.org/show_bug.cgi?id=153478
+
+        Reviewed by Csaba Osztrogonác.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+
+2016-02-02  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Unreviewed attempt to fix Mac CMake build after r195999.
+
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        Add ENABLE_RESOURCE_USAGE to CMake builds.
+
+2016-02-02  Alejandro G. Castro  <alex@igalia.com>
+
+        [GTK][EFL] Upgrade OpenWebRTC dependency
+        https://bugs.webkit.org/show_bug.cgi?id=153489
+
+        Reviewed by Philippe Normand.
+
+        * Source/cmake/FindOpenWebRTC.cmake: Bump OpenWebRTC dependency,
+        required to make the mediastream work.
+
+2016-02-01  Alex Christensen  <achristensen@webkit.org>
+
+        [Win] WTFHeaderDetection.h no longer needed
+        https://bugs.webkit.org/show_bug.cgi?id=153753
+        rdar://problem/24434627
+
+        Reviewed by Darin Adler.
+
+        * Source/cmake/WebKitFS.cmake:
+
+2016-01-31  Joonghun Park  <jh718.park@samsung.com>
+
+        [EFL] All API tests are broken on 15.10
+        https://bugs.webkit.org/show_bug.cgi?id=153528
+
+        Reviewed by Gyuyoung Kim.
+
+        * CMakeLists.txt: Having include(WebKitCommon) statement follow
+        CMAKE_FOO_OUTPUT_DIRECTORY otherwise all the API tests gets blocked.
+
+2016-01-30  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Enable SamplingProfiler on POSIX environment
+        https://bugs.webkit.org/show_bug.cgi?id=153584
+
+        Reviewed by Michael Saboff.
+
+        Add features.h header check. It will define __GLIBC__.
+
+        * Source/cmake/OptionsCommon.cmake:
+
+2016-01-27  Alexey Proskuryakov  <ap@apple.com>
+
+        Remove ENABLE_CURRENTSRC
+        https://bugs.webkit.org/show_bug.cgi?id=153545
+
+        Reviewed by Simon Fraser.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/OptionsMac.cmake:
+        * Source/cmake/OptionsWin.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmake/tools/vsprops/FeatureDefines.props:
+        * Source/cmake/tools/vsprops/FeatureDefinesCairo.props:
+
+2016-01-25  Alex Christensen  <achristensen@webkit.org>
+
+        Fix internal Windows build
+        https://bugs.webkit.org/show_bug.cgi?id=153469
+
+        Reviewed by Brent Fulgham.
+
+        * Source/cmake/WebKitMacros.cmake:
+        Pass the GPERF_EXECUTABLE that we found to make-hash-tools.pl.
+
+2016-01-23  Aaron Chu  <arona.chu@gmail.com>
+
+        Web Inspector: AXI: node-link-list should be collapsible
+        https://bugs.webkit.org/show_bug.cgi?id=130911
+        
+        Added a manual test to test the node list in the Accessibility Inspector
+
+        Reviewed by Timothy Hatcher.
+
+        * ManualTests/accessibility/collapsible-node-link-list.html: Added.
+
+2016-01-22  Alex Christensen  <achristensen@webkit.org>
+
+        Fix internal Windows build
+        https://bugs.webkit.org/show_bug.cgi?id=153385
+        rdar://problem/24310408
+
+        Reviewed by Brian Weinstein.
+
+        * Source/cmake/WinTools.make:
+        * Source/cmake/tools/vsprops: Copied from WebKitLibraries/win/tools/vsprops.
+        These property sheets are needed for some projects that are not in this repository
+        and don't use CMake in the official build.  We want to leave them unchanged for now.
+
+2016-01-22  Alex Christensen  <achristensen@webkit.org>
+
+        Only set CMake output directories if they aren't already set
+        https://bugs.webkit.org/show_bug.cgi?id=153373
+
+        Reviewed by Michael Catanzaro.
+
+        * CMakeLists.txt:
+        r195242 caused Windows builds to copy files to bin instead of bin64.
+        CMAKE_RUNTIME_OUTPUT_DIRECTORY is being set in OptionsWin.cmake, and this was now resetting it.
+        This also makes it so you can set these variables by command line.
+
+2016-01-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.11.4 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2016-01-18  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [CMake] Duplicate attempts to find software during cmake stage
+        https://bugs.webkit.org/show_bug.cgi?id=153211
+
+        Reviewed by Martin Robinson.
+
+        * CMakeLists.txt: Remove duplication of commands in WebKitCommon.cmake.
+        * Source/cmake/WebKitCommon.cmake: Guard the entire file so it runs only once.
+
+2016-01-17  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [CMake] Do not build bmalloc when USE_SYSTEM_MALLOC is ON
+        https://bugs.webkit.org/show_bug.cgi?id=153190
+
+        Reviewed by Csaba Osztrogonác.
+
+        Build bmalloc when NOT USE_SYSTEM_MALLOC rather than when NOT WIN32.
+
+        * Source/CMakeLists.txt:
+        * Source/cmake/OptionsWin.cmake:
+
+2016-01-16  Jeremy Huddleston Sequoia  <jeremyhu@apple.com>
+
+        [GTK] Use -Wl,-all_load on darwin to include contents of all static archives
+
+        https://bugs.webkit.org/show_bug.cgi?id=153117
+
+        Reviewed by Michael Catanzaro.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2016-01-13  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [CMake] Do not use LLVM static libraries for FTL JIT
+        https://bugs.webkit.org/show_bug.cgi?id=151559
+
+        Reviewed by Michael Catanzaro.
+
+        Also export LLVM_LIBRARIES variable that can be used to prefer
+        linking to the llvm dynamic libraries.
+
+        * Source/cmake/FindLLVM.cmake:
+
+2016-01-13  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK] Add comments above options declarations in OptionsGTK.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=153074
+
+        Reviewed by Martin Robinson.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2016-01-12  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update OptionsGTK.cmake and NEWS for 2.11.3 release.
+
+        * Source/cmake/OptionsGTK.cmake: Bump version numbers.
+
+2016-01-12  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add a build flag for custom element
+        https://bugs.webkit.org/show_bug.cgi?id=153005
+
+        Reviewed by Alex Christensen.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsWin.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+
+2016-01-08  Alex Christensen  <achristensen@webkit.org>
+
+        Fix internal Windows build
+        https://bugs.webkit.org/show_bug.cgi?id=152937
+
+        Reviewed by Brent Fulgham.
+
+        * Source/cmake/WebKitCommon.cmake:
+        Try looking in the default cygwin installation directory for executables like bison, flex, gperf, and ruby.
+        This is needed on Windows builds that are not driven by cygwin, but need to use the cygwin installations of these tools.
+        This is the effective equivalent of this line in WebKitLibraries/win/tools/vsprops/common.props in the old build system:
+        set PATH=%SystemDrive%\cygwin\bin;%PATH%
+
+2016-01-06  Gyuyoung Kim  <gyuyoung.kim@webkit.org>
+
+        [EFL] Set WebKit2 process output name
+        https://bugs.webkit.org/show_bug.cgi?id=152773
+
+        Reviewed by Benjamin Poulain.
+
+        If we add *WebKit* prefix to each WK2 process, it is more clear when checking what process is running.
+        So this patch sets wk2 process output name.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2016-01-05  Zan Dobersek  <zdobersek@igalia.com>
+
+        [CMake] Remove USE_UDIS86 variable
+        https://bugs.webkit.org/show_bug.cgi?id=152731
+
+        Reviewed by Gyuyoung Kim.
+
+        Remove the USE_UDIS86 variable in CMake files. The specific build guard
+        is now enabled by default in Source/WTF/wtf/Platform.h, so the handling
+        in CMake isn't required anymore. The Udis86-specific files have to be
+        built unconditionally now, though.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/OptionsMac.cmake:
+
+2016-01-04  Alex Christensen  <achristensen@webkit.org>
+
+        Fix Mac CMake build after r194454.
+
+        * Source/cmake/OptionsMac.cmake:
+        _macosx, _iphoneos, and _iphonesimulator are used in FeatureDefines.xcconfig but won't be used in CMake.
+        If we actually switch to CMake, we will need to verify that all the feature enabling is equivalent, and it isn't right now.
+
 2015-12-31  Michael Catanzaro  <mcatanzaro@igalia.com>
 
         [GTK][CMake] Do not override default values of build options with the default value

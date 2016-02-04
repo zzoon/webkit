@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -59,15 +59,35 @@ void ControlValue::convertToJump(BasicBlock* destination)
 
     this->ControlValue::~ControlValue();
 
-    new (this) ControlValue(index, Jump, origin, FrequentedBlock(destination));
+    new (this) ControlValue(Jump, origin, FrequentedBlock(destination));
 
     this->owner = owner;
+    this->m_index = index;
+}
+
+void ControlValue::convertToOops()
+{
+    unsigned index = this->index();
+    Origin origin = this->origin();
+    BasicBlock* owner = this->owner;
+
+    this->ControlValue::~ControlValue();
+
+    new (this) ControlValue(Oops, origin);
+
+    this->owner = owner;
+    this->m_index = index;
 }
 
 void ControlValue::dumpMeta(CommaPrinter& comma, PrintStream& out) const
 {
     for (FrequentedBlock successor : m_successors)
         out.print(comma, successor);
+}
+
+Value* ControlValue::cloneImpl() const
+{
+    return new ControlValue(*this);
 }
 
 } } // namespace JSC::B3

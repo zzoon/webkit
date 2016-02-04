@@ -41,6 +41,7 @@
 #if USE(MEDIA_FOUNDATION)
 
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 
 SOFT_LINK_LIBRARY(Mf);
 SOFT_LINK_OPTIONAL(Mf, MFCreateSourceResolver, HRESULT, STDAPICALLTYPE, (IMFSourceResolver**));
@@ -51,6 +52,7 @@ SOFT_LINK_OPTIONAL(Mf, MFGetService, HRESULT, STDAPICALLTYPE, (IUnknown*, REFGUI
 SOFT_LINK_OPTIONAL(Mf, MFCreateAudioRendererActivate, HRESULT, STDAPICALLTYPE, (IMFActivate**));
 SOFT_LINK_OPTIONAL(Mf, MFCreateVideoRendererActivate, HRESULT, STDAPICALLTYPE, (HWND, IMFActivate**));
 SOFT_LINK_OPTIONAL(Mf, MFCreateSampleGrabberSinkActivate, HRESULT, STDAPICALLTYPE, (IMFMediaType*, IMFSampleGrabberSinkCallback*, IMFActivate**));
+SOFT_LINK_OPTIONAL(Mf, MFGetSupportedMimeTypes, HRESULT, STDAPICALLTYPE, (PROPVARIANT*));
 
 SOFT_LINK_LIBRARY(Mfplat);
 SOFT_LINK_OPTIONAL(Mfplat, MFStartup, HRESULT, STDAPICALLTYPE, (ULONG, DWORD));
@@ -118,9 +120,37 @@ bool MediaPlayerPrivateMediaFoundation::isAvailable()
     return true;
 }
 
-void MediaPlayerPrivateMediaFoundation::getSupportedTypes(HashSet<String>& types)
+static const HashSet<String, ASCIICaseInsensitiveHash>& mimeTypeCache()
 {
-    types.add(String("video/mp4"));
+    static NeverDestroyed<HashSet<String, ASCIICaseInsensitiveHash>> cachedTypes;
+
+    if (cachedTypes.get().size() > 0)
+        return cachedTypes;
+
+    cachedTypes.get().add(String("video/mp4"));
+
+    if (!MFGetSupportedMimeTypesPtr())
+        return cachedTypes;
+
+    PROPVARIANT propVarMimeTypeArray;
+    PropVariantInit(&propVarMimeTypeArray);
+
+    HRESULT hr = MFGetSupportedMimeTypesPtr()(&propVarMimeTypeArray);
+
+    if (SUCCEEDED(hr)) {
+        CALPWSTR mimeTypeArray = propVarMimeTypeArray.calpwstr;
+        for (unsigned i = 0; i < mimeTypeArray.cElems; i++)
+            cachedTypes.get().add(mimeTypeArray.pElems[i]);
+    }
+
+    PropVariantClear(&propVarMimeTypeArray);
+
+    return cachedTypes;
+}
+
+void MediaPlayerPrivateMediaFoundation::getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>& types)
+{
+    types = mimeTypeCache();
 }
 
 MediaPlayer::SupportsType MediaPlayerPrivateMediaFoundation::supportsType(const MediaEngineSupportParameters& parameters)
@@ -128,7 +158,7 @@ MediaPlayer::SupportsType MediaPlayerPrivateMediaFoundation::supportsType(const 
     if (parameters.type.isNull() || parameters.type.isEmpty())
         return MediaPlayer::IsNotSupported;
 
-    if (parameters.type == "video/mp4")
+    if (mimeTypeCache().contains(parameters.type))
         return MediaPlayer::IsSupported;
 
     return MediaPlayer::IsNotSupported;
@@ -749,8 +779,10 @@ MediaPlayerPrivateMediaFoundation::AsyncCallback::~AsyncCallback()
         m_mediaPlayer->removeListener(this);
 }
 
-HRESULT MediaPlayerPrivateMediaFoundation::AsyncCallback::QueryInterface(REFIID riid, __RPC__deref_out void __RPC_FAR *__RPC_FAR *ppvObject)
+HRESULT MediaPlayerPrivateMediaFoundation::AsyncCallback::QueryInterface(_In_ REFIID riid, __RPC__deref_out void __RPC_FAR *__RPC_FAR *ppvObject)
 {
+    if (!ppvObject)
+        return E_POINTER;
     if (!IsEqualGUID(riid, IID_IMFAsyncCallback)) {
         *ppvObject = nullptr;
         return E_NOINTERFACE;

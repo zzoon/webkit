@@ -31,6 +31,7 @@
 #include "RemoteNetworkingContext.h"
 
 #if USE(NETWORK_SESSION)
+#include "DownloadID.h"
 #include "NetworkSession.h"
 #include <WebCore/AuthenticationChallenge.h>
 #else
@@ -60,7 +61,10 @@ public:
     void continueDidReceiveResponse();
 
 #if USE(NETWORK_SESSION)
-    void convertTaskToDownload();
+    void convertTaskToDownload(DownloadID);
+    void setPendingDownloadID(DownloadID);
+    void setPendingDownload(PendingDownload&);
+    DownloadID pendingDownloadID() { return m_task->pendingDownloadID(); }
     
     // NetworkSessionTaskClient.
     virtual void willPerformHTTPRedirection(const WebCore::ResourceResponse&, const WebCore::ResourceRequest&, std::function<void(const WebCore::ResourceRequest&)>) final override;
@@ -69,6 +73,9 @@ public:
     virtual void didReceiveData(RefPtr<WebCore::SharedBuffer>&&) final override;
     virtual void didCompleteWithError(const WebCore::ResourceError&) final override;
     virtual void didBecomeDownload() final override;
+    virtual void didSendData(uint64_t totalBytesSent, uint64_t totalBytesExpectedToSend) override;
+    virtual void wasBlocked() override;
+    virtual void cannotShowURL() override;
 #else
     // ResourceHandleClient
     virtual void willSendRequestAsync(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse& redirectResponse) override;
@@ -117,14 +124,14 @@ private:
 
     NetworkLoadClient& m_client;
     const NetworkLoadParameters m_parameters;
-    RefPtr<RemoteNetworkingContext> m_networkingContext;
 #if USE(NETWORK_SESSION)
-    Ref<NetworkDataTask> m_task;
+    RefPtr<NetworkDataTask> m_task;
     WebCore::AuthenticationChallenge m_challenge;
     ChallengeCompletionHandler m_challengeCompletionHandler;
     ResponseCompletionHandler m_responseCompletionHandler;
     RedirectCompletionHandler m_redirectCompletionHandler;
 #else
+    RefPtr<RemoteNetworkingContext> m_networkingContext;
     RefPtr<WebCore::ResourceHandle> m_handle;
 #endif
 

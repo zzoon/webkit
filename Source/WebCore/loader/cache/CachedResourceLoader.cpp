@@ -221,20 +221,24 @@ CachedResourceHandle<CachedCSSStyleSheet> CachedResourceLoader::requestUserCSSSt
 #endif
 
     auto& memoryCache = MemoryCache::singleton();
-    if (CachedResource* existing = memoryCache.resourceForRequest(request.resourceRequest(), sessionID())) {
-        if (is<CachedCSSStyleSheet>(*existing))
-            return downcast<CachedCSSStyleSheet>(existing);
-        memoryCache.remove(*existing);
+    if (request.allowsCaching()) {
+        if (CachedResource* existing = memoryCache.resourceForRequest(request.resourceRequest(), sessionID())) {
+            if (is<CachedCSSStyleSheet>(*existing))
+                return downcast<CachedCSSStyleSheet>(existing);
+            memoryCache.remove(*existing);
+        }
     }
+
     if (url.string() != request.resourceRequest().url())
         request.mutableResourceRequest().setURL(url);
 
     CachedResourceHandle<CachedCSSStyleSheet> userSheet = new CachedCSSStyleSheet(request.resourceRequest(), request.charset(), sessionID());
 
-    memoryCache.add(*userSheet);
+    if (request.allowsCaching())
+        memoryCache.add(*userSheet);
     // FIXME: loadResource calls setOwningCachedResourceLoader() if the resource couldn't be added to cache. Does this function need to call it, too?
 
-    userSheet->load(*this, ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, SkipSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::SkipPolicyCheck, DefersLoadingPolicy::AllowDefersLoading));
+    userSheet->load(*this, ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, ClientRequestedCredentials, SkipSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::SkipPolicyCheck, DefersLoadingPolicy::AllowDefersLoading, CachingPolicy::AllowCaching));
     
     return userSheet;
 }
@@ -555,7 +559,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
 #endif
 
     auto& memoryCache = MemoryCache::singleton();
-    if (memoryCache.disabled()) {
+    if (request.allowsCaching() && memoryCache.disabled()) {
         DocumentResourceMap::iterator it = m_documentResources.find(url.string());
         if (it != m_documentResources.end()) {
             it->value->setOwningCachedResourceLoader(nullptr);
@@ -570,11 +574,12 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
         request.mutableResourceRequest().setDomainForCachePartition(document()->topOrigin()->domainForCachePartition());
 #endif
 
-    resource = memoryCache.resourceForRequest(request.resourceRequest(), sessionID());
+    if (request.allowsCaching())
+        resource = memoryCache.resourceForRequest(request.resourceRequest(), sessionID());
 
     logMemoryCacheResourceRequest(frame(), resource ? DiagnosticLoggingKeys::inMemoryCacheKey() : DiagnosticLoggingKeys::notInMemoryCacheKey());
 
-    const RevalidationPolicy policy = determineRevalidationPolicy(type, request.mutableResourceRequest(), request.forPreload(), resource.get(), request.defer());
+    const RevalidationPolicy policy = determineRevalidationPolicy(type, request, resource.get());
     switch (policy) {
     case Reload:
         memoryCache.remove(*resource);
@@ -608,7 +613,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
 
         // We don't support immediate loads, but we do support immediate failure.
         if (resource->errorOccurred()) {
-            if (resource->inCache())
+            if (resource->allowsCaching() && resource->inCache())
                 memoryCache.remove(*resource);
             return nullptr;
         }
@@ -636,6 +641,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::revalidateResource(co
     ASSERT(resource->canUseCacheValidator());
     ASSERT(!resource->resourceToRevalidate());
     ASSERT(resource->sessionID() == sessionID());
+    ASSERT(resource->allowsCaching());
 
     CachedResourceHandle<CachedResource> newResource = createResource(resource->type(), resource->resourceRequest(), resource->encoding(), resource->sessionID());
 
@@ -661,7 +667,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::loadResource(CachedRe
 
     CachedResourceHandle<CachedResource> resource = createResource(type, request.mutableResourceRequest(), request.charset(), sessionID());
 
-    if (!memoryCache.add(*resource))
+    if (request.allowsCaching() && !memoryCache.add(*resource))
         resource->setOwningCachedResourceLoader(this);
 #if ENABLE(RESOURCE_TIMING)
     storeResourceTimingInitiatorInformation(resource, request);
@@ -713,13 +719,15 @@ static void logResourceRevalidationDecision(CachedResource::RevalidationDecision
     }
 }
 
-CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalidationPolicy(CachedResource::Type type, ResourceRequest& request, bool forPreload, CachedResource* existingResource, CachedResourceRequest::DeferOption defer) const
+CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalidationPolicy(CachedResource::Type type, CachedResourceRequest& cachedResourceRequest, CachedResource* existingResource) const
 {
+    auto& request = cachedResourceRequest.resourceRequest();
+
     if (!existingResource)
         return Load;
 
     // We already have a preload going for this URL.
-    if (forPreload && existingResource->isPreloaded())
+    if (cachedResourceRequest.forPreload() && existingResource->isPreloaded())
         return Use;
 
     // If the same URL has been loaded as a different type, we need to reload.
@@ -728,6 +736,9 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
         logMemoryCacheResourceRequest(frame(), DiagnosticLoggingKeys::inMemoryCacheKey(), DiagnosticLoggingKeys::unusedReasonTypeMismatchKey());
         return Reload;
     }
+
+    if (existingResource->encoding() != TextEncoding(cachedResourceRequest.charset()))
+        return Reload;
 
     // FIXME: We should use the same cache policy for all resource types. The raw resource policy is overly strict
     //        while the normal subresource policy is too loose.
@@ -743,7 +754,7 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
 
     // Do not load from cache if images are not enabled. The load for this image will be blocked
     // in CachedImage::load.
-    if (CachedResourceRequest::DeferredByClient == defer)
+    if (cachedResourceRequest.defer() == CachedResourceRequest::DeferredByClient)
         return Reload;
     
     // Don't reload resources while pasting.
@@ -1146,7 +1157,7 @@ void CachedResourceLoader::printPreloadStats()
                 imageMisses++;
         }
         
-        if (resource->errorOccurred())
+        if (resource->errorOccurred() && resource->preloadResult() == CachedResource::PreloadNotReferenced)
             MemoryCache::singleton().remove(resource);
         
         resource->decreasePreloadCount();
@@ -1164,7 +1175,7 @@ void CachedResourceLoader::printPreloadStats()
 
 const ResourceLoaderOptions& CachedResourceLoader::defaultCachedResourceOptions()
 {
-    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck, DefersLoadingPolicy::AllowDefersLoading);
+    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForAllCredentials, ClientRequestedCredentials, DoSecurityCheck, UseDefaultOriginRestrictionsForType, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck, DefersLoadingPolicy::AllowDefersLoading, CachingPolicy::AllowCaching);
     return options;
 }
 

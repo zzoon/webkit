@@ -108,6 +108,10 @@
 #include "MediaElementAudioSourceNode.h"
 #endif
 
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
+#include "WebVideoFullscreenInterface.h"
+#endif
+
 #if PLATFORM(IOS)
 #include "RuntimeApplicationChecksIOS.h"
 #include "WebVideoFullscreenInterfaceAVKit.h"
@@ -206,7 +210,7 @@ using namespace HTMLNames;
 typedef HashMap<Document*, HashSet<HTMLMediaElement*>> DocumentElementSetMap;
 static DocumentElementSetMap& documentToElementSetMap()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(DocumentElementSetMap, map, ());
+    static NeverDestroyed<DocumentElementSetMap> map;
     return map;
 }
 
@@ -337,7 +341,7 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document& docum
     , m_lastTimeUpdateEventMovieTime(MediaTime::positiveInfiniteTime())
     , m_loadState(WaitingForSource)
     , m_videoFullscreenMode(VideoFullscreenModeNone)
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     , m_videoFullscreenGravity(MediaPlayer::VideoGravityResizeAspect)
 #endif
     , m_preload(MediaPlayer::Auto)
@@ -660,9 +664,9 @@ void HTMLMediaElement::parseAttribute(const QualifiedName& name, const AtomicStr
     else if (name == loopAttr)
         updateSleepDisabling();
     else if (name == preloadAttr) {
-        if (equalIgnoringCase(value, "none"))
+        if (equalLettersIgnoringASCIICase(value, "none"))
             m_preload = MediaPlayer::None;
-        else if (equalIgnoringCase(value, "metadata"))
+        else if (equalLettersIgnoringASCIICase(value, "metadata"))
             m_preload = MediaPlayer::MetaData;
         else {
             // The spec does not define an "invalid value default" but "auto" is suggested as the
@@ -918,7 +922,7 @@ String HTMLMediaElement::canPlayType(const String& mimeType, const String& keySy
 {
     MediaEngineSupportParameters parameters;
     ContentType contentType(mimeType);
-    parameters.type = contentType.type().lower();
+    parameters.type = contentType.type().convertToASCIILowercase();
     parameters.codecs = contentType.parameter(ASCIILiteral("codecs"));
     parameters.url = url;
 #if ENABLE(ENCRYPTED_MEDIA)
@@ -2148,6 +2152,7 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
     if (m_readyState >= HAVE_METADATA && oldState < HAVE_METADATA) {
         prepareMediaFragmentURI();
         scheduleEvent(eventNames().durationchangeEvent);
+        scheduleResizeEvent();
         scheduleEvent(eventNames().loadedmetadataEvent);
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
         if (hasEventListeners(eventNames().webkitplaybacktargetavailabilitychangedEvent))
@@ -2689,6 +2694,7 @@ void HTMLMediaElement::refreshCachedTime() const
 
 void HTMLMediaElement::invalidateCachedTime() const
 {
+    m_cachedTime = MediaTime::invalidTime();
     if (!m_player || !m_player->maximumDurationToCacheMediaTime())
         return;
 
@@ -2703,7 +2709,6 @@ void HTMLMediaElement::invalidateCachedTime() const
     static const double minimumTimePlayingBeforeCacheSnapshot = 0.5;
 
     m_minimumClockTimeToUpdateCachedTime = monotonicallyIncreasingTime() + minimumTimePlayingBeforeCacheSnapshot;
-    m_cachedTime = MediaTime::invalidTime();
 }
 
 // playback state
@@ -3573,9 +3578,13 @@ void HTMLMediaElement::addTextTrack(PassRefPtr<TextTrack> track)
 
     if (!m_requireCaptionPreferencesChangedCallbacks) {
         m_requireCaptionPreferencesChangedCallbacks = true;
-        document().registerForCaptionPreferencesChangedCallbacks(this);
+        Document& document = this->document();
+        document.registerForCaptionPreferencesChangedCallbacks(this);
+        if (Page* page = document.page())
+            m_captionDisplayMode = page->group().captionPreferences()->captionDisplayMode();
     }
 
+    track->setManualSelectionMode(m_captionDisplayMode == CaptionUserPreferences::Manual);
     textTracks()->append(track);
 
     closeCaptionTracksChanged();
@@ -4149,7 +4158,7 @@ URL HTMLMediaElement::selectNextSourceChild(ContentType* contentType, String* ke
         
         if (source->fastHasAttribute(mediaAttr)) {
             MediaQueryEvaluator screenEval("screen", document().frame(), renderer() ? &renderer()->style() : nullptr);
-            RefPtr<MediaQuerySet> media = MediaQuerySet::createAllowingDescriptionSyntax(source->media());
+            RefPtr<MediaQuerySet> media = source->mediaQuerySet();
 #if !LOG_DISABLED
             if (shouldLog)
                 LOG(Media, "HTMLMediaElement::selectNextSourceChild(%p) - 'media' is %s", this, source->media().utf8().data());
@@ -4169,7 +4178,7 @@ URL HTMLMediaElement::selectNextSourceChild(ContentType* contentType, String* ke
 #endif
             MediaEngineSupportParameters parameters;
             ContentType contentType(type);
-            parameters.type = contentType.type().lower();
+            parameters.type = contentType.type().convertToASCIILowercase();
             parameters.codecs = contentType.parameter(ASCIILiteral("codecs"));
             parameters.url = mediaURL;
 #if ENABLE(ENCRYPTED_MEDIA)
@@ -4494,6 +4503,8 @@ void HTMLMediaElement::mediaPlayerSizeChanged(MediaPlayer*)
         downcast<MediaDocument>(document()).mediaElementNaturalSizeChanged(expandedIntSize(m_player->naturalSize()));
 
     beginProcessingMediaPlayerCallback();
+    if (m_readyState > HAVE_NOTHING)
+        scheduleResizeEventIfSizeChanged();
     if (renderer())
         renderer()->updateFromElement();
     endProcessingMediaPlayerCallback();
@@ -4548,7 +4559,7 @@ void HTMLMediaElement::mediaPlayerEngineUpdated(MediaPlayer*)
     }
 #endif
 
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     if (!m_player)
         return;
     m_player->setVideoFullscreenFrame(m_videoFullscreenFrame);
@@ -5293,7 +5304,7 @@ void HTMLMediaElement::enterFullscreen(VideoFullscreenMode mode)
         return;
 
 #if ENABLE(FULLSCREEN_API)
-    if (document().settings() && document().settings()->fullScreenEnabled()) {
+    if (mode == VideoFullscreenModeStandard && document().settings() && document().settings()->fullScreenEnabled()) {
         document().requestFullScreenForElement(this, 0, Document::ExemptIFrameAllowFullScreenRequirement);
         return;
     }
@@ -5304,7 +5315,7 @@ void HTMLMediaElement::enterFullscreen(VideoFullscreenMode mode)
         mediaControls()->enteredFullscreen();
     if (document().page() && is<HTMLVideoElement>(*this)) {
         HTMLVideoElement& asVideo = downcast<HTMLVideoElement>(*this);
-        if (document().page()->chrome().client().supportsVideoFullscreen()) {
+        if (document().page()->chrome().client().supportsVideoFullscreen(m_videoFullscreenMode)) {
             document().page()->chrome().client().enterVideoFullscreenForVideoElement(asVideo, m_videoFullscreenMode);
             scheduleEvent(eventNames().webkitbeginfullscreenEvent);
         }
@@ -5321,13 +5332,15 @@ void HTMLMediaElement::exitFullscreen()
     LOG(Media, "HTMLMediaElement::exitFullscreen(%p)", this);
 
 #if ENABLE(FULLSCREEN_API)
-    if (document().settings() && document().settings()->fullScreenEnabled()) {
-        if (document().webkitIsFullScreen() && document().webkitCurrentFullScreenElement() == this)
+    if (document().settings() && document().settings()->fullScreenEnabled() && document().webkitCurrentFullScreenElement() == this) {
+        if (document().webkitIsFullScreen())
             document().webkitCancelFullScreen();
         return;
     }
 #endif
+
     ASSERT(m_videoFullscreenMode != VideoFullscreenModeNone);
+    VideoFullscreenMode oldVideoFullscreenMode = m_videoFullscreenMode;
     fullscreenModeChanged(VideoFullscreenModeNone);
     if (hasMediaControls())
         mediaControls()->exitedFullscreen();
@@ -5335,7 +5348,7 @@ void HTMLMediaElement::exitFullscreen()
         if (m_mediaSession->requiresFullscreenForVideoPlayback(*this))
             pauseInternal();
 
-        if (document().page()->chrome().client().supportsVideoFullscreen()) {
+        if (document().page()->chrome().client().supportsVideoFullscreen(oldVideoFullscreenMode)) {
             document().page()->chrome().client().exitVideoFullscreenForVideoElement(downcast<HTMLVideoElement>(*this));
             scheduleEvent(eventNames().webkitendfullscreenEvent);
         }
@@ -5364,7 +5377,7 @@ PlatformLayer* HTMLMediaElement::platformLayer() const
     return m_player ? m_player->platformLayer() : nullptr;
 }
 
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
 void HTMLMediaElement::setVideoFullscreenLayer(PlatformLayer* platformLayer)
 {
     m_videoFullscreenLayer = platformLayer;
@@ -5715,6 +5728,11 @@ void HTMLMediaElement::captionPreferencesChanged()
     CaptionUserPreferences::CaptionDisplayMode displayMode = document().page()->group().captionPreferences()->captionDisplayMode();
     if (m_captionDisplayMode == displayMode)
         return;
+
+    if (m_captionDisplayMode == CaptionUserPreferences::Manual || displayMode == CaptionUserPreferences::Manual) {
+        for (unsigned i = 0; i < m_textTracks->length(); ++i)
+            m_textTracks->item(i)->setManualSelectionMode(displayMode == CaptionUserPreferences::Manual);
+    }
 
     m_captionDisplayMode = displayMode;
     setWebkitClosedCaptionsVisible(m_captionDisplayMode == CaptionUserPreferences::AlwaysOn);
@@ -6552,7 +6570,7 @@ bool HTMLMediaElement::shouldOverrideBackgroundPlaybackRestriction(PlatformMedia
 #endif
     if (m_videoFullscreenMode & VideoFullscreenModePictureInPicture)
         return true;
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     if (m_videoFullscreenMode == VideoFullscreenModeStandard && supportsPictureInPicture() && isPlaying())
         return true;
 #endif
@@ -6578,7 +6596,6 @@ void HTMLMediaElement::updateMediaState(UpdateMediaState updateState)
 
 MediaProducer::MediaStateFlags HTMLMediaElement::mediaState() const
 {
-
     MediaStateFlags state = IsNotPlaying;
 
     bool hasActiveVideo = isVideo() && hasVideo();
@@ -6587,12 +6604,18 @@ MediaProducer::MediaStateFlags HTMLMediaElement::mediaState() const
     if (m_player && m_player->isCurrentPlaybackTargetWireless())
         state |= IsPlayingToExternalDevice;
 
-    if (m_player && m_hasPlaybackTargetAvailabilityListeners && !m_mediaSession->wirelessVideoPlaybackDisabled(*this))
-        state |= RequiresPlaybackTargetMonitoring;
+    if (m_hasPlaybackTargetAvailabilityListeners) {
+        state |= HasPlaybackTargetAvailabilityListener;
+        if (!m_mediaSession->wirelessVideoPlaybackDisabled(*this))
+            state |= RequiresPlaybackTargetMonitoring;
+    }
 
     bool requireUserGesture = m_mediaSession->hasBehaviorRestriction(MediaElementSession::RequireUserGestureToAutoplayToExternalDevice);
     if (m_readyState >= HAVE_METADATA && !requireUserGesture && !m_failedToPlayToWirelessTarget)
         state |= ExternalDeviceAutoPlayCandidate;
+
+    if (hasActiveVideo || hasAudio)
+        state |= HasAudioOrVideo;
 
     if (hasActiveVideo && endedPlayback())
         state |= DidPlayToEnd;

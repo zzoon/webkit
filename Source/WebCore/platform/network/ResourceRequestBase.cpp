@@ -76,7 +76,7 @@ std::unique_ptr<ResourceRequest> ResourceRequestBase::adopt(std::unique_ptr<Cros
         ASSERT(encodingCount <= 3);
         request->setResponseContentDispositionEncodingFallbackArray(encoding1, encoding2, encoding3);
     }
-    request->setHTTPBody(data->httpBody);
+    request->setHTTPBody(data->httpBody.copyRef());
     request->setAllowCookies(data->allowCookies);
     request->doPlatformAdopt(WTFMove(data));
     return request;
@@ -379,6 +379,16 @@ void ResourceRequestBase::clearHTTPAccept()
         m_platformRequestUpdated = false;
 }
 
+void ResourceRequestBase::clearHTTPAcceptEncoding()
+{
+    updateResourceRequest();
+
+    m_httpHeaderFields.remove(HTTPHeaderName::AcceptEncoding);
+
+    if (url().protocolIsInHTTPFamily())
+        m_platformRequestUpdated = false;
+}
+
 void ResourceRequestBase::setResponseContentDispositionEncodingFallbackArray(const String& encoding1, const String& encoding2, const String& encoding3)
 {
     updateResourceRequest(); 
@@ -403,11 +413,11 @@ FormData* ResourceRequestBase::httpBody() const
     return m_httpBody.get();
 }
 
-void ResourceRequestBase::setHTTPBody(PassRefPtr<FormData> httpBody)
+void ResourceRequestBase::setHTTPBody(RefPtr<FormData>&& httpBody)
 {
     updateResourceRequest();
 
-    m_httpBody = httpBody;
+    m_httpBody = WTFMove(httpBody);
 
     m_resourceRequestBodyUpdated = true;
 

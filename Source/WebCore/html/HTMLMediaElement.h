@@ -120,7 +120,7 @@ public:
     WEBCORE_EXPORT virtual void returnToRealtime() override;
 
     // Eventually overloaded in HTMLVideoElement
-    virtual bool supportsFullscreen() const override { return false; };
+    virtual bool supportsFullscreen(HTMLMediaElementEnums::VideoFullscreenMode) const override { return false; };
 
     virtual bool supportsScanning() const override;
 
@@ -130,7 +130,7 @@ public:
 
     WEBCORE_EXPORT PlatformMedia platformMedia() const;
     PlatformLayer* platformLayer() const;
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     void setVideoFullscreenLayer(PlatformLayer*);
     PlatformLayer* videoFullscreenLayer() const { return m_videoFullscreenLayer.get(); }
     void setVideoFullscreenFrame(FloatRect);
@@ -638,6 +638,8 @@ private:
     void addPlayedRange(const MediaTime& start, const MediaTime& end);
     
     void scheduleTimeupdateEvent(bool periodicEvent);
+    virtual void scheduleResizeEvent() { }
+    virtual void scheduleResizeEventIfSizeChanged() { }
 
     // loading
     void selectMediaResource();
@@ -759,6 +761,7 @@ private:
         Synchronously,
     };
     void updateMediaState(UpdateMediaState updateState = UpdateMediaState::Synchronously);
+    bool hasPlaybackTargetAvailabilityListeners() const { return m_hasPlaybackTargetAvailabilityListeners; }
 #endif
 
     void isVisibleInViewportChanged() override final;
@@ -820,7 +823,7 @@ private:
     RefPtr<Node> m_nextChildNodeToConsider;
 
     VideoFullscreenMode m_videoFullscreenMode;
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     RetainPtr<PlatformLayer> m_videoFullscreenLayer;
     FloatRect m_videoFullscreenFrame;
     MediaPlayerEnums::VideoGravity m_videoFullscreenGravity;

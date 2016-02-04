@@ -176,9 +176,36 @@ std::unique_ptr<GraphicsLayer> RenderLayerBacking::createGraphicsLayer(const Str
 #endif
 #if PLATFORM(COCOA) && USE(CA)
     graphicsLayer->setAcceleratesDrawing(compositor().acceleratedDrawingEnabled());
-#endif    
+    graphicsLayer->setUsesDisplayListDrawing(compositor().displayListDrawingEnabled());
+#endif
     
     return graphicsLayer;
+}
+
+void RenderLayerBacking::setUsesDisplayListDrawing(bool usesDisplayListDrawing)
+{
+    // Note that this only affects the primary layer.
+    if (usesDisplayListDrawing == m_graphicsLayer->usesDisplayListDrawing())
+        return;
+
+    m_graphicsLayer->setUsesDisplayListDrawing(usesDisplayListDrawing);
+    if (m_graphicsLayer->drawsContent())
+        m_graphicsLayer->setNeedsDisplay();
+}
+
+String RenderLayerBacking::displayListAsText(DisplayList::AsTextFlags flags) const
+{
+    return m_graphicsLayer->displayListAsText(flags);
+}
+
+void RenderLayerBacking::setIsTrackingDisplayListReplay(bool isTrackingReplay)
+{
+    m_graphicsLayer->setIsTrackingDisplayListReplay(isTrackingReplay);
+}
+
+String RenderLayerBacking::replayDisplayListAsText(DisplayList::AsTextFlags flags) const
+{
+    return m_graphicsLayer->replayDisplayListAsText(flags);
 }
 
 void RenderLayerBacking::tiledBackingUsageChanged(const GraphicsLayer* layer, bool usingTiledBacking)

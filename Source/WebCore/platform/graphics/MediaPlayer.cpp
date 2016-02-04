@@ -243,19 +243,19 @@ static void addMediaEngine(CreateMediaEnginePlayer constructor, MediaEngineSuppo
 
 static const AtomicString& applicationOctetStream()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, applicationOctetStream, ("application/octet-stream", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<const AtomicString> applicationOctetStream("application/octet-stream", AtomicString::ConstructFromLiteral);
     return applicationOctetStream;
 }
 
 static const AtomicString& textPlain()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, textPlain, ("text/plain", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<const AtomicString> textPlain("text/plain", AtomicString::ConstructFromLiteral);
     return textPlain;
 }
 
 static const AtomicString& codecs()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, codecs, ("codecs", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<const AtomicString> codecs("codecs", AtomicString::ConstructFromLiteral);
     return codecs;
 }
 
@@ -332,10 +332,10 @@ bool MediaPlayer::load(const URL& url, const ContentType& contentType, const Str
 {
     ASSERT(!m_reloadTimer.isActive());
 
-    m_contentMIMEType = contentType.type().lower();
+    m_contentMIMEType = contentType.type().convertToASCIILowercase();
     m_contentTypeCodecs = contentType.parameter(codecs());
     m_url = url;
-    m_keySystem = keySystem.lower();
+    m_keySystem = keySystem.convertToASCIILowercase();
     m_contentMIMETypeWasInferredFromExtension = false;
 
 #if ENABLE(MEDIA_SOURCE)
@@ -374,7 +374,7 @@ bool MediaPlayer::load(const URL& url, const ContentType& contentType, MediaSour
     ASSERT(mediaSource);
 
     m_mediaSource = mediaSource;
-    m_contentMIMEType = contentType.type().lower();
+    m_contentMIMEType = contentType.type().convertToASCIILowercase();
     m_contentTypeCodecs = contentType.parameter(codecs());
     m_url = url;
     m_keySystem = "";
@@ -525,17 +525,17 @@ void MediaPlayer::setShouldBufferData(bool shouldBuffer)
 #if ENABLE(ENCRYPTED_MEDIA)
 MediaPlayer::MediaKeyException MediaPlayer::generateKeyRequest(const String& keySystem, const unsigned char* initData, unsigned initDataLength)
 {
-    return m_private->generateKeyRequest(keySystem.lower(), initData, initDataLength);
+    return m_private->generateKeyRequest(keySystem.convertToASCIILowercase(), initData, initDataLength);
 }
 
 MediaPlayer::MediaKeyException MediaPlayer::addKey(const String& keySystem, const unsigned char* key, unsigned keyLength, const unsigned char* initData, unsigned initDataLength, const String& sessionId)
 {
-    return m_private->addKey(keySystem.lower(), key, keyLength, initData, initDataLength, sessionId);
+    return m_private->addKey(keySystem.convertToASCIILowercase(), key, keyLength, initData, initDataLength, sessionId);
 }
 
 MediaPlayer::MediaKeyException MediaPlayer::cancelKeyRequest(const String& keySystem, const String& sessionId)
 {
-    return m_private->cancelKeyRequest(keySystem.lower(), sessionId);
+    return m_private->cancelKeyRequest(keySystem.convertToASCIILowercase(), sessionId);
 }
 #endif
 
@@ -651,7 +651,7 @@ PlatformLayer* MediaPlayer::platformLayer() const
     return m_private->platformLayer();
 }
     
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
 void MediaPlayer::setVideoFullscreenLayer(PlatformLayer* layer)
 {
     m_private->setVideoFullscreenLayer(layer);
@@ -676,7 +676,9 @@ MediaPlayer::VideoFullscreenMode MediaPlayer::fullscreenMode() const
 {
     return m_client.mediaPlayerFullscreenMode();
 }
+#endif
 
+#if PLATFORM(IOS)
 NSArray* MediaPlayer::timedMetadata() const
 {
     return m_private->timedMetadata();
@@ -860,7 +862,7 @@ MediaPlayer::SupportsType MediaPlayer::supportsType(const MediaEngineSupportPara
     // slow connections. <https://bugs.webkit.org/show_bug.cgi?id=86409>
     if (client && client->mediaPlayerNeedsSiteSpecificHacks()) {
         String host = client->mediaPlayerDocumentHost();
-        if ((host.endsWith(".youtube.com", false) || equalIgnoringCase("youtube.com", host))
+        if ((host.endsWith(".youtube.com", false) || equalLettersIgnoringASCIICase(host, "youtube.com"))
             && (parameters.type.startsWith("video/webm", false) || parameters.type.startsWith("video/x-flv", false)))
             return IsNotSupported;
     }
@@ -871,10 +873,10 @@ MediaPlayer::SupportsType MediaPlayer::supportsType(const MediaEngineSupportPara
     return engine->supportsTypeAndCodecs(parameters);
 }
 
-void MediaPlayer::getSupportedTypes(HashSet<String>& types)
+void MediaPlayer::getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>& types)
 {
     for (auto& engine : installedMediaEngines()) {
-        HashSet<String> engineTypes;
+        HashSet<String, ASCIICaseInsensitiveHash> engineTypes;
         engine.getSupportedTypes(engineTypes);
         types.add(engineTypes.begin(), engineTypes.end());
     }

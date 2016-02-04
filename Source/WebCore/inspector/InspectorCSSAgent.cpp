@@ -79,10 +79,10 @@ enum ForcePseudoClassFlags {
 
 static unsigned computePseudoClassMask(const InspectorArray& pseudoClassArray)
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(String, active, (ASCIILiteral("active")));
-    DEPRECATED_DEFINE_STATIC_LOCAL(String, hover, (ASCIILiteral("hover")));
-    DEPRECATED_DEFINE_STATIC_LOCAL(String, focus, (ASCIILiteral("focus")));
-    DEPRECATED_DEFINE_STATIC_LOCAL(String, visited, (ASCIILiteral("visited")));
+    static NeverDestroyed<String> active(ASCIILiteral("active"));
+    static NeverDestroyed<String> hover(ASCIILiteral("hover"));
+    static NeverDestroyed<String> focus(ASCIILiteral("focus"));
+    static NeverDestroyed<String> visited(ASCIILiteral("visited"));
     if (!pseudoClassArray.length())
         return PseudoClassNone;
 
@@ -363,6 +363,9 @@ void InspectorCSSAgent::didCreateFrontendAndBackend(Inspector::FrontendRouter*, 
 void InspectorCSSAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason)
 {
     resetNonPersistentData();
+
+    String unused;
+    disable(unused);
 }
 
 void InspectorCSSAgent::discardAgent()
@@ -773,14 +776,8 @@ InspectorStyleSheet* InspectorCSSAgent::createInspectorStyleSheetForDocument(Doc
     if (!document.isHTMLDocument() && !document.isSVGDocument())
         return nullptr;
 
-    ExceptionCode ec = 0;
-    RefPtr<Element> styleElement = document.createElement("style", ec);
-    if (ec)
-        return nullptr;
-
-    styleElement->setAttribute("type", "text/css", ec);
-    if (ec)
-        return nullptr;
+    Ref<Element> styleElement = document.createElement(HTMLNames::styleTag, false);
+    styleElement->setAttribute(HTMLNames::typeAttr, "text/css");
 
     ContainerNode* targetNode;
     // HEAD is absent in ImageDocuments, for example.
@@ -796,7 +793,8 @@ InspectorStyleSheet* InspectorCSSAgent::createInspectorStyleSheetForDocument(Doc
     // Set this flag, so when we create it, we put it into the via inspector map.
     m_creatingViaInspectorStyleSheet = true;
     InlineStyleOverrideScope overrideScope(document);
-    targetNode->appendChild(styleElement.releaseNonNull(), ec);
+    ExceptionCode ec = 0;
+    targetNode->appendChild(WTFMove(styleElement), ec);
     m_creatingViaInspectorStyleSheet = false;
     if (ec)
         return nullptr;
@@ -1050,7 +1048,7 @@ RefPtr<Inspector::Protocol::Array<Inspector::Protocol::CSS::RuleMatch>> Inspecto
         int index = 0;
         for (const CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector)) {
             unsigned ignoredSpecificity;
-            bool matched = selectorChecker.match(selector, element, context, ignoredSpecificity);
+            bool matched = selectorChecker.match(*selector, *element, context, ignoredSpecificity);
             if (matched)
                 matchingSelectors->addItem(index);
             ++index;

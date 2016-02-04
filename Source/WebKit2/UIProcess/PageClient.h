@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -59,6 +59,7 @@ namespace WebKit {
 
 class DrawingAreaProxy;
 class NativeWebKeyboardEvent;
+class NativeWebMouseEvent;
 class RemoteLayerTreeTransaction;
 class ViewSnapshot;
 class WebContextMenuProxy;
@@ -211,6 +212,7 @@ public:
 #if PLATFORM(IOS)
     virtual WebCore::IntPoint accessibilityScreenToRootView(const WebCore::IntPoint&) = 0;
     virtual WebCore::IntRect rootViewToAccessibilityScreen(const WebCore::IntRect&) = 0;
+    virtual void didNotHandleTapAsClick(const WebCore::IntPoint&) = 0;
 #endif
     
     virtual void doneWithKeyEvent(const NativeWebKeyboardEvent&, bool wasEventHandled) = 0;
@@ -352,11 +354,13 @@ public:
     virtual void refView() = 0;
     virtual void derefView() = 0;
 
-#if USE(GSTREAMER)
-    virtual bool decicePolicyForInstallMissingMediaPluginsPermissionRequest(InstallMissingMediaPluginsPermissionRequest&) = 0;
+#if ENABLE(VIDEO) && USE(GSTREAMER)
+    virtual bool decidePolicyForInstallMissingMediaPluginsPermissionRequest(InstallMissingMediaPluginsPermissionRequest&) = 0;
 #endif
 
     virtual void didRestoreScrollPosition() = 0;
+
+    virtual bool windowIsFrontWindowUnderMouse(const NativeWebMouseEvent&) { return false; }
 };
 
 } // namespace WebKit

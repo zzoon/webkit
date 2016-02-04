@@ -208,7 +208,7 @@ private:
         }
             
         case ArithNegate: {
-            if (m_graph.negateShouldSpeculateInt32(node, FixupPass)) {
+            if (m_graph.unaryArithShouldSpeculateInt32(node, FixupPass)) {
                 fixIntOrBooleanEdge(node->child1());
                 if (bytecodeCanTruncateInteger(node->arithNodeFlags()))
                     node->setArithMode(Arith::Unchecked);
@@ -218,7 +218,7 @@ private:
                     node->setArithMode(Arith::CheckOverflowAndNegativeZero);
                 break;
             }
-            if (m_graph.negateShouldSpeculateMachineInt(node, FixupPass)) {
+            if (m_graph.unaryArithShouldSpeculateMachineInt(node, FixupPass)) {
                 fixEdge<Int52RepUse>(node->child1());
                 if (bytecodeCanIgnoreNegativeZero(node->arithNodeFlags()))
                     node->setArithMode(Arith::CheckOverflow);
@@ -242,7 +242,7 @@ private:
                 node->setResult(NodeResultJS);
                 break;
             }
-            if (m_graph.mulShouldSpeculateInt32(node, FixupPass)) {
+            if (m_graph.binaryArithShouldSpeculateInt32(node, FixupPass)) {
                 fixIntOrBooleanEdge(leftChild);
                 fixIntOrBooleanEdge(rightChild);
                 if (bytecodeCanTruncateInteger(node->arithNodeFlags()))
@@ -253,7 +253,7 @@ private:
                     node->setArithMode(Arith::CheckOverflowAndNegativeZero);
                 break;
             }
-            if (m_graph.mulShouldSpeculateMachineInt(node, FixupPass)) {
+            if (m_graph.binaryArithShouldSpeculateMachineInt(node, FixupPass)) {
                 fixEdge<Int52RepUse>(leftChild);
                 fixEdge<Int52RepUse>(rightChild);
                 if (bytecodeCanIgnoreNegativeZero(node->arithNodeFlags()))
@@ -281,8 +281,7 @@ private:
                 node->setResult(NodeResultJS);
                 break;
             }
-            if (Node::shouldSpeculateInt32OrBooleanForArithmetic(leftChild.node(), rightChild.node())
-                && node->canSpeculateInt32(FixupPass)) {
+            if (m_graph.binaryArithShouldSpeculateInt32(node, FixupPass)) {
                 if (optimizeForX86() || optimizeForARM64() || optimizeForARMv7IDIVSupported()) {
                     fixIntOrBooleanEdge(leftChild);
                     fixIntOrBooleanEdge(rightChild);
@@ -321,8 +320,7 @@ private:
             
         case ArithMin:
         case ArithMax: {
-            if (Node::shouldSpeculateInt32OrBooleanForArithmetic(node->child1().node(), node->child2().node())
-                && node->canSpeculateInt32(FixupPass)) {
+            if (m_graph.binaryArithShouldSpeculateInt32(node, FixupPass)) {
                 fixIntOrBooleanEdge(node->child1());
                 fixIntOrBooleanEdge(node->child2());
                 break;
@@ -334,8 +332,7 @@ private:
         }
             
         case ArithAbs: {
-            if (node->child1()->shouldSpeculateInt32OrBooleanForArithmetic()
-                && node->canSpeculateInt32(FixupPass)) {
+            if (m_graph.unaryArithShouldSpeculateInt32(node, FixupPass)) {
                 fixIntOrBooleanEdge(node->child1());
                 break;
             }
@@ -363,7 +360,7 @@ private:
         }
 
         case ArithRound: {
-            if (node->child1()->shouldSpeculateInt32OrBooleanForArithmetic() && node->canSpeculateInt32(FixupPass)) {
+            if (m_graph.unaryArithShouldSpeculateInt32(node, FixupPass)) {
                 fixIntOrBooleanEdge(node->child1());
                 insertCheck<Int32Use>(m_indexInBlock, node->child1().node());
                 node->convertToIdentity();
@@ -605,6 +602,10 @@ private:
         }
 
         case StringFromCharCode:
+            if (node->child1()->shouldSpeculateUntypedForArithmetic()) {
+                fixEdge<UntypedUse>(node->child1());
+                break;
+            }
             fixEdge<Int32Use>(node->child1());
             break;
 
@@ -1002,30 +1003,7 @@ private:
         }
             
         case ToThis: {
-            ECMAMode ecmaMode = m_graph.executableFor(node->origin.semantic)->isStrictMode() ? StrictMode : NotStrictMode;
-
-            if (node->child1()->shouldSpeculateOther()) {
-                if (ecmaMode == StrictMode) {
-                    fixEdge<OtherUse>(node->child1());
-                    node->convertToIdentity();
-                    break;
-                }
-
-                m_insertionSet.insertNode(
-                    m_indexInBlock, SpecNone, Check, node->origin,
-                    Edge(node->child1().node(), OtherUse));
-                observeUseKindOnNode<OtherUse>(node->child1().node());
-                m_graph.convertToConstant(
-                    node, m_graph.globalThisObjectFor(node->origin.semantic));
-                break;
-            }
-            
-            if (isFinalObjectSpeculation(node->child1()->prediction())) {
-                fixEdge<FinalObjectUse>(node->child1());
-                node->convertToIdentity();
-                break;
-            }
-            
+            fixupToThis(node);
             break;
         }
             
@@ -1589,6 +1567,85 @@ private:
         if (!node->child2()) {
             ASSERT(!node->child3());
             node->convertToIdentity();
+        }
+    }
+
+    void fixupToThis(Node* node)
+    {
+        ECMAMode ecmaMode = m_graph.executableFor(node->origin.semantic)->isStrictMode() ? StrictMode : NotStrictMode;
+
+        if (ecmaMode == StrictMode) {
+            if (node->child1()->shouldSpeculateBoolean()) {
+                fixEdge<BooleanUse>(node->child1());
+                node->convertToIdentity();
+                return;
+            }
+
+            if (node->child1()->shouldSpeculateInt32()) {
+                fixEdge<Int32Use>(node->child1());
+                node->convertToIdentity();
+                return;
+            }
+
+            if (enableInt52() && node->child1()->shouldSpeculateMachineInt()) {
+                fixEdge<Int52RepUse>(node->child1());
+                node->convertToIdentity();
+                node->setResult(NodeResultInt52);
+                return;
+            }
+
+            if (node->child1()->shouldSpeculateNumber()) {
+                fixEdge<DoubleRepUse>(node->child1());
+                node->convertToIdentity();
+                node->setResult(NodeResultDouble);
+                return;
+            }
+
+            if (node->child1()->shouldSpeculateSymbol()) {
+                fixEdge<SymbolUse>(node->child1());
+                node->convertToIdentity();
+                return;
+            }
+
+            if (node->child1()->shouldSpeculateStringIdent()) {
+                fixEdge<StringIdentUse>(node->child1());
+                node->convertToIdentity();
+                return;
+            }
+
+            if (node->child1()->shouldSpeculateString()) {
+                fixEdge<StringUse>(node->child1());
+                node->convertToIdentity();
+                return;
+            }
+        }
+
+        if (node->child1()->shouldSpeculateOther()) {
+            if (ecmaMode == StrictMode) {
+                fixEdge<OtherUse>(node->child1());
+                node->convertToIdentity();
+                return;
+            }
+
+            m_insertionSet.insertNode(
+                m_indexInBlock, SpecNone, Check, node->origin,
+                Edge(node->child1().node(), OtherUse));
+            observeUseKindOnNode<OtherUse>(node->child1().node());
+            m_graph.convertToConstant(
+                node, m_graph.globalThisObjectFor(node->origin.semantic));
+            return;
+        }
+
+        if (node->child1()->shouldSpeculateStringObject()) {
+            fixEdge<StringObjectUse>(node->child1());
+            node->convertToIdentity();
+            return;
+        }
+
+        if (isFinalObjectSpeculation(node->child1()->prediction())) {
+            fixEdge<FinalObjectUse>(node->child1());
+            node->convertToIdentity();
+            return;
         }
     }
     

@@ -436,18 +436,90 @@ WebInspector.CSSStyleDeclarationSection = class CSSStyleDeclarationSection exten
 
         let contextMenu = WebInspector.ContextMenu.createFromEvent(event);
 
-        if (!this._style.inherited) {
-            contextMenu.appendItem(WebInspector.UIString("Duplicate Selector"), () => {
-                if (this._delegate && typeof this._delegate.cssStyleDeclarationSectionFocusNextNewInspectorRule === "function")
-                    this._delegate.cssStyleDeclarationSectionFocusNextNewInspectorRule();
-
-                this._style.nodeStyles.addRule(this._currentSelectorText);
-            });
-        }
-
         contextMenu.appendItem(WebInspector.UIString("Copy Rule"), () => {
             InspectorFrontendHost.copyText(this._style.generateCSSRuleString());
         });
+
+        if (this._style.inherited)
+            return;
+
+        contextMenu.appendItem(WebInspector.UIString("Duplicate Selector"), () => {
+            if (this._delegate && typeof this._delegate.focusEmptySectionWithStyle === "function") {
+                let existingRules = this._style.nodeStyles.rulesForSelector(this._currentSelectorText);
+                for (let rule of existingRules) {
+                    if (this._delegate.focusEmptySectionWithStyle(rule.style))
+                        return;
+                }
+            }
+
+            if (this._delegate && typeof this._delegate.cssStyleDeclarationSectionFocusNewInspectorRuleWithSelector === "function")
+                this._delegate.cssStyleDeclarationSectionFocusNewInspectorRuleWithSelector(this._currentSelectorText);
+
+            this._style.nodeStyles.addRule(this._currentSelectorText);
+        });
+
+        // Only used one colon temporarily since single-colon pseudo elements are valid CSS.
+        if (WebInspector.CSSStyleManager.PseudoElementNames.some((className) => this._style.selectorText.includes(":" + className)))
+            return;
+
+        if (WebInspector.CSSStyleManager.ForceablePseudoClasses.every((className) => !this._style.selectorText.includes(":" + className))) {
+            for (let pseudoClass of WebInspector.CSSStyleManager.ForceablePseudoClasses) {
+                if (pseudoClass === "visited" && this._style.node.nodeName() !== "A")
+                    continue;
+
+                let pseudoClassSelector = ":" + pseudoClass;
+
+                contextMenu.appendItem(WebInspector.UIString("Add %s Rule").format(pseudoClassSelector), () => {
+                    this._style.node.setPseudoClassEnabled(pseudoClass, true);
+
+                    let selector;
+                    if (this._style.ownerRule)
+                        selector = this._style.ownerRule.selectors.map((selector) => selector.text + pseudoClassSelector).join(", ");
+                    else
+                        selector = this._currentSelectorText + pseudoClassSelector;
+
+                    if (this._delegate && typeof this._delegate.cssStyleDeclarationSectionFocusNewInspectorRuleWithSelector === "function")
+                        this._delegate.cssStyleDeclarationSectionFocusNewInspectorRuleWithSelector(selector);
+
+                    this._style.nodeStyles.addRule(selector);
+                });
+            }
+        }
+
+        for (let pseudoElement of WebInspector.CSSStyleManager.PseudoElementNames) {
+            let pseudoElementSelector = "::" + pseudoElement;
+            const styleText = "content: \"\";";
+
+            let existingSection = null;
+            if (this._delegate && typeof this._delegate.sectionForStyle === "function") {
+                let existingRules = this._style.nodeStyles.rulesForSelector(this._currentSelectorText + pseudoElementSelector);
+                if (existingRules.length) {
+                    // There shouldn't really ever be more than one pseudo-element rule
+                    // that is not in a media query. As such, just focus the first rule
+                    // on the assumption that it is the only one necessary.
+                    existingSection = this._delegate.sectionForStyle(existingRules[0].style);
+                }
+            }
+
+            let title = existingSection ? WebInspector.UIString("Focus %s Rule") : WebInspector.UIString("Create %s Rule");
+            contextMenu.appendItem(title.format(pseudoElementSelector), () => {
+                if (existingSection) {
+                    existingSection.focus();
+                    return;
+                }
+
+                let selector;
+                if (this._style.ownerRule)
+                    selector = this._style.ownerRule.selectors.map((selector) => selector.text + pseudoElementSelector).join(", ");
+                else
+                    selector = this._currentSelectorText + pseudoElementSelector;
+
+                if (this._delegate && typeof this._delegate.cssStyleDeclarationSectionFocusNewInspectorRuleWithSelector === "function")
+                    this._delegate.cssStyleDeclarationSectionFocusNewInspectorRuleWithSelector(selector);
+
+                this._style.nodeStyles.addRule(selector, styleText);
+            });
+        }
     }
 
     _handleIconElementClicked()

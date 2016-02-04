@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@
 #include "B3Effects.h"
 #include "B3Opcode.h"
 #include "B3Origin.h"
+#include "B3SparseCollection.h"
 #include "B3Type.h"
 #include "B3ValueKey.h"
 #include <wtf/CommaPrinter.h>
@@ -42,10 +43,10 @@ namespace JSC { namespace B3 {
 
 class BasicBlock;
 class CheckValue;
+class PhiChildren;
 class Procedure;
 
 class JS_EXPORT_PRIVATE Value {
-    WTF_MAKE_NONCOPYABLE(Value);
     WTF_MAKE_FAST_ALLOCATED;
 public:
     typedef Vector<Value*, 3> AdjacencyList;
@@ -62,6 +63,7 @@ public:
     Opcode opcode() const { return m_opcode; }
 
     Origin origin() const { return m_origin; }
+    void setOrigin(Origin origin) { m_origin = origin; }
     
     Value*& child(unsigned index) { return m_children[index]; }
     Value* child(unsigned index) const { return m_children[index]; }
@@ -83,9 +85,10 @@ public:
 
     void replaceWithIdentity(Value*);
     void replaceWithNop();
+    void replaceWithPhi();
 
     void dump(PrintStream&) const;
-    void deepDump(const Procedure&, PrintStream&) const;
+    void deepDump(const Procedure*, PrintStream&) const;
 
     // This is how you cast Values. For example, if you want to do something provided that we have a
     // ArgumentRegValue, you can do:
@@ -203,12 +206,28 @@ public:
     // of Identity's.
     void performSubstitution();
 
+    // Walk the ancestors of this value (i.e. the graph of things it transitively uses). This
+    // either walks phis or not, depending on whether PhiChildren is null. Your callback gets
+    // called with the signature:
+    //
+    //     (Value*) -> WalkStatus
+    enum WalkStatus {
+        Continue,
+        IgnoreChildren,
+        Stop
+    };
+    template<typename Functor>
+    void walk(const Functor& functor, PhiChildren* = nullptr);
+
 protected:
+    virtual Value* cloneImpl() const;
+    
     virtual void dumpChildren(CommaPrinter&, PrintStream&) const;
     virtual void dumpMeta(CommaPrinter&, PrintStream&) const;
 
 private:
     friend class Procedure;
+    friend class SparseCollection<Value>;
 
     // Checks that this opcode is valid for use with B3::Value.
 #if ASSERT_DISABLED
@@ -219,31 +238,31 @@ private:
 
 protected:
     enum CheckedOpcodeTag { CheckedOpcode };
+
+    Value(const Value&) = default;
+    Value& operator=(const Value&) = default;
     
     // Instantiate values via Procedure.
     // This form requires specifying the type explicitly:
     template<typename... Arguments>
-    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Type type, Origin origin, Value* firstChild, Arguments... arguments)
-        : m_index(index)
-        , m_opcode(opcode)
+    explicit Value(CheckedOpcodeTag, Opcode opcode, Type type, Origin origin, Value* firstChild, Arguments... arguments)
+        : m_opcode(opcode)
         , m_type(type)
         , m_origin(origin)
         , m_children{ firstChild, arguments... }
     {
     }
     // This form is for specifying the type explicitly when the opcode has no children:
-    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Type type, Origin origin)
-        : m_index(index)
-        , m_opcode(opcode)
+    explicit Value(CheckedOpcodeTag, Opcode opcode, Type type, Origin origin)
+        : m_opcode(opcode)
         , m_type(type)
         , m_origin(origin)
     {
     }
     // This form is for those opcodes that can infer their type from the opcode and first child:
     template<typename... Arguments>
-    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Origin origin, Value* firstChild)
-        : m_index(index)
-        , m_opcode(opcode)
+    explicit Value(CheckedOpcodeTag, Opcode opcode, Origin origin, Value* firstChild)
+        : m_opcode(opcode)
         , m_type(typeFor(opcode, firstChild))
         , m_origin(origin)
         , m_children{ firstChild }
@@ -251,9 +270,8 @@ protected:
     }
     // This form is for those opcodes that can infer their type from the opcode and first and second child:
     template<typename... Arguments>
-    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Origin origin, Value* firstChild, Value* secondChild, Arguments... arguments)
-        : m_index(index)
-        , m_opcode(opcode)
+    explicit Value(CheckedOpcodeTag, Opcode opcode, Origin origin, Value* firstChild, Value* secondChild, Arguments... arguments)
+        : m_opcode(opcode)
         , m_type(typeFor(opcode, firstChild, secondChild))
         , m_origin(origin)
         , m_children{ firstChild, secondChild, arguments... }
@@ -261,25 +279,22 @@ protected:
     }
     // This form is for those opcodes that can infer their type from the opcode alone, and that don't
     // take any arguments:
-    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Origin origin)
-        : m_index(index)
-        , m_opcode(opcode)
+    explicit Value(CheckedOpcodeTag, Opcode opcode, Origin origin)
+        : m_opcode(opcode)
         , m_type(typeFor(opcode, nullptr))
         , m_origin(origin)
     {
     }
     // Use this form for varargs.
-    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Type type, Origin origin, const AdjacencyList& children)
-        : m_index(index)
-        , m_opcode(opcode)
+    explicit Value(CheckedOpcodeTag, Opcode opcode, Type type, Origin origin, const AdjacencyList& children)
+        : m_opcode(opcode)
         , m_type(type)
         , m_origin(origin)
         , m_children(children)
     {
     }
-    explicit Value(unsigned index, CheckedOpcodeTag, Opcode opcode, Type type, Origin origin, AdjacencyList&& children)
-        : m_index(index)
-        , m_opcode(opcode)
+    explicit Value(CheckedOpcodeTag, Opcode opcode, Type type, Origin origin, AdjacencyList&& children)
+        : m_opcode(opcode)
         , m_type(type)
         , m_origin(origin)
         , m_children(WTFMove(children))
@@ -289,8 +304,8 @@ protected:
     // This is the constructor you end up actually calling, if you're instantiating Value
     // directly.
     template<typename... Arguments>
-    explicit Value(unsigned index, Opcode opcode, Arguments&&... arguments)
-        : Value(index, CheckedOpcode, opcode, std::forward<Arguments>(arguments)...)
+    explicit Value(Opcode opcode, Arguments&&... arguments)
+        : Value(CheckedOpcode, opcode, std::forward<Arguments>(arguments)...)
     {
         checkOpcode(opcode);
     }
@@ -301,7 +316,9 @@ private:
     static Type typeFor(Opcode, Value* firstChild, Value* secondChild = nullptr);
 
     // This group of fields is arranged to fit in 64 bits.
-    unsigned m_index;
+protected:
+    unsigned m_index { UINT_MAX };
+private:
     Opcode m_opcode;
     Type m_type;
     
@@ -314,7 +331,7 @@ public:
 
 class DeepValueDump {
 public:
-    DeepValueDump(const Procedure& proc, const Value* value)
+    DeepValueDump(const Procedure* proc, const Value* value)
         : m_proc(proc)
         , m_value(value)
     {
@@ -329,13 +346,17 @@ public:
     }
 
 private:
-    const Procedure& m_proc;
+    const Procedure* m_proc;
     const Value* m_value;
 };
 
 inline DeepValueDump deepDump(const Procedure& proc, const Value* value)
 {
-    return DeepValueDump(proc, value);
+    return DeepValueDump(&proc, value);
+}
+inline DeepValueDump deepDump(const Value* value)
+{
+    return DeepValueDump(nullptr, value);
 }
 
 } } // namespace JSC::B3

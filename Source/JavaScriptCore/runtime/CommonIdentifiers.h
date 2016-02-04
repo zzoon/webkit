@@ -268,29 +268,22 @@
     macro(match) \
     macro(replace) \
     macro(search) \
-    macro(species) \
     macro(split) \
     macro(toPrimitive)
 
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL(macro) \
     macro(hasInstance) \
     macro(iterator) \
-    macro(unscopables) \
-    macro(toStringTag)
-
-#define JSC_COMMON_BYTECODE_INTRINSICS_EACH_NAME(macro) \
-    macro(assert) \
-    macro(putByValDirect) \
-    macro(toString)
+    macro(species) \
+    macro(toStringTag) \
+    macro(unscopables)
 
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_PROPERTY_NAME(macro) \
-    JSC_COMMON_BYTECODE_INTRINSICS_EACH_NAME(macro) \
+    JSC_COMMON_BYTECODE_INTRINSIC_FUNCTIONS_EACH_NAME(macro) \
+    JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_EACH_NAME(macro) \
     macro(iteratedObject) \
     macro(arrayIteratorNextIndex) \
     macro(arrayIterationKind) \
-    macro(arrayIterationKindKey) \
-    macro(arrayIterationKindValue) \
-    macro(arrayIterationKindKeyValue) \
     macro(charCodeAt) \
     macro(iteratedString) \
     macro(stringIteratorNextIndex) \
@@ -319,14 +312,12 @@
     macro(TypeError) \
     macro(typedArrayLength) \
     macro(typedArraySort) \
-    macro(undefined) \
     macro(BuiltinLog) \
     macro(homeObject) \
     macro(getTemplateObject) \
     macro(enqueueJob) \
     macro(handler) \
     macro(promiseState) \
-    macro(promisePending) \
     macro(promiseFulfillReactions) \
     macro(promiseRejectReactions) \
     macro(promiseResult) \
@@ -357,11 +348,18 @@
     macro(Collator) \
     macro(DateTimeFormat) \
     macro(NumberFormat) \
+    macro(thisTimeValue) \
     macro(newTargetLocal) \
     macro(derivedConstructor) \
     macro(isBoundFunction) \
     macro(hasInstanceBoundFunction) \
     macro(instanceOf) \
+    macro(isSet) \
+    macro(isMap) \
+    macro(SetIterator) \
+    macro(setIteratorNext) \
+    macro(MapIterator) \
+    macro(mapIteratorNext) \
 
 
 namespace JSC {
@@ -411,14 +409,9 @@ namespace JSC {
         const Identifier* lookUpPrivateName(const Identifier&) const;
         Identifier lookUpPublicName(const Identifier&) const;
 
-        const BytecodeIntrinsicRegistry& bytecodeIntrinsicRegistry() const { return m_bytecodeIntrinsicRegistry; }
-
         // Callers of this method should make sure that identifiers given to this method 
         // survive the lifetime of CommonIdentifiers and related VM.
         JS_EXPORT_PRIVATE void appendExternalName(const Identifier& publicName, const Identifier& privateName);
-
-    private:
-        BytecodeIntrinsicRegistry m_bytecodeIntrinsicRegistry;
     };
 
 } // namespace JSC

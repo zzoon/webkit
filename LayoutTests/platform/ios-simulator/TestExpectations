@@ -7,6 +7,7 @@
 #//////////////////////////////////////////////////////////////////////////////////////////
 
 accessibility/ios-simulator [ Pass ]
+displaylists [ Pass ]
 quicklook [ Pass ]
 http/tests/quicklook [ Pass ]
 
@@ -82,6 +83,9 @@ media
 http/tests/media
 imported/w3c/web-platform-tests/html/semantics/embedded-content/media-elements
 
+# No touch events
+fast/shadow-dom/touch-event-ios.html [ Skip ]
+
 # MediaSource is not currently supported on iOS.
 fast/history/page-cache-media-source-closed-2.html [ Skip ]
 fast/history/page-cache-media-source-closed.html [ Skip ]
@@ -147,6 +151,7 @@ fast/events/clear-drag-state.html
 fast/events/clear-edit-drag-state.html
 fast/events/content-changed-during-drop.html
 fast/events/crash-on-mutate-during-drop.html
+fast/events/drag-and-drop-link-fast-multiple-times-does-not-crash.html
 fast/events/drag-and-drop-autoscroll-inner-frame.html
 fast/events/drag-and-drop-autoscroll.html
 fast/events/drag-and-drop-dataTransfer-types-nocrash.html
@@ -204,6 +209,25 @@ fast/forms/auto-fill-button/mouse-down-input-mouse-release-auto-fill-button.html
 
 fast/events/touch [ Skip ]
 
+# Mouse events are not supported on iOS
+fast/scrolling/arrow-key-scroll-in-rtl-document.html [ Skip ]
+fast/scrolling/overflow-scroll-past-max.html [ Skip ]
+pageoverlay/overlay-small-frame-mouse-events.html [ Skip ]
+loader/stateobjects/pushstate-size.html [ Skip ]
+loader/stateobjects/pushstate-size-iframe.html [ Skip ]
+fast/loader/stateobjects/replacestate-frequency-with-user-gesture.html [ Skip ]
+fast/loader/stateobjects/pushstate-frequency-with-user-gesture.html [ Skip ]
+
+webkit.org/b/148695 fast/shadow-dom [ Pass ]
+webkit.org/b/149440 fast/shadow-dom/css-scoping-shadow-host-functional-rule.html [ ImageOnlyFailure ]
+webkit.org/b/149441 fast/shadow-dom/css-scoping-shadow-slotted-rule.html [ ImageOnlyFailure ]
+webkit.org/b/149441 fast/shadow-dom/css-scoping-shadow-slot-display-override.html [ ImageOnlyFailure ]
+
+webkit.org/b/150225 fast/custom-elements [ Pass ]
+
+# This test needs to be rewritten to use runUIScript to work on iOS
+webkit.org/b/152993 http/tests/contentdispositionattachmentsandbox/form-submission-disabled.html [ Skip ]
+
 ###
 # Known failures
 ##
@@ -222,9 +246,6 @@ svg/clip-path/clip-path-line-use-before-defined.svg [ ImageOnlyFailure ]
 # SVG
 webkit.org/b/137574 svg/dom/SVGAnimatedAngle.html [ Skip ] # Pass, Crash
 webkit.org/b/137574 svg/css/arrow-with-shadow.svg [ Skip ] # Pass, Crash
-
-# window.requestAnimationFrame() broken in iOS Simulator
-webkit.org/b/137588 fast/animation
 
 # Animation tests that fail:
 animations/cross-fade-background-image.html [ ImageOnlyFailure ]
@@ -2761,6 +2782,9 @@ webkit.org/b/149297 accessibility/aria-current.html [ Pass ]
 # Enable "aria-table-attributes" test for iOS
 webkit.org/b/150366 accessibility/aria-table-attributes.html [ Pass ]
 
+# Enable Text marker tests for iOS
+webkit.org/b/153292 accessibility/text-marker [ Pass ]
+
 # More flaky tests (Sept 18, 2015)
 
 fast/forms/select-element-focus-ring.html [ Failure Pass ]
@@ -2832,22 +2856,20 @@ webkit.org/b/152134 fast/events/ios/keyboard-should-not-trigger-resize.html [ Pa
 webkit.org/b/152134 fast/events/ios/single-tap-generates-click.html [ Pass Timeout ]
 webkit.org/b/152134 fast/events/ios/unscalable-viewport-clicks-on-doubletap.html [ Pass Timeout ]
 webkit.org/b/152134 fast/events/ios/viewport-device-width-at-initial-scale-fast-clicks.html  [ Pass Timeout ]
+webkit.org/b/152134 fast/events/ios/viewport-no-width-value-allows-double-tap.html  [ Pass Timeout ]
 
-webkit.org/b/152141 fast/picture/image-picture-1x.html [ Failure ]
-webkit.org/b/152141 fast/picture/image-picture-invalid.html [ Failure ]
-webkit.org/b/152141 fast/picture/image-picture-nested.html [ Failure ]
+# Failing tests related to picture element
+webkit.org/b/152141 fast/picture/image-picture-1x.html [ Skip ]
+webkit.org/b/152141 fast/picture/image-picture-invalid.html [ Skip ]
+webkit.org/b/152141 fast/picture/image-picture-nested.html [ Skip ]
+webkit.org/b/153043 fast/picture/image-picture-loads-1x.html [ Skip ]
+webkit.org/b/152992 http/tests/loading/preload-picture-invalid.html [ Skip ]
+webkit.org/b/152992 http/tests/loading/preload-picture-nested.html [ Skip ]
+webkit.org/b/152992 http/tests/loading/preload-picture-sizes.html [ Skip ]
+webkit.org/b/152140 fast/picture/viewport-resize.html [ Skip ]
 
-webkit.org/b/152279 http/tests/misc/large-js-program.php [ Pass Crash ]
-webkit.org/b/152279 js/dom/line-column-numbers.html [ Pass Crash ]
-
-webkit.org/b/152390 http/tests/contentdispositionattachmentsandbox/referer-header-stripped-with-meta-referer-always.html [ Skip ]
-webkit.org/b/152390 http/tests/contentdispositionattachmentsandbox/referer-header-stripped-with-meta-referer-default.html [ Skip ]
-webkit.org/b/152390 http/tests/contentdispositionattachmentsandbox/referer-header-stripped-with-meta-referer-never.html [ Skip ]
-webkit.org/b/152390 http/tests/contentdispositionattachmentsandbox/referer-header-stripped-with-meta-referer-no-referrer-when-downgrade.html [ Skip ]
-webkit.org/b/152390 http/tests/contentdispositionattachmentsandbox/referer-header-stripped-with-meta-referer-no-referrer.html [ Skip ]
-webkit.org/b/152390 http/tests/contentdispositionattachmentsandbox/referer-header-stripped-with-meta-referer-origin.html [ Skip ]
-webkit.org/b/152390 http/tests/contentdispositionattachmentsandbox/referer-header-stripped-with-meta-referer-unsafe-url.html [ Skip ]
-webkit.org/b/152390 http/tests/contentdispositionattachmentsandbox/referer-header-stripped.html [ Skip ]
+webkit.org/b/152279 http/tests/misc/large-js-program.php [ Skip ]
+webkit.org/b/152279 js/dom/line-column-numbers.html [ Skip ]
 
 webkit.org/b/152137 fast/media/mq-any-hover-matchMedia.html [ Failure ]
 webkit.org/b/152137 fast/media/mq-any-hover-styling.html [ Failure ]
@@ -2862,3 +2884,51 @@ webkit.org/b/152137 fast/media/mq-pointer.html [ Failure ]
 webkit.org/b/152442 fast/scrolling/rtl-point-in-iframe.html [ Skip ]
 
 webkit.org/b/152449 fast/events/can-click-element-on-page-with-active-pseudo-class-and-search-field.html [ Skip ]
+
+webkit.org/b/152701 fast/animation/request-animation-frame-disabled.html [ Skip ]
+
+webkit.org/b/152439 compositing/overflow/dynamic-composited-scrolling-status.html [ Failure ]
+
+webkit.org/b/152282 css3/filters/composited-during-animation-layertree.html [ Failure ]
+webkit.org/b/152282 css3/filters/composited-during-transition-layertree.html [ Failure ]
+
+webkit.org/b/152448 js/intl-collator.html [ Failure ]
+
+webkit.org/b/152935 fast/scrolling/scroll-position-on-reload-rtl.html [ Failure ]
+
+# Since this test directory is explicitly enabled for iOS, the passing tests are being re-enabled individually until flakiness is resolved
+webkit.org/b/153110 fast/viewport/ios/width-is-device-width-overflowing.html [ Pass Failure ]
+webkit.org/b/153110 fast/viewport/ios/width-is-device-width-overflowing-body-overflow-hidden.html [ Pass Failure ]
+webkit.org/b/153110 fast/viewport/ios/width-is-device-width-overflowing-body-overflow-hidden-tall.html [ Pass Failure ]
+fast/viewport/ios/width-is-device-width.html [ Pass ]
+fast/viewport/ios/width-is-device-width-overflowing-no-shrink-to-fit.html [ Pass ]
+
+webkit.org/b/153371 imported/w3c/web-platform-tests/XMLHttpRequest/getresponseheader-chunked-trailer.htm [ Pass Failure ]
+
+webkit.org/b/152446 http/tests/loading/preload-no-store-frame-src.html [ Failure ]
+
+webkit.org/b/153498 svg/dom/SVGScriptElement/script-change-externalResourcesRequired-while-loading.svg [ Pass Timeout ]
+
+# displaylist tests are flaky on ios-simulator wk2
+webkit.org/b/153656 displaylists/canvas-display-list.html [ Pass Failure ]
+webkit.org/b/153656 displaylists/extent-includes-transforms.html [ Pass Failure ]
+webkit.org/b/153656 displaylists/extent-includes-shadow.html [ Pass Failure ]
+webkit.org/b/153656 displaylists/layer-dispay-list.html [ Pass Failure ]
+webkit.org/b/153656 displaylists/replay-skip-clipped-rect.html [ Pass Failure ]
+
+webkit.org/b/153370 imported/w3c/web-platform-tests/html/dom/documents/dom-tree-accessors/document.getElementsByName/document.getElementsByName-newelements-xhtml.xhtml [ Failure ]
+webkit.org/b/153370 imported/w3c/web-platform-tests/html/dom/documents/dom-tree-accessors/document.getElementsByName/document.getElementsByName-newelements.html [ Failure ]
+
+webkit.org/b/152438 fast/text/fallback-language-han-2.html [ ImageOnlyFailure ]
+
+webkit.org/b/153311 fast/replaced/preferred-widths.html [ Pass Failure ]
+
+webkit.org/b/153336 imported/w3c/web-platform-tests/XMLHttpRequest/open-url-multi-window-4.htm [ Pass Failure ]
+
+webkit.org/b/153803 perf/show-hide-table-rows.html [ Pass Failure ]
+
+webkit.org/b/152306 fast/forms/input-user-input-sanitization.html [ Skip ]
+
+webkit.org/b/153850 imported/w3c/web-platform-tests/html/semantics/forms/the-select-element/select-ask-for-reset.html [ Skip ]
+
+webkit.org/b/153314 http/tests/history/back-to-post.php [ Pass Timeout ]

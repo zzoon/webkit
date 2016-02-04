@@ -944,6 +944,17 @@ void Page::setPagination(const Pagination& pagination)
     PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
+void Page::setPaginationLineGridEnabled(bool enabled)
+{
+    if (m_paginationLineGridEnabled == enabled)
+        return;
+    
+    m_paginationLineGridEnabled = enabled;
+    
+    setNeedsRecalcStyleInAllFrames();
+    PageCache::singleton().markPagesForFullStyleRecalc(*this);
+}
+
 unsigned Page::pageCount() const
 {
     if (m_pagination.mode == Pagination::Unpaginated)
@@ -1032,7 +1043,7 @@ void Page::userStyleSheetLocationChanged()
         m_didLoadUserStyleSheet = true;
 
         Vector<char> styleSheetAsUTF8;
-        if (base64Decode(decodeURLEscapeSequences(url.string().substring(35)), styleSheetAsUTF8, Base64IgnoreWhitespace))
+        if (base64Decode(decodeURLEscapeSequences(url.string().substring(35)), styleSheetAsUTF8, Base64IgnoreSpacesAndNewLines))
             m_userStyleSheet = String::fromUTF8(styleSheetAsUTF8.data(), styleSheetAsUTF8.size());
     }
 
@@ -1212,7 +1223,8 @@ void Page::updateIsPlayingMedia(uint64_t sourceElementID)
 {
     MediaProducer::MediaStateFlags state = MediaProducer::IsNotPlaying;
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
-        state |= frame->document()->mediaState();
+        if (Document* document = frame->document())
+            state |= document->mediaState();
     }
 
     if (state == m_mediaState)
@@ -1304,10 +1316,7 @@ void Page::setPageActivityState(PageActivityState::Flags activityState)
 {
     chrome().client().setPageActivityState(activityState);
     
-    if (activityState == PageActivityState::NoFlags && !isVisible())
-        scheduleTabSuspension(true);
-    else
-        scheduleTabSuspension(false);
+    updateTabSuspensionState();
 }
 
 void Page::setIsVisible(bool isVisible)
@@ -1360,7 +1369,7 @@ void Page::setIsVisibleInternal(bool isVisible)
             view->hide();
     }
 
-    scheduleTabSuspension(!isVisible);
+    updateTabSuspensionState();
 }
 
 void Page::setIsPrerender()
@@ -1734,6 +1743,11 @@ void Page::setSessionID(SessionID sessionID)
 {
     ASSERT(sessionID.isValid());
 
+#if ENABLE(INDEXED_DATABASE)
+    if (sessionID != m_sessionID)
+        m_idbIDBConnectionToServer = nullptr;
+#endif
+
     bool privateBrowsingStateChanged = (sessionID.isEphemeral() != m_sessionID.isEphemeral());
 
     m_sessionID = sessionID;
@@ -1835,19 +1849,14 @@ void Page::setAllowsMediaDocumentInlinePlayback(bool flag)
 #if ENABLE(INDEXED_DATABASE)
 IDBClient::IDBConnectionToServer& Page::idbConnection()
 {
-    if (!m_idbIDBConnectionToServer) {
-        if (usesEphemeralSession()) {
-            auto inProcessServer = InProcessIDBServer::create();
-            m_idbIDBConnectionToServer = &inProcessServer->connectionToServer();
-        } else
-            m_idbIDBConnectionToServer = &databaseProvider().idbConnectionToServerForSession(m_sessionID);
-    }
+    if (!m_idbIDBConnectionToServer)
+        m_idbIDBConnectionToServer = &databaseProvider().idbConnectionToServerForSession(m_sessionID);
     
     return *m_idbIDBConnectionToServer;
 }
 #endif
 
-#if ENABLE(RESOURCE_USAGE_OVERLAY)
+#if ENABLE(RESOURCE_USAGE)
 void Page::setResourceUsageOverlayVisible(bool visible)
 {
     if (!visible) {
@@ -1862,17 +1871,39 @@ void Page::setResourceUsageOverlayVisible(bool visible)
 
 bool Page::canTabSuspend()
 {
-    return s_tabSuspensionIsEnabled && !m_isPrerender && (m_pageThrottler.activityState() == PageActivityState::NoFlags) && PageCache::singleton().canCache(this);
+    if (!s_tabSuspensionIsEnabled)
+        return false;
+    if (m_isPrerender)
+        return false;
+    if (isVisible())
+        return false;
+    if (m_pageThrottler.activityState() != PageActivityState::NoFlags)
+        return false;
+
+    for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        if (frame->loader().state() != FrameStateComplete)
+            return false;
+        if (frame->loader().isLoading())
+            return false;
+        if (!frame->document() || !frame->document()->canSuspendActiveDOMObjectsForDocumentSuspension(nullptr))
+            return false;
+    }
+
+    return true;
 }
 
 void Page::setIsTabSuspended(bool shouldSuspend)
 {
+    if (m_isTabSuspended == shouldSuspend)
+        return;
+    m_isTabSuspended = shouldSuspend;
+
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (auto* document = frame->document()) {
             if (shouldSuspend)
-                document->suspend();
+                document->suspend(ActiveDOMObject::PageWillBeSuspended);
             else
-                document->resume();
+                document->resume(ActiveDOMObject::PageWillBeSuspended);
         }
     }
 }
@@ -1882,26 +1913,20 @@ void Page::setTabSuspensionEnabled(bool enable)
     s_tabSuspensionIsEnabled = enable;
 }
 
-void Page::scheduleTabSuspension(bool shouldSuspend)
+void Page::updateTabSuspensionState()
 {
-    if (m_shouldTabSuspend == shouldSuspend)
+    if (canTabSuspend()) {
+        const auto tabSuspensionDelay = std::chrono::minutes(1);
+        m_tabSuspensionTimer.startOneShot(tabSuspensionDelay);
         return;
-    
-    if (shouldSuspend && canTabSuspend()) {
-        m_shouldTabSuspend = shouldSuspend;
-        m_tabSuspensionTimer.startOneShot(0);
-    } else {
-        m_tabSuspensionTimer.stop();
-        if (!shouldSuspend) {
-            m_shouldTabSuspend = shouldSuspend;
-            setIsTabSuspended(false);
-        }
     }
+    m_tabSuspensionTimer.stop();
+    setIsTabSuspended(false);
 }
 
 void Page::tabSuspensionTimerFired()
 {
-    setIsTabSuspended(true);
+    setIsTabSuspended(canTabSuspend());
 }
 
 } // namespace WebCore

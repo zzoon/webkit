@@ -32,7 +32,6 @@ namespace WebCore {
 
 class MediaStreamPrivate;
 class RealtimeMediaSourceOwr;
-class URL;
 
 class MediaPlayerPrivateGStreamerOwr : public MediaPlayerPrivateGStreamerBase, private RealtimeMediaSource::Observer {
 public:
@@ -40,75 +39,72 @@ public:
     ~MediaPlayerPrivateGStreamerOwr();
 
     static void registerMediaEngine(MediaEngineRegistrar);
-    virtual String engineDescription() const { return "OpenWebRTC"; }
-
-    virtual void load(const String&);
-#if ENABLE(MEDIA_SOURCE)
-    virtual void load(const String&, MediaSourcePrivateClient*) { }
-#endif
-    virtual void load(MediaStreamPrivate&);
-    virtual void cancelLoad() { }
-
-    virtual void prepareToPlay() { }
-    void play();
-    void pause();
-
-    bool hasVideo() const;
-    bool hasAudio() const;
-
-    virtual float duration() const { return 0; }
-
-    virtual float currentTime() const;
-    virtual void seek(float) { }
-    virtual bool seeking() const { return false; }
-
-    virtual void setRate(float) { }
-    virtual void setPreservesPitch(bool) { }
-    virtual bool paused() const { return m_paused; }
-
-    virtual bool hasClosedCaptions() const { return false; }
-    virtual void setClosedCaptionsVisible(bool) { };
-
-    virtual float maxTimeSeekable() const { return 0; }
-    virtual std::unique_ptr<PlatformTimeRanges> buffered() const { return std::make_unique<PlatformTimeRanges>(); }
-    bool didLoadingProgress() const;
-
-    virtual unsigned long long totalBytes() const { return 0; }
-    virtual unsigned bytesLoaded() const { return 0; }
-
-    virtual bool canLoadPoster() const { return false; }
-    virtual void setPoster(const String&) { }
-
-    virtual bool isLiveStream() const { return true; }
-
-    // RealtimeMediaSource::Observer implementation
-    virtual void sourceStopped() override final;
-    virtual void sourceMutedChanged() override final;
-    virtual void sourceSettingsChanged() override final;
-    virtual bool preventSourceFromStopping() override final;
-
-protected:
-    virtual GstElement* createVideoSink();
 
 private:
-    static void getSupportedTypes(HashSet<String>&);
+    GstElement* createVideoSink() override;
+    GstElement* audioSink() const override { return m_audioSink.get(); }
+    bool isLiveStream() const override { return true; }
+
+    String engineDescription() const override { return "OpenWebRTC"; }
+
+    void load(const String&) override;
+#if ENABLE(MEDIA_SOURCE)
+    void load(const String&, MediaSourcePrivateClient*) override { }
+#endif
+    void load(MediaStreamPrivate&) override;
+    void cancelLoad() override { }
+
+    void prepareToPlay() override { }
+    void play() override;
+    void pause() override;
+
+    bool hasVideo() const override;
+    bool hasAudio() const override;
+
+    float duration() const override { return 0; }
+
+    float currentTime() const override;
+    void seek(float) override { }
+    bool seeking() const override { return false; }
+
+    void setRate(float) override { }
+    void setPreservesPitch(bool) override { }
+    bool paused() const override { return m_paused; }
+
+    bool hasClosedCaptions() const override { return false; }
+    void setClosedCaptionsVisible(bool) override { };
+
+    float maxTimeSeekable() const override { return 0; }
+    std::unique_ptr<PlatformTimeRanges> buffered() const override { return std::make_unique<PlatformTimeRanges>(); }
+    bool didLoadingProgress() const override;
+
+    unsigned long long totalBytes() const override { return 0; }
+
+    bool canLoadPoster() const override { return false; }
+    void setPoster(const String&) override { }
+
+    // RealtimeMediaSource::Observer implementation.
+    void sourceStopped() override final;
+    void sourceMutedChanged() override final;
+    void sourceSettingsChanged() override final;
+    bool preventSourceFromStopping() override final;
+
+    static void getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>&);
     static MediaPlayer::SupportsType supportsType(const MediaEngineSupportParameters&);
-    static bool isAvailable();
+    static bool initializeGStreamerAndGStreamerDebugging();
     void createGSTAudioSinkBin();
     void loadingFailed(MediaPlayer::NetworkState error);
     bool internalLoad();
     void stop();
-    virtual GstElement* audioSink() const { return m_audioSink.get(); }
 
-private:
-    bool m_paused;
-    bool m_stopped;
+    bool m_paused { true };
+    bool m_stopped { true };
     RefPtr<RealtimeMediaSourceOwr> m_videoSource;
     RefPtr<RealtimeMediaSourceOwr> m_audioSource;
     GRefPtr<GstElement> m_audioSink;
     RefPtr<MediaStreamPrivate> m_streamPrivate;
-    OwrGstVideoRenderer* m_videoRenderer;
-    OwrGstAudioRenderer* m_audioRenderer;
+    GRefPtr<OwrGstVideoRenderer> m_videoRenderer;
+    GRefPtr<OwrGstAudioRenderer> m_audioRenderer;
 };
 
 } // namespace WebCore

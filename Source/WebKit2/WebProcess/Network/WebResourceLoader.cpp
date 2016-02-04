@@ -207,12 +207,7 @@ void WebResourceLoader::didReceiveResource(const ShareableResource::Handle& hand
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
 void WebResourceLoader::canAuthenticateAgainstProtectionSpace(const ProtectionSpace& protectionSpace)
 {
-    Ref<WebResourceLoader> protect(*this);
-
-    bool result = m_coreLoader->canAuthenticateAgainstProtectionSpace(protectionSpace);
-
-    if (!m_coreLoader)
-        return;
+    bool result = m_coreLoader ? m_coreLoader->canAuthenticateAgainstProtectionSpace(protectionSpace) : false;
 
     send(Messages::NetworkResourceLoader::ContinueCanAuthenticateAgainstProtectionSpace(result));
 }

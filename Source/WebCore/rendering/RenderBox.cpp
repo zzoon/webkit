@@ -25,6 +25,7 @@
 #include "config.h"
 #include "RenderBox.h"
 
+#include "CSSFontSelector.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "Document.h"
@@ -384,12 +385,13 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
 
     if (isDocElementRenderer || isBodyRenderer) {
         // Propagate the new writing mode and direction up to the RenderView.
+        auto* documentElementRenderer = document().documentElement()->renderer();
         RenderStyle& viewStyle = view().style();
         bool viewChangedWritingMode = false;
         bool rootStyleChanged = false;
         bool viewStyleChanged = false;
-        RenderObject* rootRenderer = isBodyRenderer ? document().documentElement()->renderer() : nullptr;
-        if (viewStyle.direction() != newStyle.direction() && (isDocElementRenderer || !document().directionSetOnDocumentElement())) {
+        auto* rootRenderer = isBodyRenderer ? documentElementRenderer : nullptr;
+        if (viewStyle.direction() != newStyle.direction() && (isDocElementRenderer || !documentElementRenderer->style().hasExplicitlySetDirection())) {
             viewStyle.setDirection(newStyle.direction());
             viewStyleChanged = true;
             if (isBodyRenderer) {
@@ -399,7 +401,7 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
             setNeedsLayoutAndPrefWidthsRecalc();
         }
 
-        if (viewStyle.writingMode() != newStyle.writingMode() && (isDocElementRenderer || !document().writingModeSetOnDocumentElement())) {
+        if (viewStyle.writingMode() != newStyle.writingMode() && (isDocElementRenderer || !documentElementRenderer->style().hasExplicitlySetWritingMode())) {
             viewStyle.setWritingMode(newStyle.writingMode());
             viewChangedWritingMode = true;
             viewStyleChanged = true;
@@ -427,6 +429,15 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
         
         if (rootStyleChanged && is<RenderBlockFlow>(rootRenderer) && downcast<RenderBlockFlow>(*rootRenderer).multiColumnFlowThread())
             downcast<RenderBlockFlow>(*rootRenderer).updateStylesForColumnChildren();
+        
+        if (isBodyRenderer && pagination.mode != Pagination::Unpaginated && frame().page()->paginationLineGridEnabled()) {
+            // Propagate the body font back up to the RenderView and use it as
+            // the basis of the grid.
+            if (newStyle.fontDescription() != view().style().fontDescription()) {
+                view().style().setFontDescription(newStyle.fontDescription());
+                view().style().fontCascade().update(&document().fontSelector());
+            }
+        }
 
         if (diff != StyleDifferenceEqual)
             view().compositor().rootOrBodyStyleChanged(*this, oldStyle);
@@ -2369,7 +2380,12 @@ void RenderBox::computeLogicalWidthInRegion(LogicalExtentComputedValues& compute
     // https://bugs.webkit.org/show_bug.cgi?id=46418
     bool inVerticalBox = parent()->isDeprecatedFlexibleBox() && (parent()->style().boxOrient() == VERTICAL);
     bool stretching = (parent()->style().boxAlign() == BSTRETCH);
+    // FIXME: Stretching is the only reason why we don't want the box to be treated as a replaced element, so we could perhaps
+    // refactor all this logic, not only for flex and grid since alignment is intended to be applied to any block.
     bool treatAsReplaced = shouldComputeSizeAsReplaced() && (!inVerticalBox || !stretching);
+#if ENABLE(CSS_GRID_LAYOUT)
+    treatAsReplaced = treatAsReplaced && (!isGridItem() || !hasStretchedLogicalWidth());
+#endif
 
     const RenderStyle& styleToUse = style();
     Length logicalWidthLength = treatAsReplaced ? Length(computeReplacedLogicalWidth(), Fixed) : styleToUse.logicalWidth();
@@ -2517,6 +2533,23 @@ static bool isStretchingColumnFlexItem(const RenderBox& flexitem)
     return false;
 }
 
+// FIXME: Can/Should we move this inside specific layout classes (flex. grid)? Can we refactor columnFlexItemHasStretchAlignment logic?
+bool RenderBox::hasStretchedLogicalWidth() const
+{
+    auto& style = this->style();
+    if (!style.logicalWidth().isAuto() || style.marginStart().isAuto() || style.marginEnd().isAuto())
+        return false;
+    RenderBlock* containingBlock = this->containingBlock();
+    if (!containingBlock) {
+        // We are evaluating align-self/justify-self, which default to 'normal' for the root element.
+        // The 'normal' value behaves like 'start' except for Flexbox Items, which obviously should have a container.
+        return false;
+    }
+    if (containingBlock->isHorizontalWritingMode() != isHorizontalWritingMode())
+        return RenderStyle::resolveAlignment(containingBlock->style(), style, ItemPositionStretch) == ItemPositionStretch;
+    return RenderStyle::resolveJustification(containingBlock->style(), style, ItemPositionStretch) == ItemPositionStretch;
+}
+
 bool RenderBox::sizesLogicalWidthToFitContent(SizeType widthType) const
 {
     // Anonymous inline blocks always fill the width of their containing block.
@@ -2529,10 +2562,8 @@ bool RenderBox::sizesLogicalWidthToFitContent(SizeType widthType) const
         return true;
 
 #if ENABLE(CSS_GRID_LAYOUT)
-    if (parent()->isRenderGrid()) {
-        bool allowedToStretchChildAlongRowAxis = style().logicalWidth().isAuto() && !style().marginStartUsing(&parent()->style()).isAuto() && !style().marginEndUsing(&parent()->style()).isAuto();
-        return !allowedToStretchChildAlongRowAxis || RenderStyle::resolveJustification(parent()->style(), style(), ItemPositionStretch) != ItemPositionStretch;
-    }
+    if (isGridItem())
+        return !hasStretchedLogicalWidth();
 #endif
 
     // This code may look a bit strange.  Basically width:intrinsic should clamp the size when testing both
@@ -3331,25 +3362,32 @@ static void computeInlineStaticDistance(Length& logicalLeft, Length& logicalRigh
     if (child->parent()->style().direction() == LTR) {
         LayoutUnit staticPosition = child->layer()->staticInlinePosition() - containerBlock->borderLogicalLeft();
         for (auto* current = child->parent(); current && current != containerBlock; current = current->container()) {
-            if (is<RenderBox>(*current)) {
-                staticPosition += downcast<RenderBox>(*current).logicalLeft();
-                if (region && is<RenderBlock>(*current)) {
-                    const RenderBlock& currentBlock = downcast<RenderBlock>(*current);
-                    region = currentBlock.clampToStartAndEndRegions(region);
-                    RenderBoxRegionInfo* boxInfo = currentBlock.renderBoxRegionInfo(region);
-                    if (boxInfo)
-                        staticPosition += boxInfo->logicalLeft();
-                }
+            if (!is<RenderBox>(*current))
+                continue;
+            const auto& renderBox = downcast<RenderBox>(*current);
+            staticPosition += renderBox.logicalLeft();
+            if (renderBox.isInFlowPositioned())
+                staticPosition += renderBox.isHorizontalWritingMode() ? renderBox.offsetForInFlowPosition().width() : renderBox.offsetForInFlowPosition().height();
+            if (region && is<RenderBlock>(*current)) {
+                const RenderBlock& currentBlock = downcast<RenderBlock>(*current);
+                region = currentBlock.clampToStartAndEndRegions(region);
+                RenderBoxRegionInfo* boxInfo = currentBlock.renderBoxRegionInfo(region);
+                if (boxInfo)
+                    staticPosition += boxInfo->logicalLeft();
             }
         }
         logicalLeft.setValue(Fixed, staticPosition);
     } else {
-        RenderBox& enclosingBox = child->parent()->enclosingBox();
+        const RenderBox& enclosingBox = child->parent()->enclosingBox();
         LayoutUnit staticPosition = child->layer()->staticInlinePosition() + containerLogicalWidth + containerBlock->borderLogicalLeft();
-        for (RenderElement* current = &enclosingBox; current; current = current->container()) {
+        for (const RenderElement* current = &enclosingBox; current; current = current->container()) {
             if (is<RenderBox>(*current)) {
-                if (current != containerBlock)
-                    staticPosition -= downcast<RenderBox>(*current).logicalLeft();
+                if (current != containerBlock) {
+                    const auto& renderBox = downcast<RenderBox>(*current);
+                    staticPosition -= renderBox.logicalLeft();
+                    if (renderBox.isInFlowPositioned())
+                        staticPosition -= renderBox.isHorizontalWritingMode() ? renderBox.offsetForInFlowPosition().width() : renderBox.offsetForInFlowPosition().height();
+                }
                 if (current == &enclosingBox)
                     staticPosition -= enclosingBox.logicalWidth();
                 if (region && is<RenderBlock>(*current)) {
@@ -3713,8 +3751,13 @@ static void computeBlockStaticDistance(Length& logicalTop, Length& logicalBottom
     // FIXME: The static distance computation has not been patched for mixed writing modes.
     LayoutUnit staticLogicalTop = child->layer()->staticBlockPosition() - containerBlock->borderBefore();
     for (RenderElement* container = child->parent(); container && container != containerBlock; container = container->container()) {
-        if (is<RenderBox>(*container) && !is<RenderTableRow>(*container))
-            staticLogicalTop += downcast<RenderBox>(*container).logicalTop();
+        if (!is<RenderBox>(*container))
+            continue;
+        const auto& renderBox = downcast<RenderBox>(*container);
+        if (!is<RenderTableRow>(renderBox))
+            staticLogicalTop += renderBox.logicalTop();
+        if (renderBox.isInFlowPositioned())
+            staticLogicalTop += renderBox.isHorizontalWritingMode() ? renderBox.offsetForInFlowPosition().height() : renderBox.offsetForInFlowPosition().width();
     }
     logicalTop.setValue(Fixed, staticLogicalTop);
 }

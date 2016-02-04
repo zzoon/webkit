@@ -305,6 +305,9 @@ void WebProcess::initializeWebProcess(WebProcessCreationParameters&& parameters)
     for (auto& scheme : parameters.urlSchemesRegisteredAsCORSEnabled)
         registerURLSchemeAsCORSEnabled(scheme);
 
+    for (auto& scheme : parameters.urlSchemesRegisteredAsAlwaysRevalidated)
+        registerURLSchemeAsAlwaysRevalidated(scheme);
+
     WebCore::Settings::setShouldRewriteConstAsVar(parameters.shouldRewriteConstAsVar);
 
 #if ENABLE(CACHE_PARTITIONING)
@@ -425,6 +428,11 @@ void WebProcess::registerURLSchemeAsCORSEnabled(const String& urlScheme) const
     SchemeRegistry::registerURLSchemeAsCORSEnabled(urlScheme);
 }
 
+void WebProcess::registerURLSchemeAsAlwaysRevalidated(const String& urlScheme) const
+{
+    SchemeRegistry::registerURLSchemeAsAlwaysRevalidated(urlScheme);
+}
+
 #if ENABLE(CACHE_PARTITIONING)
 void WebProcess::registerURLSchemeAsCachePartitioned(const String& urlScheme) const
 {
@@ -488,6 +496,11 @@ void WebProcess::setCacheModel(uint32_t cm)
         m_cacheModel = cacheModel;
         platformSetCacheModel(cacheModel);
     }
+}
+
+void WebProcess::clearCachedCredentials()
+{
+    NetworkStorageSession::defaultStorageSession().credentialStorage().clearCredentials();
 }
 
 WebPage* WebProcess::focusedWebPage() const
@@ -708,16 +721,16 @@ static inline void addCaseFoldedCharacters(StringHasher& hasher, const String& s
     if (string.isEmpty())
         return;
     if (string.is8Bit()) {
-        hasher.addCharacters<LChar, CaseFoldingHash::foldCase<LChar>>(string.characters8(), string.length());
+        hasher.addCharacters<LChar, ASCIICaseInsensitiveHash::foldCase<LChar>>(string.characters8(), string.length());
         return;
     }
-    hasher.addCharacters<UChar, CaseFoldingHash::foldCase<UChar>>(string.characters16(), string.length());
+    hasher.addCharacters<UChar, ASCIICaseInsensitiveHash::foldCase<UChar>>(string.characters16(), string.length());
 }
 
 static unsigned hashForPlugInOrigin(const String& pageOrigin, const String& pluginOrigin, const String& mimeType)
 {
     // We want to avoid concatenating the strings and then taking the hash, since that could lead to an expensive conversion.
-    // We also want to avoid using the hash() function in StringImpl or CaseFoldingHash because that masks out bits for the use of flags.
+    // We also want to avoid using the hash() function in StringImpl or ASCIICaseInsensitiveHash because that masks out bits for the use of flags.
     StringHasher hasher;
     addCaseFoldedCharacters(hasher, pageOrigin);
     hasher.addCharacter(0);

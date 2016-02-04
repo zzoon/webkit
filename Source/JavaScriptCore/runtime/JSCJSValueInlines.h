@@ -46,7 +46,7 @@ ALWAYS_INLINE int32_t JSValue::toInt32(ExecState* exec) const
 
 inline uint32_t JSValue::toUInt32(ExecState* exec) const
 {
-    // See comment on JSC::toUInt32, above.
+    // See comment on JSC::toUInt32, in JSCJSValue.h.
     return toInt32(exec);
 }
 
@@ -680,6 +680,16 @@ inline JSObject* JSValue::toObject(ExecState* exec, JSGlobalObject* globalObject
 inline bool JSValue::isFunction() const
 {
     return isCell() && (asCell()->inherits(JSFunction::info()) || asCell()->inherits(InternalFunction::info()));
+}
+
+// FIXME: We could do this in a smarter way. See: https://bugs.webkit.org/show_bug.cgi?id=153670
+inline bool JSValue::isConstructor() const
+{
+    if (isFunction()) {
+        ConstructData data;
+        return getConstructData(*this, data) != ConstructTypeNone;
+    }
+    return false;
 }
 
 // this method is here to be after the inline declaration of JSCell::inherits

@@ -170,6 +170,7 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 - (void)_becomeFirstResponderWithSelectionMovingForward:(BOOL)selectingForward completionHandler:(void (^)(BOOL didBecomeFirstResponder))completionHandler WK_AVAILABLE(NA, 9_0);
 
 - (id)_snapshotLayerContentsForBackForwardListItem:(WKBackForwardListItem *)item WK_AVAILABLE(NA, 9_0);
+- (NSArray *)_dataDetectionResults;
 
 #else
 @property (readonly) NSColor *_pageExtendedBackgroundColor;
@@ -208,6 +209,7 @@ typedef NS_ENUM(NSInteger, _WKImmediateActionType) {
 // Set to 0 to have the page length equal the view length.
 @property (nonatomic, setter=_setPageLength:) CGFloat _pageLength;
 @property (nonatomic, setter=_setGapBetweenPages:) CGFloat _gapBetweenPages;
+@property (nonatomic, setter=_setPaginationLineGridEnabled:) BOOL _paginationLineGridEnabled;
 @property (readonly) NSUInteger _pageCount;
 
 @property (nonatomic, readonly) BOOL _supportsTextZoom;

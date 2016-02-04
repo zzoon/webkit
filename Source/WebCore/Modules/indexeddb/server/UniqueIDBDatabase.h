@@ -41,6 +41,7 @@
 #include <wtf/Deque.h>
 #include <wtf/HashCountedSet.h>
 #include <wtf/HashSet.h>
+#include <wtf/ListHashSet.h>
 #include <wtf/Ref.h>
 #include <wtf/ThreadSafeRefCounted.h>
 
@@ -130,10 +131,10 @@ private:
     void performAbortTransaction(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier);
     void beginTransactionInBackingStore(const IDBTransactionInfo&);
     void performCreateObjectStore(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, const IDBObjectStoreInfo&);
-    void performDeleteObjectStore(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, const String& objectStoreName);
+    void performDeleteObjectStore(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier);
     void performClearObjectStore(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier);
     void performCreateIndex(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, const IDBIndexInfo&);
-    void performDeleteIndex(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const String& indexName);
+    void performDeleteIndex(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, uint64_t indexIdentifier);
     void performPutOrAdd(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyData&, const ThreadSafeDataBuffer& valueData, IndexedDB::ObjectStoreOverwriteMode);
     void performGetRecord(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, const IDBKeyRangeData&);
     void performGetIndexRecord(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, uint64_t objectStoreIdentifier, uint64_t indexIdentifier, IndexedDB::IndexRecordType, const IDBKeyRangeData&);
@@ -147,10 +148,10 @@ private:
     void didDeleteBackingStore();
     void didOpenBackingStore(const IDBDatabaseInfo&);
     void didPerformCreateObjectStore(uint64_t callbackIdentifier, const IDBError&, const IDBObjectStoreInfo&);
-    void didPerformDeleteObjectStore(uint64_t callbackIdentifier, const IDBError&, const String& objectStoreName);
+    void didPerformDeleteObjectStore(uint64_t callbackIdentifier, const IDBError&, uint64_t objectStoreIdentifier);
     void didPerformClearObjectStore(uint64_t callbackIdentifier, const IDBError&);
     void didPerformCreateIndex(uint64_t callbackIdentifier, const IDBError&, const IDBIndexInfo&);
-    void didPerformDeleteIndex(uint64_t callbackIdentifier, const IDBError&, uint64_t objectStoreIdentifier, const String& indexName);
+    void didPerformDeleteIndex(uint64_t callbackIdentifier, const IDBError&, uint64_t objectStoreIdentifier, uint64_t indexIdentifier);
     void didPerformPutOrAdd(uint64_t callbackIdentifier, const IDBError&, const IDBKeyData&);
     void didPerformGetRecord(uint64_t callbackIdentifier, const IDBError&, const IDBGetResult&);
     void didPerformGetCount(uint64_t callbackIdentifier, const IDBError&, uint64_t);
@@ -183,7 +184,7 @@ private:
     Deque<Ref<ServerOpenDBRequest>> m_pendingOpenDBRequests;
     RefPtr<ServerOpenDBRequest> m_currentOpenDBRequest;
 
-    HashSet<RefPtr<UniqueIDBDatabaseConnection>> m_openDatabaseConnections;
+    ListHashSet<RefPtr<UniqueIDBDatabaseConnection>> m_openDatabaseConnections;
     HashSet<RefPtr<UniqueIDBDatabaseConnection>> m_closePendingDatabaseConnections;
 
     RefPtr<UniqueIDBDatabaseConnection> m_versionChangeDatabaseConnection;
@@ -192,6 +193,9 @@ private:
     bool m_isOpeningBackingStore { false };
     std::unique_ptr<IDBBackingStore> m_backingStore;
     std::unique_ptr<IDBDatabaseInfo> m_databaseInfo;
+    std::unique_ptr<IDBDatabaseInfo> m_mostRecentDeletedDatabaseInfo;
+
+    bool m_backingStoreSupportsSimultaneousTransactions { false };
 
     HashMap<uint64_t, ErrorCallback> m_errorCallbacks;
     HashMap<uint64_t, KeyDataCallback> m_keyDataCallbacks;
@@ -203,11 +207,10 @@ private:
     Deque<RefPtr<UniqueIDBDatabaseTransaction>> m_pendingTransactions;
     HashMap<IDBResourceIdentifier, RefPtr<UniqueIDBDatabaseTransaction>> m_inProgressTransactions;
 
-    // The key into this set is the object store ID.
-    // The set counts how many transactions are open to the given object store.
-    // This helps make sure opening narrowly scoped transactions (one or two object stores)
-    // doesn't continuously block widely scoped write transactions.
+    // The keys into these sets are the object store ID.
+    // These sets help to decide which transactions can be started and which must be deferred.
     HashCountedSet<uint64_t> m_objectStoreTransactionCounts;
+    HashSet<uint64_t> m_objectStoreWriteTransactions;
 
     bool m_deletePending { false };
     bool m_deleteBackingStoreInProgress { false };

@@ -113,7 +113,7 @@ ImageBuffer::ImageBuffer(const FloatSize& size, float resolutionScale, ColorSpac
     RetainPtr<CGContextRef> cgContext;
     if (accelerateRendering) {
 #if USE(IOSURFACE_CANVAS_BACKING_STORE)
-        FloatSize userBounds = scaleSizeToUserSpace(FloatSize(width.unsafeGet(), height.unsafeGet()), m_data.backingStoreSize, m_size);
+        FloatSize userBounds = sizeForDestinationSize(FloatSize(width.unsafeGet(), height.unsafeGet()));
         m_data.surface = IOSurface::create(m_data.backingStoreSize, IntSize(userBounds), imageColorSpace);
         cgContext = m_data.surface->ensurePlatformContext();
         if (cgContext)
@@ -153,6 +153,11 @@ ImageBuffer::ImageBuffer(const FloatSize& size, float resolutionScale, ColorSpac
 
 ImageBuffer::~ImageBuffer()
 {
+}
+
+FloatSize ImageBuffer::sizeForDestinationSize(FloatSize destinationSize) const
+{
+    return scaleSizeToUserSpace(destinationSize, m_data.backingStoreSize, internalSize());
 }
 
 GraphicsContext& ImageBuffer::context() const
@@ -259,11 +264,11 @@ RetainPtr<CGImageRef> ImageBuffer::copyNativeImage(BackingStoreCopy copyBehavior
     return image;
 }
 
-void ImageBuffer::drawConsuming(std::unique_ptr<ImageBuffer> imageBuffer, GraphicsContext& destContext, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode, bool useLowQualityScale)
+void ImageBuffer::drawConsuming(std::unique_ptr<ImageBuffer> imageBuffer, GraphicsContext& destContext, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode)
 {
 #if USE(IOSURFACE_CANVAS_BACKING_STORE)
     if (!imageBuffer->m_data.surface) {
-        imageBuffer->draw(destContext, destRect, srcRect, op, blendMode, useLowQualityScale);
+        imageBuffer->draw(destContext, destRect, srcRect, op, blendMode);
         return;
     }
     
@@ -278,11 +283,11 @@ void ImageBuffer::drawConsuming(std::unique_ptr<ImageBuffer> imageBuffer, Graphi
     adjustedSrcRect.scale(resolutionScale, resolutionScale);
     destContext.drawNativeImage(image.get(), backingStoreSize, destRect, adjustedSrcRect, op, blendMode);
 #else
-    imageBuffer->draw(destContext, destRect, srcRect, op, blendMode, useLowQualityScale);
+    imageBuffer->draw(destContext, destRect, srcRect, op, blendMode);
 #endif
 }
 
-void ImageBuffer::draw(GraphicsContext& destContext, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode, bool)
+void ImageBuffer::draw(GraphicsContext& destContext, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator op, BlendMode blendMode)
 {
     RetainPtr<CGImageRef> image;
     if (&destContext == &context() || destContext.isAcceleratedContext())
@@ -312,13 +317,6 @@ void ImageBuffer::drawPattern(GraphicsContext& destContext, const FloatRect& src
         if (RefPtr<Image> copy = copyImage(CopyBackingStore))
             copy->drawPattern(destContext, adjustedSrcRect, patternTransform, phase, spacing, op, destRect, blendMode);
     }
-}
-
-void ImageBuffer::clip(GraphicsContext& contextToClip, const FloatRect& rect) const
-{
-    FloatSize backingStoreSizeInUserSpace = scaleSizeToUserSpace(rect.size(), m_data.backingStoreSize, internalSize());
-    RetainPtr<CGImageRef> image = copyNativeImage(DontCopyBackingStore);
-    contextToClip.clipToNativeImage(image.get(), rect, backingStoreSizeInUserSpace);
 }
 
 PassRefPtr<Uint8ClampedArray> ImageBuffer::getUnmultipliedImageData(const IntRect& rect, CoordinateSystem coordinateSystem) const
@@ -387,7 +385,7 @@ void ImageBuffer::putByteArray(Multiply multiplied, Uint8ClampedArray* source, c
     CGContextSetShadowWithColor(destContext, CGSizeZero, 0, 0);
 
     // Draw the image in CG coordinate space
-    FloatSize scaledDestSize = scaleSizeToUserSpace(coordinateSystem == LogicalCoordinateSystem ? logicalSize() : internalSize(), m_data.backingStoreSize, internalSize());
+    FloatSize scaledDestSize = sizeForDestinationSize(coordinateSystem == LogicalCoordinateSystem ? logicalSize() : internalSize());
     IntPoint destPointInCGCoords(destPoint.x() + sourceRect.x(), scaledDestSize.height() - (destPoint.y() + sourceRect.y()) - sourceRect.height());
     IntRect destRectInCGCoords(destPointInCGCoords, sourceCopySize);
     CGContextClipToRect(destContext, destRectInCGCoords);
@@ -419,11 +417,11 @@ static RetainPtr<CFStringRef> utiFromMIMEType(const String& mimeType)
     static const CFStringRef kUTTypePNG = CFSTR("public.png");
     static const CFStringRef kUTTypeGIF = CFSTR("com.compuserve.gif");
 
-    if (equalIgnoringCase(mimeType, "image/png"))
+    if (equalLettersIgnoringASCIICase(mimeType, "image/png"))
         return kUTTypePNG;
-    if (equalIgnoringCase(mimeType, "image/jpeg"))
+    if (equalLettersIgnoringASCIICase(mimeType, "image/jpeg"))
         return jpegUTI();
-    if (equalIgnoringCase(mimeType, "image/gif"))
+    if (equalLettersIgnoringASCIICase(mimeType, "image/gif"))
         return kUTTypeGIF;
 
     ASSERT_NOT_REACHED();
@@ -506,7 +504,7 @@ String ImageBuffer::toDataURL(const String& mimeType, const double* quality, Coo
         RetainPtr<CGContextRef> context = adoptCF(CGBitmapContextCreate(0, logicalSize().width(), logicalSize().height(), 8, 4 * logicalSize().width(), sRGBColorSpaceRef(), kCGImageAlphaPremultipliedLast));
         CGContextSetBlendMode(context.get(), kCGBlendModeCopy);
         CGContextClipToRect(context.get(), CGRectMake(0, 0, logicalSize().width(), logicalSize().height()));
-        FloatSize imageSizeInUserSpace = scaleSizeToUserSpace(logicalSize(), m_data.backingStoreSize, internalSize());
+        FloatSize imageSizeInUserSpace = sizeForDestinationSize(logicalSize());
         CGContextDrawImage(context.get(), CGRectMake(0, 0, imageSizeInUserSpace.width(), imageSizeInUserSpace.height()), image.get());
         image = adoptCF(CGBitmapContextCreateImage(context.get()));
     }

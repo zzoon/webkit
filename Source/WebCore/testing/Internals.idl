@@ -57,6 +57,12 @@ enum MediaControlEvent {
     "previous-track"
 };
 
+enum AutoFillButtonType {
+    "AutoFillButtonTypeNone",
+    "AutoFillButtonTypeContacts",
+    "AutoFillButtonTypeCredentials"
+};
+
 [
     NoInterfaceObject,
 ] interface Internals {
@@ -140,6 +146,7 @@ enum MediaControlEvent {
     [RaisesException] void setViewBaseBackgroundColor(DOMString colorValue);
 
     [RaisesException] void setPagination(DOMString mode, long gap, optional long pageLength);
+    [RaisesException] void setPaginationLineGridEnabled(boolean enabled);
 
     [RaisesException] DOMString configurationForViewport(unrestricted float devicePixelRatio,
                                        long deviceWidth,
@@ -151,7 +158,7 @@ enum MediaControlEvent {
     [RaisesException] boolean elementShouldAutoComplete(Element inputElement);
     [RaisesException] void setEditingValue(Element inputElement, DOMString value);
     [RaisesException] void setAutofilled(Element inputElement, boolean enabled);
-    [RaisesException] void setShowAutoFillButton(Element inputElement, boolean enabled);
+    [RaisesException] void setShowAutoFillButton(Element inputElement, AutoFillButtonType autoFillButtonType);
     [RaisesException] unsigned long countMatchesForText(DOMString text, unsigned long findOptions, DOMString markMatches);
 
     [RaisesException] void paintControlTints();
@@ -198,12 +205,16 @@ enum MediaControlEvent {
     [RaisesException] void setAutomaticTextReplacementEnabled(boolean enabled);
     [RaisesException] void setAutomaticSpellingCorrectionEnabled(boolean enabled);
 
+    [RaisesException] void handleAcceptedCandidate(DOMString candidate);
+
     [RaisesException] boolean isOverwriteModeEnabled();
     [RaisesException] void toggleOverwriteModeEnabled();
 
     [RaisesException] unsigned long numberOfScrollableAreas();
 
     [RaisesException] boolean isPageBoxVisible(long pageNumber);
+
+    [RaisesException] unsigned long imageFrameIndex(Element element);
 
     readonly attribute InternalSettings settings;
     readonly attribute unsigned long workerThreadCount;
@@ -222,9 +233,18 @@ enum MediaControlEvent {
 
     [RaisesException] DOMString repaintRectsAsText();
 
-    [RaisesException] void garbageCollectDocumentResources();
+    // These throw if the element does not have a compositing layer.
+    [RaisesException] void setElementUsesDisplayListDrawing(Element element, boolean usesDisplayListDrawing);
+    [RaisesException] void setElementTracksDisplayListReplay(Element element, boolean trackReplay);
 
-    void allowRoundingHacks();
+    // Flags for displayListForElement.
+    const unsigned short DISPLAY_LIST_INCLUDES_PLATFORM_OPERATIONS = 1;
+    // Returns the recorded display list.
+    [RaisesException] DOMString displayListForElement(Element element, optional unsigned short flags);
+    // Returns the display list that was actually painted.
+    [RaisesException] DOMString replayDisplayListForElement(Element element, optional unsigned short flags);
+
+    [RaisesException] void garbageCollectDocumentResources();
 
     [RaisesException] void insertAuthorCSS(DOMString css);
     [RaisesException] void insertUserCSS(DOMString css);

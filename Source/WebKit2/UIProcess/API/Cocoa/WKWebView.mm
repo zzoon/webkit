@@ -142,7 +142,24 @@ enum class DynamicViewportUpdateMode {
     ResizingWithDocumentHidden,
 };
 
+#if USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/RemoteLayerBackingStoreAdditions.mm>
+#else
+
+namespace WebKit {
+
+#if USE(IOSURFACE)
+static WebCore::IOSurface::Format bufferFormat(bool)
+{
+    return WebCore::IOSurface::Format::RGBA;
+}
+#endif // USE(IOSURFACE)
+
+} // namespace WebKit
+
 #endif
+
+#endif // PLATFORM(IOS)
 
 #if PLATFORM(MAC)
 #import "WKTextFinderClient.h"
@@ -184,6 +201,8 @@ WKWebView* fromWebPageProxy(WebKit::WebPageProxy& page)
     CGSize _maximumUnobscuredSizeOverride;
     CGRect _inputViewBounds;
     CGFloat _viewportMetaTagWidth;
+    BOOL _viewportMetaTagWidthWasExplicit;
+    BOOL _viewportMetaTagCameFromImageDocument;
     CGFloat _initialScaleFactor;
     BOOL _fastClickingIsDisabled;
 
@@ -297,6 +316,28 @@ static bool shouldAllowPictureInPictureMediaPlayback()
 
 #endif
 
+#if ENABLE(DATA_DETECTION)
+static WebCore::DataDetectorTypes fromWKDataDetectorTypes(uint64_t types)
+{
+    if (static_cast<WKDataDetectorTypes>(types) == WKDataDetectorTypeNone)
+        return WebCore::DataDetectorTypeNone;
+    if (static_cast<WKDataDetectorTypes>(types) == WKDataDetectorTypeAll)
+        return WebCore::DataDetectorTypeAll;
+    
+    uint32_t value = WebCore::DataDetectorTypeNone;
+    if (types & WKDataDetectorTypePhoneNumber)
+        value |= WebCore::DataDetectorTypePhoneNumber;
+    if (types & WKDataDetectorTypeLink)
+        value |= WebCore::DataDetectorTypeLink;
+    if (types & WKDataDetectorTypeAddress)
+        value |= WebCore::DataDetectorTypeAddress;
+    if (types & WKDataDetectorTypeCalendarEvent)
+        value |= WebCore::DataDetectorTypeCalendarEvent;
+    
+    return static_cast<WebCore::DataDetectorTypes>(value);
+}
+#endif
+
 - (instancetype)initWithFrame:(CGRect)frame configuration:(WKWebViewConfiguration *)configuration
 {
     if (!(self = [super initWithFrame:frame]))
@@ -365,6 +406,9 @@ static bool shouldAllowPictureInPictureMediaPlayback()
     pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::requiresUserGestureForAudioPlaybackKey(), WebKit::WebPreferencesStore::Value(!![_configuration _requiresUserActionForAudioPlayback]));
     pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::invisibleAutoplayNotPermittedKey(), WebKit::WebPreferencesStore::Value(!![_configuration _invisibleAutoplayNotPermitted]));
     pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::mediaDataLoadsAutomaticallyKey(), WebKit::WebPreferencesStore::Value(!![_configuration _mediaDataLoadsAutomatically]));
+#endif
+#if ENABLE(DATA_DETECTION)
+    pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::dataDetectorTypesKey(), WebKit::WebPreferencesStore::Value(static_cast<uint32_t>(fromWKDataDetectorTypes([_configuration dataDetectorTypes]))));
 #endif
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     pageConfiguration->preferenceValues().set(WebKit::WebPreferencesKey::allowsAirPlayForMediaPlaybackKey(), WebKit::WebPreferencesStore::Value(!![_configuration allowsAirPlayForMediaPlayback]));
@@ -442,6 +486,8 @@ static bool shouldAllowPictureInPictureMediaPlayback()
 #endif
 
 #if PLATFORM(IOS)
+    [_contentView _webViewDestroyed];
+
     if (_remoteObjectRegistry)
         _page->process().processPool().removeMessageReceiver(Messages::RemoteObjectRegistry::messageReceiverName(), _page->pageID());
 
@@ -790,7 +836,14 @@ static WKErrorCode callbackErrorCode(WebKit::CallbackBase::Error error)
 
 - (BOOL)becomeFirstResponder
 {
-    return [_contentView becomeFirstResponder] || [super becomeFirstResponder];
+    return [self._currentContentView becomeFirstResponder] || [super becomeFirstResponder];
+}
+
+- (BOOL)canBecomeFirstResponder
+{
+    if (self._currentContentView == _contentView && [_contentView isResigningFirstResponder])
+        return NO;
+    return YES;
 }
 
 static inline CGFloat floorToDevicePixel(CGFloat input, float deviceScaleFactor)
@@ -858,6 +911,9 @@ static CGSize roundScrollViewContentSize(const WebKit::WebPageProxy& page, CGSiz
         [_customContentFixedOverlayView setFrame:self.bounds];
         [self addSubview:_customContentFixedOverlayView.get()];
     }
+
+    if (self.isFirstResponder && self._currentContentView.canBecomeFirstResponder)
+        [self._currentContentView becomeFirstResponder];
 }
 
 - (void)_didFinishLoadingDataForCustomContentProviderWithSuggestedFilename:(const String&)suggestedFilename data:(NSData *)data
@@ -1066,6 +1122,8 @@ static inline bool areEssentiallyEqualAsFloat(float a, float b)
         [_scrollView setZoomScale:layerTreeTransaction.pageScaleFactor()];
 
     _viewportMetaTagWidth = layerTreeTransaction.viewportMetaTagWidth();
+    _viewportMetaTagWidthWasExplicit = layerTreeTransaction.viewportMetaTagWidthWasExplicit();
+    _viewportMetaTagCameFromImageDocument = layerTreeTransaction.viewportMetaTagCameFromImageDocument();
     _initialScaleFactor = layerTreeTransaction.initialScaleFactor();
     if (![_contentView _mayDisableDoubleTapGesturesDuringSingleTap])
         [_contentView _setDoubleTapGesturesEnabled:self._allowsDoubleTapGestures];
@@ -1187,15 +1245,21 @@ static inline bool areEssentiallyEqualAsFloat(float a, float b)
     CATransform3D transform = CATransform3DMakeScale(deviceScale, deviceScale, 1);
 
 #if USE(IOSURFACE)
-    auto surface = WebCore::IOSurface::create(WebCore::expandedIntSize(snapshotSize), WebCore::ColorSpaceSRGB);
+    WebCore::IOSurface::Format snapshotFormat = WebKit::bufferFormat(true /* is opaque */);
+    auto surface = WebCore::IOSurface::create(WebCore::expandedIntSize(snapshotSize), WebCore::ColorSpaceSRGB, snapshotFormat);
     CARenderServerRenderLayerWithTransform(MACH_PORT_NULL, self.layer.context.contextId, reinterpret_cast<uint64_t>(self.layer), surface->surface(), 0, 0, &transform);
 
-    RefPtr<WebKit::ViewSnapshot> viewSnapshot = WebKit::ViewSnapshot::create(nullptr);
-    WebCore::IOSurface::convertToFormat(WTFMove(surface), WebCore::IOSurface::Format::YUV422, [viewSnapshot](std::unique_ptr<WebCore::IOSurface> convertedSurface) {
-        viewSnapshot->setSurface(WTFMove(convertedSurface));
-    });
+    WebCore::IOSurface::Format compressedFormat = WebCore::IOSurface::Format::YUV422;
+    if (WebCore::IOSurface::allowConversionFromFormatToFormat(snapshotFormat, compressedFormat)) {
+        RefPtr<WebKit::ViewSnapshot> viewSnapshot = WebKit::ViewSnapshot::create(nullptr);
+        WebCore::IOSurface::convertToFormat(WTFMove(surface), WebCore::IOSurface::Format::YUV422, [viewSnapshot](std::unique_ptr<WebCore::IOSurface> convertedSurface) {
+            viewSnapshot->setSurface(WTFMove(convertedSurface));
+        });
 
-    return viewSnapshot;
+        return viewSnapshot;
+    }
+
+    return WebKit::ViewSnapshot::create(WTFMove(surface));
 #else
     uint32_t slotID = [WebKit::ViewSnapshotStore::snapshottingContext() createImageSlot:snapshotSize hasAlpha:YES];
 
@@ -1526,6 +1590,26 @@ static WebCore::FloatPoint constrainContentOffset(WebCore::FloatPoint contentOff
 {
     [super setBackgroundColor:backgroundColor];
     [_contentView setBackgroundColor:backgroundColor];
+}
+
+- (BOOL)_allowsDoubleTapGestures
+{
+    if (_fastClickingIsDisabled)
+        return YES;
+
+    // If the page is not user scalable, we don't allow double tap gestures.
+    if (![_scrollView isZoomEnabled] || [_scrollView minimumZoomScale] >= [_scrollView maximumZoomScale])
+        return NO;
+
+    // If the viewport width was not explicit, we allow double tap gestures.
+    if (!_viewportMetaTagWidthWasExplicit || _viewportMetaTagCameFromImageDocument)
+        return YES;
+
+    // For scalable viewports, only disable double tap gestures if the viewport width is device width.
+    if (_viewportMetaTagWidth != WebCore::ViewportArguments::ValueDeviceWidth)
+        return YES;
+
+    return !areEssentiallyEqualAsFloat(contentZoomScale(self), _initialScaleFactor);
 }
 
 #pragma mark - UIScrollViewDelegate
@@ -3038,6 +3122,10 @@ static int32_t activeOrientation(WKWebView *webView)
     return nil;
 }
 
+- (NSArray *)_dataDetectionResults
+{
+    return [_contentView _dataDetectionResults];
+}
 #endif
 
 - (void)_didRelaunchProcess
@@ -3268,6 +3356,16 @@ static inline WebCore::LayoutMilestones layoutMilestones(_WKRenderingProgressEve
 - (void)_setGapBetweenPages:(CGFloat)gapBetweenPages
 {
     _page->setGapBetweenPages(gapBetweenPages);
+}
+
+- (BOOL)_paginationLineGridEnabled
+{
+    return _page->paginationLineGridEnabled();
+}
+
+- (void)_setPaginationLineGridEnabled:(BOOL)lineGridEnabled
+{
+    _page->setPaginationLineGridEnabled(lineGridEnabled);
 }
 
 - (NSUInteger)_pageCount
@@ -3997,22 +4095,6 @@ static inline WebKit::FindOptions toFindOptions(_WKFindOptions wkFindOptions)
     return [(WKPDFView *)_customContentView.get() suggestedFilename];
 }
 
-- (BOOL)_allowsDoubleTapGestures
-{
-    if (_fastClickingIsDisabled)
-        return YES;
-
-    // If the page is not user scalable, we don't allow double tap gestures.
-    if (![_scrollView isZoomEnabled] || [_scrollView minimumZoomScale] >= [_scrollView maximumZoomScale])
-        return NO;
-
-    // For scalable viewports, only disable double tap gestures if the viewport width is device width.
-    if (_viewportMetaTagWidth != WebCore::ViewportArguments::ValueDeviceWidth)
-        return YES;
-
-    return !areEssentiallyEqualAsFloat(contentZoomScale(self), _initialScaleFactor);
-}
-
 - (_WKWebViewPrintFormatter *)_webViewPrintFormatter
 {
     UIViewPrintFormatter *viewPrintFormatter = self.viewPrintFormatter;
@@ -4289,6 +4371,10 @@ static constexpr std::chrono::milliseconds didFinishLoadingTimeout = std::chrono
 
 #if PLATFORM(IOS) && USE(APPLE_INTERNAL_SDK)
 #import <WebKitAdditions/WKWebViewAdditions.mm>
+#endif
+
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 && USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/WKWebViewAdditionsMac.mm>
 #endif
 
 #endif // WK_API_ENABLED

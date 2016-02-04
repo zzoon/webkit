@@ -25,7 +25,7 @@
 
 WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem extends WebInspector.GeneralTreeElement
 {
-    constructor(style, title, subtitle)
+    constructor(delegate, style, title, subtitle)
     {
         let iconClassName;
         switch (style.type) {
@@ -56,6 +56,8 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
         title = title.trim();
 
         super(["visual-style-selector-item", iconClassName], title, subtitle, style);
+
+        this._delegate = delegate;
 
         this._iconClassName = iconClassName;
         this._lastValue = title;
@@ -137,23 +139,72 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
     {
         let contextMenu = WebInspector.ContextMenu.createFromEvent(event);
 
-        if (this.representedObject.ownerRule) {
-            contextMenu.appendItem(WebInspector.UIString("Show Source"), () => {
-                if (event.metaKey)
-                    WebInspector.showOriginalUnformattedSourceCodeLocation(this.representedObject.ownerRule.sourceCodeLocation);
-                else
-                    WebInspector.showSourceCodeLocation(this.representedObject.ownerRule.sourceCodeLocation);
-            });
-        }
-
         contextMenu.appendItem(WebInspector.UIString("Copy Rule"), () => {
             InspectorFrontendHost.copyText(this.representedObject.generateCSSRuleString());
         });
 
-        contextMenu.appendItem(WebInspector.UIString("Reset"), () => {
-            this.representedObject.resetText();
-            this.dispatchEventToListeners(WebInspector.VisualStyleSelectorTreeItem.Event.StyleTextReset);
+        if (this.representedObject.modified) {
+            contextMenu.appendItem(WebInspector.UIString("Reset"), () => {
+                this.representedObject.resetText();
+            });
+        }
+
+        if (!this.representedObject.ownerRule)
+            return;
+
+        contextMenu.appendItem(WebInspector.UIString("Show Source"), () => {
+            if (event.metaKey)
+                WebInspector.showOriginalUnformattedSourceCodeLocation(this.representedObject.ownerRule.sourceCodeLocation);
+            else
+                WebInspector.showSourceCodeLocation(this.representedObject.ownerRule.sourceCodeLocation);
         });
+
+        // Only used one colon temporarily since single-colon pseudo elements are valid CSS.
+        if (WebInspector.CSSStyleManager.PseudoElementNames.some((className) => this.representedObject.selectorText.includes(":" + className)))
+            return;
+
+        if (WebInspector.CSSStyleManager.ForceablePseudoClasses.every((className) => !this.representedObject.selectorText.includes(":" + className))) {
+            for (let pseudoClass of WebInspector.CSSStyleManager.ForceablePseudoClasses) {
+                if (pseudoClass === "visited" && this.representedObject.node.nodeName() !== "A")
+                    continue;
+
+                let pseudoClassSelector = ":" + pseudoClass;
+
+                contextMenu.appendItem(WebInspector.UIString("Add %s Rule").format(pseudoClassSelector), () => {
+                    this.representedObject.node.setPseudoClassEnabled(pseudoClass, true);
+                    let pseudoSelectors = this.representedObject.ownerRule.selectors.map((selector) => selector.text + pseudoClassSelector);
+                    this.representedObject.nodeStyles.addRule(pseudoSelectors.join(", "));
+                });
+            }
+        }
+
+        for (let pseudoElement of WebInspector.CSSStyleManager.PseudoElementNames) {
+            let pseudoElementSelector = "::" + pseudoElement;
+            const styleText = "content: \"\";";
+
+            let existingTreeItem = null;
+            if (this._delegate && typeof this._delegate.treeItemForStyle === "function") {
+                let selectorText = this.representedObject.ownerRule.selectorText;
+                let existingRules = this.representedObject.nodeStyles.rulesForSelector(selectorText + pseudoElementSelector);
+                if (existingRules.length) {
+                    // There shouldn't really ever be more than one pseudo-element rule
+                    // that is not in a media query. As such, just focus the first rule
+                    // on the assumption that it is the only one necessary.
+                    existingTreeItem = this._delegate.treeItemForStyle(existingRules[0].style);
+                }
+            }
+
+            let title = existingTreeItem ? WebInspector.UIString("Select %s Rule") : WebInspector.UIString("Create %s Rule");
+            contextMenu.appendItem(title.format(pseudoElementSelector), () => {
+                if (existingTreeItem) {
+                    existingTreeItem.select(true, true);
+                    return;
+                }
+
+                let pseudoSelectors = this.representedObject.ownerRule.selectors.map((selector) => selector.text + pseudoElementSelector);
+                this.representedObject.nodeStyles.addRule(pseudoSelectors.join(", "), styleText);
+            });
+        }
     }
 
     _handleCheckboxChanged(event)
@@ -230,6 +281,5 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
 };
 
 WebInspector.VisualStyleSelectorTreeItem.Event = {
-    StyleTextReset: "visual-style-selector-item-style-text-reset",
     CheckboxChanged: "visual-style-selector-item-checkbox-changed"
 };

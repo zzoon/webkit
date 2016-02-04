@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,10 +48,15 @@ enum Opcode : int16_t {
     ConstDouble,
     ConstFloat,
 
-    // The magical stack slot. This is viewed as executing at the top of the program regardless of
-    // where in control flow you put it. Each instance of a StackSlot Value gets a disjoint range of
-    // stack memory. Use the StackSlotValue class.
-    StackSlot,
+    // B3 supports non-SSA variables. These are accessed using Get and Set opcodes. Use the
+    // VariableValue class. It's a good idea to run fixSSA() to turn these into SSA. The
+    // optimizer will do that eventually, but if your input tends to use these opcodes, you
+    // should run fixSSA() directly before launching the optimizer.
+    Set,
+    Get,
+
+    // Gets the base address of a StackSlot.
+    SlotBase,
 
     // The magical argument register. This is viewed as executing at the top of the program
     // regardless of where in control flow you put it, and the compiler takes care to ensure that we
@@ -72,6 +77,11 @@ enum Opcode : int16_t {
     Mul,
     Div, // All bets are off as to what will happen when you execute this for -2^31/-1 and x/0.
     Mod, // All bets are off as to what will happen when you execute this for -2^31%-1 and x%0.
+
+    // Polymorphic negation. Note that we only need this for floating point, since integer negation
+    // is exactly like Sub(0, x). But that's not true for floating point. Sub(0, 0) is 0, while
+    // Neg(0) is -0. Also, we canonicalize Sub(0, x) into Neg(x) in case of integers.
+    Neg,
 
     // Integer math.
     ChillDiv, // doesn't trap ever, behaves like JS (x/y)|0.

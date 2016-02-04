@@ -1754,7 +1754,7 @@ static LayoutRect transparencyClipBox(const RenderLayer& layer, const RenderLaye
 
         TransformationMatrix transform;
         transform.translate(delta.width(), delta.height());
-        transform = transform * *layer.transform();
+        transform.multiply(*layer.transform());
 
         // We don't use fragment boxes when collecting a transformed layer's bounding box, since it always
         // paints unfragmented.
@@ -1804,14 +1804,15 @@ void RenderLayer::beginTransparencyLayers(GraphicsContext& context, const LayerP
         context.clip(pixelSnappedClipRect);
 
 #if ENABLE(CSS_COMPOSITING)
-        if (hasBlendMode())
+        // RenderSVGRoot takes care of its blend mode.
+        if (!renderer().isSVGRoot() && hasBlendMode())
             context.setCompositeOperation(context.compositeOperation(), blendMode());
 #endif
 
         context.beginTransparencyLayer(renderer().opacity());
 
 #if ENABLE(CSS_COMPOSITING)
-        if (hasBlendMode())
+        if (!renderer().isSVGRoot() && hasBlendMode())
             context.setCompositeOperation(context.compositeOperation(), BlendModeNormal);
 #endif
 
@@ -2129,9 +2130,9 @@ LayoutPoint RenderLayer::convertToLayerCoords(const RenderLayer* ancestorLayer, 
     return locationInLayerCoords;
 }
 
-LayoutSize RenderLayer::offsetFromAncestor(const RenderLayer* ancestorLayer) const
+LayoutSize RenderLayer::offsetFromAncestor(const RenderLayer* ancestorLayer, ColumnOffsetAdjustment adjustForColumns) const
 {
-    return toLayoutSize(convertToLayerCoords(ancestorLayer, LayoutPoint()));
+    return toLayoutSize(convertToLayerCoords(ancestorLayer, LayoutPoint(), adjustForColumns));
 }
 
 #if PLATFORM(IOS)
@@ -2821,12 +2822,13 @@ static LayoutRect cornerRect(const RenderLayer* layer, const LayoutRect& bounds)
 
 IntRect RenderLayer::scrollCornerRect() const
 {
-    // We have a scrollbar corner when a scrollbar is visible and not filling the entire length of the box.
+    // We have a scrollbar corner when a non overlay scrollbar is visible and not filling the entire length of the box.
     // This happens when:
-    // (a) A resizer is present and at least one scrollbar is present
-    // (b) Both scrollbars are present.
-    bool hasHorizontalBar = horizontalScrollbar();
-    bool hasVerticalBar = verticalScrollbar();
+    // (a) A resizer is present and at least one non overlay scrollbar is present
+    // (b) Both non overlay scrollbars are present.
+    // Overlay scrollbars always fill the entire length of the box so we never have scroll corner in that case.
+    bool hasHorizontalBar = m_hBar && !m_hBar->isOverlayScrollbar();
+    bool hasVerticalBar = m_vBar && !m_vBar->isOverlayScrollbar();
     bool hasResizer = renderer().style().resize() != RESIZE_NONE;
     if ((hasHorizontalBar && hasVerticalBar) || (hasResizer && (hasHorizontalBar || hasVerticalBar)))
         return snappedIntRect(cornerRect(this, renderBox()->borderBoxRect()));
@@ -3633,12 +3635,12 @@ void RenderLayer::drawPlatformResizerImage(GraphicsContext& context, const Layou
     RefPtr<Image> resizeCornerImage;
     FloatSize cornerResizerSize;
     if (renderer().document().deviceScaleFactor() >= 2) {
-        DEPRECATED_DEFINE_STATIC_LOCAL(Image*, resizeCornerImageHiRes, (Image::loadPlatformResource("textAreaResizeCorner@2x").leakRef()));
+        static NeverDestroyed<Image*> resizeCornerImageHiRes(Image::loadPlatformResource("textAreaResizeCorner@2x").leakRef());
         resizeCornerImage = resizeCornerImageHiRes;
         cornerResizerSize = resizeCornerImage->size();
         cornerResizerSize.scale(0.5f);
     } else {
-        DEPRECATED_DEFINE_STATIC_LOCAL(Image*, resizeCornerImageLoRes, (Image::loadPlatformResource("textAreaResizeCorner").leakRef()));
+        static NeverDestroyed<Image*> resizeCornerImageLoRes(Image::loadPlatformResource("textAreaResizeCorner").leakRef());
         resizeCornerImage = resizeCornerImageLoRes;
         cornerResizerSize = resizeCornerImage->size();
     }
@@ -3817,7 +3819,7 @@ void RenderLayer::clipToRect(const LayerPaintingInfo& paintingInfo, GraphicsCont
         // containing block chain so we check that also.
         for (RenderLayer* layer = rule == IncludeSelfForBorderRadius ? this : parent(); layer; layer = layer->parent()) {
             if (layer->renderer().hasOverflowClip() && layer->renderer().style().hasBorderRadius() && inContainingBlockChain(this, layer)) {
-                LayoutRect adjustedClipRect = LayoutRect(toLayoutPoint(layer->offsetFromAncestor(paintingInfo.rootLayer)), layer->size());
+                LayoutRect adjustedClipRect = LayoutRect(toLayoutPoint(layer->offsetFromAncestor(paintingInfo.rootLayer, AdjustForColumns)), layer->size());
                 adjustedClipRect.move(paintingInfo.subpixelAccumulation);
                 context.clipRoundedRect(layer->renderer().style().getRoundedInnerBorderFor(adjustedClipRect).pixelSnappedRoundedRectForPainting(deviceScaleFactor));
             }

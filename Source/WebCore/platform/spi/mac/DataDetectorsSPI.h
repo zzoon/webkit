@@ -23,12 +23,15 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#import <wtf/Platform.h>
+#ifndef DataDetectorsSPI_h
+#define DataDetectorsSPI_h
 
-#if PLATFORM(MAC)
+#import <wtf/Platform.h>
 
 #import <WebCore/DataDetectorsCoreSPI.h>
 #import <WebCore/SoftLinking.h>
+
+#if PLATFORM(MAC)
 
 #if USE(APPLE_INTERNAL_SDK)
 
@@ -108,3 +111,5 @@ SOFT_LINK(DataDetectors, DDHighlightGetBoundingRect, CGRect, (DDHighlightRef hig
 SOFT_LINK(DataDetectors, DDHighlightPointIsOnHighlight, Boolean, (DDHighlightRef highlight, CGPoint point, Boolean* onButton), (highlight, point, onButton))
 
 #endif
+
+#endif // DataDetectorsSPI_h

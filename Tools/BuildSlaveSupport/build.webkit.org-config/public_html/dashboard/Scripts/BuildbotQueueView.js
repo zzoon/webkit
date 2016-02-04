@@ -38,9 +38,12 @@ BuildbotQueueView = function(queues)
         queue.addEventListener(BuildbotQueue.Event.UnauthorizedAccess, this._unauthorizedAccess, this);
     }.bind(this));
 
-    Dashboard.Repository.OpenSource.trac.addEventListener(Trac.Event.CommitsUpdated, this._newCommitsRecorded, this);
-    if (typeof Dashboard.Repository.Internal.trac != "undefined")
-        Dashboard.Repository.Internal.trac.addEventListener(Trac.Event.CommitsUpdated, this._newCommitsRecorded, this);
+    var sortedRepositories = Dashboard.sortedRepositories;
+    for (var i = 0; i < sortedRepositories.length; i++) {
+        var trac = sortedRepositories[i].trac;
+        if (trac)
+            trac.addEventListener(Trac.Event.CommitsUpdated, this._newCommitsRecorded, this);
+    }
 };
 
 BaseObject.addConstructorFunctions(BuildbotQueueView);
@@ -121,7 +124,7 @@ BuildbotQueueView.prototype = {
             linkElement.className = "revision";
             linkElement.href = trac.revisionURL(commit.revisionNumber);
             linkElement.target = "_blank";
-            linkElement.textContent = "r" + commit.revisionNumber;
+            linkElement.textContent = this._formatRevisionForDisplay(commit.revisionNumber, branch.repository);
             result.appendChild(linkElement);
 
             var authorElement = document.createElement("span");
@@ -141,9 +144,9 @@ BuildbotQueueView.prototype = {
 
         // FIXME: To be 100% correct, we should also filter out changes that are ignored by
         // the queue, see _should_file_trigger_build in wkbuild.py.
-        var commits = trac.commitsOnBranch(branch, function(commit) { return commit.revisionNumber >= firstRevisionNumber && commit.revisionNumber <= lastRevisionNumber; });
+        var commits = trac.commitsOnBranch(branch.name, function(commit) { return commit.revisionNumber >= firstRevisionNumber && commit.revisionNumber <= lastRevisionNumber; });
         return commits.map(function(commit) {
-            return lineForCommit(trac, commit);
+            return lineForCommit.call(this, trac, commit);
         }, this).reverse();
     },
 
@@ -166,7 +169,7 @@ BuildbotQueueView.prototype = {
             var latestProductiveRevisionNumber = latestProductiveIteration.revision[repositoryName];
             if (!latestProductiveRevisionNumber || !trac.latestRecordedRevisionNumber)
                 continue;
-            var lines = this._popoverLinesForCommitRange(trac, branch.name, latestProductiveRevisionNumber + 1, trac.latestRecordedRevisionNumber);
+            var lines = this._popoverLinesForCommitRange(trac, branch, latestProductiveRevisionNumber + 1, trac.latestRecordedRevisionNumber);
             var length = lines.length;
             if (length && shouldAddDivider)
                 this._addDividerToPopover(content);
@@ -198,7 +201,7 @@ BuildbotQueueView.prototype = {
             content.appendChild(line);
             this._addDividerToPopover(content);
         } else {
-            line.textContent = "no commits to " + context.branch + " since previous result";
+            line.textContent = "no commits to " + context.branch.name + " since previous result";
             content.appendChild(line);
         }
 
@@ -218,21 +221,14 @@ BuildbotQueueView.prototype = {
         var repositoryName = repository.name;
         console.assert(iteration.revision[repositoryName]);
         var content = document.createElement("span");
-        var revision = iteration.revision[repositoryName];
-        if (repository.isSVN)
-            content.textContent = "r" + revision;
-        else if (repository.isGit) {
-            // Truncating for display. Git traditionally uses seven characters for a short hash.
-            content.textContent = revision.substr(0, 7);
-        } else
-            console.assert(false, "Should not get here; " + repository.name + " did not specify a known VCS type.");
+        content.textContent = this._formatRevisionForDisplay(iteration.revision[repositoryName], repository);
         content.classList.add("revision-number");
 
         if (previousIteration) {
             console.assert(previousIteration.revision[repositoryName]);
             var context = {
                 trac: repository.trac,
-                branch: branch.name,
+                branch: branch,
                 firstRevision: previousIteration.revision[repositoryName] + 1,
                 lastRevision: iteration.revision[repositoryName]
             };
@@ -292,7 +288,6 @@ BuildbotQueueView.prototype = {
             fragment.appendChild(content);
             shouldAddPlusSign = true;
         }
-        console.assert(fragment.childNodes.length);
         return fragment;
     },
 
@@ -338,6 +333,14 @@ BuildbotQueueView.prototype = {
     _unauthorizedAccess: function(event)
     {
         this.updateSoon();
-    }
+    },
 
+    _formatRevisionForDisplay: function(revision, repository)
+    {
+        console.assert(repository.isSVN || repository.isGit, "Should not get here; " + repository.name + " did not specify a known VCS type.");
+        if (repository.isSVN)
+            return "r" + revision;
+        // Truncating for display. Git traditionally uses seven characters for a short hash.
+        return revision.substr(0, 7);
+    }
 };

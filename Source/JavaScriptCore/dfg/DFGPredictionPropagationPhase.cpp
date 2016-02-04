@@ -306,9 +306,9 @@ private:
 
         case ArithNegate:
             if (node->child1()->prediction()) {
-                if (m_graph.negateShouldSpeculateInt32(node, m_pass))
+                if (m_graph.unaryArithShouldSpeculateInt32(node, m_pass))
                     changed |= mergePrediction(SpecInt32);
-                else if (m_graph.negateShouldSpeculateMachineInt(node, m_pass))
+                else if (m_graph.unaryArithShouldSpeculateMachineInt(node, m_pass))
                     changed |= mergePrediction(SpecInt52);
                 else
                     changed |= mergePrediction(speculatedDoubleTypeForPrediction(node->child1()->prediction()));
@@ -337,14 +337,18 @@ private:
             if (left && right) {
                 if (isFullNumberOrBooleanSpeculationExpectingDefined(left)
                     && isFullNumberOrBooleanSpeculationExpectingDefined(right)) {
-                    if (m_graph.mulShouldSpeculateInt32(node, m_pass))
+                    if (m_graph.binaryArithShouldSpeculateInt32(node, m_pass))
                         changed |= mergePrediction(SpecInt32);
-                    else if (m_graph.mulShouldSpeculateMachineInt(node, m_pass))
+                    else if (m_graph.binaryArithShouldSpeculateMachineInt(node, m_pass))
                         changed |= mergePrediction(SpecInt52);
                     else
                         changed |= mergePrediction(speculatedDoubleTypeForPredictions(left, right));
-                } else
-                    changed |= mergePrediction(SpecInt32 | SpecBytecodeDouble);
+                } else {
+                    if (node->mayHaveNonIntResult())
+                        changed |= mergePrediction(SpecInt32 | SpecBytecodeDouble);
+                    else
+                        changed |= mergePrediction(SpecInt32);
+                }
             }
             break;
         }
@@ -357,8 +361,7 @@ private:
             if (left && right) {
                 if (isFullNumberOrBooleanSpeculationExpectingDefined(left)
                     && isFullNumberOrBooleanSpeculationExpectingDefined(right)) {
-                    if (Node::shouldSpeculateInt32OrBooleanForArithmetic(node->child1().node(), node->child2().node())
-                        && node->canSpeculateInt32(m_pass))
+                    if (m_graph.binaryArithShouldSpeculateInt32(node, m_pass))
                         changed |= mergePrediction(SpecInt32);
                     else
                         changed |= mergePrediction(SpecBytecodeDouble);
@@ -486,11 +489,58 @@ private:
         }
 
         case ToThis: {
+            // ToThis in methods for primitive types should speculate primitive types in strict mode.
+            ECMAMode ecmaMode = m_graph.executableFor(node->origin.semantic)->isStrictMode() ? StrictMode : NotStrictMode;
+            if (ecmaMode == StrictMode) {
+                if (node->child1()->shouldSpeculateBoolean()) {
+                    changed |= mergePrediction(SpecBoolean);
+                    break;
+                }
+
+                if (node->child1()->shouldSpeculateInt32()) {
+                    changed |= mergePrediction(SpecInt32);
+                    break;
+                }
+
+                if (enableInt52() && node->child1()->shouldSpeculateMachineInt()) {
+                    changed |= mergePrediction(SpecMachineInt);
+                    break;
+                }
+
+                if (node->child1()->shouldSpeculateNumber()) {
+                    changed |= mergePrediction(SpecMachineInt);
+                    break;
+                }
+
+                if (node->child1()->shouldSpeculateSymbol()) {
+                    changed |= mergePrediction(SpecSymbol);
+                    break;
+                }
+
+                if (node->child1()->shouldSpeculateStringIdent()) {
+                    changed |= mergePrediction(SpecStringIdent);
+                    break;
+                }
+
+                if (node->child1()->shouldSpeculateString()) {
+                    changed |= mergePrediction(SpecString);
+                    break;
+                }
+            } else {
+                if (node->child1()->shouldSpeculateString()) {
+                    changed |= mergePrediction(SpecStringObject);
+                    break;
+                }
+            }
+
             SpeculatedType prediction = node->child1()->prediction();
             if (prediction) {
                 if (prediction & ~SpecObject) {
-                    prediction &= SpecObject;
-                    prediction = mergeSpeculations(prediction, SpecObjectOther);
+                    // Wrapper objects are created only in sloppy mode.
+                    if (ecmaMode != StrictMode) {
+                        prediction &= SpecObject;
+                        prediction = mergeSpeculations(prediction, SpecObjectOther);
+                    }
                 }
                 changed |= mergePrediction(prediction);
             }
@@ -807,8 +857,8 @@ private:
                 
             if (isFullNumberSpeculation(left)
                 && isFullNumberSpeculation(right)
-                && !m_graph.mulShouldSpeculateInt32(node, m_pass)
-                && !m_graph.mulShouldSpeculateMachineInt(node, m_pass))
+                && !m_graph.binaryArithShouldSpeculateInt32(node, m_pass)
+                && !m_graph.binaryArithShouldSpeculateMachineInt(node, m_pass))
                 ballot = VoteDouble;
             else
                 ballot = VoteValue;
@@ -829,7 +879,7 @@ private:
                 
             if (isFullNumberSpeculation(left)
                 && isFullNumberSpeculation(right)
-                && !(Node::shouldSpeculateInt32OrBooleanForArithmetic(node->child1().node(), node->child2().node()) && node->canSpeculateInt32(m_pass)))
+                && !m_graph.binaryArithShouldSpeculateInt32(node, m_pass))
                 ballot = VoteDouble;
             else
                 ballot = VoteValue;
@@ -842,7 +892,7 @@ private:
         case ArithAbs:
             DoubleBallot ballot;
             if (node->child1()->shouldSpeculateNumber()
-                && !(node->child1()->shouldSpeculateInt32OrBooleanForArithmetic() && node->canSpeculateInt32(m_pass)))
+                && !m_graph.unaryArithShouldSpeculateInt32(node, m_pass))
                 ballot = VoteDouble;
             else
                 ballot = VoteValue;

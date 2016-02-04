@@ -4,7 +4,7 @@ On success, you will see a series of "PASS" messages, followed by "TEST COMPLETE
 
 
 Ordinary values for input:
-PASS input.formAction is ""
+PASS input.formAction is location.href
 PASS input.formEnctype is ""
 PASS input.formMethod is ""
 PASS input.formTarget is ""
@@ -32,8 +32,8 @@ PASS input.formEnctype is "application/x-www-form-urlencoded"
 PASS input.formMethod is ""
 PASS input.getAttribute("formMethod") is null
 PASS input.formMethod is "get"
-PASS input.formTarget is ""
-PASS input.getAttribute("formTarget") is null
+PASS input.formTarget is "null"
+PASS input.getAttribute("formTarget") is "null"
 PASS input.formTarget is "null"
 
 Setting undefined for input:
@@ -59,7 +59,7 @@ PASS input.getAttribute("formTarget") is "256"
 PASS input.formTarget is "256"
 
 Ordinary values for button:
-PASS button.formAction is ""
+PASS button.formAction is location.href
 PASS button.formEnctype is ""
 PASS button.formMethod is ""
 PASS button.formTarget is ""
@@ -87,8 +87,8 @@ PASS button.formEnctype is "application/x-www-form-urlencoded"
 PASS button.formMethod is ""
 PASS button.getAttribute("formMethod") is null
 PASS button.formMethod is "get"
-PASS button.formTarget is ""
-PASS button.getAttribute("formTarget") is null
+PASS button.formTarget is "null"
+PASS button.getAttribute("formTarget") is "null"
 PASS button.formTarget is "null"
 
 Setting undefined for button:

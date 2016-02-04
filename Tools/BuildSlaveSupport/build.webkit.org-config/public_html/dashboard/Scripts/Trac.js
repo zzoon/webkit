@@ -63,10 +63,10 @@ Trac.prototype = {
         return this.recordedCommits[this.recordedCommits.length - 1].revisionNumber;
     },
 
-    commitsOnBranch: function(branch, filter)
+    commitsOnBranch: function(branchName, filter)
     {
-        return this.recordedCommits.filter(function(commit) {
-            return (!commit.containsBranchLocation || commit.branch === branch) && filter(commit);
+        return this.recordedCommits.filter(function(commit, index, array) {
+            return (!commit.containsBranchLocation || commit.branches.includes(branchName)) && filter(commit, index, array);
         });
     },
 
@@ -87,17 +87,19 @@ Trac.prototype = {
             "&daysback=" + ((toDay - fromDay) / 1000 / 60 / 60 / 24);
     },
 
-    _convertCommitInfoElementToObject: function(doc, commitElement)
+    _parseRevisionFromURL: function(url)
     {
-        var link = doc.evaluate("./link", commitElement, null, XPathResult.STRING_TYPE).stringValue;
-
         // There are multiple link formats for Trac that we support:
         // https://trac.webkit.org/changeset/190497
         // http://trac.foobar.com/repository/changeset/75388/project
-        var linkComponents = link.split("/");
-        var revisionNumber = parseInt(linkComponents.pop());
-        if (!revisionNumber)
-            var revisionNumber = parseInt(linkComponents.pop());
+        // https://git.foobar.com/trac/Whatever.git/changeset/0e498db5d8e5b5a342631
+        return /changeset\/([a-f0-9]+).*$/.exec(url)[1];
+    },
+
+    _convertCommitInfoElementToObject: function(doc, commitElement)
+    {
+        var link = doc.evaluate("./link", commitElement, null, XPathResult.STRING_TYPE).stringValue;
+        var revisionNumber = this._parseRevisionFromURL(link);
 
         function tracNSResolver(prefix)
         {
@@ -140,7 +142,8 @@ Trac.prototype = {
             author: author,
             date: date,
             description: parsedDescription.innerHTML,
-            containsBranchLocation: location !== ""
+            containsBranchLocation: location !== "",
+            branches: []
         };
 
         if (result.containsBranchLocation) {
@@ -149,11 +152,11 @@ Trac.prototype = {
             if (location.startsWith("tags/"))
                 result.tag = location.substr(5, location.indexOf("/", 5) - 5);
             else if (location.startsWith("branches/"))
-                result.branch = location.substr(9, location.indexOf("/", 9) - 9);
+                result.branches.push(location.substr(9, location.indexOf("/", 9) - 9));
             else if (location.startsWith("releases/"))
                 result.release = location.substr(9, location.indexOf("/", 9) - 9);
             else if (location.startsWith("trunk/"))
-                result.branch = "trunk";
+                result.branches.push("trunk");
             else if (location.startsWith("submissions/"))
                 ; // These changes are never relevant to the dashboard.
             else {
@@ -161,6 +164,12 @@ Trac.prototype = {
                 // not match any explicitly specified branches.
                 console.assert(false);
             }
+        }
+
+        var gitBranches = doc.evaluate("./branches", commitElement, null, XPathResult.STRING_TYPE).stringValue;
+        if (gitBranches) {
+            result.containsBranchLocation = true;
+            result.branches = result.branches.concat(gitBranches.split(", "));
         }
 
         return result;
@@ -195,7 +204,7 @@ Trac.prototype = {
         }
 
         if (newCommits.length)
-            this.recordedCommits = newCommits.concat(this.recordedCommits).sort(function(a, b) { return a.revisionNumber - b.revisionNumber; });
+            this.recordedCommits = newCommits.concat(this.recordedCommits).sort(function(a, b) { return a.date - b.date; });
 
         if (newCommits.length || knownCommitsWereUpdated)
             this.dispatchEventToListeners(Trac.Event.CommitsUpdated, null);

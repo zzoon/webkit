@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -63,11 +63,13 @@ public:
 protected:
     void dumpMeta(CommaPrinter&, PrintStream&) const override;
 
+    Value* cloneImpl() const override;
+
 private:
     friend class Procedure;
 
-    ConstFloatValue(unsigned index, Origin origin, float value)
-        : Value(index, CheckedOpcode, ConstFloat, Float, origin)
+    ConstFloatValue(Origin origin, float value)
+        : Value(CheckedOpcode, ConstFloat, Float, origin)
         , m_value(value)
     {
     }

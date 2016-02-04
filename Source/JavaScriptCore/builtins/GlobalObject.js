@@ -62,5 +62,12 @@ function isDictionary(object)
 {
     "use strict";
 
-    return typeof object === "undefined" || object == null || typeof object === "object";
+    return object === @undefined || object == null || typeof object === "object";
+}
+
+// FIXME: this needs to have it's name changed to "get [Symbol.species]".
+// see: https://bugs.webkit.org/show_bug.cgi?id=151363
+function speciesGetter()
+{
+    return this;
 }

@@ -165,6 +165,7 @@ list(APPEND WebCore_SOURCES
     platform/gtk/LanguageGtk.cpp
     platform/gtk/LoggingGtk.cpp
     platform/gtk/MIMETypeRegistryGtk.cpp
+    platform/gtk/ScrollAnimatorGtk.cpp
     platform/gtk/SharedBufferGtk.cpp
     platform/gtk/TemporaryLinkStubs.cpp
     platform/gtk/UserAgentGtk.cpp
@@ -414,6 +415,9 @@ if (ENABLE_MEDIA_STREAM)
     list(APPEND WebCore_LIBRARIES
         ${OPENWEBRTC_LIBRARIES}
     )
+    list(APPEND WebCore_SOURCES
+        platform/graphics/gstreamer/MediaPlayerPrivateGStreamerOwr.cpp
+    )
 endif ()
 
 if (USE_TEXTURE_MAPPER)
@@ -429,6 +433,7 @@ if (USE_TEXTURE_MAPPER)
     if (USE_TEXTURE_MAPPER_GL)
         list(APPEND WebCore_SOURCES
             platform/graphics/texmap/BitmapTextureGL.cpp
+            platform/graphics/texmap/ClipStack.cpp
             platform/graphics/texmap/TextureMapperGL.cpp
             platform/graphics/texmap/TextureMapperShaderProgram.cpp
         )
@@ -942,7 +947,7 @@ set(GObjectDOMBindings_GIR_HEADERS ${GObjectDOMBindings_GIR_HEADERS} PARENT_SCOP
 
 if (ENABLE_SMOOTH_SCROLLING)
     list(APPEND WebCore_SOURCES
-        platform/ScrollAnimatorNone.cpp
+        platform/ScrollAnimationSmooth.cpp
     )
 endif ()
 

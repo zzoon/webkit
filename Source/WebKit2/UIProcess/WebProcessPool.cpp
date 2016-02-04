@@ -27,6 +27,7 @@
 #include "WebProcessPool.h"
 
 #include "APIArray.h"
+#include "APIAutomationClient.h"
 #include "APIDownloadClient.h"
 #include "APILegacyContextHistoryClient.h"
 #include "APIPageConfiguration.h"
@@ -138,6 +139,7 @@ WebProcessPool::WebProcessPool(API::ProcessPoolConfiguration& configuration)
     , m_haveInitialEmptyProcess(false)
     , m_processWithPageCache(0)
     , m_defaultPageGroup(WebPageGroup::createNonNull())
+    , m_automationClient(std::make_unique<API::AutomationClient>())
     , m_downloadClient(std::make_unique<API::DownloadClient>())
     , m_historyClient(std::make_unique<API::LegacyContextHistoryClient>())
     , m_visitedLinkStore(VisitedLinkStore::create())
@@ -159,6 +161,9 @@ WebProcessPool::WebProcessPool(API::ProcessPoolConfiguration& configuration)
     , m_userObservablePageCounter([this](bool) { updateProcessSuppressionState(); })
     , m_processSuppressionDisabledForPageCounter([this](bool) { updateProcessSuppressionState(); })
 {
+    for (auto& scheme : m_configuration->alwaysRevalidatedURLSchemes())
+        m_schemesToRegisterAsAlwaysRevalidated.add(scheme);
+
 #if ENABLE(CACHE_PARTITIONING)
     for (const auto& urlScheme : m_configuration->cachePartitionedURLSchemes())
         m_schemesToRegisterAsCachePartitioned.add(urlScheme);
@@ -275,6 +280,14 @@ void WebProcessPool::setDownloadClient(std::unique_ptr<API::DownloadClient> down
         m_downloadClient = std::make_unique<API::DownloadClient>();
     else
         m_downloadClient = WTFMove(downloadClient);
+}
+
+void WebProcessPool::setAutomationClient(std::unique_ptr<API::AutomationClient> automationClient)
+{
+    if (!automationClient)
+        m_automationClient = std::make_unique<API::AutomationClient>();
+    else
+        m_automationClient = WTFMove(automationClient);
 }
 
 void WebProcessPool::setMaximumNumberOfProcesses(unsigned maximumNumberOfProcesses)
@@ -561,6 +574,7 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
     copyToVector(m_schemesToRegisterAsNoAccess, parameters.urlSchemesRegisteredAsNoAccess);
     copyToVector(m_schemesToRegisterAsDisplayIsolated, parameters.urlSchemesRegisteredAsDisplayIsolated);
     copyToVector(m_schemesToRegisterAsCORSEnabled, parameters.urlSchemesRegisteredAsCORSEnabled);
+    copyToVector(m_schemesToRegisterAsAlwaysRevalidated, parameters.urlSchemesRegisteredAsAlwaysRevalidated);
 #if ENABLE(CACHE_PARTITIONING)
     copyToVector(m_schemesToRegisterAsCachePartitioned, parameters.urlSchemesRegisteredAsCachePartitioned);
 #endif
@@ -1059,10 +1073,24 @@ void WebProcessPool::useTestingNetworkSession()
     m_shouldUseTestingNetworkSession = true;
 }
 
+void WebProcessPool::clearCachedCredentials()
+{
+    sendToAllProcesses(Messages::WebProcess::ClearCachedCredentials());
+    if (m_networkProcess)
+        m_networkProcess->send(Messages::NetworkProcess::ClearCachedCredentials(), 0);
+}
+
 void WebProcessPool::allowSpecificHTTPSCertificateForHost(const WebCertificateInfo* certificate, const String& host)
 {
     if (m_networkProcess)
         m_networkProcess->send(Messages::NetworkProcess::AllowSpecificHTTPSCertificateForHost(certificate->certificateInfo(), host), 0);
+}
+
+void WebProcessPool::updateAutomationCapabilities() const
+{
+#if ENABLE(REMOTE_INSPECTOR)
+    Inspector::RemoteInspector::singleton().clientCapabilitiesDidChange();
+#endif
 }
 
 void WebProcessPool::setHTTPPipeliningEnabled(bool enabled)

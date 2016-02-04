@@ -28,6 +28,7 @@
 
 #if USE(IOSURFACE)
 
+#import "CoreGraphicsSPI.h"
 #import "GraphicsContextCG.h"
 #import "IOSurfacePool.h"
 #import "IOSurfaceSPI.h"
@@ -36,11 +37,10 @@
 #import "MachSendRight.h"
 #import <wtf/Assertions.h>
 
-extern "C" {
-CGContextRef CGIOSurfaceContextCreate(IOSurfaceRef, size_t, size_t, size_t, size_t, CGColorSpaceRef, CGBitmapInfo);
-CGImageRef CGIOSurfaceContextCreateImage(CGContextRef);
-CGImageRef CGIOSurfaceContextCreateImageReference(CGContextRef);
-}
+#if PLATFORM(IOS)
+// Move this into the SPI header once it's possible to put inside the APPLE_INTERNAL_SDK block.
+NSString * const WebIOSurfaceAcceleratorUnwireSurfaceKey = @"UnwireSurface";
+#endif
 
 using namespace WebCore;
 
@@ -286,13 +286,12 @@ CGContextRef IOSurface::ensurePlatformContext()
     case Format::RGBA:
         break;
     case Format::RGB10:
-        bitsPerComponent = 10;
-        bitsPerPixel = 32;
-        break;
     case Format::RGB10A8:
-        // FIXME: This doesn't take the two-plane format into account.
-        bitsPerComponent = 10;
-        bitsPerPixel = 32;
+        // A half-float format will be used if CG needs to read back the IOSurface contents,
+        // but for an IOSurface-to-IOSurface copy, there shoud be no conversion.
+        bitsPerComponent = 16;
+        bitsPerPixel = 64;
+        bitmapInfo = kCGImageAlphaPremultipliedLast | kCGBitmapByteOrder16Host | kCGBitmapFloatComponents;
         break;
     case Format::YUV422:
         ASSERT_NOT_REACHED();
@@ -374,25 +373,12 @@ void IOSurface::releaseGraphicsContext()
 }
 
 #if PLATFORM(IOS)
-WEBCORE_EXPORT void IOSurface::copyToSurface(IOSurface& destSurface)
+bool IOSurface::allowConversionFromFormatToFormat(Format sourceFormat, Format destFormat)
 {
-    if (destSurface.format() != format()) {
-        WTFLogAlways("Trying to copy IOSurface to another surface with a different format");
-        return;
-    }
+    if ((sourceFormat == Format::RGB10 || sourceFormat == Format::RGB10A8) && destFormat == Format::YUV422)
+        return false;
 
-    if (destSurface.size() != size()) {
-        WTFLogAlways("Trying to copy IOSurface to another surface with a different size");
-        return;
-    }
-
-    static IOSurfaceAcceleratorRef accelerator;
-    if (!accelerator)
-        IOSurfaceAcceleratorCreate(nullptr, nullptr, &accelerator);
-
-    IOReturn ret = IOSurfaceAcceleratorTransformSurface(accelerator, m_surface.get(), destSurface.surface(), nullptr, nullptr, nullptr, nullptr, nullptr);
-    if (ret)
-        WTFLogAlways("IOSurfaceAcceleratorTransformSurface %p to %p failed with error %d", m_surface.get(), destSurface.surface(), ret);
+    return true;
 }
 
 void IOSurface::convertToFormat(std::unique_ptr<WebCore::IOSurface>&& inSurface, Format format, std::function<void(std::unique_ptr<WebCore::IOSurface>)> callback)
@@ -424,7 +410,9 @@ void IOSurface::convertToFormat(std::unique_ptr<WebCore::IOSurface>&& inSurface,
         delete callback;
     };
 
-    IOReturn ret = IOSurfaceAcceleratorTransformSurface(accelerator, inSurface->surface(), destinationIOSurfaceRef, nullptr, nullptr, &completion, nullptr, nullptr);
+    NSDictionary *options = @{ WebIOSurfaceAcceleratorUnwireSurfaceKey : @YES };
+
+    IOReturn ret = IOSurfaceAcceleratorTransformSurface(accelerator, inSurface->surface(), destinationIOSurfaceRef, (CFDictionaryRef)options, nullptr, &completion, nullptr, nullptr);
     ASSERT_UNUSED(ret, ret == kIOReturnSuccess);
 }
 #endif // PLATFORM(IOS)

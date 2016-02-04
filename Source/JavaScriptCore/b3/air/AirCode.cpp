@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 
 #include "AirCCallSpecial.h"
 #include "B3BasicBlockUtils.h"
-#include "B3StackSlotValue.h"
+#include "B3StackSlot.h"
 
 namespace JSC { namespace B3 { namespace Air {
 
@@ -52,25 +52,20 @@ BasicBlock* Code::addBlock(double frequency)
     return result;
 }
 
-StackSlot* Code::addStackSlot(unsigned byteSize, StackSlotKind kind, StackSlotValue* value)
+StackSlot* Code::addStackSlot(unsigned byteSize, StackSlotKind kind, B3::StackSlot* b3Slot)
 {
-    std::unique_ptr<StackSlot> slot(new StackSlot(byteSize, m_stackSlots.size(), kind, value));
-    StackSlot* result = slot.get();
-    m_stackSlots.append(WTFMove(slot));
-    return result;
+    return m_stackSlots.addNew(byteSize, kind, b3Slot);
 }
 
-StackSlot* Code::addStackSlot(StackSlotValue* value)
+StackSlot* Code::addStackSlot(B3::StackSlot* b3Slot)
 {
-    return addStackSlot(value->byteSize(), value->kind(), value);
+    return addStackSlot(b3Slot->byteSize(), StackSlotKind::Locked, b3Slot);
 }
 
 Special* Code::addSpecial(std::unique_ptr<Special> special)
 {
-    Special* result = special.get();
-    result->m_code = this;
-    m_specials.append(WTFMove(special));
-    return result;
+    special->m_code = this;
+    return m_specials.add(WTFMove(special));
 }
 
 CCallSpecial* Code::cCallSpecial()

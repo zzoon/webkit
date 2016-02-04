@@ -370,6 +370,18 @@ static void delayBetweenMove(int eventIndex, double elapsed)
     [self _updateTouchPoints:newLocations count:touchCount];
 }
 
+- (void)touchDown:(CGPoint)location touchCount:(NSUInteger)count completionBlock:(void (^)(void))completionBlock
+{
+    [self touchDown:location touchCount:count];
+    [self _sendMarkerHIDEventWithCompletionBlock:completionBlock];
+}
+
+- (void)liftUp:(CGPoint)location touchCount:(NSUInteger)count completionBlock:(void (^)(void))completionBlock
+{
+    [self liftUp:location touchCount:count];
+    [self _sendMarkerHIDEventWithCompletionBlock:completionBlock];
+}
+
 - (void)sendTaps:(int)tapCount location:(CGPoint)location withNumberOfTouches:(int)touchCount completionBlock:(void (^)(void))completionBlock
 {
     struct timespec doubleDelay = { 0, static_cast<long>(multiTapInterval) };
@@ -574,6 +586,24 @@ static inline uint32_t hidUsageCodeForCharacter(NSString *key)
     return 0;
 }
 
+- (void)keyPress:(NSString *)character completionBlock:(void (^)(void))completionBlock
+{
+    bool shouldWrapWithShift = shouldWrapWithShiftKeyEventForCharacter(character);
+    uint32_t usage = hidUsageCodeForCharacter(character);
+    uint64_t absoluteMachTime = mach_absolute_time();
+
+    if (shouldWrapWithShift)
+        [self _sendIOHIDKeyboardEvent:absoluteMachTime usage:kHIDUsage_KeyboardLeftShift isKeyDown:true];
+
+    [self _sendIOHIDKeyboardEvent:absoluteMachTime usage:usage isKeyDown:true];
+    [self _sendIOHIDKeyboardEvent:absoluteMachTime usage:usage isKeyDown:false];
+
+    if (shouldWrapWithShift)
+        [self _sendIOHIDKeyboardEvent:absoluteMachTime usage:kHIDUsage_KeyboardLeftShift isKeyDown:false];
+
+    [self _sendMarkerHIDEventWithCompletionBlock:completionBlock];
+}
+
 - (void)keyDown:(NSString *)character completionBlock:(void (^)(void))completionBlock
 {
     bool shouldWrapWithShift = shouldWrapWithShiftKeyEventForCharacter(character);
@@ -584,6 +614,16 @@ static inline uint32_t hidUsageCodeForCharacter(NSString *key)
         [self _sendIOHIDKeyboardEvent:absoluteMachTime usage:kHIDUsage_KeyboardLeftShift isKeyDown:true];
 
     [self _sendIOHIDKeyboardEvent:absoluteMachTime usage:usage isKeyDown:true];
+
+    [self _sendMarkerHIDEventWithCompletionBlock:completionBlock];
+}
+
+- (void)keyUp:(NSString *)character completionBlock:(void (^)(void))completionBlock
+{
+    bool shouldWrapWithShift = shouldWrapWithShiftKeyEventForCharacter(character);
+    uint32_t usage = hidUsageCodeForCharacter(character);
+    uint64_t absoluteMachTime = mach_absolute_time();
+
     [self _sendIOHIDKeyboardEvent:absoluteMachTime usage:usage isKeyDown:false];
 
     if (shouldWrapWithShift)

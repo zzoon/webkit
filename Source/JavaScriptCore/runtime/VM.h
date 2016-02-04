@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2013-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -63,6 +63,7 @@
 #include <wtf/HashSet.h>
 #include <wtf/SimpleStats.h>
 #include <wtf/StackBounds.h>
+#include <wtf/Stopwatch.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/WTFThreadData.h>
@@ -76,9 +77,11 @@
 namespace JSC {
 
 class BuiltinExecutables;
+class BytecodeIntrinsicRegistry;
 class CodeBlock;
 class CodeCache;
 class CommonIdentifiers;
+class CustomGetterSetter;
 class ExecState;
 class Exception;
 class HandleStack;
@@ -86,6 +89,7 @@ class TypeProfiler;
 class TypeProfilerLog;
 class Identifier;
 class Interpreter;
+class JSBoundSlotBaseFunction;
 class JSGlobalObject;
 class JSObject;
 class LLIntOffsetsExtractor;
@@ -93,6 +97,9 @@ class LegacyProfiler;
 class NativeExecutable;
 class RegExpCache;
 class RegisterAtOffsetList;
+#if ENABLE(SAMPLING_PROFILER)
+class SamplingProfiler;
+#endif
 class ScriptExecutable;
 class SourceProvider;
 class SourceProviderCache;
@@ -242,6 +249,11 @@ public:
     JS_EXPORT_PRIVATE Watchdog& ensureWatchdog();
     JS_EXPORT_PRIVATE Watchdog* watchdog() { return m_watchdog.get(); }
 
+#if ENABLE(SAMPLING_PROFILER)
+    JS_EXPORT_PRIVATE SamplingProfiler* samplingProfiler() { return m_samplingProfiler.get(); }
+    JS_EXPORT_PRIVATE void ensureSamplingProfiler(RefPtr<Stopwatch>&&);
+#endif
+
 private:
     RefPtr<JSLock> m_apiLock;
 
@@ -325,6 +337,7 @@ public:
     NumericStrings numericStrings;
     DateInstanceCache dateInstanceCache;
     WTF::SimpleStats machineCodeBytesPerBytecodeWordForBaselineJIT;
+    WeakGCMap<std::pair<CustomGetterSetter*, int>, JSBoundSlotBaseFunction> customGetterSetterFunctionMap;
     WeakGCMap<StringImpl*, JSString, PtrHash<StringImpl*>> stringCache;
     Strong<JSString> lastCachedString;
 
@@ -381,7 +394,7 @@ public:
     {
         return jitStubs->ctiStub(this, generator);
     }
-    NativeExecutable* getHostFunction(NativeFunction, Intrinsic);
+    NativeExecutable* getHostFunction(NativeFunction, Intrinsic, const String& name);
     
     std::unique_ptr<RegisterAtOffsetList> allCalleeSaveRegisterOffsets;
     
@@ -392,7 +405,7 @@ public:
 #if ENABLE(FTL_JIT)
     std::unique_ptr<FTL::Thunks> ftlThunks;
 #endif
-    NativeExecutable* getHostFunction(NativeFunction, NativeFunction constructor);
+    NativeExecutable* getHostFunction(NativeFunction, NativeFunction constructor, const String& name);
 
     static ptrdiff_t exceptionOffset()
     {
@@ -461,7 +474,7 @@ public:
     }
 
     void* lastStackTop() { return m_lastStackTop; }
-    void setLastStackTop(void* lastStackTop) { m_lastStackTop = lastStackTop; }
+    void setLastStackTop(void*);
 
     const ClassInfo* const jsArrayClassInfo;
     const ClassInfo* const jsFinalObjectClassInfo;
@@ -476,6 +489,8 @@ public:
     void* osrExitJumpDestination;
     Vector<ScratchBuffer*> scratchBuffers;
     size_t sizeOfLastScratchBuffer;
+
+    bool isExecutingInRegExpJIT { false };
 
     ScratchBuffer* scratchBufferForSize(size_t size)
     {
@@ -559,6 +574,7 @@ public:
     JS_EXPORT_PRIVATE void whenIdle(std::function<void()>);
 
     JS_EXPORT_PRIVATE void deleteAllCode();
+    JS_EXPORT_PRIVATE void deleteAllLinkedCode();
 
     void registerWatchpointForImpureProperty(const Identifier&, Watchpoint*);
     
@@ -585,6 +601,11 @@ public:
     ALWAYS_INLINE bool shouldRewriteConstAsVar() { return m_shouldRewriteConstAsVar; }
 
     inline bool shouldTriggerTermination(ExecState*);
+
+    void setShouldBuildPCToCodeOriginMapping() { m_shouldBuildPCToCodeOriginMapping = true; }
+    bool shouldBuilderPCToCodeOriginMapping() const { return m_shouldBuildPCToCodeOriginMapping; }
+
+    BytecodeIntrinsicRegistry& bytecodeIntrinsicRegistry() { return *m_bytecodeIntrinsicRegistry; }
 
 private:
     friend class LLIntOffsetsExtractor;
@@ -637,6 +658,7 @@ private:
     bool m_failNextNewCodeBlock { false };
     bool m_inDefineOwnProperty;
     bool m_shouldRewriteConstAsVar { false };
+    bool m_shouldBuildPCToCodeOriginMapping { false };
     std::unique_ptr<CodeCache> m_codeCache;
     LegacyProfiler* m_enabledProfiler;
     std::unique_ptr<BuiltinExecutables> m_builtinExecutables;
@@ -650,6 +672,10 @@ private:
     Deque<std::unique_ptr<QueuedTask>> m_microtaskQueue;
     MallocPtr<EncodedJSValue> m_exceptionFuzzBuffer;
     RefPtr<Watchdog> m_watchdog;
+#if ENABLE(SAMPLING_PROFILER)
+    RefPtr<SamplingProfiler> m_samplingProfiler;
+#endif
+    std::unique_ptr<BytecodeIntrinsicRegistry> m_bytecodeIntrinsicRegistry;
 };
 
 #if ENABLE(GC_VALIDATION)

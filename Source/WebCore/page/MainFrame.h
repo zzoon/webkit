@@ -29,6 +29,10 @@
 #include "Frame.h"
 #include <wtf/Vector.h>
 
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/MainFrameIncludes.h>
+#endif
+
 namespace WebCore {
 
 class DiagnosticLoggingClient;
@@ -63,6 +67,10 @@ public:
 #endif // PLATFORM(MAC)
 
     WEBCORE_EXPORT DiagnosticLoggingClient& diagnosticLoggingClient() const;
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/MainFrameMembers.h>
+#endif
 
 private:
     MainFrame(Page&, PageConfiguration&);

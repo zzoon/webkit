@@ -41,7 +41,7 @@ public:
 
     WEBCORE_EXPORT unsigned videoWidth() const;
     WEBCORE_EXPORT unsigned videoHeight() const;
-    
+
     // Fullscreen
     void webkitEnterFullscreen(ExceptionCode&);
     void webkitExitFullscreen();
@@ -89,6 +89,8 @@ public:
 private:
     HTMLVideoElement(const QualifiedName&, Document&, bool);
 
+    virtual void scheduleResizeEvent() override;
+    virtual void scheduleResizeEventIfSizeChanged() override;
     virtual bool rendererIsNeeded(const RenderStyle&) override;
     virtual void didAttachRenderers() override;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
@@ -96,7 +98,7 @@ private:
     virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
     virtual bool isVideo() const override { return true; }
     virtual bool hasVideo() const override { return player() && player()->hasVideo(); }
-    virtual bool supportsFullscreen() const override;
+    virtual bool supportsFullscreen(HTMLMediaElementEnums::VideoFullscreenMode) const override;
     virtual bool isURLAttribute(const Attribute&) const override;
     virtual const AtomicString& imageSourceURL() const override;
 
@@ -110,6 +112,9 @@ private:
     std::unique_ptr<HTMLImageLoader> m_imageLoader;
 
     AtomicString m_defaultPosterURL;
+
+    unsigned m_lastReportedVideoWidth { 0 };
+    unsigned m_lastReportedVideoHeight { 0 };
 };
 
 } // namespace WebCore

@@ -159,11 +159,16 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         return (contentView instanceof WebInspector.TimelineView) ? contentView : null;
     }
 
+    get timelineOverviewHeight()
+    {
+        return this._currentTimelineOverview.height;
+    }
+
     shown()
     {
         this._currentTimelineOverview.shown();
         this._contentViewContainer.shown();
-        this._clearTimelineNavigationItem.enabled = !this._recording.readonly;
+        this._clearTimelineNavigationItem.enabled = !this._recording.readonly && !isNaN(this._recording.startTime);
 
         this._currentContentViewDidChange();
 
@@ -319,13 +324,6 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         return true;
     }
 
-    // Protected
-
-    layout()
-    {
-        this._currentTimelineOverview.updateLayoutForResize();
-    }
-
     // Private
 
     _currentContentViewDidChange(event)
@@ -343,9 +341,9 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
             this.replaceSubview(this._currentTimelineOverview, newTimelineOverview);
 
             this._currentTimelineOverview = newTimelineOverview;
-            this._currentTimelineOverview.shown();
 
             this._updateTimelineOverviewHeight();
+            this._currentTimelineOverview.shown();
         }
 
         if (timelineView) {
@@ -498,6 +496,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
     {
         if (!this._updating)
             this._startUpdatingCurrentTime(event.data.startTime);
+        this._clearTimelineNavigationItem.enabled = !this._recording.readonly;
     }
 
     _capturingStopped(event)
@@ -555,21 +554,8 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
     _updateTimelineOverviewHeight()
     {
         const rulerHeight = 29;
-        const timelineHeight = 36;
-        const renderingFramesTimelineHeight = 108;
-
-        let overviewHeight;
-        if (this.currentTimelineView && this.currentTimelineView.representedObject.type === WebInspector.TimelineRecord.Type.RenderingFrame)
-            overviewHeight = renderingFramesTimelineHeight;
-        else {
-            let timelineCount = this._timelineViewMap.size;
-            if (this._renderingFrameTimeline)
-                timelineCount--;
-
-            overviewHeight = timelineCount * timelineHeight;
-        }
-
-        let styleValue = (overviewHeight + rulerHeight) + "px";
+        
+        let styleValue = (rulerHeight + this.timelineOverviewHeight) + "px";
         this._currentTimelineOverview.element.style.height = styleValue;
         this._contentViewContainer.element.style.top = styleValue;
     }
@@ -586,8 +572,8 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         if (timeline.type === WebInspector.TimelineRecord.Type.RenderingFrame)
             this._renderingFrameTimeline = timeline;
 
-        let displayName = WebInspector.TimelineSidebarPanel.displayNameForTimeline(timeline);
-        let iconClassName = WebInspector.TimelineSidebarPanel.iconClassNameForTimeline(timeline);
+        let displayName = WebInspector.TimelineTabContentView.displayNameForTimeline(timeline);
+        let iconClassName = WebInspector.TimelineTabContentView.iconClassNameForTimeline(timeline);
         let pathComponent = new WebInspector.HierarchicalPathComponent(displayName, iconClassName, timeline);
         pathComponent.addEventListener(WebInspector.HierarchicalPathComponent.Event.SiblingWasSelected, this._pathComponentSelected, this);
         this._pathComponentMap.set(timeline, pathComponent);
@@ -650,6 +636,7 @@ WebInspector.TimelineRecordingContentView = class TimelineRecordingContentView e
         this._overviewTimelineView.reset();
         for (var timelineView of this._timelineViewMap.values())
             timelineView.reset();
+        this._clearTimelineNavigationItem.enabled = false;
     }
 
     _recordingUnloaded(event)

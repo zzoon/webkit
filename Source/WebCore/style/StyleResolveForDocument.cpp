@@ -78,11 +78,11 @@ Ref<RenderStyle> resolveForDocument(const Document& document)
         // If there is no body, then use the document element.
         auto* body = document.bodyOrFrameset();
         RenderObject* bodyRenderer = body ? body->renderer() : nullptr;
-        if (bodyRenderer && !document.writingModeSetOnDocumentElement())
+        if (bodyRenderer && !docElementRenderer->style().hasExplicitlySetWritingMode())
             documentStyle.get().setWritingMode(bodyRenderer->style().writingMode());
         else
             documentStyle.get().setWritingMode(docElementRenderer->style().writingMode());
-        if (bodyRenderer && !document.directionSetOnDocumentElement())
+        if (bodyRenderer && !docElementRenderer->style().hasExplicitlySetDirection())
             documentStyle.get().setDirection(bodyRenderer->style().direction());
         else
             documentStyle.get().setDirection(docElementRenderer->style().direction());
@@ -94,6 +94,10 @@ Ref<RenderStyle> resolveForDocument(const Document& document)
         documentStyle.get().setColumnGap(pagination.gap);
         if (renderView.multiColumnFlowThread())
             renderView.updateColumnProgressionFromStyle(documentStyle.get());
+        if (renderView.frame().page()->paginationLineGridEnabled()) {
+            documentStyle.get().setLineGrid("-webkit-default-pagination-grid");
+            documentStyle.get().setLineSnap(LineSnapContain);
+        }
     }
 
     const Settings& settings = renderView.frame().settings();

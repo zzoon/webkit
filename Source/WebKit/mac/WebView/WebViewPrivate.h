@@ -517,9 +517,6 @@ Could be worth adding to the API.
 
 + (void)_setAlwaysUsesComplexTextCodePath:(BOOL)f;
 
-+ (void)_setAllowsRoundingHacks:(BOOL)allowsRoundingHacks;
-+ (BOOL)_allowsRoundingHacks;
-
 #if !TARGET_OS_IPHONE
 - (NSCachedURLResponse *)_cachedResponseForURL:(NSURL *)URL;
 #endif
@@ -850,6 +847,10 @@ Could be worth adding to the API.
 - (void)_setGapBetweenPages:(CGFloat)pageGap;
 - (CGFloat)_gapBetweenPages;
 - (NSUInteger)_pageCount;
+
+// Whether or not a line grid is enabled by default when paginated via the pagination API.
+- (void)_setPaginationLineGridEnabled:(BOOL)lineGridEnabled;
+- (BOOL)_paginationLineGridEnabled;
 
 #if !TARGET_OS_IPHONE
 - (void)_setCustomBackingScaleFactor:(CGFloat)overrideScaleFactor;

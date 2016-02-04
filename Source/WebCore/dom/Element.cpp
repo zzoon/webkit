@@ -78,6 +78,7 @@
 #include "Settings.h"
 #include "StyleProperties.h"
 #include "StyleResolver.h"
+#include "StyleTreeResolver.h"
 #include "TextIterator.h"
 #include "VoidCallback.h"
 #include "WheelEvent.h"
@@ -88,6 +89,7 @@
 #include "markup.h"
 #include <wtf/BitVector.h>
 #include <wtf/CurrentTime.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
@@ -436,19 +438,24 @@ ALWAYS_INLINE void Element::synchronizeAttribute(const QualifiedName& name) cons
     }
 }
 
+static ALWAYS_INLINE bool isStyleAttribute(const Element& element, const AtomicString& attributeLocalName)
+{
+    if (shouldIgnoreAttributeCase(element))
+        return equalLettersIgnoringASCIICase(attributeLocalName, "style");
+    return attributeLocalName == styleAttr.localName();
+}
+
 ALWAYS_INLINE void Element::synchronizeAttribute(const AtomicString& localName) const
 {
     // This version of synchronizeAttribute() is streamlined for the case where you don't have a full QualifiedName,
     // e.g when called from DOM API.
     if (!elementData())
         return;
-    // FIXME: this should be comparing in the ASCII range.
-    if (elementData()->styleAttributeIsDirty() && equalPossiblyIgnoringCase(localName, styleAttr.localName(), shouldIgnoreAttributeCase(*this))) {
+    if (elementData()->styleAttributeIsDirty() && isStyleAttribute(*this, localName)) {
         ASSERT_WITH_SECURITY_IMPLICATION(isStyledElement());
         static_cast<const StyledElement*>(this)->synchronizeStyleAttributeInternal();
         return;
     }
-
     if (elementData()->animatedSVGAttributesAreDirty()) {
         // We're not passing a namespace argument on purpose. SVGNames::*Attr are defined w/o namespaces as well.
         ASSERT_WITH_SECURITY_IMPLICATION(isSVGElement());
@@ -1194,7 +1201,7 @@ inline void Element::setAttributeInternal(unsigned index, const QualifiedName& n
 static inline AtomicString makeIdForStyleResolution(const AtomicString& value, bool inQuirksMode)
 {
     if (inQuirksMode)
-        return value.lower();
+        return value.convertToASCIILowercase();
     return value;
 }
 
@@ -1402,7 +1409,7 @@ StyleResolver& Element::styleResolver()
 
 Ref<RenderStyle> Element::resolveStyle(RenderStyle* parentStyle)
 {
-    return styleResolver().styleForElement(this, parentStyle);
+    return styleResolver().styleForElement(*this, parentStyle);
 }
 
 // Returns true is the given attribute is an event handler.
@@ -1711,13 +1718,16 @@ RefPtr<ShadowRoot> Element::attachShadow(const Dictionary& dictionary, Exception
     return shadowRoot();
 }
 
-ShadowRoot* Element::bindingShadowRoot() const
+ShadowRoot* Element::shadowRootForBindings(JSC::ExecState& state) const
 {
     ShadowRoot* root = shadowRoot();
     if (!root)
         return nullptr;
-    if (root->type() != ShadowRoot::Type::Open)
-        return nullptr;
+
+    if (root->type() != ShadowRoot::Type::Open) {
+        if (!JSC::jsCast<JSDOMGlobalObject*>(state.lexicalGlobalObject())->world().shadowRootIsAlwaysOpen())
+            return nullptr;
+    }
     return root;
 }
 
@@ -1887,8 +1897,6 @@ void Element::removeAllEventListeners()
 void Element::beginParsingChildren()
 {
     clearIsParsingChildrenFinished();
-    if (auto styleResolver = document().styleResolverIfExists())
-        styleResolver->pushParentElement(this);
 }
 
 void Element::finishParsingChildren()
@@ -1896,8 +1904,6 @@ void Element::finishParsingChildren()
     ContainerNode::finishParsingChildren();
     setIsParsingChildrenFinished();
     checkForSiblingStyleChanges(*this, FinishedParsingChildren, ElementTraversal::lastChild(*this), nullptr);
-    if (auto styleResolver = document().styleResolverIfExists())
-        styleResolver->popParentElement(this);
 }
 
 #if ENABLE(TREE_DEBUGGING)
@@ -2875,13 +2881,12 @@ void Element::requestPointerLock()
 SpellcheckAttributeState Element::spellcheckAttributeState() const
 {
     const AtomicString& value = fastGetAttribute(HTMLNames::spellcheckAttr);
-    if (value == nullAtom)
+    if (value.isNull())
         return SpellcheckAttributeDefault;
-    if (equalIgnoringCase(value, "true") || equalIgnoringCase(value, ""))
+    if (value.isEmpty() || equalLettersIgnoringASCIICase(value, "true"))
         return SpellcheckAttributeTrue;
-    if (equalIgnoringCase(value, "false"))
+    if (equalLettersIgnoringASCIICase(value, "false"))
         return SpellcheckAttributeFalse;
-
     return SpellcheckAttributeDefault;
 }
 
@@ -2931,21 +2936,21 @@ const AtomicString& Element::webkitRegionOverset() const
 {
     document().updateLayoutIgnorePendingStylesheets();
 
-    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, undefinedState, ("undefined", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<AtomicString> undefinedState("undefined", AtomicString::ConstructFromLiteral);
     if (!document().cssRegionsEnabled() || !renderNamedFlowFragment())
         return undefinedState;
 
     switch (regionOversetState()) {
     case RegionFit: {
-        DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, fitState, ("fit", AtomicString::ConstructFromLiteral));
+        static NeverDestroyed<AtomicString> fitState("fit", AtomicString::ConstructFromLiteral);
         return fitState;
     }
     case RegionEmpty: {
-        DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, emptyState, ("empty", AtomicString::ConstructFromLiteral));
+        static NeverDestroyed<AtomicString> emptyState("empty", AtomicString::ConstructFromLiteral);
         return emptyState;
     }
     case RegionOverset: {
-        DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, overflowState, ("overset", AtomicString::ConstructFromLiteral));
+        static NeverDestroyed<AtomicString> overflowState("overset", AtomicString::ConstructFromLiteral);
         return overflowState;
     }
     case RegionUndefined:
@@ -3374,7 +3379,7 @@ void Element::clearHasPendingResources()
 
 bool Element::canContainRangeEndPoint() const
 {
-    return !equalIgnoringCase(fastGetAttribute(roleAttr), "img");
+    return !equalLettersIgnoringASCIICase(fastGetAttribute(roleAttr), "img");
 }
 
 String Element::completeURLsInAttributeValue(const URL& base, const Attribute& attribute) const

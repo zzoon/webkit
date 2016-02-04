@@ -338,11 +338,11 @@ static bool handleUnignoredTLSErrors(ResourceHandle* handle, SoupMessage* messag
 
 static void tlsErrorsChangedCallback(SoupMessage* message, GParamSpec*, gpointer data)
 {
-    ResourceHandle* handle = static_cast<ResourceHandle*>(data);
+    RefPtr<ResourceHandle> handle = static_cast<ResourceHandle*>(data);
     if (!handle || handle->cancelledOrClientless())
         return;
 
-    if (handleUnignoredTLSErrors(handle, message))
+    if (handleUnignoredTLSErrors(handle.get(), message))
         handle->cancel();
 }
 
@@ -506,7 +506,7 @@ static void doRedirect(ResourceHandle* handle)
         // or if current redirection says so
         if (message->method == SOUP_METHOD_GET || shouldRedirectAsGET(message, newURL, crossOrigin)) {
             newRequest.setHTTPMethod("GET");
-            newRequest.setHTTPBody(0);
+            newRequest.setHTTPBody(nullptr);
             newRequest.clearHTTPContentType();
         }
     }

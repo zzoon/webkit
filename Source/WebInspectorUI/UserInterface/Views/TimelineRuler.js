@@ -310,7 +310,7 @@ WebInspector.TimelineRuler = class TimelineRuler extends WebInspector.View
             markerElement.title = WebInspector.UIString("Load \u2014 %s").format(Number.secondsToString(markerTime));
             break;
         case WebInspector.TimelineMarker.Type.DOMContentEvent:
-            markerElement.title = WebInspector.UIString("DOMContentLoaded \u2014 %s").format(Number.secondsToString(markerTime));
+            markerElement.title = WebInspector.UIString("DOM Content Loaded \u2014 %s").format(Number.secondsToString(markerTime));
             break;
         case WebInspector.TimelineMarker.Type.TimeStamp:
             if (marker.details)
@@ -358,7 +358,7 @@ WebInspector.TimelineRuler = class TimelineRuler extends WebInspector.View
             this._updateSelection(visibleWidth, this.duration);
     }
 
-    needsLayout()
+    needsLayout(layoutReason)
     {
         if (this.layoutPending)
             return;
@@ -373,13 +373,16 @@ WebInspector.TimelineRuler = class TimelineRuler extends WebInspector.View
             this._scheduledSelectionLayoutUpdateIdentifier = undefined;
         }
 
-        super.needsLayout();
+        super.needsLayout(layoutReason);
     }
 
     // Protected
 
-    layout()
+    layout(layoutReason)
     {
+        if (layoutReason === WebInspector.View.LayoutReason.Resize)
+            this._cachedClientWidth = this.element.clientWidth;
+
         let visibleWidth = this._recalculate();
         if (visibleWidth <= 0)
             return;
@@ -506,7 +509,7 @@ WebInspector.TimelineRuler = class TimelineRuler extends WebInspector.View
         this._scheduledMarkerLayoutUpdateIdentifier = requestAnimationFrame(() => {
             this._scheduledMarkerLayoutUpdateIdentifier = undefined;
 
-            let visibleWidth = this.element.clientWidth;
+            let visibleWidth = this._cachedClientWidth;
             if (visibleWidth <= 0)
                 return;
 
@@ -529,7 +532,7 @@ WebInspector.TimelineRuler = class TimelineRuler extends WebInspector.View
         this._scheduledSelectionLayoutUpdateIdentifier = requestAnimationFrame(() => {
             this._scheduledSelectionLayoutUpdateIdentifier = undefined;
 
-            let visibleWidth = this.element.clientWidth;
+            let visibleWidth = this._cachedClientWidth;
             if (visibleWidth <= 0)
                 return;
 
@@ -539,7 +542,7 @@ WebInspector.TimelineRuler = class TimelineRuler extends WebInspector.View
 
     _recalculate()
     {
-        let visibleWidth = this.element.clientWidth;
+        let visibleWidth = this._cachedClientWidth;
         if (visibleWidth <= 0)
             return 0;
 
@@ -732,7 +735,7 @@ WebInspector.TimelineRuler = class TimelineRuler extends WebInspector.View
             this.element.classList.add(WebInspector.TimelineRuler.ResizingSelectionStyleClassName);
         }
 
-        this._updateSelection(this.element.clientWidth, this.duration);
+        this._updateSelection(this._cachedClientWidth, this.duration);
 
         event.preventDefault();
         event.stopPropagation();
@@ -826,7 +829,7 @@ WebInspector.TimelineRuler = class TimelineRuler extends WebInspector.View
                 this.selectionEndTime = Math.min(Math.max(this.selectionStartTime + this.minimumSelectionDuration, currentTime), this.endTime);
         }
 
-        this._updateSelection(this.element.clientWidth, this.duration);
+        this._updateSelection(this._cachedClientWidth, this.duration);
 
         event.preventDefault();
         event.stopPropagation();

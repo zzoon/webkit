@@ -464,12 +464,12 @@ void Editor::pasteAsPlainText(const String& pastingText, bool smartReplace)
     target->dispatchEvent(TextEvent::createForPlainTextPaste(document().domWindow(), pastingText, smartReplace));
 }
 
-void Editor::pasteAsFragment(PassRefPtr<DocumentFragment> pastingFragment, bool smartReplace, bool matchStyle, MailBlockquoteHandling respectsMailBlockquote)
+void Editor::pasteAsFragment(Ref<DocumentFragment>&& pastingFragment, bool smartReplace, bool matchStyle, MailBlockquoteHandling respectsMailBlockquote)
 {
     Node* target = findEventTargetFromSelection();
     if (!target)
         return;
-    target->dispatchEvent(TextEvent::createForFragmentPaste(document().domWindow(), pastingFragment, smartReplace, matchStyle, respectsMailBlockquote));
+    target->dispatchEvent(TextEvent::createForFragmentPaste(document().domWindow(), WTFMove(pastingFragment), smartReplace, matchStyle, respectsMailBlockquote));
 }
 
 void Editor::pasteAsPlainTextBypassingDHTML()
@@ -3264,11 +3264,6 @@ void Editor::respondToChangedSelection(const VisibleSelection&, FrameSelection::
     if (client())
         client()->respondToChangedSelection(&m_frame);
 
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-    if (client() && canEdit())
-        client()->requestCandidatesForSelection(m_frame.selection().selection());
-#endif
-
 #if ENABLE(TELEPHONE_NUMBER_DETECTION) && !PLATFORM(IOS)
     if (shouldDetectTelephoneNumbers())
         m_telephoneNumberDetectionUpdateTimer.startOneShot(0);
@@ -3531,6 +3526,57 @@ TextCheckingTypeMask Editor::resolveTextCheckingTypeMask(TextCheckingTypeMask te
 #endif // !PLATFORM(IOS)
 
     return checkingTypes;
+}
+
+static RefPtr<Range> candidateRangeForSelection(Frame& frame)
+{
+    const VisibleSelection& selection = frame.selection().selection();
+    return selection.isCaret() ? wordRangeFromPosition(selection.start()) : frame.selection().toNormalizedRange();
+}
+
+static bool candidateWouldReplaceText(const VisibleSelection& selection)
+{
+    // If the character behind the caret in the current selection is anything but a space or a newline then we should
+    // replace the whole current word with the candidate.
+    UChar32 characterAfterSelection, characterBeforeSelection, twoCharacterBeforeSelection = 0;
+    charactersAroundPosition(selection.visibleStart(), characterAfterSelection, characterBeforeSelection, twoCharacterBeforeSelection);
+    return !(characterBeforeSelection == '\0' || characterBeforeSelection == '\n' || characterBeforeSelection == ' ');
+}
+
+String Editor::stringForCandidateRequest() const
+{
+    const VisibleSelection& selection = m_frame.selection().selection();
+    RefPtr<Range> rangeForCurrentlyTypedString = candidateRangeForSelection(m_frame);
+    if (rangeForCurrentlyTypedString && candidateWouldReplaceText(selection))
+        return plainText(rangeForCurrentlyTypedString.get());
+
+    return String();
+}
+
+void Editor::handleAcceptedCandidate(TextCheckingResult acceptedCandidate)
+{
+    const VisibleSelection& selection = m_frame.selection().selection();
+    RefPtr<Range> candidateRange = candidateRangeForSelection(m_frame);
+    int candidateLength = acceptedCandidate.length;
+
+    m_isHandlingAcceptedCandidate = true;
+
+    if (candidateWouldReplaceText(selection))
+        m_frame.selection().setSelectedRange(candidateRange.get(), UPSTREAM, true);
+
+    insertText(acceptedCandidate.replacement, 0);
+
+    // Some candidates come with a space built in, and we do not need to add another space in that case.
+    if (!acceptedCandidate.replacement.endsWith(' ')) {
+        insertText(ASCIILiteral(" "), 0);
+        ++candidateLength;
+    }
+
+    RefPtr<Range> insertedCandidateRange = rangeExpandedAroundPositionByCharacters(selection.visibleStart(), candidateLength);
+    if (insertedCandidateRange)
+        insertedCandidateRange->startContainer().document().markers().addMarker(insertedCandidateRange.get(), DocumentMarker::AcceptedCandidate, acceptedCandidate.replacement);
+
+    m_isHandlingAcceptedCandidate = false;
 }
 
 bool Editor::unifiedTextCheckerEnabled() const

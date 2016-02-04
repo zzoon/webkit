@@ -70,6 +70,7 @@
 #include "UnicodeBidi.h"
 #include <memory>
 #include <wtf/Forward.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/RefCounted.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
@@ -168,9 +169,6 @@ public:
                 | unicodeBidiMask << unicodeBidiOffset
                 | verticalAlignMask << verticalAlignOffset
                 | floatingMask << floatingOffset
-                | pageBreakMask << pageBreakInsideOffset
-                | pageBreakMask << pageBreakBeforeOffset
-                | pageBreakMask << pageBreakAfterOffset
                 | oneBitMask << explicitInheritanceOffset
                 | tableLayoutBitMask << tableLayoutOffset
                 | hasViewportUnitsBitMask << hasViewportUnitsOffset;
@@ -211,16 +209,6 @@ public:
         bool isFloating() const { return floating() != NoFloat; }
         EFloat floating() const { return static_cast<EFloat>(getValue(floatingMask, floatingOffset)); }
         void setFloating(EFloat floating) { updateValue(floating, floatingMask, floatingOffset); }
-
-        // For valid values of page-break-inside see http://www.w3.org/TR/CSS21/page.html#page-break-props
-        EPageBreak pageBreakInside() const { return static_cast<EPageBreak>(getValue(pageBreakMask, pageBreakInsideOffset)); }
-        void setPageBreakInside(EPageBreak pageBreakInside) { ASSERT(pageBreakInside == PBAUTO || pageBreakInside == PBAVOID); updateValue(pageBreakInside, pageBreakMask, pageBreakInsideOffset); }
-
-        EPageBreak pageBreakBefore() const { return static_cast<EPageBreak>(getValue(pageBreakMask, pageBreakBeforeOffset)); }
-        void setPageBreakBefore(EPageBreak pageBreakBefore) { updateValue(pageBreakBefore, pageBreakMask, pageBreakBeforeOffset); }
-
-        EPageBreak pageBreakAfter() const { return static_cast<EPageBreak>(getValue(pageBreakMask, pageBreakAfterOffset)); }
-        void setPageBreakAfter(EPageBreak pageBreakAfter) { updateValue(pageBreakAfter, pageBreakMask, pageBreakAfterOffset); }
 
         bool hasAnyPublicPseudoStyles() const { return PUBLIC_PSEUDOID_MASK & getValue(pseudoBitsMask, pseudoBitsOffset); }
         bool hasPseudoStyle(PseudoId pseudo) const
@@ -273,6 +261,12 @@ public:
 
         bool isLink() const { return getBoolean(isLinkOffset); }
         void setIsLink(bool value) { updateBoolean(value, isLinkOffset); }
+
+        bool hasExplicitlySetDirection() const { return getBoolean(hasExplicitlySetDirectionOffset); }
+        void setHasExplicitlySetDirection(bool value) { updateBoolean(value, hasExplicitlySetDirectionOffset); }
+
+        bool hasExplicitlySetWritingMode() const { return getBoolean(hasExplicitlySetWritingModeOffset); }
+        void setHasExplicitlySetWritingMode(bool value) { updateBoolean(value, hasExplicitlySetWritingModeOffset); }
 
         static ptrdiff_t flagsMemoryOffset() { return OBJECT_OFFSETOF(NonInheritedFlags, m_flags); }
         static uint64_t flagIsaffectedByActive() { return oneBitMask << affectedByActiveOffset; }
@@ -340,15 +334,14 @@ public:
         static const unsigned floatingBitCount = 2;
         static const uint64_t floatingMask = (oneBitMask << floatingBitCount) - 1;
         static const unsigned floatingOffset = unicodeBidiOffset + unicodeBidiBitCount;
-        static const unsigned pageBreakBitCount = 2;
-        static const uint64_t pageBreakMask = (oneBitMask << pageBreakBitCount) - 1;
-        static const unsigned pageBreakInsideOffset = floatingOffset + floatingBitCount;
-        static const unsigned pageBreakBeforeOffset = pageBreakInsideOffset + pageBreakBitCount;
-        static const unsigned pageBreakAfterOffset = pageBreakBeforeOffset + pageBreakBitCount;
+        static const unsigned hasExplicitlySetDirectionBitcount = 1;
+        static const unsigned hasExplicitlySetDirectionOffset = floatingOffset + floatingBitCount;
+        static const unsigned hasExplicitlySetWritingModeBitcount = 1;
+        static const unsigned hasExplicitlySetWritingModeOffset = hasExplicitlySetDirectionOffset + hasExplicitlySetDirectionBitcount;
 
         // Byte 5.
         static const unsigned explicitInheritanceBitCount = 1;
-        static const unsigned explicitInheritanceOffset = pageBreakAfterOffset + pageBreakBitCount;
+        static const unsigned explicitInheritanceOffset = hasExplicitlySetWritingModeOffset + hasExplicitlySetWritingModeBitcount;
         static const unsigned tableLayoutBitCount = 1;
         static const uint64_t tableLayoutBitMask = oneBitMask;
         static const unsigned tableLayoutOffset = explicitInheritanceOffset + explicitInheritanceBitCount;
@@ -384,8 +377,7 @@ public:
         static const unsigned affectedByDragOffset = affectedByActiveOffset + 1;
         static const unsigned isLinkOffset = affectedByDragOffset + 1;
 
-
-        // Only 60 bits are assigned. There are 4 bits available currently used as padding to improve code generation.
+        // 60 bits are assigned. There are 4 bits available currently used as padding to improve code generation.
         // If you add more style bits here, you will also need to update RenderStyle::copyNonInheritedFrom().
         uint64_t m_flags;
     };
@@ -743,6 +735,7 @@ public:
 
     TextDirection direction() const { return static_cast<TextDirection>(inherited_flags._direction); }
     bool isLeftToRightDirection() const { return direction() == LTR; }
+    bool hasExplicitlySetDirection() const { return noninherited_flags.hasExplicitlySetDirection(); }
 
     const Length& specifiedLineHeight() const;
     Length lineHeight() const;
@@ -881,11 +874,13 @@ public:
     short orphans() const { return rareInheritedData->orphans; }
     bool hasAutoWidows() const { return rareInheritedData->m_hasAutoWidows; }
     bool hasAutoOrphans() const { return rareInheritedData->m_hasAutoOrphans; }
-    EPageBreak pageBreakInside() const { return noninherited_flags.pageBreakInside(); }
-    EPageBreak pageBreakBefore() const { return noninherited_flags.pageBreakBefore(); }
-    EPageBreak pageBreakAfter() const { return noninherited_flags.pageBreakAfter(); }
 
     // CSS3 Getter Methods
+    BreakInside breakInside() const { return static_cast<BreakInside>(rareNonInheritedData->m_breakInside); }
+    BreakBetween breakBefore() const { return static_cast<BreakBetween>(rareNonInheritedData->m_breakBefore); }
+    BreakBetween breakAfter() const { return static_cast<BreakBetween>(rareNonInheritedData->m_breakAfter); }
+    
+    HangingPunctuation hangingPunctuation() const { return static_cast<HangingPunctuation>(rareInheritedData->m_hangingPunctuation); }
 
     float outlineOffset() const
     {
@@ -1028,12 +1023,7 @@ public:
     unsigned short columnRuleWidth() const { return rareNonInheritedData->m_multiCol->ruleWidth(); }
     bool columnRuleIsTransparent() const { return rareNonInheritedData->m_multiCol->m_rule.isTransparent(); }
     ColumnSpan columnSpan() const { return static_cast<ColumnSpan>(rareNonInheritedData->m_multiCol->m_columnSpan); }
-    EPageBreak columnBreakBefore() const { return static_cast<EPageBreak>(rareNonInheritedData->m_multiCol->m_breakBefore); }
-    EPageBreak columnBreakInside() const { return static_cast<EPageBreak>(rareNonInheritedData->m_multiCol->m_breakInside); }
-    EPageBreak columnBreakAfter() const { return static_cast<EPageBreak>(rareNonInheritedData->m_multiCol->m_breakAfter); }
-    EPageBreak regionBreakBefore() const { return static_cast<EPageBreak>(rareNonInheritedData->m_regionBreakBefore); }
-    EPageBreak regionBreakInside() const { return static_cast<EPageBreak>(rareNonInheritedData->m_regionBreakInside); }
-    EPageBreak regionBreakAfter() const { return static_cast<EPageBreak>(rareNonInheritedData->m_regionBreakAfter); }
+
     const TransformOperations& transform() const { return rareNonInheritedData->m_transform->m_operations; }
     const Length& transformOriginX() const { return rareNonInheritedData->m_transform->m_x; }
     const Length& transformOriginY() const { return rareNonInheritedData->m_transform->m_y; }
@@ -1153,9 +1143,14 @@ public:
     bool isFlippedLinesWritingMode() const { return WebCore::isFlippedLinesWritingMode(writingMode()); }
     bool isFlippedBlocksWritingMode() const { return WebCore::isFlippedWritingMode(writingMode()); }
 
+    ImageOrientationEnum imageOrientation() const
+    {
 #if ENABLE(CSS_IMAGE_ORIENTATION)
-    ImageOrientationEnum imageOrientation() const { return static_cast<ImageOrientationEnum>(rareInheritedData->m_imageOrientation); }
+        return static_cast<ImageOrientationEnum>(rareInheritedData->m_imageOrientation);
+#else
+        return DefaultImageOrientation;
 #endif
+    }
 
     EImageRendering imageRendering() const { return static_cast<EImageRendering>(rareInheritedData->m_imageRendering); }
 
@@ -1380,6 +1375,7 @@ public:
     void setTextDecorationSkip(TextDecorationSkip skip) { SET_VAR(rareInheritedData, m_textDecorationSkip, skip); }
     void setTextUnderlinePosition(TextUnderlinePosition v) { SET_VAR(rareInheritedData, m_textUnderlinePosition, v); }
     void setDirection(TextDirection v) { inherited_flags._direction = v; }
+    void setHasExplicitlySetDirection(bool v) { noninherited_flags.setHasExplicitlySetDirection(v); }
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     void setSpecifiedLineHeight(Length v);
 #endif
@@ -1493,11 +1489,6 @@ public:
     void setHasAutoOrphans() { SET_VAR(rareInheritedData, m_hasAutoOrphans, true); SET_VAR(rareInheritedData, orphans, initialOrphans()); }
     void setOrphans(short o) { SET_VAR(rareInheritedData, m_hasAutoOrphans, false); SET_VAR(rareInheritedData, orphans, o); }
 
-    // For valid values of page-break-inside see http://www.w3.org/TR/CSS21/page.html#page-break-props
-    void setPageBreakInside(EPageBreak b) { noninherited_flags.setPageBreakInside(b); }
-    void setPageBreakBefore(EPageBreak b) { noninherited_flags.setPageBreakBefore(b); }
-    void setPageBreakAfter(EPageBreak b) { noninherited_flags.setPageBreakAfter(b); }
-
     // CSS3 Setters
     void setOutlineOffset(float v) { SET_VAR(m_background, m_outline.m_offset, v); }
     void setTextShadow(std::unique_ptr<ShadowData>, bool add = false);
@@ -1604,13 +1595,6 @@ public:
     void setColumnRuleWidth(unsigned short w) { SET_VAR(rareNonInheritedData.access()->m_multiCol, m_rule.m_width, w); }
     void resetColumnRule() { SET_VAR(rareNonInheritedData.access()->m_multiCol, m_rule, BorderValue()); }
     void setColumnSpan(ColumnSpan columnSpan) { SET_VAR(rareNonInheritedData.access()->m_multiCol, m_columnSpan, columnSpan); }
-    void setColumnBreakBefore(EPageBreak p) { SET_VAR(rareNonInheritedData.access()->m_multiCol, m_breakBefore, p); }
-    // For valid values of column-break-inside see http://www.w3.org/TR/css3-multicol/#break-before-break-after-break-inside
-    void setColumnBreakInside(EPageBreak p) { ASSERT(p == PBAUTO || p == PBAVOID); SET_VAR(rareNonInheritedData.access()->m_multiCol, m_breakInside, p); }
-    void setColumnBreakAfter(EPageBreak p) { SET_VAR(rareNonInheritedData.access()->m_multiCol, m_breakAfter, p); }
-    void setRegionBreakBefore(EPageBreak p) { SET_VAR(rareNonInheritedData, m_regionBreakBefore, p); }
-    void setRegionBreakInside(EPageBreak p) { ASSERT(p == PBAUTO || p == PBAVOID); SET_VAR(rareNonInheritedData, m_regionBreakInside, p); }
-    void setRegionBreakAfter(EPageBreak p) { SET_VAR(rareNonInheritedData, m_regionBreakAfter, p); }
     void inheritColumnPropertiesFrom(RenderStyle* parent) { rareNonInheritedData.access()->m_multiCol = parent->rareNonInheritedData->m_multiCol; }
     void setTransform(const TransformOperations& ops) { SET_VAR(rareNonInheritedData.access()->m_transform, m_operations, ops); }
     void setTransformOriginX(Length length) { SET_VAR(rareNonInheritedData.access()->m_transform, m_x, WTFMove(length)); }
@@ -1636,6 +1620,12 @@ public:
 #endif
 
     void setTabSize(unsigned size) { SET_VAR(rareInheritedData, m_tabSize, size); }
+
+    void setBreakBefore(BreakBetween breakBehavior) { SET_VAR(rareNonInheritedData, m_breakBefore, breakBehavior); }
+    void setBreakAfter(BreakBetween breakBehavior) { SET_VAR(rareNonInheritedData, m_breakAfter, breakBehavior); }
+    void setBreakInside(BreakInside breakBehavior) { SET_VAR(rareNonInheritedData, m_breakInside, breakBehavior); }
+    
+    void setHangingPunctuation(HangingPunctuation punctuation) { SET_VAR(rareInheritedData, m_hangingPunctuation, punctuation); }
 
     // End CSS3 Setters
 
@@ -1864,6 +1854,9 @@ public:
         return true;
     }
 
+    bool hasExplicitlySetWritingMode() const { return noninherited_flags.hasExplicitlySetWritingMode(); }
+    void setHasExplicitlySetWritingMode(bool v) { noninherited_flags.setHasExplicitlySetWritingMode(v); }
+
     // A unique style is one that has matches something that makes it impossible to share.
     bool unique() const { return noninherited_flags.isUnique(); }
     void setUnique() { noninherited_flags.setIsUnique(); }
@@ -1890,7 +1883,9 @@ public:
     static EPosition initialPosition() { return StaticPosition; }
     static EVerticalAlign initialVerticalAlign() { return BASELINE; }
     static EFloat initialFloating() { return NoFloat; }
-    static EPageBreak initialPageBreak() { return PBAUTO; }
+    static BreakBetween initialBreakBetween() { return AutoBreakBetween; }
+    static BreakInside initialBreakInside() { return AutoBreakInside; }
+    static HangingPunctuation initialHangingPunctuation() { return NoHangingPunctuation; }
     static ETableLayout initialTableLayout() { return TAUTO; }
     static EBorderCollapse initialBorderCollapse() { return BSEPARATE; }
     static EBorderStyle initialBorderStyle() { return BNONE; }
@@ -2008,7 +2003,7 @@ public:
     static unsigned short initialColumnCount() { return 1; }
     static ColumnFill initialColumnFill() { return ColumnFillBalance; }
     static ColumnSpan initialColumnSpan() { return ColumnSpanNone; }
-    static const TransformOperations& initialTransform() { DEPRECATED_DEFINE_STATIC_LOCAL(TransformOperations, ops, ()); return ops; }
+    static const TransformOperations& initialTransform() { static NeverDestroyed<TransformOperations> ops; return ops; }
     static Length initialTransformOriginX() { return Length(50.0f, Percent); }
     static Length initialTransformOriginY() { return Length(50.0f, Percent); }
     static EPointerEvents initialPointerEvents() { return PE_AUTO; }
@@ -2114,9 +2109,9 @@ public:
     static const Vector<StyleDashboardRegion>& initialDashboardRegions();
     static const Vector<StyleDashboardRegion>& noneDashboardRegions();
 #endif
-    static const FilterOperations& initialFilter() { DEPRECATED_DEFINE_STATIC_LOCAL(FilterOperations, ops, ()); return ops; }
+    static const FilterOperations& initialFilter() { static NeverDestroyed<FilterOperations> ops; return ops; }
 #if ENABLE(FILTERS_LEVEL_2)
-    static const FilterOperations& initialBackdropFilter() { DEPRECATED_DEFINE_STATIC_LOCAL(FilterOperations, ops, ()); return ops; }
+    static const FilterOperations& initialBackdropFilter() { static NeverDestroyed<FilterOperations> ops; return ops; }
 #endif
 #if ENABLE(CSS_COMPOSITING)
     static BlendMode initialBlendMode() { return BlendModeNormal; }

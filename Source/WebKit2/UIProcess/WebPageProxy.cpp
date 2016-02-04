@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2015-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -143,14 +143,11 @@
 #include "RemoteLayerTreeDrawingAreaProxy.h"
 #include "RemoteLayerTreeScrollingPerformanceData.h"
 #include "ViewSnapshotStore.h"
+#include "WebVideoFullscreenManagerProxy.h"
+#include "WebVideoFullscreenManagerProxyMessages.h"
 #include <WebCore/MachSendRight.h>
 #include <WebCore/RunLoopObserver.h>
 #include <WebCore/TextIndicatorWindow.h>
-#endif
-
-#if PLATFORM(IOS)
-#include "WebVideoFullscreenManagerProxy.h"
-#include "WebVideoFullscreenManagerProxyMessages.h"
 #endif
 
 #if USE(CAIRO)
@@ -166,6 +163,10 @@
 #include "WebMediaSessionFocusManager.h"
 #include "WebMediaSessionMetadata.h"
 #include <WebCore/MediaSessionMetadata.h>
+#endif
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/WebPageProxyIncludes.h>
 #endif
 
 // This controls what strategy we use for mouse wheel coalescing.
@@ -361,6 +362,7 @@ WebPageProxy::WebPageProxy(PageClient& pageClient, WebProcessProxy& process, uin
     , m_paginationBehavesLikeColumns(false)
     , m_pageLength(0)
     , m_gapBetweenPages(0)
+    , m_paginationLineGridEnabled(false)
     , m_isValid(true)
     , m_isClosed(false)
     , m_canRunModal(false)
@@ -443,12 +445,6 @@ WebPageProxy::WebPageProxy(PageClient& pageClient, WebProcessProxy& process, uin
     m_webProcessLifetimeTracker.addObserver(m_visitedLinkStore);
     m_webProcessLifetimeTracker.addObserver(m_websiteDataStore);
 
-    if (m_process->state() == WebProcessProxy::State::Running) {
-        if (m_userContentController)
-            m_process->addWebUserContentControllerProxy(*m_userContentController);
-        m_process->addVisitedLinkStore(m_visitedLinkStore);
-    }
-
     updateViewState();
     updateActivityToken();
     updateProccessSuppressionState();
@@ -472,11 +468,15 @@ WebPageProxy::WebPageProxy(PageClient& pageClient, WebProcessProxy& process, uin
 #if ENABLE(FULLSCREEN_API)
     m_fullScreenManager = WebFullScreenManagerProxy::create(*this, m_pageClient.fullScreenManagerProxyClient());
 #endif
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     m_videoFullscreenManager = WebVideoFullscreenManagerProxy::create(*this);
 #endif
 #if ENABLE(VIBRATION)
     m_vibration = WebVibrationProxy::create(this);
+#endif
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/WebPageProxyInitialization.cpp>
 #endif
 
     m_process->addMessageReceiver(Messages::WebPageProxy::messageReceiverName(), m_pageID, *this);
@@ -486,7 +486,7 @@ WebPageProxy::WebPageProxy(PageClient& pageClient, WebProcessProxy& process, uin
 
 #if PLATFORM(COCOA)
     const CFIndex viewStateChangeRunLoopOrder = (CFIndex)RunLoopObserver::WellKnownRunLoopOrders::CoreAnimationCommit - 1;
-    m_viewStateChangeDispatcher = RunLoopObserver::create(viewStateChangeRunLoopOrder, [this] {
+    m_viewStateChangeDispatcher = std::make_unique<RunLoopObserver>(viewStateChangeRunLoopOrder, [this] {
         this->dispatchViewStateChange();
     });
 #endif
@@ -703,8 +703,12 @@ void WebPageProxy::reattachToWebProcess()
 #if ENABLE(FULLSCREEN_API)
     m_fullScreenManager = WebFullScreenManagerProxy::create(*this, m_pageClient.fullScreenManagerProxyClient());
 #endif
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     m_videoFullscreenManager = WebVideoFullscreenManagerProxy::create(*this);
+#endif
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/WebPageProxyInitialization.cpp>
 #endif
 
     initializeWebPage();
@@ -738,14 +742,14 @@ RefPtr<API::Navigation> WebPageProxy::reattachToWebProcessWithItem(WebBackForwar
     if (m_isClosed)
         return nullptr;
 
-    if (item && item != m_backForwardList->currentItem())
-        m_backForwardList->goToItem(item);
-
     ASSERT(!isValid());
     reattachToWebProcess();
 
     if (!item)
         return nullptr;
+
+    if (item != m_backForwardList->currentItem())
+        m_backForwardList->goToItem(item);
 
     auto navigation = m_navigationState->createBackForwardNavigation();
 
@@ -798,6 +802,23 @@ void WebPageProxy::initializeWebPage()
 #if PLATFORM(COCOA)
     send(Messages::WebPage::SetSmartInsertDeleteEnabled(m_isSmartInsertDeleteEnabled));
 #endif
+
+    m_needsToFinishInitializingWebPageAfterProcessLaunch = true;
+    finishInitializingWebPageAfterProcessLaunch();
+}
+
+void WebPageProxy::finishInitializingWebPageAfterProcessLaunch()
+{
+    if (!m_needsToFinishInitializingWebPageAfterProcessLaunch)
+        return;
+    if (m_process->state() != WebProcessProxy::State::Running)
+        return;
+
+    m_needsToFinishInitializingWebPageAfterProcessLaunch = false;
+
+    if (m_userContentController)
+        m_process->addWebUserContentControllerProxy(*m_userContentController);
+    m_process->addVisitedLinkStore(m_visitedLinkStore);
 }
 
 void WebPageProxy::close()
@@ -1339,8 +1360,10 @@ void WebPageProxy::updateViewState(ViewState::Flags flagsToUpdate)
         m_viewState |= ViewState::IsVisible;
     if (flagsToUpdate & ViewState::IsVisibleOrOccluded && m_pageClient.isViewVisibleOrOccluded())
         m_viewState |= ViewState::IsVisibleOrOccluded;
-    if (flagsToUpdate & ViewState::IsInWindow && m_pageClient.isViewInWindow())
+    if (flagsToUpdate & ViewState::IsInWindow && m_pageClient.isViewInWindow()) {
         m_viewState |= ViewState::IsInWindow;
+        m_viewWasEverInWindow = true;
+    }
     if (flagsToUpdate & ViewState::IsVisuallyIdle && m_pageClient.isVisuallyIdle())
         m_viewState |= ViewState::IsVisuallyIdle;
 }
@@ -1373,7 +1396,7 @@ void WebPageProxy::viewDidLeaveWindow()
     if (m_colorPicker)
         endColorPicker();
 #endif
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     // When leaving the current page, close the video fullscreen.
     if (m_videoFullscreenManager)
         m_videoFullscreenManager->requestHideAndExitFullscreen();
@@ -1408,9 +1431,8 @@ void WebPageProxy::dispatchViewStateChange()
     updateViewState(m_potentiallyChangedViewStateFlags);
     ViewState::Flags changed = m_viewState ^ previousViewState;
 
-    bool isNowInWindow = (changed & ViewState::IsInWindow) && isInWindow();
     // We always want to wait for the Web process to reply if we've been in-window before and are coming back in-window.
-    if (m_viewWasEverInWindow && isNowInWindow && m_drawingArea->hasVisibleContent())
+    if (m_viewWasEverInWindow && (changed & ViewState::IsInWindow) && isInWindow() && m_drawingArea->hasVisibleContent())
         m_viewStateChangeWantsSynchronousReply = true;
 
     // Don't wait synchronously if the view state is not visible. (This matters in particular on iOS, where a hidden page may be suspended.)
@@ -1445,7 +1467,6 @@ void WebPageProxy::dispatchViewStateChange()
 
     m_potentiallyChangedViewStateFlags = ViewState::NoFlags;
     m_viewStateChangeWantsSynchronousReply = false;
-    m_viewWasEverInWindow |= isNowInWindow;
 }
 
 void WebPageProxy::updateActivityToken()
@@ -1667,6 +1688,9 @@ void WebPageProxy::handleMouseEvent(const NativeWebMouseEvent& event)
     if (!isValid())
         return;
 
+    if (m_pageClient.windowIsFrontWindowUnderMouse(event))
+        setToolTip(String());
+
     // NOTE: This does not start the responsiveness timer because mouse move should not indicate interaction.
     if (event.type() != WebEvent::MouseMove)
         m_process->responsivenessTimer().start();
@@ -1801,7 +1825,9 @@ void WebPageProxy::sendWheelEvent(const WebWheelEvent& event)
             rubberBandsAtBottom()
         ), 0);
 
-    m_process->sendMainThreadPing();
+    // Manually ping the web process to check for responsiveness since our wheel
+    // event will dispatch to a non-main thread, which always responds.
+    m_process->isResponsive(nullptr);
 }
 
 void WebPageProxy::handleKeyboardEvent(const NativeWebKeyboardEvent& event)
@@ -2527,6 +2553,18 @@ void WebPageProxy::setGapBetweenPages(double gap)
     m_process->send(Messages::WebPage::SetGapBetweenPages(gap), m_pageID);
 }
 
+void WebPageProxy::setPaginationLineGridEnabled(bool lineGridEnabled)
+{
+    if (lineGridEnabled == m_paginationLineGridEnabled)
+        return;
+    
+    m_paginationLineGridEnabled = lineGridEnabled;
+    
+    if (!isValid())
+        return;
+    m_process->send(Messages::WebPage::SetPaginationLineGridEnabled(lineGridEnabled), m_pageID);
+}
+
 void WebPageProxy::pageScaleFactorDidChange(double scaleFactor)
 {
     m_pageScaleFactor = scaleFactor;
@@ -2637,7 +2675,20 @@ void WebPageProxy::getBytecodeProfile(std::function<void (const String&, Callbac
     m_loadDependentStringCallbackIDs.add(callbackID);
     m_process->send(Messages::WebPage::GetBytecodeProfile(callbackID), m_pageID);
 }
-    
+
+void WebPageProxy::isWebProcessResponsive(std::function<void (bool isWebProcessResponsive)> callbackFunction)
+{
+    if (!isValid()) {
+        RunLoop::main().dispatch([callbackFunction] {
+            bool isWebProcessResponsive = true;
+            callbackFunction(isWebProcessResponsive);
+        });
+        return;
+    }
+
+    m_process->isResponsive(callbackFunction);
+}
+
 #if ENABLE(MHTML)
 void WebPageProxy::getContentsAsMHTMLData(std::function<void (API::Data*, CallbackBase::Error)> callbackFunction)
 {
@@ -3597,10 +3648,7 @@ void WebPageProxy::webProcessWillShutDown()
 void WebPageProxy::processDidFinishLaunching()
 {
     ASSERT(m_process->state() == WebProcessProxy::State::Running);
-
-    if (m_userContentController)
-        m_process->addWebUserContentControllerProxy(*m_userContentController);
-    m_process->addVisitedLinkStore(m_visitedLinkStore);
+    finishInitializingWebPageAfterProcessLaunch();
 }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -3939,12 +3987,14 @@ WebFullScreenManagerProxy* WebPageProxy::fullScreenManager()
 }
 #endif
     
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
 RefPtr<WebVideoFullscreenManagerProxy> WebPageProxy::videoFullscreenManager()
 {
     return m_videoFullscreenManager;
 }
+#endif
 
+#if PLATFORM(IOS)
 bool WebPageProxy::allowsMediaDocumentInlinePlayback() const
 {
     return m_allowsMediaDocumentInlinePlayback;
@@ -4688,11 +4738,16 @@ void WebPageProxy::scriptValueCallback(const IPC::DataReference& dataReference, 
         return;
     }
 
+    if (dataReference.isEmpty()) {
+        callback->performCallbackWithReturnValue(nullptr, hadException, details);
+        return;
+    }
+
     Vector<uint8_t> data;
     data.reserveInitialCapacity(dataReference.size());
     data.append(dataReference.data(), dataReference.size());
 
-    callback->performCallbackWithReturnValue(data.size() ? API::SerializedScriptValue::adopt(data).ptr() : nullptr, hadException, details);
+    callback->performCallbackWithReturnValue(API::SerializedScriptValue::adopt(WTFMove(data)).ptr(), hadException, details);
 }
 
 void WebPageProxy::computedPagesCallback(const Vector<IntRect>& pageRects, double totalScaleFactorForPrinting, uint64_t callbackID)
@@ -4983,12 +5038,14 @@ void WebPageProxy::resetState(ResetStateReason resetStateReason)
 
     m_visibleScrollerThumbRect = IntRect();
 
-#if PLATFORM(IOS)
+#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     if (m_videoFullscreenManager) {
         m_videoFullscreenManager->invalidate();
         m_videoFullscreenManager = nullptr;
     }
+#endif
 
+#if PLATFORM(IOS)
     m_lastVisibleContentRectUpdate = VisibleContentRectUpdateInfo();
     m_dynamicViewportSizeUpdateWaitingForTarget = false;
     m_dynamicViewportSizeUpdateWaitingForLayerTreeCommit = false;
@@ -4999,6 +5056,10 @@ void WebPageProxy::resetState(ResetStateReason resetStateReason)
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET) && !PLATFORM(IOS)
     m_pageClient.mediaSessionManager().removeAllPlaybackTargetPickerClients(*this);
+#endif
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/WebPageProxyInvalidation.cpp>
 #endif
 
     CallbackBase::Error error;
@@ -5040,6 +5101,8 @@ void WebPageProxy::resetStateAfterProcessExited()
 
     m_isValid = false;
     m_isPageSuspended = false;
+
+    m_needsToFinishInitializingWebPageAfterProcessLaunch = false;
 
     m_editorState = EditorState();
 
@@ -5093,6 +5156,7 @@ WebPageCreationParameters WebPageProxy::creationParameters()
     parameters.paginationBehavesLikeColumns = m_paginationBehavesLikeColumns;
     parameters.pageLength = m_pageLength;
     parameters.gapBetweenPages = m_gapBetweenPages;
+    parameters.paginationLineGridEnabled = m_paginationLineGridEnabled;
     parameters.userAgent = userAgent();
     parameters.itemStates = m_backForwardList->itemStates();
     parameters.sessionID = m_sessionID;
@@ -5994,6 +6058,11 @@ void WebPageProxy::installViewStateChangeCompletionHandler(void (^completionHand
     }, m_process->throttler().backgroundActivityToken());
     uint64_t callbackID = m_callbacks.put(voidCallback.release());
     m_nextViewStateChangeCallbacks.append(callbackID);
+}
+
+void WebPageProxy::handleAcceptedCandidate(WebCore::TextCheckingResult acceptedCandidate)
+{
+    m_process->send(Messages::WebPage::HandleAcceptedCandidate(acceptedCandidate), m_pageID);
 }
 #endif
 

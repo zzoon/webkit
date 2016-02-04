@@ -200,6 +200,7 @@ list(APPEND WebKit2_SOURCES
 
     WebProcess/MediaCache/WebMediaKeyStorageManager.cpp
 
+    WebProcess/Plugins/Netscape/unix/NetscapePluginUnix.cpp
     WebProcess/Plugins/Netscape/unix/PluginProxyUnix.cpp
 
     WebProcess/Plugins/Netscape/x11/NetscapePluginX11.cpp
@@ -273,6 +274,8 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/WebProcess/soup"
     "${WEBKIT2_DIR}/WebProcess/unix"
     "${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/efl"
+    "${WEBKIT2_DIR}/WebProcess/Plugins/Netscape/unix"
+    "${WEBKIT2_DIR}/WebProcess/Plugins/Netscape/x11"
     "${WEBKIT2_DIR}/WebProcess/WebCoreSupport/efl"
     "${WEBKIT2_DIR}/WebProcess/WebCoreSupport/soup"
     "${WEBKIT2_DIR}/WebProcess/WebPage/CoordinatedGraphics"
@@ -508,10 +511,10 @@ add_definitions(-DTEST_RESOURCES_DIR=\"${TEST_RESOURCES_DIR}\"
     -DLIBEXECDIR=\"${EXEC_INSTALL_DIR}\"
     -DDATADIR=\"${CMAKE_INSTALL_PREFIX}/share\"
     -DEXTENSIONMANAGERDIR=\"${CMAKE_INSTALL_PREFIX}/${EWEBKIT_EXTENSION_MANAGER_INSTALL_DIR}\"
-    -DWEBPROCESSNAME=\"WebProcess\"
-    -DPLUGINPROCESSNAME=\"PluginProcess\"
-    -DNETWORKPROCESSNAME=\"NetworkProcess\"
-    -DDATABASEPROCESSNAME=\"DatabaseProcess\"
+    -DWEBPROCESSNAME=\"WebKitWebProcess\"
+    -DPLUGINPROCESSNAME=\"WebKitPluginProcess\"
+    -DNETWORKPROCESSNAME=\"WebKitNetworkProcess\"
+    -DDATABASEPROCESSNAME=\"WebKitDatabaseProcess\"
     -DEXTENSIONMANAGERNAME=\"libewebkit_extension_manager.so\"
     -DGTEST_HAS_RTTI=0
 )

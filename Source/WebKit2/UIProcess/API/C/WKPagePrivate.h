@@ -64,6 +64,8 @@ WK_EXPORT void WKPageSetPageLength(WKPageRef page, double pageLength);
 WK_EXPORT double WKPageGetPageLength(WKPageRef page);
 WK_EXPORT void WKPageSetGapBetweenPages(WKPageRef page, double gap);
 WK_EXPORT double WKPageGetGapBetweenPages(WKPageRef page);
+WK_EXPORT void WKPageSetPaginationLineGridEnabled(WKPageRef page, bool lineGridEnabled);
+WK_EXPORT bool WKPageGetPaginationLineGridEnabled(WKPageRef page);
 
 WK_EXPORT unsigned WKPageGetPageCount(WKPageRef page);
 
@@ -90,6 +92,9 @@ WK_EXPORT void WKPageSetMayStartMediaWhenInWindow(WKPageRef page, bool mayStartM
 
 typedef void (*WKPageGetBytecodeProfileFunction)(WKStringRef, WKErrorRef, void*);
 WK_EXPORT void WKPageGetBytecodeProfile(WKPageRef page, void* context, WKPageGetBytecodeProfileFunction function);
+
+typedef void (*WKPageIsWebProcessResponsiveFunction)(bool isWebProcessResponsive, void* context);
+WK_EXPORT void WKPageIsWebProcessResponsive(WKPageRef page, void* context, WKPageIsWebProcessResponsiveFunction function);
     
 WK_EXPORT WKArrayRef WKPageCopyRelatedPages(WKPageRef page);
 

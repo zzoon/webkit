@@ -411,6 +411,13 @@ inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, 
     return view->wrap(exec, globalObject);
 }
 
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSC::JSGlobalObject* globalObject, JSC::ArrayBufferView* view)
+{
+    if (!view)
+        return JSC::jsNull();
+    return view->wrap(exec, globalObject);
+}
+
 template<typename T> inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, RefPtr<T> ptr)
 {
     return toJS(exec, globalObject, ptr.get());
@@ -505,6 +512,14 @@ template<typename T, size_t inlineCapacity> inline JSC::JSValue jsArray(JSC::Exe
     if (!vector)
         return JSC::constructEmptyArray(exec, nullptr, globalObject, 0);
     return jsArray(exec, globalObject, *vector);
+}
+
+template<typename Value1, typename Value2> inline JSC::JSValue jsPair(JSC::ExecState& state, JSDOMGlobalObject* globalObject, const Value1& value1, const Value2& value2)
+{
+    JSC::MarkedArgumentBuffer args;
+    args.append(toJS(&state, globalObject, value1));
+    args.append(toJS(&state, globalObject, value2));
+    return constructArray(&state, 0, globalObject, args);
 }
 
 WEBCORE_EXPORT JSC::JSValue jsArray(JSC::ExecState*, JSDOMGlobalObject*, PassRefPtr<DOMStringList>);

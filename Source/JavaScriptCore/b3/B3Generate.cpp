@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +32,11 @@
 #include "AirGenerate.h"
 #include "AirInstInlines.h"
 #include "B3Common.h"
+#include "B3DuplicateTails.h"
+#include "B3EliminateCommonSubexpressions.h"
+#include "B3FixSSA.h"
+#include "B3FoldPathConstants.h"
+#include "B3LegalizeMemoryOffsets.h"
 #include "B3LowerMacros.h"
 #include "B3LowerMacrosAfterOptimizations.h"
 #include "B3LowerToAir.h"
@@ -41,6 +46,7 @@
 #include "B3ReduceStrength.h"
 #include "B3TimingScope.h"
 #include "B3Validate.h"
+#include "PCToCodeOriginMap.h"
 
 namespace JSC { namespace B3 {
 
@@ -61,7 +67,7 @@ void generateToAir(Procedure& procedure, unsigned optLevel)
 {
     TimingScope timingScope("generateToAir");
     
-    if (shouldDumpIR() && !shouldDumpIRAtEachPhase()) {
+    if (shouldDumpIR(B3Mode) && !shouldDumpIRAtEachPhase(B3Mode)) {
         dataLog("Initial B3:\n");
         dataLog(procedure);
     }
@@ -72,19 +78,29 @@ void generateToAir(Procedure& procedure, unsigned optLevel)
     if (shouldValidateIR())
         validate(procedure);
 
-    lowerMacros(procedure);
-
     if (optLevel >= 1) {
         reduceDoubleToFloat(procedure);
-
         reduceStrength(procedure);
+        eliminateCommonSubexpressions(procedure);
+        duplicateTails(procedure);
+        fixSSA(procedure);
+        foldPathConstants(procedure);
         
         // FIXME: Add more optimizations here.
         // https://bugs.webkit.org/show_bug.cgi?id=150507
     }
 
-    lowerMacrosAfterOptimizations(procedure);
+    lowerMacros(procedure);
 
+    if (optLevel >= 1) {
+        reduceStrength(procedure);
+
+        // FIXME: Add more optimizations here.
+        // https://bugs.webkit.org/show_bug.cgi?id=150507
+    }
+
+    lowerMacrosAfterOptimizations(procedure);
+    legalizeMemoryOffsets(procedure);
     moveConstants(procedure);
 
     if (shouldValidateIR())
@@ -92,7 +108,7 @@ void generateToAir(Procedure& procedure, unsigned optLevel)
     
     // If we're doing super verbose dumping, the phase scope of any phase will already do a dump.
     // Note that lowerToAir() acts like a phase in this regard.
-    if (shouldDumpIR() && !shouldDumpIRAtEachPhase()) {
+    if (shouldDumpIR(B3Mode) && !shouldDumpIRAtEachPhase(B3Mode)) {
         dataLog("B3 after ", procedure.lastPhaseName(), ", before generation:\n");
         dataLog(procedure);
     }

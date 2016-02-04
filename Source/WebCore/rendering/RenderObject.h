@@ -419,6 +419,7 @@ public:
     virtual bool isSVGForeignObject() const { return false; }
     virtual bool isSVGResourceContainer() const { return false; }
     virtual bool isSVGResourceFilter() const { return false; }
+    virtual bool isSVGResourceClipper() const { return false; }
     virtual bool isSVGResourceFilterPrimitive() const { return false; }
 
     // FIXME: Those belong into a SVG specific base-class for all renderers (see above)
@@ -472,11 +473,7 @@ public:
 #endif
             ;
     }
-    bool isAnonymousInlineBlock() const
-    {
-        return isAnonymous() && style().display() == INLINE_BLOCK && style().styleType() == NOPSEUDO && isRenderBlockFlow() && !isRubyRun() && !isRubyBase();
-    }
-
+    bool isAnonymousInlineBlock() const;
     bool isElementContinuation() const { return node() && node()->renderer() != this; }
     bool isInlineElementContinuation() const { return isElementContinuation() && isInline(); }
     bool isBlockElementContinuation() const { return isElementContinuation() && !isInline(); }

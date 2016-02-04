@@ -32,6 +32,7 @@
 #include "IDBOpenDBRequest.h"
 #include "IDBResourceIdentifier.h"
 #include "IDBTransactionImpl.h"
+#include "ScopeGuard.h"
 #include <wtf/RefCounted.h>
 
 namespace WebCore {
@@ -129,6 +130,9 @@ protected:
     RefPtr<DOMError> m_domError;
     IDBError m_idbError;
     IndexedDB::RequestType m_requestType = { IndexedDB::RequestType::Other };
+    bool m_contextStopped { false };
+
+    Event* m_openDatabaseSuccessEvent { nullptr };
 
 private:
     void onError();
@@ -144,7 +148,7 @@ private:
 
     RefPtr<IDBCursor> m_pendingCursor;
 
-    bool m_contextStopped { false };
+    std::unique_ptr<ScopeGuard> m_cursorRequestNotifier;
 };
 
 } // namespace IDBClient

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,7 +36,9 @@
 #include "B3DataSection.h"
 #include "B3Dominators.h"
 #include "B3OpaqueByproducts.h"
+#include "B3StackSlot.h"
 #include "B3ValueInlines.h"
+#include "B3Variable.h"
 
 namespace JSC { namespace B3 {
 
@@ -68,6 +70,24 @@ BasicBlock* Procedure::addBlock(double frequency)
     return result;
 }
 
+StackSlot* Procedure::addStackSlot(unsigned byteSize)
+{
+    return m_stackSlots.addNew(byteSize);
+}
+
+Variable* Procedure::addVariable(Type type)
+{
+    return m_variables.addNew(type); 
+}
+
+Value* Procedure::clone(Value* value)
+{
+    std::unique_ptr<Value> clone(value->cloneImpl());
+    clone->m_index = UINT_MAX;
+    clone->owner = nullptr;
+    return m_values.add(WTFMove(clone));
+}
+
 Value* Procedure::addIntConstant(Origin origin, Type type, int64_t value)
 {
     switch (type) {
@@ -88,6 +108,16 @@ Value* Procedure::addIntConstant(Origin origin, Type type, int64_t value)
 Value* Procedure::addIntConstant(Value* likeValue, int64_t value)
 {
     return addIntConstant(likeValue->origin(), likeValue->type(), value);
+}
+
+Value* Procedure::addBottom(Origin origin, Type type)
+{
+    return addIntConstant(origin, type, 0);
+}
+
+Value* Procedure::addBottom(Value* value)
+{
+    return addBottom(value->origin(), value->type());
 }
 
 Value* Procedure::addBoolConstant(Origin origin, TriState triState)
@@ -117,6 +147,31 @@ void Procedure::resetValueOwners()
 
 void Procedure::resetReachability()
 {
+    if (shouldValidateIR()) {
+        // Validate the basic properties that we need for resetting reachability. We often reset
+        // reachability before IR validation, so without this mini-validation, you would crash inside
+        // B3::resetReachability() without getting any IR dump.
+
+        BasicBlock* badBlock = nullptr;
+        for (BasicBlock* block : *this) {
+            if (!block->size()) {
+                badBlock = block;
+                break;
+            }
+
+            if (!block->last()->as<ControlValue>()) {
+                badBlock = block;
+                break;
+            }
+        }
+
+        if (badBlock) {
+            dataLog("FATAL: Invalid basic block ", *badBlock, " while running Procedure::resetReachability().\n");
+            dataLog(*this);
+            RELEASE_ASSERT_NOT_REACHED();
+        }
+    }
+    
     B3::resetReachability(
         m_blocks,
         [&] (BasicBlock* deleted) {
@@ -133,8 +188,32 @@ void Procedure::invalidateCFG()
 
 void Procedure::dump(PrintStream& out) const
 {
-    for (BasicBlock* block : *this)
+    IndexSet<Value> valuesInBlocks;
+    for (BasicBlock* block : *this) {
         out.print(deepDump(*this, block));
+        valuesInBlocks.addAll(*block);
+    }
+    bool didPrint = false;
+    for (Value* value : values()) {
+        if (valuesInBlocks.contains(value))
+            continue;
+
+        if (!didPrint) {
+            dataLog("Orphaned values:\n");
+            didPrint = true;
+        }
+        dataLog("    ", deepDump(*this, value), "\n");
+    }
+    if (variables().size()) {
+        out.print("Variables:\n");
+        for (Variable* variable : variables())
+            out.print("    ", deepDump(variable), "\n");
+    }
+    if (stackSlots().size()) {
+        out.print("Stack slots:\n");
+        for (StackSlot* slot : stackSlots())
+            out.print("    ", pointerDump(slot), ": ", deepDump(slot), "\n");
+    }
     if (m_byproducts->count())
         out.print(*m_byproducts);
 }
@@ -149,11 +228,38 @@ Vector<BasicBlock*> Procedure::blocksInPostOrder()
     return B3::blocksInPostOrder(at(0));
 }
 
+void Procedure::deleteStackSlot(StackSlot* stackSlot)
+{
+    m_stackSlots.remove(stackSlot);
+}
+
+void Procedure::deleteVariable(Variable* variable)
+{
+    m_variables.remove(variable);
+}
+
 void Procedure::deleteValue(Value* value)
 {
-    ASSERT(m_values[value->index()].get() == value);
-    m_valueIndexFreeList.append(value->index());
-    m_values[value->index()] = nullptr;
+    m_values.remove(value);
+}
+
+void Procedure::deleteOrphans()
+{
+    IndexSet<Value> valuesInBlocks;
+    for (BasicBlock* block : *this)
+        valuesInBlocks.addAll(*block);
+
+    // Since this method is not on any hot path, we do it conservatively: first a pass to
+    // identify the values to be removed, and then a second pass to remove them. This avoids any
+    // risk of the value iteration being broken by removals.
+    Vector<Value*, 16> toRemove;
+    for (Value* value : values()) {
+        if (!valuesInBlocks.contains(value))
+            toRemove.append(value);
+    }
+
+    for (Value* value : toRemove)
+        deleteValue(value);
 }
 
 Dominators& Procedure::dominators()
@@ -206,15 +312,32 @@ const RegisterAtOffsetList& Procedure::calleeSaveRegisters() const
     return code().calleeSaveRegisters();
 }
 
-size_t Procedure::addValueIndex()
+Value* Procedure::addValueImpl(Value* value)
 {
-    if (m_valueIndexFreeList.isEmpty()) {
-        size_t index = m_values.size();
-        m_values.append(nullptr);
-        return index;
+    return m_values.add(std::unique_ptr<Value>(value));
+}
+
+void Procedure::setBlockOrderImpl(Vector<BasicBlock*>& blocks)
+{
+    IndexSet<BasicBlock> blocksSet;
+    blocksSet.addAll(blocks);
+
+    for (BasicBlock* block : *this) {
+        if (!blocksSet.contains(block))
+            blocks.append(block);
     }
-    
-    return m_valueIndexFreeList.takeLast();
+
+    // Place blocks into this's block list by first leaking all of the blocks and then readopting
+    // them.
+    for (auto& entry : m_blocks)
+        entry.release();
+
+    m_blocks.resize(blocks.size());
+    for (unsigned i = 0; i < blocks.size(); ++i) {
+        BasicBlock* block = blocks[i];
+        block->m_index = i;
+        m_blocks[i] = std::unique_ptr<BasicBlock>(block);
+    }
 }
 
 } } // namespace JSC::B3

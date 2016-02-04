@@ -40,7 +40,7 @@
 #include "B3ControlValue.h"
 #include "B3MemoryValue.h"
 #include "B3Procedure.h"
-#include "B3StackSlotValue.h"
+#include "B3SlotBaseValue.h"
 #include "B3SwitchValue.h"
 #include "B3UpsilonValue.h"
 #include "B3ValueInlines.h"
@@ -53,6 +53,7 @@
 #include "FTLValueFromBlock.h"
 #include "FTLWeight.h"
 #include "FTLWeightedTarget.h"
+#include <wtf/OrderMaker.h>
 #include <wtf/StringPrintStream.h>
 
 // FIXME: remove this once everything can be generated through B3.
@@ -82,11 +83,7 @@ public:
         m_frequency = value;
     }
 
-    LBasicBlock newBlock(const char* name = "")
-    {
-        UNUSED_PARAM(name);
-        return m_proc.addBlock(m_frequency);
-    }
+    LBasicBlock newBlock(const char* name = "");
 
     LBasicBlock insertNewBlocksBefore(LBasicBlock nextBlock)
     {
@@ -94,6 +91,8 @@ public:
         m_nextBlock = nextBlock;
         return lastNextBlock;
     }
+
+    void applyBlockOrder();
 
     LBasicBlock appendTo(LBasicBlock, LBasicBlock nextBlock);
     void appendTo(LBasicBlock);
@@ -103,7 +102,7 @@ public:
 
     LValue framePointer() { return m_block->appendNew<B3::Value>(m_proc, B3::FramePointer, origin()); }
 
-    B3::StackSlotValue* lockedStackSlot(size_t bytes);
+    B3::SlotBaseValue* lockedStackSlot(size_t bytes);
 
     LValue constBool(bool value) { return m_block->appendNew<B3::Const32Value>(m_proc, origin(), value); }
     LValue constInt32(int32_t value) { return m_block->appendNew<B3::Const32Value>(m_proc, origin(), value); }
@@ -130,21 +129,14 @@ public:
     LValue chillDiv(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::ChillDiv, origin(), left, right); }
     LValue mod(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Mod, origin(), left, right); }
     LValue chillMod(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::ChillMod, origin(), left, right); }
-    LValue neg(LValue value)
-    {
-        LValue zero = m_block->appendIntConstant(m_proc, origin(), value->type(), 0);
-        return sub(zero, value);
-    }
+    LValue neg(LValue);
 
     LValue doubleAdd(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Add, origin(), left, right); }
     LValue doubleSub(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Sub, origin(), left, right); }
     LValue doubleMul(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Mul, origin(), left, right); }
     LValue doubleDiv(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Div, origin(), left, right); }
     LValue doubleMod(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::Mod, origin(), left, right); }
-    LValue doubleNeg(LValue value)
-    {
-        return sub(doubleZero, value);
-    }
+    LValue doubleNeg(LValue value) { return neg(value); }
 
     LValue bitAnd(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::BitAnd, origin(), left, right); }
     LValue bitOr(LValue left, LValue right) { return m_block->appendNew<B3::Value>(m_proc, B3::BitOr, origin(), left, right); }
@@ -165,16 +157,32 @@ public:
     LValue doubleAbs(LValue value) { return m_block->appendNew<B3::Value>(m_proc, B3::Abs, origin(), value); }
     LValue doubleCeil(LValue operand) { return m_block->appendNew<B3::Value>(m_proc, B3::Ceil, origin(), operand); }
 
-    LValue doubleSin(LValue value) { return callWithoutSideEffects(B3::Double, sin, value); }
-    LValue doubleCos(LValue value) { return callWithoutSideEffects(B3::Double, cos, value); }
+    LValue doubleSin(LValue value)
+    {
+        double (*sinDouble)(double) = sin;
+        return callWithoutSideEffects(B3::Double, sinDouble, value);
+    }
+    LValue doubleCos(LValue value)
+    {
+        double (*cosDouble)(double) = cos;
+        return callWithoutSideEffects(B3::Double, cosDouble, value);
+    }
 
-    LValue doublePow(LValue xOperand, LValue yOperand) { return callWithoutSideEffects(B3::Double, pow, xOperand, yOperand); }
+    LValue doublePow(LValue xOperand, LValue yOperand)
+    {
+        double (*powDouble)(double, double) = pow;
+        return callWithoutSideEffects(B3::Double, powDouble, xOperand, yOperand);
+    }
 
     LValue doublePowi(LValue xOperand, LValue yOperand);
 
     LValue doubleSqrt(LValue value) { return m_block->appendNew<B3::Value>(m_proc, B3::Sqrt, origin(), value); }
 
-    LValue doubleLog(LValue value) { return callWithoutSideEffects(B3::Double, log, value); }
+    LValue doubleLog(LValue value)
+    {
+        double (*logDouble)(double) = log;
+        return callWithoutSideEffects(B3::Double, logDouble, value);
+    }
 
     static bool hasSensibleDoubleToInt();
     LValue doubleToInt(LValue);
@@ -389,11 +397,11 @@ public:
 
     // Branches to an already-created handler if true, "falls through" if false. Fall-through is
     // simulated by creating a continuation for you.
-    void check(LValue condition, WeightedTarget taken, Weight notTakenWeight) { CRASH(); }
-
+    void check(LValue condition, WeightedTarget taken, Weight notTakenWeight);
+    
     // Same as check(), but uses Weight::inverse() to compute the notTakenWeight.
-    void check(LValue condition, WeightedTarget taken) { CRASH(); }
-
+    void check(LValue condition, WeightedTarget taken);
+    
     template<typename VectorType>
     void switchInstruction(LValue value, const VectorType& cases, LBasicBlock fallThrough, Weight fallThroughWeight)
     {
@@ -409,21 +417,6 @@ public:
     void ret(LValue value) { m_block->appendNew<B3::ControlValue>(m_proc, B3::Return, origin(), value); }
 
     void unreachable() { m_block->appendNew<B3::ControlValue>(m_proc, B3::Oops, origin()); }
-
-    template<typename Functor>
-    void speculate(LValue value, const StackmapArgumentList& arguments, const Functor& functor)
-    {
-        B3::CheckValue* check = speculate(value, arguments);
-        check->setGenerator(functor);
-    }
-
-    B3::CheckValue* speculate(LValue value, const StackmapArgumentList& arguments)
-    {
-        B3::CheckValue* check = speculate(value);
-        for (LValue value : arguments)
-            check->append(B3::ConstrainedValue(value));
-        return check;
-    }
 
     B3::CheckValue* speculate(LValue value)
     {
@@ -475,6 +468,8 @@ public:
     double m_frequency { 1 };
 
 private:
+    OrderMaker<LBasicBlock> m_blockOrder;
+    
     template<typename Function, typename... Args>
     LValue callWithoutSideEffects(B3::Type type, Function function, LValue arg1, Args... args)
     {

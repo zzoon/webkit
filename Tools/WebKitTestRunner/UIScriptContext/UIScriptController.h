@@ -39,16 +39,22 @@ public:
     {
         return adoptRef(*new UIScriptController(context));
     }
-    
+
+    void contextDestroyed();
+
     void makeWindowObject(JSContextRef, JSObjectRef windowObject, JSValueRef* exception);
     
     void doAsyncTask(JSValueRef callback);
     void zoomToScale(double scale, JSValueRef callback);
 
+    void touchDownAtPoint(long x, long y, long touchCount, JSValueRef callback);
+    void liftUpAtPoint(long x, long y, long touchCount, JSValueRef callback);
     void singleTapAtPoint(long x, long y, JSValueRef callback);
     void doubleTapAtPoint(long x, long y, JSValueRef callback);
     
     void typeCharacterUsingHardwareKeyboard(JSStringRef character, JSValueRef callback);
+    void keyDownUsingHardwareKeyboard(JSStringRef character, JSValueRef callback);
+    void keyUpUsingHardwareKeyboard(JSStringRef character, JSValueRef callback);
 
     void setWillBeginZoomingCallback(JSValueRef);
     JSValueRef willBeginZoomingCallback() const;
@@ -87,7 +93,7 @@ private:
 
     JSObjectRef objectFromRect(const WKRect&) const;
 
-    UIScriptContext& m_context;
+    UIScriptContext* m_context;
 };
 
 }

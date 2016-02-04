@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,9 +35,11 @@
 #include "AirStackSlot.h"
 #include "B3ArgumentRegValue.h"
 #include "B3BasicBlockInlines.h"
+#include "B3BlockWorklist.h"
 #include "B3CCallValue.h"
 #include "B3CheckSpecial.h"
 #include "B3Commutativity.h"
+#include "B3Dominators.h"
 #include "B3IndexMap.h"
 #include "B3IndexSet.h"
 #include "B3MemoryValue.h"
@@ -46,11 +48,19 @@
 #include "B3PhaseScope.h"
 #include "B3PhiChildren.h"
 #include "B3Procedure.h"
-#include "B3StackSlotValue.h"
+#include "B3SlotBaseValue.h"
+#include "B3StackSlot.h"
 #include "B3UpsilonValue.h"
 #include "B3UseCounts.h"
 #include "B3ValueInlines.h"
+#include "B3Variable.h"
+#include "B3VariableValue.h"
 #include <wtf/ListDump.h>
+
+#if COMPILER(GCC) && ASSERT_DISABLED
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-type"
+#endif // COMPILER(GCC) && ASSERT_DISABLED
 
 namespace JSC { namespace B3 {
 
@@ -68,6 +78,7 @@ public:
         , m_blockToBlock(procedure.size())
         , m_useCounts(procedure)
         , m_phiChildren(procedure)
+        , m_dominators(procedure.dominators())
         , m_procedure(procedure)
         , m_code(procedure.code())
     {
@@ -82,15 +93,26 @@ public:
             switch (value->opcode()) {
             case Phi: {
                 m_phiToTmp[value] = m_code.newTmp(Arg::typeForB3Type(value->type()));
-                break;
-            }
-            case B3::StackSlot: {
-                StackSlotValue* stackSlotValue = value->as<StackSlotValue>();
-                m_stackToStack.add(stackSlotValue, m_code.addStackSlot(stackSlotValue));
+                if (verbose)
+                    dataLog("Phi tmp for ", *value, ": ", m_phiToTmp[value], "\n");
                 break;
             }
             default:
                 break;
+            }
+        }
+
+        for (B3::StackSlot* stack : m_procedure.stackSlots())
+            m_stackToStack.add(stack, m_code.addStackSlot(stack));
+        for (Variable* variable : m_procedure.variables())
+            m_variableToTmp.add(variable, m_code.newTmp(Arg::typeForB3Type(variable->type())));
+
+        // Figure out which blocks are not rare.
+        m_fastWorklist.push(m_procedure[0]);
+        while (B3::BasicBlock* block = m_fastWorklist.pop()) {
+            for (B3::FrequentedBlock& successor : block->successors()) {
+                if (!successor.isRare())
+                    m_fastWorklist.push(successor.block());
             }
         }
 
@@ -102,6 +124,8 @@ public:
             m_block = block;
             // Reset some state.
             m_insts.resize(0);
+
+            m_isRare = !m_fastWorklist.saw(block);
 
             if (verbose)
                 dataLog("Lowering Block ", *block, ":\n");
@@ -284,11 +308,17 @@ private:
         if (!tmp) {
             while (shouldCopyPropagate(value))
                 value = value->child(0);
+
+            if (value->opcode() == FramePointer)
+                return Tmp(GPRInfo::callFrameRegister);
+
             Tmp& realTmp = m_valueToTmp[value];
             if (!realTmp) {
                 realTmp = m_code.newTmp(Arg::typeForB3Type(value->type()));
                 if (m_procedure.isFastConstant(value->key()))
                     m_code.addFastTmp(realTmp);
+                if (verbose)
+                    dataLog("Tmp for ", *value, ": ", realTmp, "\n");
             }
             tmp = realTmp;
         }
@@ -352,11 +382,7 @@ private:
     // This turns the given operand into an address.
     Arg effectiveAddr(Value* address, int32_t offset, Arg::Width width)
     {
-        // B3 allows any memory operation to have a 32-bit offset. That's not how some architectures
-        // work. We solve this by requiring a just-before-lowering phase that legalizes offsets.
-        // FIXME: Implement such a legalization phase.
-        // https://bugs.webkit.org/show_bug.cgi?id=152530
-        ASSERT(Arg::isValidAddrForm(offset));
+        ASSERT(Arg::isValidAddrForm(offset, width));
 
         auto fallback = [&] () -> Arg {
             return Arg::addr(tmp(address), offset);
@@ -416,8 +442,8 @@ private:
         case FramePointer:
             return Arg::addr(Tmp(GPRInfo::callFrameRegister), offset);
 
-        case B3::StackSlot:
-            return Arg::stack(m_stackToStack.get(address->as<StackSlotValue>()), offset);
+        case SlotBase:
+            return Arg::stack(m_stackToStack.get(address->as<SlotBaseValue>()->slot()), offset);
 
         default:
             return fallback();
@@ -441,15 +467,20 @@ private:
         return result;
     }
 
-    ArgPromise loadPromise(Value* loadValue, B3::Opcode loadOpcode)
+    ArgPromise loadPromiseAnyOpcode(Value* loadValue)
     {
-        if (loadValue->opcode() != loadOpcode)
-            return Arg();
         if (!canBeInternal(loadValue))
             return Arg();
         if (crossesInterference(loadValue))
             return Arg();
         return ArgPromise(addr(loadValue), loadValue);
+    }
+
+    ArgPromise loadPromise(Value* loadValue, B3::Opcode loadOpcode)
+    {
+        if (loadValue->opcode() != loadOpcode)
+            return Arg();
+        return loadPromiseAnyOpcode(loadValue);
     }
 
     ArgPromise loadPromise(Value* loadValue)
@@ -562,18 +593,31 @@ private:
         // - A child might be a candidate for coalescing with this value.
         //
         // Currently, we have machinery in place to recognize super obvious forms of the latter issue.
-
-        bool result = m_useCounts.numUsingInstructions(right) == 1;
         
         // We recognize when a child is a Phi that has this value as one of its children. We're very
         // conservative about this; for example we don't even consider transitive Phi children.
         bool leftIsPhiWithThis = m_phiChildren[left].transitivelyUses(m_value);
         bool rightIsPhiWithThis = m_phiChildren[right].transitivelyUses(m_value);
-        
-        if (leftIsPhiWithThis != rightIsPhiWithThis)
-            result = rightIsPhiWithThis;
 
-        return result;
+        if (leftIsPhiWithThis != rightIsPhiWithThis)
+            return rightIsPhiWithThis;
+
+        if (m_useCounts.numUsingInstructions(right) != 1)
+            return false;
+        
+        if (m_useCounts.numUsingInstructions(left) != 1)
+            return true;
+
+        // The use count might be 1 if the variable is live around a loop. We can guarantee that we
+        // pick the the variable that is least likely to suffer this problem if we pick the one that
+        // is closest to us in an idom walk. By convention, we slightly bias this in favor of
+        // returning true.
+
+        // We cannot prefer right if right is further away in an idom walk.
+        if (m_dominators.strictlyDominates(right->owner, left->owner))
+            return false;
+
+        return true;
     }
 
     template<Air::Opcode opcode32, Air::Opcode opcode64, Air::Opcode opcodeDouble, Air::Opcode opcodeFloat, Commutativity commutativity = NotCommutative>
@@ -727,14 +771,34 @@ private:
         Arg storeAddr = addr(m_value);
         ASSERT(storeAddr);
 
+        auto getLoadPromise = [&] (Value* load) -> ArgPromise {
+            switch (m_value->opcode()) {
+            case B3::Store:
+                if (load->opcode() != B3::Load)
+                    return ArgPromise();
+                break;
+            case B3::Store8:
+                if (load->opcode() != B3::Load8Z && load->opcode() != B3::Load8S)
+                    return ArgPromise();
+                break;
+            case B3::Store16:
+                if (load->opcode() != B3::Load16Z && load->opcode() != B3::Load16S)
+                    return ArgPromise();
+                break;
+            default:
+                return ArgPromise();
+            }
+            return loadPromiseAnyOpcode(load);
+        };
+        
         ArgPromise loadPromise;
         Value* otherValue = nullptr;
-        
-        loadPromise = this->loadPromise(left);
+
+        loadPromise = getLoadPromise(left);
         if (loadPromise.peek() == storeAddr)
             otherValue = right;
         else if (commutativity == Commutative) {
-            loadPromise = this->loadPromise(right);
+            loadPromise = getLoadPromise(right);
             if (loadPromise.peek() == storeAddr)
                 otherValue = left;
         }
@@ -799,8 +863,25 @@ private:
         switch (type) {
         case Int32:
         case Int64:
+            // For Int32, we could return Move or Move32. It's a trade-off.
+            //
+            // Move32: Using Move32 guarantees that we use the narrower move, but in cases where the
+            //     register allocator can't prove that the variables involved are 32-bit, this will
+            //     disable coalescing.
+            //
+            // Move: Using Move guarantees that the register allocator can coalesce normally, but in
+            //     cases where it can't prove that the variables are 32-bit and it doesn't coalesce,
+            //     this will force us to use a full 64-bit Move instead of the slightly cheaper
+            //     32-bit Move32.
+            //
+            // Coalescing is a lot more profitable than turning Move into Move32. So, it's better to
+            // use Move here because in cases where the register allocator cannot prove that
+            // everything is 32-bit, we still get coalescing.
             return Move;
         case Float:
+            // MoveFloat is always coalescable and we never convert MoveDouble to MoveFloat, so we
+            // should use MoveFloat when we know that the temporaries involved are 32-bit.
+            return MoveFloat;
         case Double:
             return MoveDouble;
         case Void:
@@ -858,6 +939,7 @@ private:
                 arg = tmp(value.value());
                 break;
             case ValueRep::Register:
+                stackmap->earlyClobbered().clear(value.rep().reg());
                 arg = Tmp(value.rep().reg());
                 append(Move, immOrTmp(value.value()), arg);
                 break;
@@ -1267,37 +1349,39 @@ private:
             }
         }
 
-        if (canCommitInternal && value->as<MemoryValue>()) {
-            // Handle things like Branch(Load8Z(value))
+        if (Arg::isValidImmForm(-1)) {
+            if (canCommitInternal && value->as<MemoryValue>()) {
+                // Handle things like Branch(Load8Z(value))
 
-            if (Inst result = tryTest(Arg::Width8, loadPromise(value, Load8Z), Arg::imm(-1))) {
-                commitInternal(value);
-                return result;
+                if (Inst result = tryTest(Arg::Width8, loadPromise(value, Load8Z), Arg::imm(-1))) {
+                    commitInternal(value);
+                    return result;
+                }
+
+                if (Inst result = tryTest(Arg::Width8, loadPromise(value, Load8S), Arg::imm(-1))) {
+                    commitInternal(value);
+                    return result;
+                }
+
+                if (Inst result = tryTest(Arg::Width16, loadPromise(value, Load16Z), Arg::imm(-1))) {
+                    commitInternal(value);
+                    return result;
+                }
+
+                if (Inst result = tryTest(Arg::Width16, loadPromise(value, Load16S), Arg::imm(-1))) {
+                    commitInternal(value);
+                    return result;
+                }
+
+                if (Inst result = tryTest(width, loadPromise(value), Arg::imm(-1))) {
+                    commitInternal(value);
+                    return result;
+                }
             }
 
-            if (Inst result = tryTest(Arg::Width8, loadPromise(value, Load8S), Arg::imm(-1))) {
-                commitInternal(value);
+            if (Inst result = test(width, resCond, tmpPromise(value), Arg::imm(-1)))
                 return result;
-            }
-
-            if (Inst result = tryTest(Arg::Width16, loadPromise(value, Load16Z), Arg::imm(-1))) {
-                commitInternal(value);
-                return result;
-            }
-
-            if (Inst result = tryTest(Arg::Width16, loadPromise(value, Load16S), Arg::imm(-1))) {
-                commitInternal(value);
-                return result;
-            }
-
-            if (Inst result = tryTest(width, loadPromise(value), Arg::imm(-1))) {
-                commitInternal(value);
-                return result;
-            }
         }
-
-        if (Inst result = test(width, resCond, tmpPromise(value), Arg::imm(-1)))
-            return result;
         
         // Sometimes this is the only form of test available. We prefer not to use this because
         // it's less canonical.
@@ -1336,6 +1420,7 @@ private:
                     }
                     return Inst();
                 }
+                ASSERT_NOT_REACHED();
             },
             [this] (
                 Arg::Width width, const Arg& resCond,
@@ -1365,6 +1450,7 @@ private:
                     }
                     return Inst();
                 }
+                ASSERT_NOT_REACHED();
             },
             [this] (Arg doubleCond, const ArgPromise& left, const ArgPromise& right) -> Inst {
                 if (isValidForm(BranchDouble, Arg::DoubleCond, left.kind(), right.kind())) {
@@ -1411,6 +1497,7 @@ private:
                     }
                     return Inst();
                 }
+                ASSERT_NOT_REACHED();
             },
             [this] (
                 Arg::Width width, const Arg& resCond,
@@ -1434,6 +1521,7 @@ private:
                     }
                     return Inst();
                 }
+                ASSERT_NOT_REACHED();
             },
             [this] (const Arg& doubleCond, const ArgPromise& left, const ArgPromise& right) -> Inst {
                 if (isValidForm(CompareDouble, Arg::DoubleCond, left.kind(), right.kind(), Arg::Tmp)) {
@@ -1493,6 +1581,7 @@ private:
                     }
                     return Inst();
                 }
+                ASSERT_NOT_REACHED();
             },
             [&] (
                 Arg::Width width, const Arg& resCond,
@@ -1519,6 +1608,7 @@ private:
                     }
                     return Inst();
                 }
+                ASSERT_NOT_REACHED();
             },
             [&] (Arg doubleCond, const ArgPromise& left, const ArgPromise& right) -> Inst {
                 if (isValidForm(config.moveConditionallyDouble, Arg::DoubleCond, left.kind(), right.kind(), Arg::Tmp, Arg::Tmp)) {
@@ -1537,34 +1627,6 @@ private:
                 return Inst();
             },
             inverted);
-    }
-
-    template<typename BankInfo>
-    Arg marshallCCallArgument(unsigned& argumentCount, unsigned& stackCount, Value* child)
-    {
-        unsigned argumentIndex = argumentCount++;
-        if (argumentIndex < BankInfo::numberOfArgumentRegisters) {
-            Tmp result = Tmp(BankInfo::toArgumentRegister(argumentIndex));
-            append(relaxedMoveForType(child->type()), immOrTmp(child), result);
-            return result;
-        }
-
-        // Compute the place that this goes onto the stack. On X86_64 and probably other calling
-        // conventions that don't involve obsolete computers and operating systems, sub-pointer-size
-        // arguments are still given a full pointer-sized stack slot. Hence we don't have to consider
-        // the type of the argument when deducing the stack index.
-        unsigned stackIndex = stackCount++;
-
-        Arg result = Arg::callArg(stackIndex * sizeof(void*));
-        
-        // Put the code for storing the argument before anything else. This significantly eases the
-        // burden on the register allocator. If we could, we'd hoist these stores as far as
-        // possible.
-        // FIXME: Add a phase to hoist stores as high as possible to relieve register pressure.
-        // https://bugs.webkit.org/show_bug.cgi?id=151063
-        m_insts.last().insert(0, createStore(child, result));
-        
-        return result;
     }
 
     void lower()
@@ -1610,10 +1672,12 @@ private:
         }
 
         case Sub: {
-            if (m_value->child(0)->isInt(0))
-                appendUnOp<Neg32, Neg64>(m_value->child(1));
-            else
-                appendBinOp<Sub32, Sub64, SubDouble, SubFloat>(m_value->child(0), m_value->child(1));
+            appendBinOp<Sub32, Sub64, SubDouble, SubFloat>(m_value->child(0), m_value->child(1));
+            return;
+        }
+
+        case Neg: {
+            appendUnOp<Neg32, Neg64, NegateDouble, Air::Oops>(m_value->child(0));
             return;
         }
 
@@ -1623,21 +1687,25 @@ private:
             return;
         }
 
+        case ChillDiv:
+            RELEASE_ASSERT(isARM64());
+            FALLTHROUGH;
         case Div: {
-            if (isInt(m_value->type())) {
 #if CPU(X86) || CPU(X86_64)
+            if (isInt(m_value->type())) {
                 lowerX86Div();
                 append(Move, Tmp(X86Registers::eax), tmp(m_value));
-#endif
                 return;
             }
-            ASSERT(isFloat(m_value->type()));
+#endif
+            ASSERT(!isX86() || isFloat(m_value->type()));
 
-            appendBinOp<Air::Oops, Air::Oops, DivDouble, DivFloat>(m_value->child(0), m_value->child(1));
+            appendBinOp<Div32, Div64, DivDouble, DivFloat>(m_value->child(0), m_value->child(1));
             return;
         }
 
         case Mod: {
+            RELEASE_ASSERT(isX86());
 #if CPU(X86) || CPU(X86_64)
             lowerX86Div();
             append(Move, Tmp(X86Registers::edx), tmp(m_value));
@@ -1680,7 +1748,7 @@ private:
                 appendUnOp<Not32, Not64>(m_value->child(0));
                 return;
             }
-            appendBinOp<Xor32, Xor64, Commutative>(
+            appendBinOp<Xor32, Xor64, XorDouble, XorFloat, Commutative>(
                 m_value->child(0), m_value->child(1));
             return;
         }
@@ -1707,6 +1775,12 @@ private:
 
         case Clz: {
             appendUnOp<CountLeadingZeros32, CountLeadingZeros64>(m_value->child(0));
+            return;
+        }
+
+        case Abs: {
+            RELEASE_ASSERT_WITH_MESSAGE(!isX86(), "Abs is not supported natively on x86. It must be replaced before generation.");
+            appendUnOp<Air::Oops, Air::Oops, AbsDouble, AbsFloat>(m_value->child(0));
             return;
         }
 
@@ -1769,12 +1843,42 @@ private:
 
         case B3::Store8: {
             Value* valueToStore = m_value->child(0);
+            if (canBeInternal(valueToStore)) {
+                bool matched = false;
+                switch (valueToStore->opcode()) {
+                case Add:
+                    matched = tryAppendStoreBinOp<Add8, Air::Oops, Commutative>(
+                        valueToStore->child(0), valueToStore->child(1));
+                    break;
+                default:
+                    break;
+                }
+                if (matched) {
+                    commitInternal(valueToStore);
+                    return;
+                }
+            }
             m_insts.last().append(createStore(Air::Store8, valueToStore, addr(m_value)));
             return;
         }
 
         case B3::Store16: {
             Value* valueToStore = m_value->child(0);
+            if (canBeInternal(valueToStore)) {
+                bool matched = false;
+                switch (valueToStore->opcode()) {
+                case Add:
+                    matched = tryAppendStoreBinOp<Add16, Air::Oops, Commutative>(
+                        valueToStore->child(0), valueToStore->child(1));
+                    break;
+                default:
+                    break;
+                }
+                if (matched) {
+                    commitInternal(valueToStore);
+                    return;
+                }
+            }
             m_insts.last().append(createStore(Air::Store16, valueToStore, addr(m_value)));
             return;
         }
@@ -1845,14 +1949,14 @@ private:
         }
 
         case FramePointer: {
-            append(Move, Tmp(GPRInfo::callFrameRegister), tmp(m_value));
+            ASSERT(tmp(m_value) == Tmp(GPRInfo::callFrameRegister));
             return;
         }
 
-        case B3::StackSlot: {
+        case SlotBase: {
             append(
                 Lea,
-                Arg::stack(m_stackToStack.get(m_value->as<StackSlotValue>())),
+                Arg::stack(m_stackToStack.get(m_value->as<SlotBaseValue>()->slot())),
                 tmp(m_value));
             return;
         }
@@ -1906,14 +2010,10 @@ private:
             return;
         }
 
-        case CCall: {
+        case B3::CCall: {
             CCallValue* cCall = m_value->as<CCallValue>();
-            Inst inst(Patch, cCall, Arg::special(m_code.cCallSpecial()));
 
-            // This is a bit weird - we have a super intense contract with Arg::CCallSpecial. It might
-            // be better if we factored Air::CCallSpecial out of the Air namespace and made it a B3
-            // thing.
-            // FIXME: https://bugs.webkit.org/show_bug.cgi?id=151045
+            Inst inst(m_isRare ? Air::ColdCCall : Air::CCall, cCall);
 
             // We have a ton of flexibility regarding the callee argument, but currently, we don't
             // use it yet. It gets weird for reasons:
@@ -1926,48 +2026,13 @@ private:
             // FIXME: https://bugs.webkit.org/show_bug.cgi?id=151052
             inst.args.append(tmp(cCall->child(0)));
 
-            // We need to tell Air what registers this defines.
-            inst.args.append(Tmp(GPRInfo::returnValueGPR));
-            inst.args.append(Tmp(GPRInfo::returnValueGPR2));
-            inst.args.append(Tmp(FPRInfo::returnValueFPR));
+            if (cCall->type() != Void)
+                inst.args.append(tmp(cCall));
 
-            // Now marshall the arguments. This is where we implement the C calling convention. After
-            // this, Air does not know what the convention is; it just takes our word for it.
-            unsigned gpArgumentCount = 0;
-            unsigned fpArgumentCount = 0;
-            unsigned stackCount = 0;
-            for (unsigned i = 1; i < cCall->numChildren(); ++i) {
-                Value* argChild = cCall->child(i);
-                Arg arg;
-                
-                switch (Arg::typeForB3Type(argChild->type())) {
-                case Arg::GP:
-                    arg = marshallCCallArgument<GPRInfo>(gpArgumentCount, stackCount, argChild);
-                    break;
+            for (unsigned i = 1; i < cCall->numChildren(); ++i)
+                inst.args.append(immOrTmp(cCall->child(i)));
 
-                case Arg::FP:
-                    arg = marshallCCallArgument<FPRInfo>(fpArgumentCount, stackCount, argChild);
-                    break;
-                }
-
-                if (arg.isTmp())
-                    inst.args.append(arg);
-            }
-            
             m_insts.last().append(WTFMove(inst));
-
-            switch (cCall->type()) {
-            case Void:
-                break;
-            case Int32:
-            case Int64:
-                append(Move, Tmp(GPRInfo::returnValueGPR), tmp(cCall));
-                break;
-            case Float:
-            case Double:
-                append(MoveDouble, Tmp(FPRInfo::returnValueFPR), tmp(cCall));
-                break;
-            }
             return;
         }
 
@@ -2007,6 +2072,14 @@ private:
             }
             
             fillStackmap(inst, patchpointValue, 0);
+            
+            if (patchpointValue->resultConstraint.isReg())
+                patchpointValue->lateClobbered().clear(patchpointValue->resultConstraint.reg());
+
+            for (unsigned i = patchpointValue->numGPScratchRegisters; i--;)
+                inst.args.append(m_code.newTmp(Arg::GP));
+            for (unsigned i = patchpointValue->numFPScratchRegisters; i--;)
+                inst.args.append(m_code.newTmp(Arg::FP));
             
             m_insts.last().append(WTFMove(inst));
             m_insts.last().appendVector(after);
@@ -2073,12 +2146,19 @@ private:
             } else if (imm(right) && isValidForm(opcode, Arg::ResCond, Arg::Imm, Arg::Tmp)) {
                 sources.append(imm(right));
                 append(Move, tmp(left), result);
-            } else if (commutativity == Commutative && preferRightForResult(left, right)) {
+            } else if (isValidForm(opcode, Arg::ResCond, Arg::Tmp, Arg::Tmp)) {
+                if (commutativity == Commutative && preferRightForResult(left, right)) {
+                    sources.append(tmp(left));
+                    append(Move, tmp(right), result);
+                } else {
+                    sources.append(tmp(right));
+                    append(Move, tmp(left), result);
+                }
+            } else if (isValidForm(opcode, Arg::ResCond, Arg::Tmp, Arg::Tmp, Arg::Tmp, Arg::Tmp, Arg::Tmp)) {
                 sources.append(tmp(left));
-                append(Move, tmp(right), result);
-            } else {
                 sources.append(tmp(right));
-                append(Move, tmp(left), result);
+                sources.append(m_code.newTmp(Arg::typeForB3Type(m_value->type())));
+                sources.append(m_code.newTmp(Arg::typeForB3Type(m_value->type())));
             }
 
             // There is a really hilarious case that arises when we do BranchAdd32(%x, %x). We won't emit
@@ -2153,6 +2233,21 @@ private:
             return;
         }
 
+        case Set: {
+            Value* value = m_value->child(0);
+            append(
+                relaxedMoveForType(value->type()), immOrTmp(value),
+                m_variableToTmp.get(m_value->as<VariableValue>()->variable()));
+            return;
+        }
+
+        case Get: {
+            append(
+                relaxedMoveForType(m_value->type()),
+                m_variableToTmp.get(m_value->as<VariableValue>()->variable()), tmp(m_value));
+            return;
+        }
+
         case Branch: {
             m_insts.last().append(createBranch(m_value->child(0)));
             return;
@@ -2170,17 +2265,31 @@ private:
 
         case Return: {
             Value* value = m_value->child(0);
-            Air::Opcode move;
-            Tmp dest;
-            if (isInt(value->type())) {
-                move = Move;
-                dest = Tmp(GPRInfo::returnValueGPR);
-            } else {
-                move = MoveDouble;
-                dest = Tmp(FPRInfo::returnValueFPR);
+            Tmp returnValueGPR = Tmp(GPRInfo::returnValueGPR);
+            Tmp returnValueFPR = Tmp(FPRInfo::returnValueFPR);
+            switch (value->type()) {
+            case Void:
+                // It's impossible for a void value to be used as a child. If we did want to have a
+                // void return, we'd introduce a different opcode, like ReturnVoid.
+                RELEASE_ASSERT_NOT_REACHED();
+                break;
+            case Int32:
+                append(Move, immOrTmp(value), returnValueGPR);
+                append(Ret32, returnValueGPR);
+                break;
+            case Int64:
+                append(Move, immOrTmp(value), returnValueGPR);
+                append(Ret64, returnValueGPR);
+                break;
+            case Float:
+                append(MoveFloat, tmp(value), returnValueFPR);
+                append(RetFloat, returnValueFPR);
+                break;
+            case Double:
+                append(MoveDouble, tmp(value), returnValueFPR);
+                append(RetDouble, returnValueFPR);
+                break;
             }
-            append(move, immOrTmp(value), dest);
-            append(Ret);
             return;
         }
 
@@ -2229,15 +2338,19 @@ private:
     IndexMap<Value, Tmp> m_valueToTmp; // These are values that must have a Tmp in Air. We say that a Value* with a non-null Tmp is "pinned".
     IndexMap<Value, Tmp> m_phiToTmp; // Each Phi gets its own Tmp.
     IndexMap<B3::BasicBlock, Air::BasicBlock*> m_blockToBlock;
-    HashMap<StackSlotValue*, Air::StackSlot*> m_stackToStack;
+    HashMap<B3::StackSlot*, Air::StackSlot*> m_stackToStack;
+    HashMap<Variable*, Tmp> m_variableToTmp;
 
     UseCounts m_useCounts;
     PhiChildren m_phiChildren;
+    BlockWorklist m_fastWorklist;
+    Dominators& m_dominators;
 
     Vector<Vector<Inst, 4>> m_insts;
     Vector<Inst> m_prologue;
 
     B3::BasicBlock* m_block;
+    bool m_isRare;
     unsigned m_index;
     Value* m_value;
 
@@ -2259,5 +2372,8 @@ void lowerToAir(Procedure& procedure)
 
 } } // namespace JSC::B3
 
-#endif // ENABLE(B3_JIT)
+#if COMPILER(GCC) && ASSERT_DISABLED
+#pragma GCC diagnostic pop
+#endif // COMPILER(GCC) && ASSERT_DISABLED
 
+#endif // ENABLE(B3_JIT)

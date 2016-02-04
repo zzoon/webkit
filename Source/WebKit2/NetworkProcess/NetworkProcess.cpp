@@ -103,7 +103,7 @@ AuthenticationManager& NetworkProcess::authenticationManager()
 
 DownloadManager& NetworkProcess::downloadManager()
 {
-    static NeverDestroyed<DownloadManager> downloadManager(this);
+    static NeverDestroyed<DownloadManager> downloadManager(*this);
     return downloadManager;
 }
 
@@ -253,6 +253,11 @@ void NetworkProcess::createNetworkConnectionToWebProcess()
 #else
     notImplemented();
 #endif
+}
+
+void NetworkProcess::clearCachedCredentials()
+{
+    NetworkStorageSession::defaultStorageSession().credentialStorage().clearCredentials();
 }
 
 void NetworkProcess::ensurePrivateBrowsingSession(SessionID sessionID)
@@ -446,6 +451,18 @@ void NetworkProcess::cancelDownload(DownloadID downloadID)
 {
     downloadManager().cancelDownload(downloadID);
 }
+    
+#if USE(NETWORK_SESSION)
+void NetworkProcess::continueCanAuthenticateAgainstProtectionSpace(DownloadID downloadID, bool canAuthenticate)
+{
+    downloadManager().continueCanAuthenticateAgainstProtectionSpace(downloadID, canAuthenticate);
+}
+
+void NetworkProcess::continueWillSendRequest(DownloadID downloadID, const WebCore::ResourceRequest& request)
+{
+    downloadManager().continueWillSendRequest(downloadID, request);
+}
+#endif
 
 void NetworkProcess::setCacheModel(uint32_t cm)
 {

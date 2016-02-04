@@ -152,7 +152,13 @@ RefPtr<WebCore::IDBAny> IDBRequest::source() const
 
 void IDBRequest::setSource(IDBCursor& cursor)
 {
+    ASSERT(!m_cursorRequestNotifier);
+
     m_source = IDBAny::create(cursor);
+    m_cursorRequestNotifier = std::make_unique<ScopeGuard>([this]() {
+        ASSERT(m_source->type() == IDBAny::Type::IDBCursor || m_source->type() == IDBAny::Type::IDBCursorWithValue);
+        m_source->modernIDBCursor()->decrementOutstandingRequestCount();
+    });
 }
 
 void IDBRequest::setVersionChangeTransaction(IDBTransaction& transaction)
@@ -263,7 +269,7 @@ void IDBRequest::enqueueEvent(Ref<Event>&& event)
 
 bool IDBRequest::dispatchEvent(Event& event)
 {
-    LOG(IndexedDB, "IDBRequest::dispatchEvent - %s (%p)", event.type().characters8(), this);
+    LOG(IndexedDB, "IDBRequest::dispatchEvent - %s (%p)", event.type().string().utf8().data(), this);
 
     ASSERT(m_hasPendingActivity);
     ASSERT(!m_contextStopped);
@@ -274,14 +280,16 @@ bool IDBRequest::dispatchEvent(Event& event)
     Vector<RefPtr<EventTarget>> targets;
     targets.append(this);
 
-    if (m_transaction) {
-        if (!m_transaction->isFinished())
+    if (&event == m_openDatabaseSuccessEvent)
+        m_openDatabaseSuccessEvent = nullptr;
+    else if (m_transaction && !m_transaction->isFinished()) {
             targets.append(m_transaction);
-        if (!m_transaction->database().isClosingOrClosed())
             targets.append(m_transaction->db());
     }
 
     m_hasPendingActivity = false;
+
+    m_cursorRequestNotifier = nullptr;
 
     bool dontPreventDefault;
     {
@@ -364,6 +372,7 @@ void IDBRequest::willIterateCursor(IDBCursor& cursor)
     ASSERT(m_transaction);
     ASSERT(!m_pendingCursor);
     ASSERT(&cursor == resultCursor());
+    ASSERT(!m_cursorRequestNotifier);
 
     m_pendingCursor = &cursor;
     m_hasPendingActivity = true;
@@ -371,6 +380,10 @@ void IDBRequest::willIterateCursor(IDBCursor& cursor)
     m_readyState = IDBRequestReadyState::Pending;
     m_domError = nullptr;
     m_idbError = { };
+
+    m_cursorRequestNotifier = std::make_unique<ScopeGuard>([this]() {
+        m_pendingCursor->decrementOutstandingRequestCount();
+    });
 }
 
 void IDBRequest::didOpenOrIterateCursor(const IDBResultData& resultData)
@@ -384,6 +397,7 @@ void IDBRequest::didOpenOrIterateCursor(const IDBResultData& resultData)
             m_result = IDBAny::create(*m_pendingCursor);
     }
 
+    m_cursorRequestNotifier = nullptr;
     m_pendingCursor = nullptr;
 
     requestCompleted(resultData);

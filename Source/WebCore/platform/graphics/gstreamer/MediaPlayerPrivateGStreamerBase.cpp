@@ -46,26 +46,10 @@
 
 #if USE(GSTREAMER_GL)
 #define GST_USE_UNSTABLE_API
-#include <gst/gl/gstglmemory.h>
-#undef GST_USE_UNSTABLE_API
-#endif
-
-#if GST_CHECK_VERSION(1, 1, 0) && USE(TEXTURE_MAPPER_GL)
-#include "BitmapTextureGL.h"
-#include "BitmapTexturePool.h"
-#include "TextureMapperGL.h"
-#endif
-#if USE(COORDINATED_GRAPHICS_THREADED)
-#include "TextureMapperPlatformLayerBuffer.h"
-#endif
-
-#if USE(GSTREAMER_GL)
-#include "GLContext.h"
-
-#define GST_USE_UNSTABLE_API
 #include <gst/gl/gl.h>
 #undef GST_USE_UNSTABLE_API
 
+#include "GLContext.h"
 #if USE(GLX)
 #include "GLContextGLX.h"
 #include <gst/gl/x11/gstgldisplay_x11.h>
@@ -84,8 +68,21 @@
 // defines None, breaking MediaPlayer::None enum
 #if PLATFORM(X11) && GST_GL_HAVE_PLATFORM_EGL
 #undef None
-#endif
+#endif // PLATFORM(X11) && GST_GL_HAVE_PLATFORM_EGL
 #endif // USE(GSTREAMER_GL)
+
+#if GST_CHECK_VERSION(1, 1, 0) && USE(TEXTURE_MAPPER_GL)
+#include "BitmapTextureGL.h"
+#include "BitmapTexturePool.h"
+#include "TextureMapperGL.h"
+#endif
+#if USE(COORDINATED_GRAPHICS_THREADED)
+#include "TextureMapperPlatformLayerBuffer.h"
+#endif
+
+#if USE(CAIRO) && ENABLE(ACCELERATED_2D_CANVAS)
+#include <cairo-gl.h>
+#endif
 
 GST_DEBUG_CATEGORY(webkit_media_player_debug);
 #define GST_CAT_DEFAULT webkit_media_player_debug
@@ -111,9 +108,7 @@ public:
     explicit GstVideoFrameHolder(GstSample* sample)
     {
         GstVideoInfo videoInfo;
-        gst_video_info_init(&videoInfo);
-        GstCaps* caps = gst_sample_get_caps(sample);
-        if (UNLIKELY(!gst_video_info_from_caps(&videoInfo, caps)))
+        if (UNLIKELY(!getSampleVideoInfo(sample, videoInfo)))
             return;
 
         m_size = IntSize(GST_VIDEO_INFO_WIDTH(&videoInfo), GST_VIDEO_INFO_HEIGHT(&videoInfo));
@@ -164,7 +159,7 @@ private:
     GLuint m_textureID;
     bool m_isValid { false };
 };
-#endif
+#endif // USE(COORDINATED_GRAPHICS_THREADED) && USE(GSTREAMER_GL)
 
 MediaPlayerPrivateGStreamerBase::MediaPlayerPrivateGStreamerBase(MediaPlayer* player)
     : m_player(player)
@@ -218,17 +213,17 @@ bool MediaPlayerPrivateGStreamerBase::handleSyncMessage(GstMessage* message)
         return false;
 
     if (!g_strcmp0(contextType, GST_GL_DISPLAY_CONTEXT_TYPE)) {
-        GstContext* displayContext = gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
-        gst_context_set_gl_display(displayContext, m_glDisplay.get());
-        gst_element_set_context(GST_ELEMENT(message->src), displayContext);
+        GRefPtr<GstContext> displayContext = adoptGRef(gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE));
+        gst_context_set_gl_display(displayContext.get(), m_glDisplay.get());
+        gst_element_set_context(GST_ELEMENT(message->src), displayContext.get());
         return true;
     }
 
     if (!g_strcmp0(contextType, "gst.gl.app_context")) {
-        GstContext* appContext = gst_context_new("gst.gl.app_context", TRUE);
-        GstStructure* structure = gst_context_writable_structure(appContext);
+        GRefPtr<GstContext> appContext = adoptGRef(gst_context_new("gst.gl.app_context", TRUE));
+        GstStructure* structure = gst_context_writable_structure(appContext.get());
         gst_structure_set(structure, "context", GST_GL_TYPE_CONTEXT, m_glContext.get(), nullptr);
-        gst_element_set_context(GST_ELEMENT(message->src), appContext);
+        gst_element_set_context(GST_ELEMENT(message->src), appContext.get());
         return true;
     }
 #else
@@ -497,13 +492,8 @@ void MediaPlayerPrivateGStreamerBase::pushTextureToCompositor()
     layerBuffer->setUnmanagedBufferDataHolder(WTFMove(frameHolder));
     m_platformLayerProxy->pushNextBuffer(WTFMove(layerBuffer));
 #else
-    GstCaps* caps = gst_sample_get_caps(m_sample.get());
-    if (UNLIKELY(!caps))
-        return;
-
     GstVideoInfo videoInfo;
-    gst_video_info_init(&videoInfo);
-    if (UNLIKELY(!gst_video_info_from_caps(&videoInfo, caps)))
+    if (UNLIKELY(!getSampleVideoInfo(m_sample.get(), videoInfo)))
         return;
 
     IntSize size = IntSize(GST_VIDEO_INFO_WIDTH(&videoInfo), GST_VIDEO_INFO_HEIGHT(&videoInfo));
@@ -636,16 +626,8 @@ void MediaPlayerPrivateGStreamerBase::paintToTextureMapper(TextureMapper& textur
         {
             WTF::GMutexLocker<GMutex> lock(m_sampleMutex);
 
-            if (!m_sample)
-                return;
-
-            GstCaps* caps = gst_sample_get_caps(m_sample.get());
-            if (UNLIKELY(!caps))
-                return;
-
             GstVideoInfo videoInfo;
-            gst_video_info_init(&videoInfo);
-            if (UNLIKELY(!gst_video_info_from_caps(&videoInfo, caps)))
+            if (UNLIKELY(!getSampleVideoInfo(m_sample.get(), videoInfo)))
                 return;
 
             IntSize size = IntSize(GST_VIDEO_INFO_WIDTH(&videoInfo), GST_VIDEO_INFO_HEIGHT(&videoInfo));
@@ -657,16 +639,8 @@ void MediaPlayerPrivateGStreamerBase::paintToTextureMapper(TextureMapper& textur
     }
 
 #if USE(GSTREAMER_GL)
-    if (!GST_IS_SAMPLE(m_sample.get()))
-        return;
-
-    GstCaps* caps = gst_sample_get_caps(m_sample.get());
-    if (!caps)
-        return;
-
     GstVideoInfo videoInfo;
-    gst_video_info_init(&videoInfo);
-    if (!gst_video_info_from_caps(&videoInfo, caps))
+    if (!getSampleVideoInfo(m_sample.get(), videoInfo))
         return;
 
     GstBuffer* buffer = gst_sample_get_buffer(m_sample.get());
@@ -682,6 +656,43 @@ void MediaPlayerPrivateGStreamerBase::paintToTextureMapper(TextureMapper& textur
     textureMapperGL.drawTexture(textureID, flags, size, targetRect, matrix, opacity);
     gst_video_frame_unmap(&videoFrame);
 #endif
+}
+#endif
+
+#if USE(GSTREAMER_GL)
+PassNativeImagePtr MediaPlayerPrivateGStreamerBase::nativeImageForCurrentTime()
+{
+#if !USE(CAIRO) || !ENABLE(ACCELERATED_2D_CANVAS)
+    return nullptr;
+#endif
+
+    if (m_usingFallbackVideoSink)
+        return nullptr;
+
+    WTF::GMutexLocker<GMutex> lock(m_sampleMutex);
+
+    GstVideoInfo videoInfo;
+    if (!getSampleVideoInfo(m_sample.get(), videoInfo))
+        return nullptr;
+
+    GstBuffer* buffer = gst_sample_get_buffer(m_sample.get());
+    GstVideoFrame videoFrame;
+    if (!gst_video_frame_map(&videoFrame, &videoInfo, buffer, static_cast<GstMapFlags>(GST_MAP_READ | GST_MAP_GL)))
+        return nullptr;
+
+    GLContext* context = GLContext::sharingContext();
+    context->makeContextCurrent();
+    cairo_device_t* device = context->cairoDevice();
+
+    // Thread-awareness is a huge performance hit on non-Intel drivers.
+    cairo_gl_device_set_thread_aware(device, FALSE);
+
+    unsigned textureID = *reinterpret_cast<unsigned*>(videoFrame.data[0]);
+    IntSize size = IntSize(GST_VIDEO_INFO_WIDTH(&videoInfo), GST_VIDEO_INFO_HEIGHT(&videoInfo));
+    cairo_surface_t* surface = cairo_gl_surface_create_for_texture(device, CAIRO_CONTENT_COLOR_ALPHA, textureID, size.width(), size.height());
+    gst_video_frame_unmap(&videoFrame);
+
+    return adoptRef(surface);
 }
 #endif
 

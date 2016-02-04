@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,22 +39,24 @@ public:
 
     ~CCallValue();
 
-    Effects effects;
+    Effects effects { Effects::forCall() };
 
+protected:
+    Value* cloneImpl() const override;
+    
 private:
     friend class Procedure;
 
     template<typename... Arguments>
-    CCallValue(unsigned index, Type type, Origin origin, Arguments... arguments)
-        : Value(index, CheckedOpcode, CCall, type, origin, arguments...)
-        , effects(Effects::forCall())
+    CCallValue(Type type, Origin origin, Arguments... arguments)
+        : Value(CheckedOpcode, CCall, type, origin, arguments...)
     {
         RELEASE_ASSERT(numChildren() >= 1);
     }
 
     template<typename... Arguments>
-    CCallValue(unsigned index, Type type, Origin origin, const Effects& effects, Arguments... arguments)
-        : Value(index, CheckedOpcode, CCall, type, origin, arguments...)
+    CCallValue(Type type, Origin origin, const Effects& effects, Arguments... arguments)
+        : Value(CheckedOpcode, CCall, type, origin, arguments...)
         , effects(effects)
     {
         RELEASE_ASSERT(numChildren() >= 1);

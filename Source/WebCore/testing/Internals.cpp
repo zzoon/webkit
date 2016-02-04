@@ -32,6 +32,7 @@
 #include "AnimationController.h"
 #include "ApplicationCacheStorage.h"
 #include "BackForwardController.h"
+#include "BitmapImage.h"
 #include "CachedImage.h"
 #include "CachedResourceLoader.h"
 #include "Chrome.h"
@@ -42,6 +43,7 @@
 #include "DOMPath.h"
 #include "DOMStringList.h"
 #include "DOMWindow.h"
+#include "DisplayList.h"
 #include "Document.h"
 #include "DocumentMarker.h"
 #include "DocumentMarkerController.h"
@@ -55,6 +57,7 @@
 #include "FormController.h"
 #include "FrameLoader.h"
 #include "FrameView.h"
+#include "HTMLCanvasElement.h"
 #include "HTMLIFrameElement.h"
 #include "HTMLImageElement.h"
 #include "HTMLInputElement.h"
@@ -93,6 +96,7 @@
 #include "PseudoElement.h"
 #include "Range.h"
 #include "RenderEmbeddedObject.h"
+#include "RenderLayerBacking.h"
 #include "RenderLayerCompositor.h"
 #include "RenderMenuList.h"
 #include "RenderTreeAsText.h"
@@ -292,28 +296,28 @@ bool InspectorStubFrontend::sendMessageToFrontend(const String& message)
 
 static bool markerTypeFrom(const String& markerType, DocumentMarker::MarkerType& result)
 {
-    if (equalIgnoringCase(markerType, "Spelling"))
+    if (equalLettersIgnoringASCIICase(markerType, "spelling"))
         result = DocumentMarker::Spelling;
-    else if (equalIgnoringCase(markerType, "Grammar"))
+    else if (equalLettersIgnoringASCIICase(markerType, "grammar"))
         result = DocumentMarker::Grammar;
-    else if (equalIgnoringCase(markerType, "TextMatch"))
+    else if (equalLettersIgnoringASCIICase(markerType, "textmatch"))
         result = DocumentMarker::TextMatch;
-    else if (equalIgnoringCase(markerType, "Replacement"))
+    else if (equalLettersIgnoringASCIICase(markerType, "replacement"))
         result = DocumentMarker::Replacement;
-    else if (equalIgnoringCase(markerType, "CorrectionIndicator"))
+    else if (equalLettersIgnoringASCIICase(markerType, "correctionindicator"))
         result = DocumentMarker::CorrectionIndicator;
-    else if (equalIgnoringCase(markerType, "RejectedCorrection"))
+    else if (equalLettersIgnoringASCIICase(markerType, "rejectedcorrection"))
         result = DocumentMarker::RejectedCorrection;
-    else if (equalIgnoringCase(markerType, "Autocorrected"))
+    else if (equalLettersIgnoringASCIICase(markerType, "autocorrected"))
         result = DocumentMarker::Autocorrected;
-    else if (equalIgnoringCase(markerType, "SpellCheckingExemption"))
+    else if (equalLettersIgnoringASCIICase(markerType, "spellcheckingexemption"))
         result = DocumentMarker::SpellCheckingExemption;
-    else if (equalIgnoringCase(markerType, "DeletedAutocorrection"))
+    else if (equalLettersIgnoringASCIICase(markerType, "deletedautocorrection"))
         result = DocumentMarker::DeletedAutocorrection;
-    else if (equalIgnoringCase(markerType, "DictationAlternatives"))
+    else if (equalLettersIgnoringASCIICase(markerType, "dictationalternatives"))
         result = DocumentMarker::DictationAlternatives;
 #if ENABLE(TELEPHONE_NUMBER_DETECTION)
-    else if (equalIgnoringCase(markerType, "TelephoneNumber"))
+    else if (equalLettersIgnoringASCIICase(markerType, "telephonenumber"))
         result = DocumentMarker::TelephoneNumber;
 #endif
     else
@@ -326,7 +330,7 @@ static bool markerTypesFrom(const String& markerType, DocumentMarker::MarkerType
 {
     DocumentMarker::MarkerType singularResult;
 
-    if (markerType.isEmpty() || equalIgnoringCase(markerType, "all"))
+    if (markerType.isEmpty() || equalLettersIgnoringASCIICase(markerType, "all"))
         result = DocumentMarker::AllMarkers();
     else if (markerTypeFrom(markerType, singularResult))
         result = singularResult;
@@ -353,6 +357,7 @@ void Internals::resetToConsistentState(Page* page)
 
     page->setPageScaleFactor(1, IntPoint(0, 0));
     page->setPagination(Pagination());
+    page->setPaginationLineGridEnabled(false);
 
     page->setDefersLoading(false);
     
@@ -367,7 +372,6 @@ void Internals::resetToConsistentState(Page* page)
         mainFrameView->setFixedLayoutSize(IntSize());
     }
 
-    TextRun::setAllowsRoundingHacks(false);
     WebCore::overrideUserPreferredLanguages(Vector<String>());
     WebCore::Settings::setUsesOverlayScrollbars(false);
     page->inspectorController().setProfilerEnabled(false);
@@ -588,6 +592,21 @@ void Internals::pruneMemoryCacheToSize(unsigned size)
 unsigned Internals::memoryCacheSize() const
 {
     return MemoryCache::singleton().size();
+}
+
+size_t Internals::imageFrameIndex(Element* element, ExceptionCode& ec)
+{
+    if (!is<HTMLImageElement>(element)) {
+        ec = TypeError;
+        return 0;
+    }
+
+    auto* cachedImage = downcast<HTMLImageElement>(*element).cachedImage();
+    if (!cachedImage)
+        return 0;
+
+    auto* image = cachedImage->image();
+    return is<BitmapImage>(image) ? downcast<BitmapImage>(*image).currentFrame() : 0;
 }
 
 void Internals::clearPageCache()
@@ -1186,6 +1205,17 @@ void Internals::setPagination(const String& mode, int gap, int pageLength, Excep
     page->setPagination(pagination);
 }
 
+void Internals::setPaginationLineGridEnabled(bool enabled, ExceptionCode& ec)
+{
+    Document* document = contextDocument();
+    if (!document || !document->page()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+    Page* page = document->page();
+    page->setPaginationLineGridEnabled(enabled);
+}
+
 String Internals::configurationForViewport(float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode& ec)
 {
     Document* document = contextDocument();
@@ -1267,7 +1297,19 @@ void Internals::setAutofilled(Element* element, bool enabled, ExceptionCode& ec)
     downcast<HTMLInputElement>(*element).setAutoFilled(enabled);
 }
 
-void Internals::setShowAutoFillButton(Element* element, bool show, ExceptionCode& ec)
+static AutoFillButtonType stringToAutoFillButtonType(const String& autoFillButtonType)
+{
+    if (autoFillButtonType == "AutoFillButtonTypeNone")
+        return AutoFillButtonType::None;
+    if (autoFillButtonType == "AutoFillButtonTypeCredentials")
+        return AutoFillButtonType::Credentials;
+    if (autoFillButtonType == "AutoFillButtonTypeContacts")
+        return AutoFillButtonType::Contacts;
+    ASSERT_NOT_REACHED();
+    return AutoFillButtonType::None;
+}
+
+void Internals::setShowAutoFillButton(Element* element, const String& autoFillButtonType, ExceptionCode& ec)
 {
     if (!element) {
         ec = INVALID_ACCESS_ERR;
@@ -1279,7 +1321,7 @@ void Internals::setShowAutoFillButton(Element* element, bool show, ExceptionCode
         return;
     }
 
-    downcast<HTMLInputElement>(*element).setShowAutoFillButton(show);
+    downcast<HTMLInputElement>(*element).setShowAutoFillButton(stringToAutoFillButtonType(autoFillButtonType));
 }
 
 
@@ -1755,6 +1797,18 @@ void Internals::setAutomaticSpellingCorrectionEnabled(bool enabled, ExceptionCod
 #endif
 }
 
+void Internals::handleAcceptedCandidate(const String& candidate, ExceptionCode&)
+{
+    if (!contextDocument() || !contextDocument()->frame())
+        return;
+
+    TextCheckingResult result;
+    result.type = TextCheckingTypeNone;
+    result.length = candidate.length();
+    result.replacement = candidate;
+    contextDocument()->frame()->editor().handleAcceptedCandidate(result);
+}
+
 bool Internals::isOverwriteModeEnabled(ExceptionCode&)
 {
     Document* document = contextDocument();
@@ -1964,6 +2018,148 @@ RefPtr<ClientRectList> Internals::nonFastScrollableRects(ExceptionCode& ec) cons
     return page->nonFastScrollableRects();
 }
 
+void Internals::setElementUsesDisplayListDrawing(Element* element, bool usesDisplayListDrawing, ExceptionCode& ec)
+{
+    Document* document = contextDocument();
+    if (!document || !document->renderView()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    if (!element || !element->renderer()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    if (is<HTMLCanvasElement>(*element)) {
+        downcast<HTMLCanvasElement>(*element).setUsesDisplayListDrawing(usesDisplayListDrawing);
+        return;
+    }
+
+    if (!element->renderer()->hasLayer()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+    
+    RenderLayer* layer = downcast<RenderLayerModelObject>(element->renderer())->layer();
+    if (!layer->isComposited()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+    
+    layer->backing()->setUsesDisplayListDrawing(usesDisplayListDrawing);
+}
+
+void Internals::setElementTracksDisplayListReplay(Element* element, bool isTrackingReplay, ExceptionCode& ec)
+{
+    Document* document = contextDocument();
+    if (!document || !document->renderView()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    if (!element || !element->renderer()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    if (is<HTMLCanvasElement>(*element)) {
+        downcast<HTMLCanvasElement>(*element).setTracksDisplayListReplay(isTrackingReplay);
+        return;
+    }
+
+    if (!element->renderer()->hasLayer()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    RenderLayer* layer = downcast<RenderLayerModelObject>(element->renderer())->layer();
+    if (!layer->isComposited()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+    
+    layer->backing()->setIsTrackingDisplayListReplay(isTrackingReplay);
+}
+
+String Internals::displayListForElement(Element* element, ExceptionCode& ec)
+{
+    return displayListForElement(element, 0, ec);
+}
+
+String Internals::displayListForElement(Element* element, unsigned flags, ExceptionCode& ec)
+{
+    Document* document = contextDocument();
+    if (!document || !document->renderView()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    if (!element || !element->renderer()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    DisplayList::AsTextFlags displayListFlags = 0;
+    if (flags & DISPLAY_LIST_INCLUDES_PLATFORM_OPERATIONS)
+        displayListFlags |= DisplayList::AsTextFlag::IncludesPlatformOperations;
+
+    if (is<HTMLCanvasElement>(*element))
+        return downcast<HTMLCanvasElement>(*element).displayListAsText(displayListFlags);
+
+    if (!element->renderer()->hasLayer()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    RenderLayer* layer = downcast<RenderLayerModelObject>(element->renderer())->layer();
+    if (!layer->isComposited()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    return layer->backing()->displayListAsText(displayListFlags);
+}
+
+String Internals::replayDisplayListForElement(Element* element, ExceptionCode& ec)
+{
+    return replayDisplayListForElement(element, 0, ec);
+}
+
+String Internals::replayDisplayListForElement(Element* element, unsigned flags, ExceptionCode& ec)
+{
+    Document* document = contextDocument();
+    if (!document || !document->renderView()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    if (!element || !element->renderer()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    DisplayList::AsTextFlags displayListFlags = 0;
+    if (flags & DISPLAY_LIST_INCLUDES_PLATFORM_OPERATIONS)
+        displayListFlags |= DisplayList::AsTextFlag::IncludesPlatformOperations;
+
+    if (is<HTMLCanvasElement>(*element))
+        return downcast<HTMLCanvasElement>(*element).replayDisplayListAsText(displayListFlags);
+
+    if (!element->renderer()->hasLayer()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    RenderLayer* layer = downcast<RenderLayerModelObject>(element->renderer())->layer();
+    if (!layer->isComposited()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    return layer->backing()->replayDisplayListAsText(displayListFlags);
+}
+
 void Internals::garbageCollectDocumentResources(ExceptionCode& ec) const
 {
     Document* document = contextDocument();
@@ -1972,11 +2168,6 @@ void Internals::garbageCollectDocumentResources(ExceptionCode& ec) const
         return;
     }
     document->cachedResourceLoader().garbageCollectDocumentResources();
-}
-
-void Internals::allowRoundingHacks() const
-{
-    TextRun::setAllowsRoundingHacks(true);
 }
 
 void Internals::insertAuthorCSS(const String& css, ExceptionCode& ec) const
@@ -2444,7 +2635,7 @@ RefPtr<SerializedScriptValue> Internals::deserializeBuffer(PassRefPtr<ArrayBuffe
 {
     Vector<uint8_t> bytes;
     bytes.append(static_cast<const uint8_t*>(buffer->data()), buffer->byteLength());
-    return SerializedScriptValue::adopt(bytes);
+    return SerializedScriptValue::adopt(WTFMove(bytes));
 }
 
 bool Internals::isFromCurrentWorld(Deprecated::ScriptValue value) const
@@ -2531,11 +2722,11 @@ bool Internals::mediaElementHasCharacteristic(Node* node, const String& characte
 
     HTMLMediaElement* element = downcast<HTMLMediaElement>(node);
 
-    if (equalIgnoringCase(characteristic, "Audible"))
+    if (equalLettersIgnoringASCIICase(characteristic, "audible"))
         return element->hasAudio();
-    if (equalIgnoringCase(characteristic, "Visual"))
+    if (equalLettersIgnoringASCIICase(characteristic, "visual"))
         return element->hasVideo();
-    if (equalIgnoringCase(characteristic, "Legible"))
+    if (equalLettersIgnoringASCIICase(characteristic, "legible"))
         return element->hasClosedCaptions();
 
     ec = SYNTAX_ERR;
@@ -2618,12 +2809,14 @@ void Internals::setCaptionDisplayMode(const String& mode, ExceptionCode& ec)
 #if ENABLE(VIDEO_TRACK)
     CaptionUserPreferences* captionPreferences = document->page()->group().captionPreferences();
     
-    if (equalIgnoringCase(mode, "Automatic"))
+    if (equalLettersIgnoringASCIICase(mode, "automatic"))
         captionPreferences->setCaptionDisplayMode(CaptionUserPreferences::Automatic);
-    else if (equalIgnoringCase(mode, "ForcedOnly"))
+    else if (equalLettersIgnoringASCIICase(mode, "forcedonly"))
         captionPreferences->setCaptionDisplayMode(CaptionUserPreferences::ForcedOnly);
-    else if (equalIgnoringCase(mode, "AlwaysOn"))
+    else if (equalLettersIgnoringASCIICase(mode, "alwayson"))
         captionPreferences->setCaptionDisplayMode(CaptionUserPreferences::AlwaysOn);
+    else if (equalLettersIgnoringASCIICase(mode, "manual"))
+        captionPreferences->setCaptionDisplayMode(CaptionUserPreferences::Manual);
     else
         ec = SYNTAX_ERR;
 #else
@@ -2726,11 +2919,11 @@ void Internals::beginMediaSessionInterruption(const String& interruptionString, 
 {
     PlatformMediaSession::InterruptionType interruption = PlatformMediaSession::SystemInterruption;
 
-    if (equalIgnoringCase(interruptionString, "System"))
+    if (equalLettersIgnoringASCIICase(interruptionString, "system"))
         interruption = PlatformMediaSession::SystemInterruption;
-    else if (equalIgnoringCase(interruptionString, "SystemSleep"))
+    else if (equalLettersIgnoringASCIICase(interruptionString, "systemsleep"))
         interruption = PlatformMediaSession::SystemSleep;
-    else if (equalIgnoringCase(interruptionString, "EnteringBackground"))
+    else if (equalLettersIgnoringASCIICase(interruptionString, "enteringbackground"))
         interruption = PlatformMediaSession::EnteringBackground;
     else {
         ec = INVALID_ACCESS_ERR;
@@ -2744,7 +2937,7 @@ void Internals::endMediaSessionInterruption(const String& flagsString)
 {
     PlatformMediaSession::EndInterruptionFlags flags = PlatformMediaSession::NoFlags;
 
-    if (equalIgnoringCase(flagsString, "MayResumePlaying"))
+    if (equalLettersIgnoringASCIICase(flagsString, "mayresumeplaying"))
         flags = PlatformMediaSession::MayResumePlaying;
     
     PlatformMediaSessionManager::sharedManager().endInterruption(flags);
@@ -2763,11 +2956,11 @@ void Internals::applicationWillEnterBackground() const
 void Internals::setMediaSessionRestrictions(const String& mediaTypeString, const String& restrictionsString, ExceptionCode& ec)
 {
     PlatformMediaSession::MediaType mediaType = PlatformMediaSession::None;
-    if (equalIgnoringCase(mediaTypeString, "Video"))
+    if (equalLettersIgnoringASCIICase(mediaTypeString, "video"))
         mediaType = PlatformMediaSession::Video;
-    else if (equalIgnoringCase(mediaTypeString, "Audio"))
+    else if (equalLettersIgnoringASCIICase(mediaTypeString, "audio"))
         mediaType = PlatformMediaSession::Audio;
-    else if (equalIgnoringCase(mediaTypeString, "WebAudio"))
+    else if (equalLettersIgnoringASCIICase(mediaTypeString, "webaudio"))
         mediaType = PlatformMediaSession::WebAudio;
     else {
         ec = INVALID_ACCESS_ERR;
@@ -2782,13 +2975,13 @@ void Internals::setMediaSessionRestrictions(const String& mediaTypeString, const
     Vector<String> restrictionsArray;
     restrictionsString.split(',', false, restrictionsArray);
     for (auto& restrictionString : restrictionsArray) {
-        if (equalIgnoringCase(restrictionString, "ConcurrentPlaybackNotPermitted"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "concurrentplaybacknotpermitted"))
             restrictions |= PlatformMediaSessionManager::ConcurrentPlaybackNotPermitted;
-        if (equalIgnoringCase(restrictionString, "BackgroundProcessPlaybackRestricted"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "backgroundprocessplaybackrestricted"))
             restrictions |= PlatformMediaSessionManager::BackgroundProcessPlaybackRestricted;
-        if (equalIgnoringCase(restrictionString, "BackgroundTabPlaybackRestricted"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "backgroundtabplaybackrestricted"))
             restrictions |= PlatformMediaSessionManager::BackgroundTabPlaybackRestricted;
-        if (equalIgnoringCase(restrictionString, "InterruptedPlaybackNotPermitted"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "interruptedplaybacknotpermitted"))
             restrictions |= PlatformMediaSessionManager::InterruptedPlaybackNotPermitted;
     }
     PlatformMediaSessionManager::sharedManager().addRestriction(mediaType, restrictions);
@@ -2809,31 +3002,31 @@ void Internals::setMediaElementRestrictions(HTMLMediaElement* element, const Str
     Vector<String> restrictionsArray;
     restrictionsString.split(',', false, restrictionsArray);
     for (auto& restrictionString : restrictionsArray) {
-        if (equalIgnoringCase(restrictionString, "NoRestrictions"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "norestrictions"))
             restrictions |= MediaElementSession::NoRestrictions;
-        if (equalIgnoringCase(restrictionString, "RequireUserGestureForLoad"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "requireusergestureforload"))
             restrictions |= MediaElementSession::RequireUserGestureForLoad;
-        if (equalIgnoringCase(restrictionString, "RequireUserGestureForRateChange"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "requireusergestureforratechange"))
             restrictions |= MediaElementSession::RequireUserGestureForRateChange;
-        if (equalIgnoringCase(restrictionString, "RequireUserGestureForFullscreen"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "requireusergestureforfullscreen"))
             restrictions |= MediaElementSession::RequireUserGestureForFullscreen;
-        if (equalIgnoringCase(restrictionString, "RequirePageConsentToLoadMedia"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "requirepageconsenttoloadmedia"))
             restrictions |= MediaElementSession::RequirePageConsentToLoadMedia;
-        if (equalIgnoringCase(restrictionString, "RequirePageConsentToResumeMedia"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "requirepageconsenttoresumemedia"))
             restrictions |= MediaElementSession::RequirePageConsentToResumeMedia;
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-        if (equalIgnoringCase(restrictionString, "RequireUserGestureToShowPlaybackTargetPicker"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "requireusergesturetoshowplaybacktargetpicker"))
             restrictions |= MediaElementSession::RequireUserGestureToShowPlaybackTargetPicker;
-        if (equalIgnoringCase(restrictionString, "WirelessVideoPlaybackDisabled"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "wirelessvideoplaybackdisabled"))
             restrictions |= MediaElementSession::WirelessVideoPlaybackDisabled;
 #endif
-        if (equalIgnoringCase(restrictionString, "RequireUserGestureForAudioRateChange"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "requireusergestureforaudioratechange"))
             restrictions |= MediaElementSession::RequireUserGestureForAudioRateChange;
-        if (equalIgnoringCase(restrictionString, "MetadataPreloadingNotPermitted"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "metadatapreloadingnotpermitted"))
             restrictions |= MediaElementSession::MetadataPreloadingNotPermitted;
-        if (equalIgnoringCase(restrictionString, "AutoPreloadingNotPermitted"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "autopreloadingnotpermitted"))
             restrictions |= MediaElementSession::AutoPreloadingNotPermitted;
-        if (equalIgnoringCase(restrictionString, "InvisibleAutoplayNotPermitted"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "invisibleautoplaynotpermitted"))
             restrictions |= MediaElementSession::InvisibleAutoplayNotPermitted;
     }
     element->mediaSession().addBehaviorRestriction(restrictions);
@@ -2843,21 +3036,21 @@ void Internals::postRemoteControlCommand(const String& commandString, ExceptionC
 {
     PlatformMediaSession::RemoteControlCommandType command;
     
-    if (equalIgnoringCase(commandString, "Play"))
+    if (equalLettersIgnoringASCIICase(commandString, "play"))
         command = PlatformMediaSession::PlayCommand;
-    else if (equalIgnoringCase(commandString, "Pause"))
+    else if (equalLettersIgnoringASCIICase(commandString, "pause"))
         command = PlatformMediaSession::PauseCommand;
-    else if (equalIgnoringCase(commandString, "Stop"))
+    else if (equalLettersIgnoringASCIICase(commandString, "stop"))
         command = PlatformMediaSession::StopCommand;
-    else if (equalIgnoringCase(commandString, "TogglePlayPause"))
+    else if (equalLettersIgnoringASCIICase(commandString, "toggleplaypause"))
         command = PlatformMediaSession::TogglePlayPauseCommand;
-    else if (equalIgnoringCase(commandString, "BeginSeekingBackward"))
+    else if (equalLettersIgnoringASCIICase(commandString, "beginseekingbackward"))
         command = PlatformMediaSession::BeginSeekingBackwardCommand;
-    else if (equalIgnoringCase(commandString, "EndSeekingBackward"))
+    else if (equalLettersIgnoringASCIICase(commandString, "endseekingbackward"))
         command = PlatformMediaSession::EndSeekingBackwardCommand;
-    else if (equalIgnoringCase(commandString, "BeginSeekingForward"))
+    else if (equalLettersIgnoringASCIICase(commandString, "beginseekingforward"))
         command = PlatformMediaSession::BeginSeekingForwardCommand;
-    else if (equalIgnoringCase(commandString, "EndSeekingForward"))
+    else if (equalLettersIgnoringASCIICase(commandString, "endseekingforward"))
         command = PlatformMediaSession::EndSeekingForwardCommand;
     else {
         ec = INVALID_ACCESS_ERR;
@@ -2940,16 +3133,16 @@ void Internals::setAudioContextRestrictions(AudioContext* context, const String 
     AudioContext::BehaviorRestrictions restrictions = context->behaviorRestrictions();
     context->removeBehaviorRestriction(restrictions);
 
-    restrictions = MediaElementSession::NoRestrictions;
+    restrictions = AudioContext::NoRestrictions;
 
     Vector<String> restrictionsArray;
     restrictionsString.split(',', false, restrictionsArray);
     for (auto& restrictionString : restrictionsArray) {
-        if (equalIgnoringCase(restrictionString, "NoRestrictions"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "norestrictions"))
             restrictions |= AudioContext::NoRestrictions;
-        if (equalIgnoringCase(restrictionString, "RequireUserGestureForAudioStart"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "requireusergestureforaudiostart"))
             restrictions |= AudioContext::RequireUserGestureForAudioStartRestriction;
-        if (equalIgnoringCase(restrictionString, "RequirePageConsentForAudioStart"))
+        if (equalLettersIgnoringASCIICase(restrictionString, "requirepageconsentforaudiostart"))
             restrictions |= AudioContext::RequirePageConsentForAudioStartRestriction;
     }
     context->addBehaviorRestriction(restrictions);
@@ -2984,10 +3177,14 @@ void Internals::setMockMediaPlaybackTargetPickerState(const String& deviceName, 
     Page* page = contextDocument()->frame()->page();
     ASSERT(page);
 
-    MediaPlaybackTargetContext::State state = MediaPlaybackTargetContext::Unavailable;
+    MediaPlaybackTargetContext::State state = MediaPlaybackTargetContext::Unknown;
 
-    if (equalIgnoringCase(deviceState, "DeviceAvailable"))
+    if (equalLettersIgnoringASCIICase(deviceState, "deviceavailable"))
         state = MediaPlaybackTargetContext::OutputDeviceAvailable;
+    else if (equalLettersIgnoringASCIICase(deviceState, "deviceunavailable"))
+        state = MediaPlaybackTargetContext::OutputDeviceUnavailable;
+    else if (equalLettersIgnoringASCIICase(deviceState, "unknown"))
+        state = MediaPlaybackTargetContext::Unknown;
     else {
         ec = INVALID_ACCESS_ERR;
         return;

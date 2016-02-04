@@ -110,7 +110,7 @@ public:
 #if ENABLE(CSS_IMAGE_ORIENTATION)
     unsigned m_imageOrientation : 4; // ImageOrientationEnum
 #endif
-    unsigned m_imageRendering : 2; // EImageRendering
+    unsigned m_imageRendering : 3; // EImageRendering
     unsigned m_lineSnap : 2; // LineSnap
     unsigned m_lineAlign : 1; // LineAlign
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
@@ -136,6 +136,8 @@ public:
 #if ENABLE(CSS_TRAILING_WORD)
     unsigned trailingWord : 1;
 #endif
+
+    unsigned m_hangingPunctuation : 4;
 
     AtomicString hyphenationString;
     short hyphenationLimitBefore;

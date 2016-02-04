@@ -93,6 +93,7 @@
 
 #include <wtf/CurrentTime.h>
 #include <wtf/Ref.h>
+#include <wtf/SystemTracing.h>
 #include <wtf/TemporaryChange.h>
 
 #if USE(COORDINATED_GRAPHICS)
@@ -644,30 +645,6 @@ void FrameView::adjustViewSize()
     LOG_WITH_STREAM(Layout, stream << "FrameView " << this << " adjustViewSize: unscaled document rect changed to " << renderView->unscaledDocumentRect() << " (scaled to " << size << ")");
 
     setContentsSize(size);
-}
-
-IntSize FrameView::contentsSizeRespectingOverflow() const
-{
-    RenderView* renderView = this->renderView();
-    auto* viewportRenderer = this->viewportRenderer();
-    if (!renderView || !is<RenderBox>(viewportRenderer) || !frame().isMainFrame())
-        return contentsSize();
-
-    ASSERT(frame().view() == this);
-
-    FloatRect contentRect = renderView->unscaledDocumentRect();
-    RenderBox& viewportRendererBox = downcast<RenderBox>(*viewportRenderer);
-
-    if (viewportRendererBox.style().overflowX() == OHIDDEN)
-        contentRect.setWidth(std::min<float>(contentRect.width(), viewportRendererBox.frameRect().width()));
-
-    if (viewportRendererBox.style().overflowY() == OHIDDEN)
-        contentRect.setHeight(std::min<float>(contentRect.height(), viewportRendererBox.frameRect().height()));
-
-    if (renderView->hasTransform())
-        contentRect = renderView->layer()->currentTransform().mapRect(contentRect);
-
-    return IntSize(contentRect.size());
 }
 
 void FrameView::applyOverflowToViewport(const RenderElement& renderer, ScrollbarMode& hMode, ScrollbarMode& vMode)
@@ -1260,6 +1237,8 @@ void FrameView::layout(bool allowSubtree)
         if (!root || !root->needsLayout())
             return;
     }
+    
+    TraceScope tracingScope(LayoutStart, LayoutEnd);
 
 #if PLATFORM(IOS)
     if (updateFixedPositionLayoutRect())
@@ -1787,19 +1766,19 @@ float FrameView::yPositionForHeaderLayer(const FloatPoint& scrollPosition, float
     return scrollY;
 }
 
-float FrameView::yPositionForRootContentLayer(const FloatPoint& scrollPosition, float topContentInset, float headerHeight)
-{
-    return yPositionForHeaderLayer(scrollPosition, topContentInset) + headerHeight;
-}
-
 float FrameView::yPositionForFooterLayer(const FloatPoint& scrollPosition, float topContentInset, float totalContentsHeight, float footerHeight)
 {
     return yPositionForHeaderLayer(scrollPosition, topContentInset) + totalContentsHeight - footerHeight;
 }
 
-float FrameView::yPositionForRootContentLayer() const
+FloatPoint FrameView::positionForRootContentLayer(const FloatPoint& scrollPosition, const FloatPoint& scrollOrigin, float topContentInset, float headerHeight)
 {
-    return yPositionForRootContentLayer(scrollPosition(), topContentInset(), headerHeight());
+    return FloatPoint(0, yPositionForHeaderLayer(scrollPosition, topContentInset) + headerHeight) - toFloatSize(scrollOrigin);
+}
+
+FloatPoint FrameView::positionForRootContentLayer() const
+{
+    return positionForRootContentLayer(scrollPosition(), scrollOrigin(), topContentInset(), headerHeight());
 }
 
 #if PLATFORM(IOS)
@@ -2086,7 +2065,7 @@ bool FrameView::scrollToAnchor(const String& name)
     }
   
     // Implement the rule that "" and "top" both mean top of page as in other browsers.
-    if (!anchorElement && !(name.isEmpty() || equalIgnoringCase(name, "top")))
+    if (!anchorElement && !(name.isEmpty() || equalLettersIgnoringASCIICase(name, "top")))
         return false;
 
     ContainerNode* scrollPositionAnchor = anchorElement;
@@ -2672,7 +2651,7 @@ void FrameView::scheduleRelayoutOfSubtree(RenderElement& newRelayoutRoot)
         return;
 
     if (!m_layoutRoot) {
-        // Just relayout the subtree.
+        // We already have a pending (full) layout. Just mark the subtree for layout.
         newRelayoutRoot.markContainingBlocksForLayout(ScheduleRelayout::No);
         InspectorInstrumentation::didInvalidateLayout(frame());
         return;
@@ -2693,10 +2672,9 @@ void FrameView::scheduleRelayoutOfSubtree(RenderElement& newRelayoutRoot)
         InspectorInstrumentation::didInvalidateLayout(frame());
         return;
     }
-
-    // Just do a full relayout.
-    m_layoutRoot = &newRelayoutRoot;
+    // Two disjoint subtrees need layout. Mark both of them and issue a full layout instead.
     convertSubtreeLayoutToFullLayout();
+    newRelayoutRoot.markContainingBlocksForLayout(ScheduleRelayout::No);
     InspectorInstrumentation::didInvalidateLayout(frame());
 }
 
@@ -3921,8 +3899,7 @@ void FrameView::paintControlTints()
     if (needsLayout())
         layout();
 
-    GraphicsContext context((PlatformGraphicsContext*)nullptr);
-    context.setUpdatingControlTints(true);
+    GraphicsContext context(GraphicsContext::NonPaintingReasons::UpdatingControlTints);
     if (platformWidget()) {
         // FIXME: consult paintsEntireContents().
         paintContents(context, visibleContentRect(LegacyIOSDocumentVisibleRect));
@@ -4040,7 +4017,9 @@ void FrameView::paintContents(GraphicsContext& context, const IntRect& dirtyRect
 
     if (m_layoutPhase == InViewSizeAdjust)
         return;
-    
+
+    TraceScope tracingScope(PaintViewStart, PaintViewEnd);
+
     ASSERT(m_layoutPhase == InPostLayerPositionsUpdatedAfterLayout || m_layoutPhase == OutsideLayout);
     
     RenderView* renderView = this->renderView();

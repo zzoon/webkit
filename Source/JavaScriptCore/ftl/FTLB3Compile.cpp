@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,9 +28,10 @@
 
 #if ENABLE(FTL_JIT) && FTL_USES_B3
 
+#include "AirCode.h"
 #include "B3Generate.h"
 #include "B3ProcedureInlines.h"
-#include "B3StackSlotValue.h"
+#include "B3StackSlot.h"
 #include "CodeBlockWithJITType.h"
 #include "CCallHelpers.h"
 #include "DFGCommon.h"
@@ -46,6 +47,7 @@
 #include "FTLUnwindInfo.h"
 #include "JITSubGenerator.h"
 #include "LinkBuffer.h"
+#include "PCToCodeOriginMap.h"
 #include "ScratchRegisterAllocator.h"
 
 namespace JSC { namespace FTL {
@@ -57,7 +59,7 @@ void compile(State& state, Safepoint::Result& safepointResult)
     Graph& graph = state.graph;
     CodeBlock* codeBlock = graph.m_codeBlock;
     VM& vm = graph.m_vm;
-    
+
     {
         GraphSafepoint safepoint(state.graph, safepointResult);
 
@@ -83,6 +85,12 @@ void compile(State& state, Safepoint::Result& safepointResult)
 
     int localsOffset =
         state.capturedValue->offsetFromFP() / sizeof(EncodedJSValue) + graph.m_nextMachineLocal;
+    if (shouldDumpDisassembly()) {
+        dataLog(
+            "localsOffset = ", localsOffset, " for stack slot: ",
+            pointerDump(state.capturedValue), " at ", RawPointer(state.capturedValue), "\n");
+    }
+    
     for (unsigned i = graph.m_inlineVariableData.size(); i--;) {
         InlineCallFrame* inlineCallFrame = graph.m_inlineVariableData[i].inlineCallFrame;
         
@@ -109,8 +117,23 @@ void compile(State& state, Safepoint::Result& safepointResult)
             materialization->accountForLocalsOffset(localsOffset);
     }
 
+    // We will add exception handlers while generating.
+    codeBlock->clearExceptionHandlers();
+
     CCallHelpers jit(&vm, codeBlock);
     B3::generate(*state.proc, jit);
+
+    // Emit the exception handler.
+    *state.exceptionHandler = jit.label();
+    jit.copyCalleeSavesToVMCalleeSavesBuffer();
+    jit.move(MacroAssembler::TrustedImmPtr(jit.vm()), GPRInfo::argumentGPR0);
+    jit.move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR1);
+    CCallHelpers::Call call = jit.call();
+    jit.jumpToExceptionHandler();
+    jit.addLinkTask(
+        [=] (LinkBuffer& linkBuffer) {
+            linkBuffer.link(call, FunctionPtr(lookupExceptionHandler));
+        });
 
     state.finalizer->b3CodeLinkBuffer = std::make_unique<LinkBuffer>(
         vm, jit, codeBlock, JITCompilationCanFail);
@@ -118,6 +141,10 @@ void compile(State& state, Safepoint::Result& safepointResult)
         state.allocationFailed = true;
         return;
     }
+    
+    B3::PCToOriginMap originMap = state.proc->releasePCToOriginMap();
+    if (vm.shouldBuilderPCToCodeOriginMapping())
+        codeBlock->setPCToCodeOriginMap(std::make_unique<PCToCodeOriginMap>(PCToCodeOriginMapBuilder(vm, WTFMove(originMap)), *state.finalizer->b3CodeLinkBuffer));
 
     state.generatedFunction = bitwise_cast<GeneratedFunction>(
         state.finalizer->b3CodeLinkBuffer->entrypoint().executableAddress());

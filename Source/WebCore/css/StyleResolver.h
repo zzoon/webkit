@@ -35,7 +35,6 @@
 #include "RuntimeEnabledFeatures.h"
 #include "ScrollTypes.h"
 #include "SelectorChecker.h"
-#include "SelectorFilter.h"
 #include "StyleInheritedData.h"
 #include "ViewportStyleResolver.h"
 #include <bitset>
@@ -76,6 +75,7 @@ class RenderRegion;
 class RenderScrollbar;
 class RuleData;
 class RuleSet;
+class SelectorFilter;
 class Settings;
 class StyleImage;
 class StyleKeyframe;
@@ -92,11 +92,6 @@ class SVGSVGElement;
 class ViewportStyleResolver;
 class WebKitCSSFilterValue;
 struct ResourceLoaderOptions;
-
-enum StyleSharingBehavior {
-    AllowStyleSharing,
-    DisallowStyleSharing,
-};
 
 // MatchOnlyUserAgentRules is used in media queries, where relative units
 // are interpreted according to the document root element style, and styled only
@@ -135,16 +130,11 @@ public:
     StyleResolver(Document&);
     ~StyleResolver();
 
-    // Using these during tree walk will allow style selector to optimize child and descendant selector lookups.
-    void pushParentElement(Element*);
-    void popParentElement(Element*);
+    Ref<RenderStyle> styleForElement(Element&, RenderStyle* parentStyle, RuleMatchingBehavior = MatchAllRules, const RenderRegion* regionForStyling = nullptr, const SelectorFilter* = nullptr);
 
-    Ref<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle, StyleSharingBehavior = AllowStyleSharing,
-        RuleMatchingBehavior = MatchAllRules, const RenderRegion* regionForStyling = nullptr);
+    void keyframeStylesForAnimation(Element&, const RenderStyle*, KeyframeList&);
 
-    void keyframeStylesForAnimation(Element*, const RenderStyle*, KeyframeList&);
-
-    PassRefPtr<RenderStyle> pseudoStyleForElement(Element*, const PseudoStyleRequest&, RenderStyle* parentStyle);
+    PassRefPtr<RenderStyle> pseudoStyleForElement(Element&, const PseudoStyleRequest&, RenderStyle& parentStyle);
 
     Ref<RenderStyle> styleForPage(int pageIndex);
     Ref<RenderStyle> defaultStyleForElement();
@@ -160,18 +150,10 @@ public:
 
     DocumentRuleSets& ruleSets() { return m_ruleSets; }
     const DocumentRuleSets& ruleSets() const { return m_ruleSets; }
-    SelectorFilter& selectorFilter() { return m_selectorFilter; }
 
     const MediaQueryEvaluator& mediaQueryEvaluator() const { return *m_medium; }
 
 private:
-    void initElement(Element*);
-    RenderStyle* locateSharedStyle();
-    bool styleSharingCandidateMatchesRuleSet(RuleSet*);
-    Node* locateCousinList(Element* parent, unsigned& visitedNodeCount) const;
-    StyledElement* findSiblingForStyleSharing(Node*, unsigned& count) const;
-    bool canShareStyleWithElement(StyledElement&) const;
-
     Ref<RenderStyle> styleForKeyframe(const RenderStyle*, const StyleKeyframe*, KeyframeValue&);
 
 public:
@@ -338,7 +320,7 @@ private:
     bool fastRejectSelector(const RuleData&) const;
 
     enum ShouldUseMatchedPropertiesCache { DoNotUseMatchedPropertiesCache = 0, UseMatchedPropertiesCache };
-    void applyMatchedProperties(const MatchResult&, const Element*, ShouldUseMatchedPropertiesCache = UseMatchedPropertiesCache);
+    void applyMatchedProperties(const MatchResult&, const Element&, ShouldUseMatchedPropertiesCache = UseMatchedPropertiesCache);
 
     void applyCascadedProperties(CascadedProperties&, int firstProperty, int lastProperty, const MatchResult*);
     void cascadeMatches(CascadedProperties&, const MatchResult&, bool important, int startIndex, int endIndex, bool inheritedOnly);
@@ -364,33 +346,16 @@ public:
     typedef HashMap<CSSPropertyID, RefPtr<CSSValue>> PendingImagePropertyMap;
 
     class State {
-        WTF_MAKE_NONCOPYABLE(State);
     public:
-        State()
-            : m_element(nullptr)
-            , m_styledElement(nullptr)
-            , m_parentStyle(nullptr)
-            , m_rootElementStyle(nullptr)
-            , m_regionForStyling(nullptr)
-            , m_elementLinkState(NotInsideLink)
-            , m_elementAffectedByClassRules(false)
-            , m_applyPropertyToRegularStyle(true)
-            , m_applyPropertyToVisitedLinkStyle(false)
-            , m_fontDirty(false)
-            , m_fontSizeHasViewportUnits(false)
-            , m_hasUAAppearance(false)
-            , m_backgroundData(BackgroundFillLayer)
-        {
-        }
+        State() { }
+        State(Element&, RenderStyle* parentStyle, const RenderRegion* regionForStyling = nullptr, const SelectorFilter* = nullptr);
 
     public:
-        void initElement(Element*);
-        void initForStyleResolve(Document&, Element*, RenderStyle* parentStyle, const RenderRegion* regionForStyling = nullptr);
         void clear();
 
         Document& document() const { return m_element->document(); }
         Element* element() const { return m_element; }
-        StyledElement* styledElement() const { return m_styledElement; }
+
         void setStyle(Ref<RenderStyle>&&);
         RenderStyle* style() const { return m_style.get(); }
         Ref<RenderStyle> takeStyle() { return m_style.releaseNonNull(); }
@@ -401,8 +366,6 @@ public:
 
         const RenderRegion* regionForStyling() const { return m_regionForStyling; }
         EInsideLink elementLinkState() const { return m_elementLinkState; }
-        void setElementAffectedByClassRules(bool isAffected) { m_elementAffectedByClassRules = isAffected; }
-        bool elementAffectedByClassRules() const { return m_elementAffectedByClassRules; }
 
         void setApplyPropertyToRegularStyle(bool isApply) { m_applyPropertyToRegularStyle = isApply; }
         void setApplyPropertyToVisitedLinkStyle(bool isApply) { m_applyPropertyToVisitedLinkStyle = isApply; }
@@ -443,48 +406,43 @@ public:
         
         void setAuthorRollback(std::unique_ptr<CascadedProperties>& rollback) { m_authorRollback = WTFMove(rollback); }
         void setUserRollback(std::unique_ptr<CascadedProperties>& rollback) { m_userRollback = WTFMove(rollback); }
+
+        const SelectorFilter* selectorFilter() const { return m_selectorFilter; }
         
     private:
         void updateConversionData();
 
-        Element* m_element;
+        Element* m_element { nullptr };
         RefPtr<RenderStyle> m_style;
-        StyledElement* m_styledElement;
         RefPtr<RenderStyle> m_parentStyle;
-        RenderStyle* m_rootElementStyle;
+        RenderStyle* m_rootElementStyle { nullptr };
 
-        // Required to ASSERT in applyProperties.
-        const RenderRegion* m_regionForStyling;
+        const RenderRegion* m_regionForStyling { nullptr };
         
-        EInsideLink m_elementLinkState;
+        EInsideLink m_elementLinkState { NotInsideLink };
 
-        bool m_elementAffectedByClassRules;
+        bool m_applyPropertyToRegularStyle { true };
+        bool m_applyPropertyToVisitedLinkStyle { false };
+        bool m_fontDirty { false };
+        bool m_fontSizeHasViewportUnits { false };
+        bool m_hasUAAppearance { false };
 
-        bool m_applyPropertyToRegularStyle;
-        bool m_applyPropertyToVisitedLinkStyle;
-
-        PendingImagePropertyMap m_pendingImageProperties;
-
-        Vector<RefPtr<ReferenceFilterOperation>> m_filtersWithPendingSVGDocuments;
-
-        bool m_fontDirty;
-        bool m_fontSizeHasViewportUnits;
-
-        bool m_hasUAAppearance;
         BorderData m_borderData;
-        FillLayer m_backgroundData;
+        FillLayer m_backgroundData { BackgroundFillLayer };
         Color m_backgroundColor;
 
+        PendingImagePropertyMap m_pendingImageProperties;
+        Vector<RefPtr<ReferenceFilterOperation>> m_filtersWithPendingSVGDocuments;
         CSSToLengthConversionData m_cssToLengthConversionData;
         
         CascadeLevel m_cascadeLevel { UserAgentLevel };
         std::unique_ptr<CascadedProperties> m_authorRollback;
         std::unique_ptr<CascadedProperties> m_userRollback;
+
+        const SelectorFilter* m_selectorFilter { nullptr };
     };
 
     State& state() { return m_state; }
-
-    static RenderStyle* styleNotYetAvailable() { return s_styleNotYetAvailable; }
 
     PassRefPtr<StyleImage> styleImage(CSSPropertyID, CSSValue&);
     PassRefPtr<StyleImage> cachedOrPendingFromValue(CSSPropertyID, CSSImageValue&);
@@ -513,11 +471,7 @@ public:
     void setTextOrientation(TextOrientation textOrientation) { m_state.setTextOrientation(textOrientation); }
 
 private:
-    static RenderStyle* s_styleNotYetAvailable;
-
     void cacheBorderAndBackground();
-
-    bool canShareStyleWithControl(StyledElement&) const;
 
     void applyProperty(CSSPropertyID, CSSValue*, SelectorChecker::LinkMatchMask = SelectorChecker::MatchDefault, const MatchResult* = nullptr);
     RefPtr<CSSValue> resolvedVariableValue(CSSPropertyID, const CSSVariableDependentValue&);
@@ -545,9 +499,6 @@ private:
     // the last reference to a style declaration are garbage collected.
     void sweepMatchedPropertiesCache();
 
-    bool classNamesAffectedByRules(const SpaceSplitString&) const;
-    bool sharingCandidateHasIdenticalStyleAffectingAttributes(StyledElement&) const;
-
     unsigned m_matchedPropertiesCacheAdditionsSinceLastSweep;
 
     typedef HashMap<unsigned, MatchedPropertiesCacheItem> MatchedPropertiesCache;
@@ -559,7 +510,6 @@ private:
     RefPtr<RenderStyle> m_rootDefaultStyle;
 
     Document& m_document;
-    SelectorFilter m_selectorFilter;
 
     bool m_matchAuthorAndUserStyles;
 
@@ -612,39 +562,11 @@ inline bool checkRegionSelector(const CSSSelector* regionSelector, Element* regi
     for (const CSSSelector* s = regionSelector; s; s = CSSSelectorList::next(s)) {
         SelectorChecker::CheckingContext selectorCheckingContext(SelectorChecker::Mode::QueryingRules);
         unsigned ignoredSpecificity;
-        if (selectorChecker.match(s, regionElement, selectorCheckingContext, ignoredSpecificity))
+        if (selectorChecker.match(*s, *regionElement, selectorCheckingContext, ignoredSpecificity))
             return true;
     }
     return false;
 }
-
-class StyleResolverParentPusher {
-public:
-    StyleResolverParentPusher(Element* parent)
-        : m_parent(parent)
-        , m_pushedStyleResolver(nullptr)
-    { }
-    void push()
-    {
-        if (m_pushedStyleResolver)
-            return;
-        m_pushedStyleResolver = &m_parent->styleResolver();
-        m_pushedStyleResolver->pushParentElement(m_parent);
-    }
-    ~StyleResolverParentPusher()
-    {
-        if (!m_pushedStyleResolver)
-            return;
-        // This tells us that our pushed style selector is in a bad state,
-        // so we should just bail out in that scenario.
-        ASSERT(m_pushedStyleResolver == &m_parent->styleResolver());
-        m_pushedStyleResolver->popParentElement(m_parent);
-    }
-    
-private:
-    Element* m_parent;
-    StyleResolver* m_pushedStyleResolver;
-};
 
 } // namespace WebCore
 

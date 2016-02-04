@@ -90,6 +90,11 @@ void TmpWidth::recompute(Code& code)
         for (Inst& inst : *block) {
             if (inst.opcode == Move && inst.args[1].isTmp()) {
                 if (inst.args[0].isTmp()) {
+                    // Make sure that both sides of the Move have a width already initialized. The
+                    // fixpoint below assumes that it never has to add things to the HashMap.
+                    m_width.add(inst.args[0].tmp(), Widths(Arg::GP));
+                    m_width.add(inst.args[1].tmp(), Widths(Arg::GP));
+                    
                     moves.append(&inst);
                     continue;
                 }
@@ -119,7 +124,7 @@ void TmpWidth::recompute(Code& code)
 
                     if (Arg::isZDef(role))
                         widths.def = std::max(widths.def, width);
-                    else if (Arg::isDef(role))
+                    else if (Arg::isAnyDef(role))
                         widths.def = Arg::conservativeWidth(type);
                 });
         }
@@ -133,9 +138,13 @@ void TmpWidth::recompute(Code& code)
             ASSERT(move->opcode == Move);
             ASSERT(move->args[0].isTmp());
             ASSERT(move->args[1].isTmp());
-            
-            Widths& srcWidths = m_width.add(move->args[0].tmp(), Widths(Arg::GP)).iterator->value;
-            Widths& dstWidths = m_width.add(move->args[1].tmp(), Widths(Arg::GP)).iterator->value;
+
+            // We already ensure that both tmps are added to the width map. That's important
+            // because you cannot add both tmps here while simultaneously getting a reference to
+            // their values, since the second add would invalidate the reference returned by the
+            // first one.
+            Widths& srcWidths = m_width.find(move->args[0].tmp())->value;
+            Widths& dstWidths = m_width.find(move->args[1].tmp())->value;
 
             // Legend:
             //

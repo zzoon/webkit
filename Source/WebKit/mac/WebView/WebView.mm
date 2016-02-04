@@ -295,6 +295,10 @@
 #import <WebCore/WebMediaSessionManagerMac.h>
 #endif
 
+#if USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/WebViewIncludes.h>
+#endif
+
 #if PLATFORM(MAC)
 SOFT_LINK_CONSTANT_MAY_FAIL(Lookup, LUNotificationPopoverWillClose, NSString *)
 #endif
@@ -968,6 +972,11 @@ static void WebKitInitializeGamepadProviderIfNecessary()
     pageConfiguration.chromeClient = new WebChromeClientIOS(self);
     pageConfiguration.inspectorClient = new WebInspectorClient(self);
 #endif
+
+#if USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/WebViewInitialization.mm>
+#endif
+
     pageConfiguration.editorClient = new WebEditorClient(self);
     pageConfiguration.alternativeTextClient = new WebAlternativeTextClient(self);
     pageConfiguration.loaderClientForMainFrame = new WebFrameLoaderClient;
@@ -1207,6 +1216,11 @@ static void WebKitInitializeGamepadProviderIfNecessary()
 #if ENABLE(DRAG_SUPPORT)
     pageConfiguration.dragClient = new WebDragClient(self);
 #endif
+
+#if USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/WebViewInitialization.mm>
+#endif
+
     pageConfiguration.editorClient = new WebEditorClient(self);
     pageConfiguration.inspectorClient = new WebInspectorClient(self);
     pageConfiguration.loaderClientForMainFrame = new WebFrameLoaderClient;
@@ -1229,6 +1243,7 @@ static void WebKitInitializeGamepadProviderIfNecessary()
     _private->page->settings().setDefaultFixedFontSize(13);
     _private->page->settings().setDownloadableBinaryFontsEnabled(false);
     _private->page->settings().setAcceleratedDrawingEnabled([preferences acceleratedDrawingEnabled]);
+    _private->page->settings().setDisplayListDrawingEnabled([preferences displayListDrawingEnabled]);
     
     _private->page->settings().setFontFallbackPrefersPictographs(true);
     _private->page->settings().setPictographFontFamily("AppleColorEmoji");
@@ -1493,16 +1508,6 @@ static NSMutableSet *knownPluginMIMETypes()
     FontCascade::setCodePath(f ? FontCascade::Complex : FontCascade::Auto);
 }
 
-+ (void)_setAllowsRoundingHacks:(BOOL)allowsRoundingHacks
-{
-    TextRun::setAllowsRoundingHacks(allowsRoundingHacks);
-}
-
-+ (BOOL)_allowsRoundingHacks
-{
-    return TextRun::allowsRoundingHacks();
-}
-
 + (BOOL)canCloseAllWebViews
 {
     return DOMWindow::dispatchAllPendingBeforeUnloadEvents();
@@ -1567,11 +1572,9 @@ static NSMutableSet *knownPluginMIMETypes()
     return _private->page->renderTreeSize();
 }
 
+// FIXME: This is incorrectly named, and should be removed <rdar://problem/22242515>.
 - (NSSize)_contentsSizeRespectingOverflow
 {
-    if (FrameView* view = [self _mainCoreFrame]->view())
-        return view->contentsSizeRespectingOverflow();
-    
     return [[[[self mainFrame] frameView] documentView] bounds].size;
 }
 
@@ -2283,7 +2286,8 @@ static bool needsSelfRetainWhileLoadingQuirk()
     
     settings.setAcceleratedCompositingEnabled([preferences acceleratedCompositingEnabled]);
     settings.setAcceleratedDrawingEnabled([preferences acceleratedDrawingEnabled]);
-    settings.setCanvasUsesAcceleratedDrawing([preferences canvasUsesAcceleratedDrawing]);    
+    settings.setDisplayListDrawingEnabled([preferences displayListDrawingEnabled]);
+    settings.setCanvasUsesAcceleratedDrawing([preferences canvasUsesAcceleratedDrawing]);
     settings.setShowDebugBorders([preferences showDebugBorders]);
     settings.setSimpleLineLayoutDebugBordersEnabled([preferences simpleLineLayoutDebugBordersEnabled]);
     settings.setShowRepaintCounter([preferences showRepaintCounter]);
@@ -4446,6 +4450,24 @@ static Vector<String> toStringVector(NSArray* patterns)
         return 0;
 
     return page->pagination().gap;
+}
+
+- (void)_setPaginationLineGridEnabled:(BOOL)lineGridEnabled
+{
+    Page* page = core(self);
+    if (!page)
+        return;
+    
+    page->setPaginationLineGridEnabled(lineGridEnabled);
+}
+
+- (BOOL)_paginationLineGridEnabled
+{
+    Page* page = core(self);
+    if (!page)
+        return NO;
+    
+    return page->paginationLineGridEnabled();
 }
 
 - (NSUInteger)_pageCount
@@ -6615,6 +6637,10 @@ static WebFrame *incrementFrame(WebFrame *frame, WebFindOptions options = 0)
 {
 }
 
+- (void)showCandidates:(NSArray *)candidates forString:(NSString *)string inRect:(NSRect)rectOfTypedString view:(NSView *)view completionHandler:(void (^)(NSTextCheckingResult *acceptedCandidate))completionBlock
+{
+}
+
 @end
 #endif // PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 && USE(APPLE_INTERNAL_SDK)
 
@@ -6806,9 +6832,9 @@ static NSAppleEventDescriptor* aeDescFromJSValue(ExecState* exec, JSC::JSValue j
             }
         }
         else if (object->inherits(JSArray::info())) {
-            DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<JSObject*>, visitedElems, ());
-            if (!visitedElems.contains(object)) {
-                visitedElems.add(object);
+            static NeverDestroyed<HashSet<JSObject*>> visitedElems;
+            if (!visitedElems.get().contains(object)) {
+                visitedElems.get().add(object);
                 
                 JSArray* array = static_cast<JSArray*>(object);
                 aeDesc = [NSAppleEventDescriptor listDescriptor];
@@ -6816,7 +6842,7 @@ static NSAppleEventDescriptor* aeDescFromJSValue(ExecState* exec, JSC::JSValue j
                 for (unsigned i = 0; i < numItems; ++i)
                     [aeDesc insertDescriptor:aeDescFromJSValue(exec, array->get(exec, i)) atIndex:0];
                 
-                visitedElems.remove(object);
+                visitedElems.get().remove(object);
                 return aeDesc;
             }
         }
@@ -8568,11 +8594,10 @@ bool LayerFlushController::flushLayers()
 
     [self _prepareForDictionaryLookup];
 
-    DictionaryPopupInfo adjustedPopupInfo = dictionaryPopupInfo;
-    adjustedPopupInfo.textIndicator.textBoundingRectInRootViewCoordinates = [self _convertRectFromRootView:adjustedPopupInfo.textIndicator.textBoundingRectInRootViewCoordinates];
-
-    return DictionaryLookup::animationControllerForPopup(adjustedPopupInfo, self, [self](TextIndicator& textIndicator) {
+    return DictionaryLookup::animationControllerForPopup(dictionaryPopupInfo, self, [self](TextIndicator& textIndicator) {
         [self _setTextIndicator:textIndicator withLifetime:TextIndicatorWindowLifetime::Permanent];
+    }, [self](FloatRect rectInRootViewCoordinates) {
+        return [self _convertRectFromRootView:rectInRootViewCoordinates];
     });
 }
 #endif // __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000
@@ -8597,7 +8622,7 @@ bool LayerFlushController::flushLayers()
     if (!_private->textIndicatorWindow)
         _private->textIndicatorWindow = std::make_unique<TextIndicatorWindow>(self);
 
-    NSRect textBoundingRectInWindowCoordinates = [self convertRect:textIndicator.textBoundingRectInRootViewCoordinates() toView:nil];
+    NSRect textBoundingRectInWindowCoordinates = [self convertRect:[self _convertRectFromRootView:textIndicator.textBoundingRectInRootViewCoordinates()] toView:nil];
     NSRect textBoundingRectInScreenCoordinates = [self.window convertRectToScreen:textBoundingRectInWindowCoordinates];
     _private->textIndicatorWindow->setTextIndicator(textIndicator, NSRectToCGRect(textBoundingRectInScreenCoordinates), lifetime);
 }
@@ -8633,11 +8658,10 @@ bool LayerFlushController::flushLayers()
 
     [self _prepareForDictionaryLookup];
 
-    DictionaryPopupInfo adjustedPopupInfo = dictionaryPopupInfo;
-    adjustedPopupInfo.textIndicator.textBoundingRectInRootViewCoordinates = [self _convertRectFromRootView:adjustedPopupInfo.textIndicator.textBoundingRectInRootViewCoordinates];
-
-    DictionaryLookup::showPopup(adjustedPopupInfo, self, [self](TextIndicator& textIndicator) {
+    DictionaryLookup::showPopup(dictionaryPopupInfo, self, [self](TextIndicator& textIndicator) {
         [self _setTextIndicator:textIndicator withLifetime:TextIndicatorWindowLifetime::Permanent];
+    }, [self](FloatRect rectInRootViewCoordinates) {
+        return [self _convertRectFromRootView:rectInRootViewCoordinates];
     });
 }
 

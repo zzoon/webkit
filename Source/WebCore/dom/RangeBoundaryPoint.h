@@ -33,7 +33,7 @@ namespace WebCore {
 
 class RangeBoundaryPoint {
 public:
-    explicit RangeBoundaryPoint(PassRefPtr<Node> container);
+    explicit RangeBoundaryPoint(Node* container);
 
     explicit RangeBoundaryPoint(const RangeBoundaryPoint&);
 
@@ -49,6 +49,7 @@ public:
     void setOffset(int offset);
 
     void setToBeforeChild(Node&);
+    void setToAfterChild(Node&);
     void setToStartOfNode(PassRefPtr<Node>);
     void setToEndOfNode(PassRefPtr<Node>);
 
@@ -64,7 +65,7 @@ private:
     RefPtr<Node> m_childBeforeBoundary;
 };
 
-inline RangeBoundaryPoint::RangeBoundaryPoint(PassRefPtr<Node> container)
+inline RangeBoundaryPoint::RangeBoundaryPoint(Node* container)
     : m_containerNode(container)
 {
     ASSERT(m_containerNode);
@@ -138,6 +139,14 @@ inline void RangeBoundaryPoint::setToBeforeChild(Node& child)
 {
     ASSERT(child.parentNode());
     m_childBeforeBoundary = child.previousSibling();
+    m_containerNode = child.parentNode();
+    m_offsetInContainer = m_childBeforeBoundary ? invalidOffset : 0;
+}
+
+inline void RangeBoundaryPoint::setToAfterChild(Node& child)
+{
+    ASSERT(child.parentNode());
+    m_childBeforeBoundary = &child;
     m_containerNode = child.parentNode();
     m_offsetInContainer = m_childBeforeBoundary ? invalidOffset : 0;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2014-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,6 +24,7 @@
  */
 
 #import <UIKit/UIKit.h>
+#import <UIKit/UITouch.h>
 
 #if USE(APPLE_INTERNAL_SDK)
 
@@ -32,6 +33,7 @@
 #import <UIKit/UIBarButtonItem_Private.h>
 #import <UIKit/UIDatePicker_Private.h>
 #import <UIKit/UIDevice_Private.h>
+#import <UIKit/UIDocumentMenuViewController_Private.h>
 #import <UIKit/UIDocumentPasswordView.h>
 #import <UIKit/UIFont_Private.h>
 #import <UIKit/UIGeometry_Private.h>
@@ -76,15 +78,6 @@
 
 #if HAVE(LINK_PREVIEW)
 #import <UIKit/UIPreviewItemController.h>
-#endif
-
-// FIXME: Unconditionally include this file when a new SDK is available. <rdar://problem/20150072>
-#if defined(__has_include) && __has_include(<UIKit/UIDocumentMenuViewController_Private.h>)
-#import <UIKit/UIDocumentMenuViewController_Private.h>
-#else
-@interface UIDocumentMenuViewController ()
-@property (nonatomic, assign, setter = _setIgnoreApplicationEntitlementForImport:, getter = _ignoreApplicationEntitlementForImport) BOOL _ignoreApplicationEntitlementForImport;
-@end
 #endif
 
 #else
@@ -240,6 +233,7 @@ typedef enum {
 
 @interface UIGestureRecognizer ()
 - (void)requireOtherGestureToFail:(UIGestureRecognizer *)gestureRecognizer;
+@property(nonatomic, copy) NSArray<NSNumber *> *allowedTouchTypes;
 @end
 
 @interface UILongPressGestureRecognizer ()
@@ -293,6 +287,14 @@ typedef enum {
 - (CADisplay *)_display;
 @end
 
+typedef enum {
+    UITouchTypeDirect
+} UITouchType;
+
+@interface UITouch ()
+@property(nonatomic,readonly) UITouchType type;
+@end
+
 @interface UIScrollView ()
 - (void)_stopScrollingAndZoomingAnimations;
 - (void)_zoomToCenter:(CGPoint)center scale:(CGFloat)scale duration:(CFTimeInterval)duration force:(BOOL)force;
@@ -311,6 +313,7 @@ typedef enum {
 
 @interface UITapGestureRecognizer ()
 @property (nonatomic, readonly) CGPoint location;
+@property (nonatomic, readonly) NSArray  *touches;
 @end
 
 @class WebEvent;
@@ -763,7 +766,7 @@ typedef enum {
 @end
 
 @interface UIDocumentMenuViewController ()
-@property (nonatomic, assign, setter = _setIgnoreApplicationEntitlementForImport:, getter = _ignoreApplicationEntitlementForImport) BOOL _ignoreApplicationEntitlementForImport;
+- (instancetype)_initIgnoringApplicationEntitlementForImportOfTypes:(NSArray *)types;
 @end
 
 @protocol UIDocumentPasswordViewDelegate;
@@ -842,5 +845,7 @@ extern NSString *const UIKeyInputPageUp;
 extern NSString *const UIKeyInputPageDown;
 
 extern const NSString *UIPreviewDataLink;
+extern const NSString *UIPreviewDataDDResult;
+extern const NSString *UIPreviewDataDDContext;
 
 WTF_EXTERN_C_END

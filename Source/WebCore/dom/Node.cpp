@@ -83,7 +83,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-bool Node::isSupported(const String& feature, const String& version)
+bool Node::isSupportedForBindings(const String& feature, const String& version)
 {
     return DOMImplementation::hasFeature(feature, version);
 }
@@ -2128,7 +2128,7 @@ bool Node::dispatchDOMActivateEvent(int detail, PassRefPtr<Event> underlyingEven
 {
     ASSERT_WITH_SECURITY_IMPLICATION(!NoEventDispatchAssertion::isEventDispatchForbidden());
     Ref<UIEvent> event = UIEvent::create(eventNames().DOMActivateEvent, true, true, document().defaultView(), detail);
-    event->setUnderlyingEvent(underlyingEvent);
+    event->setUnderlyingEvent(underlyingEvent.get());
     dispatchScopedEvent(event);
     return event->defaultHandled();
 }

@@ -213,6 +213,7 @@ messages -> WebPage LegacyReceiver {
     SetPaginationBehavesLikeColumns(bool behavesLikeColumns)
     SetPageLength(double pageLength)
     SetGapBetweenPages(double gap)
+    SetPaginationLineGridEnabled(bool lineGridEnabled)
 
     PostInjectedBundleMessage(String messageName, WebKit::UserData messageBody)
 
@@ -404,6 +405,7 @@ messages -> WebPage LegacyReceiver {
     DataDetectorsDidPresentUI(WebCore::PageOverlay::PageOverlayID pageOverlay)
     DataDetectorsDidChangeUI(WebCore::PageOverlay::PageOverlayID pageOverlay)
     DataDetectorsDidHideUI(WebCore::PageOverlay::PageOverlayID pageOverlay)
+    HandleAcceptedCandidate(struct WebCore::TextCheckingResult acceptedCandidate)
 #endif
 
     SetShouldDispatchFakeMouseMoveEvents(bool shouldDispatchFakeMouseMoveEvents)

@@ -247,12 +247,8 @@ bool WebVTTParser::hasRequiredFileIdentifier(const String& line)
     // A WebVTT file identifier consists of an optional BOM character,
     // the string "WEBVTT" followed by an optional space or tab character,
     // and any number of characters that are not line terminators ...
-    if (line.isEmpty())
-        return false;
-
     if (!line.startsWith(fileIdentifier, fileIdentifierLength))
         return false;
-
     if (line.length() > fileIdentifierLength && !isHTMLSpace(line[fileIdentifierLength]))
         return false;
     return true;
@@ -261,7 +257,7 @@ bool WebVTTParser::hasRequiredFileIdentifier(const String& line)
 void WebVTTParser::collectMetadataHeader(const String& line)
 {
     // WebVTT header parsing (WebVTT parser algorithm step 12)
-    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, regionHeaderName, ("Region", AtomicString::ConstructFromLiteral));
+    static NeverDestroyed<const AtomicString> regionHeaderName("Region", AtomicString::ConstructFromLiteral);
 
     // Step 12.4 If line contains the character ":" (A U+003A COLON), then set metadata's
     // name to the substring of line before the first ":" character and

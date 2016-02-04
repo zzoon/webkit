@@ -370,9 +370,10 @@ namespace JSC {
     {
     }
 
-    inline BytecodeIntrinsicNode::BytecodeIntrinsicNode(const JSTokenLocation& location, EmitterType emitter, const Identifier& ident, ArgumentsNode* args, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd)
+    inline BytecodeIntrinsicNode::BytecodeIntrinsicNode(Type type, const JSTokenLocation& location, EmitterType emitter, const Identifier& ident, ArgumentsNode* args, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd)
         : ExpressionNode(location)
         , ThrowableExpressionData(divot, divotStart, divotEnd)
+        , m_type(type)
         , m_emitter(emitter)
         , m_ident(ident)
         , m_args(args)
@@ -874,11 +875,11 @@ namespace JSC {
     {
     }
 
-    inline TryNode::TryNode(const JSTokenLocation& location, StatementNode* tryBlock, const Identifier& thrownValueIdent, StatementNode* catchBlock, VariableEnvironment& catchEnvironment, StatementNode* finallyBlock)
+    inline TryNode::TryNode(const JSTokenLocation& location, StatementNode* tryBlock, DestructuringPatternNode* catchPattern, StatementNode* catchBlock, VariableEnvironment& catchEnvironment, StatementNode* finallyBlock)
         : StatementNode(location)
         , VariableEnvironmentNode(catchEnvironment)
         , m_tryBlock(tryBlock)
-        , m_thrownValueIdent(thrownValueIdent)
+        , m_catchPattern(catchPattern)
         , m_catchBlock(catchBlock)
         , m_finallyBlock(finallyBlock)
     {

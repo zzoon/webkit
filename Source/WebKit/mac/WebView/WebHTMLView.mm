@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2005-2010, 2016 Apple Inc. All rights reserved.
  *           (C) 2006, 2007 Graham Dennis (graham.dennis@gmail.com)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -109,6 +109,7 @@
 #import <WebCore/LocalizedStrings.h>
 #import <WebCore/MIMETypeRegistry.h>
 #import <WebCore/MainFrame.h>
+#import <WebCore/NSSpellCheckerSPI.h>
 #import <WebCore/NSURLFileTypeMappingsSPI.h>
 #import <WebCore/NSViewSPI.h>
 #import <WebCore/Page.h>
@@ -977,6 +978,7 @@ struct WebHTMLViewInterpretKeyEventsParameters {
 #if !PLATFORM(IOS)
     BOOL installedTrackingArea;
     id flagsChangedEventMonitor;
+    NSRange softSpaceRange;
 #endif
 
 #ifndef NDEBUG
@@ -1324,7 +1326,7 @@ static NSURL* uniqueURLWithRelativePart(NSString *relativePart)
 
     DOMDocumentFragment *fragment = [self _documentFragmentFromPasteboard:pasteboard inContext:range allowPlainText:allowPlainText];
     if (fragment && [self _shouldInsertFragment:fragment replacingDOMRange:range givenAction:WebViewInsertActionPasted])
-        coreFrame->editor().pasteAsFragment(core(fragment), [self _canSmartReplaceWithPasteboard:pasteboard], false);
+        coreFrame->editor().pasteAsFragment(*core(fragment), [self _canSmartReplaceWithPasteboard:pasteboard], false);
 
     [webView _setInsertionPasteboard:nil];
     [webView release];
@@ -1347,7 +1349,7 @@ static NSURL* uniqueURLWithRelativePart(NSString *relativePart)
 {
     NSEvent *fakeEvent = [NSEvent mouseEventWithType:NSMouseMoved location:flagsChangedEvent.window.mouseLocationOutsideOfEventStream
         modifierFlags:flagsChangedEvent.modifierFlags timestamp:flagsChangedEvent.timestamp windowNumber:flagsChangedEvent.windowNumber
-        context:flagsChangedEvent.context eventNumber:0 clickCount:0 pressure:0];
+        context:nullptr eventNumber:0 clickCount:0 pressure:0];
 
     [self mouseMoved:fakeEvent];
 }
@@ -1657,7 +1659,7 @@ static NSURL* uniqueURLWithRelativePart(NSString *relativePart)
         modifierFlags:[[NSApp currentEvent] modifierFlags]
         timestamp:[NSDate timeIntervalSinceReferenceDate]
         windowNumber:[[self window] windowNumber]
-        context:[[NSApp currentEvent] context]
+        context:nullptr
         eventNumber:0 clickCount:0 pressure:0];
 #pragma clang diagnostic pop
 
@@ -2113,7 +2115,7 @@ static bool mouseEventIsPartOfClickOrDrag(NSEvent *event)
             modifierFlags:[[NSApp currentEvent] modifierFlags]
             timestamp:[NSDate timeIntervalSinceReferenceDate]
             windowNumber:[[view window] windowNumber]
-            context:[[NSApp currentEvent] context]
+            context:nullptr
             eventNumber:0 clickCount:0 pressure:0];
         if (Frame* lastHitCoreFrame = core([lastHitView _frame]))
             lastHitCoreFrame->eventHandler().mouseMoved(event, [[self _webView] _pressureEvent]);
@@ -2136,8 +2138,10 @@ static bool mouseEventIsPartOfClickOrDrag(NSEvent *event)
 #endif
                 ) {
                 coreFrame->eventHandler().mouseMoved(event, [[self _webView] _pressureEvent]);
-            } else
+            } else {
+                [self removeAllToolTips];
                 coreFrame->eventHandler().passMouseMovedEventToScrollbars(event, [[self _webView] _pressureEvent]);
+            }
         }
 
         [view release];
@@ -2301,7 +2305,7 @@ static bool mouseEventIsPartOfClickOrDrag(NSEvent *event)
         modifierFlags:[[NSApp currentEvent] modifierFlags]
         timestamp:[NSDate timeIntervalSinceReferenceDate]
         windowNumber:[[self window] windowNumber]
-        context:[[NSApp currentEvent] context]
+        context:nullptr
         eventNumber:0 clickCount:0 pressure:0];
 #pragma clang diagnostic pop
     [self mouseDragged:fakeEvent];
@@ -2846,6 +2850,8 @@ static bool mouseEventIsPartOfClickOrDrag(NSEvent *event)
     [[NSNotificationCenter defaultCenter] 
             addObserver:self selector:@selector(markedTextUpdate:) 
                    name:WebMarkedTextUpdatedNotification object:nil];
+#else
+    _private->softSpaceRange = NSMakeRange(NSNotFound, 0);
 #endif
     
     return self;
@@ -4587,7 +4593,7 @@ static RetainPtr<NSArray> customMenuFromDefaultItems(WebView *webView, const Con
                                        modifierFlags:[[NSApp currentEvent] modifierFlags]
                                            timestamp:[NSDate timeIntervalSinceReferenceDate]
                                         windowNumber:[[self window] windowNumber]
-                                             context:[[NSApp currentEvent] context]
+                                             context:nullptr
                                          eventNumber:0 clickCount:0 pressure:0];
     [self mouseUp:fakeEvent]; // This will also update the mouseover state.
 }
@@ -6124,7 +6130,12 @@ static BOOL writingDirectionKeyBindingsEnabled()
     [fontManager setSelectedFont:font isMultiple:multipleFonts];
     [fontManager setSelectedAttributes:(attributes ? attributes : @{ }) isMultiple:multipleFonts];
 }
-#endif
+
+- (void)_setSoftSpaceRange:(NSRange)range
+{
+    _private->softSpaceRange = range;
+}
+#endif // !PLATFORM(IOS)
 
 - (BOOL)_canSmartCopyOrDelete
 {
@@ -7083,6 +7094,14 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
 
     if (!coreFrame || !coreFrame->editor().canEdit())
         return;
+
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+    if (_private->softSpaceRange.location != NSNotFound && (replacementRange.location == NSMaxRange(_private->softSpaceRange) || replacementRange.location == NSNotFound) && replacementRange.length == 0 && [[NSSpellChecker sharedSpellChecker] deletesAutospaceBeforeString:text language:nil])
+        replacementRange = _private->softSpaceRange;
+#endif
+#if !PLATFORM(IOS)
+    _private->softSpaceRange = NSMakeRange(NSNotFound, 0);
+#endif
 
     if (replacementRange.location != NSNotFound)
         [[self _frame] _selectNSRange:replacementRange];

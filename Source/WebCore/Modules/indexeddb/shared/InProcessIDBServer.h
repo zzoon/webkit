@@ -49,6 +49,7 @@ class IDBServer;
 class InProcessIDBServer final : public IDBClient::IDBConnectionToServerDelegate, public IDBServer::IDBConnectionToClientDelegate, public RefCounted<InProcessIDBServer> {
 public:
     WEBCORE_EXPORT static Ref<InProcessIDBServer> create();
+    WEBCORE_EXPORT static Ref<InProcessIDBServer> create(const String& databaseDirectoryPath);
 
     WEBCORE_EXPORT IDBClient::IDBConnectionToServer& connectionToServer() const;
     IDBServer::IDBConnectionToClient& connectionToClient() const;
@@ -72,6 +73,7 @@ public:
     virtual void iterateCursor(const IDBRequestData&, const IDBKeyData&, unsigned long count) override final;
     virtual void establishTransaction(uint64_t databaseConnectionIdentifier, const IDBTransactionInfo&) override final;
     virtual void databaseConnectionClosed(uint64_t databaseConnectionIdentifier) override final;
+    virtual void abortOpenAndUpgradeNeeded(uint64_t databaseConnectionIdentifier, const IDBResourceIdentifier& transactionIdentifier) override final;
     virtual void didFireVersionChangeEvent(uint64_t databaseConnectionIdentifier, const IDBResourceIdentifier& requestIdentifier) override final;
 
     // IDBConnectionToClient
@@ -100,6 +102,7 @@ public:
 
 private:
     InProcessIDBServer();
+    InProcessIDBServer(const String& databaseDirectoryPath);
 
     Ref<IDBServer::IDBServer> m_server;
     RefPtr<IDBClient::IDBConnectionToServer> m_connectionToServer;

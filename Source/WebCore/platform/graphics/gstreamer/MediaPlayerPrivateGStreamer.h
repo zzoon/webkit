@@ -126,7 +126,7 @@ public:
 #endif
 
 private:
-    static void getSupportedTypes(HashSet<String>&);
+    static void getSupportedTypes(HashSet<String, ASCIICaseInsensitiveHash>&);
     static MediaPlayer::SupportsType supportsType(const MediaEngineSupportParameters&);
 
     static bool isAvailable();
@@ -204,7 +204,6 @@ private:
 #endif
     float m_seekTime;
     bool m_changingRate;
-    float m_endTime;
     bool m_isEndReached;
     mutable bool m_isStreaming;
     GstStructure* m_mediaLocations;

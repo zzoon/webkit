@@ -37,8 +37,9 @@
 #include "WAKWindow.h"
 #include <algorithm>
 #include <functional>
+#include <wtf/NeverDestroyed.h>
 
-#if __has_include(<WebKitAdditions/LayerBackingStoreAdditions.mm>)
+#if USE(APPLE_INTERNAL_SDK)
 #import <WebKitAdditions/LayerBackingStoreAdditions.mm>
 #else
 namespace WebCore {

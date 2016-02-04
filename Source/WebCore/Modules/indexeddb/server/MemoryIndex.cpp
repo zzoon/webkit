@@ -40,9 +40,9 @@
 namespace WebCore {
 namespace IDBServer {
 
-std::unique_ptr<MemoryIndex> MemoryIndex::create(const IDBIndexInfo& info, MemoryObjectStore& objectStore)
+Ref<MemoryIndex> MemoryIndex::create(const IDBIndexInfo& info, MemoryObjectStore& objectStore)
 {
-    return std::make_unique<MemoryIndex>(info, objectStore);
+    return adoptRef(*new MemoryIndex(info, objectStore));
 }
 
 MemoryIndex::MemoryIndex(const IDBIndexInfo& info, MemoryObjectStore& objectStore)
@@ -111,7 +111,7 @@ void MemoryIndex::replaceIndexValueStore(std::unique_ptr<IndexValueStore>&& valu
 
 IDBGetResult MemoryIndex::getResultForKeyRange(IndexedDB::IndexRecordType type, const IDBKeyRangeData& range) const
 {
-    LOG(IndexedDB, "MemoryIndex::getResultForKeyRange");
+    LOG(IndexedDB, "MemoryIndex::getResultForKeyRange - %s", range.loggingString().utf8().data());
 
     if (!m_records)
         return { };

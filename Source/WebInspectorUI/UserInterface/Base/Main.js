@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -70,6 +70,8 @@ WebInspector.loaded = function()
         InspectorBackend.registerDebuggerDispatcher(new WebInspector.DebuggerObserver);
     if (InspectorBackend.registerHeapDispatcher)
         InspectorBackend.registerHeapDispatcher(new WebInspector.HeapObserver);
+    if (InspectorBackend.registerMemoryDispatcher)
+        InspectorBackend.registerMemoryDispatcher(new WebInspector.MemoryObserver);
     if (InspectorBackend.registerDatabaseDispatcher)
         InspectorBackend.registerDatabaseDispatcher(new WebInspector.DatabaseObserver);
     if (InspectorBackend.registerDOMStorageDispatcher)
@@ -269,7 +271,7 @@ WebInspector.contentLoaded = function()
 
     this._reloadPageKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl, "R", this._reloadPage.bind(this));
     this._reloadPageIgnoringCacheKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.CommandOrControl | WebInspector.KeyboardShortcut.Modifier.Shift, "R", this._reloadPageIgnoringCache.bind(this));
-    this._reloadPageKeyboardShortcut.implicitlyPreventsDefault = this._reloadPageIgnoringCacheKeyboardShortcut = false;
+    this._reloadPageKeyboardShortcut.implicitlyPreventsDefault = this._reloadPageIgnoringCacheKeyboardShortcut.implicitlyPreventsDefault = false;
 
     this._consoleTabKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.Option | WebInspector.KeyboardShortcut.Modifier.CommandOrControl, "C", this._showConsoleTab.bind(this));
     this._quickConsoleKeyboardShortcut = new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.Control, WebInspector.KeyboardShortcut.Key.Apostrophe, this._focusConsolePrompt.bind(this));
@@ -390,10 +392,17 @@ WebInspector.contentLoaded = function()
 
     this._pendingOpenTabs = [];
 
+    // Previously we may have stored duplicates in this setting. Avoid creating duplicate tabs.
     let openTabTypes = this._openTabsSetting.value;
+    let seenTabTypes = new Set;
 
     for (let i = 0; i < openTabTypes.length; ++i) {
         let tabType = openTabTypes[i];
+
+        if (seenTabTypes.has(tabType))
+            continue;
+        seenTabTypes.add(tabType);
+
         if (!this.isTabTypeAllowed(tabType)) {
             this._pendingOpenTabs.push({tabType, index: i});
             continue;
@@ -467,6 +476,7 @@ WebInspector._createTabContentViewForType = function(tabType)
 
 WebInspector._rememberOpenTabs = function()
 {
+    let seenTabTypes = new Set;
     let openTabs = [];
 
     for (let tabBarItem of this.tabBar.tabBarItems) {
@@ -477,11 +487,16 @@ WebInspector._rememberOpenTabs = function()
             continue;
         console.assert(tabContentView.type, "Tab type can't be null, undefined, or empty string", tabContentView.type, tabContentView);
         openTabs.push(tabContentView.type);
+        seenTabTypes.add(tabContentView.type);
     }
 
     // Keep currently unsupported tabs in the setting at their previous index.
-    for (let {tabType, index} of this._pendingOpenTabs)
+    for (let {tabType, index} of this._pendingOpenTabs) {
+        if (seenTabTypes.has(tabType))
+            continue;
         openTabs.insertAtIndex(tabType, index);
+        seenTabTypes.add(tabType);
+    }
 
     this._openTabsSetting.value = openTabs;
 };
@@ -1328,8 +1343,8 @@ WebInspector._windowBlurred = function(event)
 
 WebInspector._windowResized = function(event)
 {
-    this.toolbar.updateLayout();
-    this.tabBar.updateLayout();
+    this.toolbar.updateLayout(WebInspector.View.LayoutReason.Resize);
+    this.tabBar.updateLayout(WebInspector.View.LayoutReason.Resize);
     this._tabBrowserSizeDidChange();
 };
 
@@ -1378,6 +1393,23 @@ WebInspector._contextMenuRequested = function(event)
         proposedContextMenu.appendItem(WebInspector.unlocalizedString("Reload Web Inspector"), () => {
             window.location.reload();
         });
+
+        let protocolSubMenu = proposedContextMenu.appendSubMenuItem(WebInspector.unlocalizedString("Protocol Debugging"), null, false);
+        let isCapturingTraffic = InspectorBackend.activeTracer instanceof WebInspector.CapturingProtocolTracer;
+
+        protocolSubMenu.appendCheckboxItem(WebInspector.unlocalizedString("Capture Trace"), () => {
+            if (isCapturingTraffic)
+                InspectorBackend.activeTracer = null;
+            else
+                InspectorBackend.activeTracer = new WebInspector.CapturingProtocolTracer;
+        }, isCapturingTraffic);
+
+        protocolSubMenu.appendSeparator();
+
+        protocolSubMenu.appendItem(WebInspector.unlocalizedString("Export Trace\u2026"), () => {
+            const forceSaveAs = true;
+            WebInspector.saveDataToFile(InspectorBackend.activeTracer.trace.saveData, forceSaveAs);
+        }, !isCapturingTraffic);
     } else {
         const onlyExisting = true;
         proposedContextMenu = WebInspector.ContextMenu.createFromEvent(event, onlyExisting);
@@ -1424,14 +1456,14 @@ WebInspector._updateDockNavigationItems = function()
 
 WebInspector._tabBrowserSizeDidChange = function()
 {
-    this.tabBrowser.updateLayout();
-    this.splitContentBrowser.updateLayout();
-    this.quickConsole.updateLayout();
+    this.tabBrowser.updateLayout(WebInspector.View.LayoutReason.Resize);
+    this.splitContentBrowser.updateLayout(WebInspector.View.LayoutReason.Resize);
+    this.quickConsole.updateLayout(WebInspector.View.LayoutReason.Resize);
 };
 
 WebInspector._quickConsoleDidResize = function(event)
 {
-    this.tabBrowser.updateLayout();
+    this.tabBrowser.updateLayout(WebInspector.View.LayoutReason.Resize);
 };
 
 WebInspector._sidebarWidthDidChange = function(event)

@@ -60,6 +60,7 @@ set(WTF_HEADERS
     NumberOfCores.h
     OSAllocator.h
     OSRandomSource.h
+    OrderMaker.h
     PageAllocation.h
     PageBlock.h
     PageReservation.h
@@ -77,6 +78,7 @@ set(WTF_HEADERS
     RAMSize.h
     RandomNumber.h
     RandomNumberSeed.h
+    RangeSet.h
     RawPointer.h
     RedBlackTree.h
     Ref.h
@@ -98,6 +100,7 @@ set(WTF_HEADERS
     Stopwatch.h
     StringExtras.h
     StringPrintStream.h
+    SystemTracing.h
     ThreadIdentifierDataPthreads.h
     ThreadSafeRefCounted.h
     ThreadSpecific.h
@@ -246,8 +249,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     )
 endif ()
 
-# FIXME: Port bmalloc to Windows. https://bugs.webkit.org/show_bug.cgi?id=143310
-if (NOT WIN32)
+if (NOT USE_SYSTEM_MALLOC)
     list(APPEND WTF_LIBRARIES bmalloc)
 endif ()
 
@@ -294,8 +296,8 @@ if (MSVC)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /SUBSYSTEM:WINDOWS")
 endif ()
 
-if (WTF_POST_BUILD_COMMAND)
-    add_custom_command(TARGET WTF POST_BUILD COMMAND ${WTF_POST_BUILD_COMMAND} VERBATIM)
+if (WTF_PRE_BUILD_COMMAND)
+    add_custom_command(TARGET WTF PRE_BUILD COMMAND ${WTF_PRE_BUILD_COMMAND} VERBATIM)
 endif ()
 
 if (WTF_OUTPUT_NAME)

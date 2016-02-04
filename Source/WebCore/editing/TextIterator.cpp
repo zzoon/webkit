@@ -261,7 +261,7 @@ bool isRendererReplacedElement(RenderObject* renderer)
         Element& element = downcast<Element>(*renderer->node());
         if (is<HTMLFormControlElement>(element) || is<HTMLLegendElement>(element) || is<HTMLMeterElement>(element) || is<HTMLProgressElement>(element))
             return true;
-        if (equalIgnoringCase(element.fastGetAttribute(roleAttr), "img"))
+        if (equalLettersIgnoringASCIICase(element.fastGetAttribute(roleAttr), "img"))
             return true;
     }
 
@@ -1388,7 +1388,12 @@ RenderText* SimplifiedBackwardsTextIterator::handleFirstLetter(int& startOffset,
 
     m_shouldHandleFirstLetter = false;
     offsetInNode = 0;
-    return firstRenderTextInFirstLetter(fragment.firstLetter());
+    RenderText* firstLetterRenderer = firstRenderTextInFirstLetter(fragment.firstLetter());
+
+    m_offset = firstLetterRenderer->caretMaxOffset();
+    m_offset += collapsedSpaceLength(*firstLetterRenderer, m_offset);
+
+    return firstLetterRenderer;
 }
 
 bool SimplifiedBackwardsTextIterator::handleReplacedElement()

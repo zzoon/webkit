@@ -1815,31 +1815,31 @@ private:
             arrayBufferView = getJSValue(DataView::create(arrayBuffer, byteOffset, length).get());
             return true;
         case Int8ArrayTag:
-            arrayBufferView = getJSValue(Int8Array::create(arrayBuffer, byteOffset, length).get());
+            arrayBufferView = toJS(m_exec, m_globalObject, Int8Array::create(arrayBuffer, byteOffset, length).get());
             return true;
         case Uint8ArrayTag:
-            arrayBufferView = getJSValue(Uint8Array::create(arrayBuffer, byteOffset, length).get());
+            arrayBufferView = toJS(m_exec, m_globalObject, Uint8Array::create(arrayBuffer, byteOffset, length).get());
             return true;
         case Uint8ClampedArrayTag:
-            arrayBufferView = getJSValue(Uint8ClampedArray::create(arrayBuffer, byteOffset, length).get());
+            arrayBufferView = toJS(m_exec, m_globalObject, Uint8ClampedArray::create(arrayBuffer, byteOffset, length).get());
             return true;
         case Int16ArrayTag:
-            arrayBufferView = getJSValue(Int16Array::create(arrayBuffer, byteOffset, length).get());
+            arrayBufferView = toJS(m_exec, m_globalObject, Int16Array::create(arrayBuffer, byteOffset, length).get());
             return true;
         case Uint16ArrayTag:
-            arrayBufferView = getJSValue(Uint16Array::create(arrayBuffer, byteOffset, length).get());
+            arrayBufferView = toJS(m_exec, m_globalObject, Uint16Array::create(arrayBuffer, byteOffset, length).get());
             return true;
         case Int32ArrayTag:
-            arrayBufferView = getJSValue(Int32Array::create(arrayBuffer, byteOffset, length).get());
+            arrayBufferView = toJS(m_exec, m_globalObject, Int32Array::create(arrayBuffer, byteOffset, length).get());
             return true;
         case Uint32ArrayTag:
-            arrayBufferView = getJSValue(Uint32Array::create(arrayBuffer, byteOffset, length).get());
+            arrayBufferView = toJS(m_exec, m_globalObject, Uint32Array::create(arrayBuffer, byteOffset, length).get());
             return true;
         case Float32ArrayTag:
-            arrayBufferView = getJSValue(Float32Array::create(arrayBuffer, byteOffset, length).get());
+            arrayBufferView = toJS(m_exec, m_globalObject, Float32Array::create(arrayBuffer, byteOffset, length).get());
             return true;
         case Float64ArrayTag:
-            arrayBufferView = getJSValue(Float64Array::create(arrayBuffer, byteOffset, length).get());
+            arrayBufferView = toJS(m_exec, m_globalObject, Float64Array::create(arrayBuffer, byteOffset, length).get());
             return true;
         default:
             return false;
@@ -2330,7 +2330,7 @@ private:
                 fail();
                 return JSValue();
             }
-            JSValue result = getJSValue(arrayBuffer.get());
+            JSValue result = JSArrayBuffer::create(m_exec->vm(), m_globalObject->arrayBufferStructure(), arrayBuffer.release());
             m_gcBuffer.append(result);
             return result;
         }
@@ -2595,27 +2595,22 @@ SerializedScriptValue::~SerializedScriptValue()
 {
 }
 
-SerializedScriptValue::SerializedScriptValue(const Vector<uint8_t>& buffer)
-    : m_data(buffer)
+SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>&& buffer)
+    : m_data(WTFMove(buffer))
 {
 }
 
-SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>& buffer)
+SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>&& buffer, const Vector<String>& blobURLs)
+    : m_data(WTFMove(buffer))
 {
-    m_data.swap(buffer);
-}
-
-SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>& buffer, Vector<String>& blobURLs)
-{
-    m_data.swap(buffer);
     for (auto& string : blobURLs)
         addBlobURL(string);
 }
 
-SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>& buffer, Vector<String>& blobURLs, std::unique_ptr<ArrayBufferContentsArray> arrayBufferContentsArray)
-    : m_arrayBufferContentsArray(WTFMove(arrayBufferContentsArray))
+SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>&& buffer, const Vector<String>& blobURLs, std::unique_ptr<ArrayBufferContentsArray>&& arrayBufferContentsArray)
+    : m_data(WTFMove(buffer))
+    , m_arrayBufferContentsArray(WTFMove(arrayBufferContentsArray))
 {
-    m_data.swap(buffer);
     for (auto& string : blobURLs)
         addBlobURL(string);
 }
@@ -2666,7 +2661,7 @@ RefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec, JSV
     if (!serializationDidCompleteSuccessfully(code))
         return nullptr;
 
-    return adoptRef(*new SerializedScriptValue(buffer, blobURLs, WTFMove(arrayBufferContentsArray)));
+    return adoptRef(*new SerializedScriptValue(WTFMove(buffer), blobURLs, WTFMove(arrayBufferContentsArray)));
 }
 
 RefPtr<SerializedScriptValue> SerializedScriptValue::create(const String& string)
@@ -2674,7 +2669,7 @@ RefPtr<SerializedScriptValue> SerializedScriptValue::create(const String& string
     Vector<uint8_t> buffer;
     if (!CloneSerializer::serialize(string, buffer))
         return nullptr;
-    return adoptRef(*new SerializedScriptValue(buffer));
+    return adoptRef(*new SerializedScriptValue(WTFMove(buffer)));
 }
 
 #if ENABLE(INDEXED_DATABASE)
@@ -2682,14 +2677,14 @@ Ref<SerializedScriptValue> SerializedScriptValue::numberValue(double value)
 {
     Vector<uint8_t> buffer;
     CloneSerializer::serializeNumber(value, buffer);
-    return adoptRef(*new SerializedScriptValue(buffer));
+    return adoptRef(*new SerializedScriptValue(WTFMove(buffer)));
 }
 
 Ref<SerializedScriptValue> SerializedScriptValue::undefinedValue()
 {
     Vector<uint8_t> buffer;
     CloneSerializer::serializeUndefined(buffer);
-    return adoptRef(*new SerializedScriptValue(buffer));
+    return adoptRef(*new SerializedScriptValue(WTFMove(buffer)));
 }
 #endif
 
@@ -2741,8 +2736,7 @@ JSValueRef SerializedScriptValue::deserialize(JSContextRef destinationContext, J
 
 Ref<SerializedScriptValue> SerializedScriptValue::nullValue()
 {
-    Vector<uint8_t> buffer;
-    return adoptRef(*new SerializedScriptValue(buffer));
+    return adoptRef(*new SerializedScriptValue(Vector<uint8_t>()));
 }
 
 void SerializedScriptValue::maybeThrowExceptionIfSerializationFailed(ExecState* exec, SerializationReturnCode code)

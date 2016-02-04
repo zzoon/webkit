@@ -29,6 +29,7 @@
 #if ENABLE(ASSEMBLER) && CPU(ARM64)
 
 #include "AssemblerBuffer.h"
+#include "AssemblerCommon.h"
 #include <limits.h>
 #include <wtf/Assertions.h>
 #include <wtf/Vector.h>
@@ -52,11 +53,6 @@ ALWAYS_INLINE bool isInt7(int32_t value)
     return value == ((value << 25) >> 25);
 }
 
-ALWAYS_INLINE bool isInt9(int32_t value)
-{
-    return value == ((value << 23) >> 23);
-}
-
 ALWAYS_INLINE bool isInt11(int32_t value)
 {
     return value == ((value << 21) >> 21);
@@ -65,16 +61,6 @@ ALWAYS_INLINE bool isInt11(int32_t value)
 ALWAYS_INLINE bool isUInt5(int32_t value)
 {
     return !(value & ~0x1f);
-}
-
-ALWAYS_INLINE bool isUInt12(int32_t value)
-{
-    return !(value & ~0xfff);
-}
-
-ALWAYS_INLINE bool isUInt12(intptr_t value)
-{
-    return !(value & ~0xfffL);
 }
 
 class UInt5 {
@@ -717,19 +703,12 @@ public:
     template<int datasize>
     static bool canEncodePImmOffset(int32_t offset)
     {
-        int32_t maxPImm = 4095 * (datasize / 8);
-        if (offset < 0)
-            return false;
-        if (offset > maxPImm)
-            return false;
-        if (offset & ((datasize / 8 ) - 1))
-            return false;
-        return true;
+        return isValidScaledUImm12<datasize>(offset);
     }
 
     static bool canEncodeSImmOffset(int32_t offset)
     {
-        return isInt9(offset);
+        return isValidSignedImm9(offset);
     }
 
 private:
@@ -3297,8 +3276,18 @@ private:
         return (insn & 0x7c000000) == 0x14000000;
     }
 
-    static int xOrSp(RegisterID reg) { ASSERT(!isZr(reg)); return reg; }
-    static int xOrZr(RegisterID reg) { ASSERT(!isSp(reg)); return reg & 31; }
+    static int xOrSp(RegisterID reg)
+    {
+        ASSERT(!isZr(reg));
+        ASSERT(!isIOS() || reg != ARM64Registers::x18);
+        return reg;
+    }
+    static int xOrZr(RegisterID reg)
+    {
+        ASSERT(!isSp(reg));
+        ASSERT(!isIOS() || reg != ARM64Registers::x18);
+        return reg & 31;
+    }
     static FPRegisterID xOrZrAsFPR(RegisterID reg) { return static_cast<FPRegisterID>(xOrZr(reg)); }
     static int xOrZrOrSp(bool useZr, RegisterID reg) { return useZr ? xOrZr(reg) : xOrSp(reg); }
 

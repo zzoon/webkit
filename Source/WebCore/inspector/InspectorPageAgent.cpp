@@ -123,10 +123,10 @@ static RefPtr<TextResourceDecoder> createXHRTextDecoder(const String& mimeType, 
     RefPtr<TextResourceDecoder> decoder;
     if (!textEncodingName.isEmpty())
         decoder = TextResourceDecoder::create("text/plain", textEncodingName);
-    else if (DOMImplementation::isXMLMIMEType(mimeType.lower())) {
+    else if (DOMImplementation::isXMLMIMEType(mimeType)) {
         decoder = TextResourceDecoder::create("application/xml");
         decoder->useLenientXMLDecoding();
-    } else if (equalIgnoringCase(mimeType, "text/html"))
+    } else if (equalLettersIgnoringASCIICase(mimeType, "text/html"))
         decoder = TextResourceDecoder::create("text/html", "UTF-8");
     else
         decoder = TextResourceDecoder::create("text/plain", "UTF-8");
@@ -230,8 +230,8 @@ void InspectorPageAgent::resourceContent(ErrorString& errorString, Frame* frame,
 //static
 String InspectorPageAgent::sourceMapURLForResource(CachedResource* cachedResource)
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeader, (ASCIILiteral("SourceMap")));
-    DEPRECATED_DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeaderDeprecated, (ASCIILiteral("X-SourceMap")));
+    static NeverDestroyed<String> sourceMapHTTPHeader(ASCIILiteral("SourceMap"));
+    static NeverDestroyed<String> sourceMapHTTPHeaderDeprecated(ASCIILiteral("X-SourceMap"));
 
     if (!cachedResource)
         return String();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,10 +38,19 @@ void PatchpointValue::dumpMeta(CommaPrinter& comma, PrintStream& out) const
 {
     Base::dumpMeta(comma, out);
     out.print(comma, "resultConstraint = ", resultConstraint);
+    if (numGPScratchRegisters)
+        out.print(comma, "numGPScratchRegisters = ", numGPScratchRegisters);
+    if (numFPScratchRegisters)
+        out.print(comma, "numFPScratchRegisters = ", numFPScratchRegisters);
 }
 
-PatchpointValue::PatchpointValue(unsigned index, Type type, Origin origin)
-    : Base(index, CheckedOpcode, Patchpoint, type, origin)
+Value* PatchpointValue::cloneImpl() const
+{
+    return new PatchpointValue(*this);
+}
+
+PatchpointValue::PatchpointValue(Type type, Origin origin)
+    : Base(CheckedOpcode, Patchpoint, type, origin)
     , effects(Effects::forCall())
     , resultConstraint(type == Void ? ValueRep::WarmAny : ValueRep::SomeRegister)
 {

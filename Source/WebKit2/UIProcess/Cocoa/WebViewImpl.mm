@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -75,6 +75,7 @@
 #import <WebCore/LookupSPI.h>
 #import <WebCore/NSApplicationSPI.h>
 #import <WebCore/NSImmediateActionGestureRecognizerSPI.h>
+#import <WebCore/NSSpellCheckerSPI.h>
 #import <WebCore/NSTextFinderSPI.h>
 #import <WebCore/NSWindowSPI.h>
 #import <WebCore/PlatformEventFactoryMac.h>
@@ -418,6 +419,26 @@ static void* keyValueObservingContext = &keyValueObservingContext;
 
 @end
 
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 && USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/WebViewImplAdditions.mm>
+#else
+namespace WebKit {
+
+void WebViewImpl::updateWebViewImplAdditions()
+{
+}
+
+void WebViewImpl::showCandidates(NSArray *candidates, NSString *string, NSRect rectOfTypedString, NSView *view, void (^completionHandler)(NSTextCheckingResult *acceptedCandidate))
+{
+}
+
+void WebViewImpl::webViewImplAdditionsWillDestroyView()
+{
+}
+
+} // namespace WebKit
+#endif // __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 && USE(APPLE_INTERNAL_SDK)
+
 namespace WebKit {
 
 static NSTrackingAreaOptions trackingAreaOptions()
@@ -492,6 +513,7 @@ WebViewImpl::~WebViewImpl()
     [m_layoutStrategy invalidate];
 
     [m_immediateActionController willDestroyView:m_view];
+    webViewImplAdditionsWillDestroyView();
 
     m_page->close();
 
@@ -565,6 +587,8 @@ bool WebViewImpl::becomeFirstResponder()
     m_page->restoreSelectionInFocusedEditableElement();
 
     m_inBecomeFirstResponder = false;
+
+    updateWebViewImplAdditions();
 
     if (direction != NSDirectSelection) {
         NSEvent *event = [NSApp currentEvent];
@@ -1228,7 +1252,7 @@ void WebViewImpl::postFakeMouseMovedEventForFlagsChangedEvent(NSEvent *flagsChan
 {
     NSEvent *fakeEvent = [NSEvent mouseEventWithType:NSMouseMoved location:flagsChangedEvent.window.mouseLocationOutsideOfEventStream
         modifierFlags:flagsChangedEvent.modifierFlags timestamp:flagsChangedEvent.timestamp windowNumber:flagsChangedEvent.windowNumber
-        context:flagsChangedEvent.context eventNumber:0 clickCount:0 pressure:0];
+        context:nullptr eventNumber:0 clickCount:0 pressure:0];
     NativeWebMouseEvent webEvent(fakeEvent, m_lastPressureEvent.get(), m_view);
     m_page->handleMouseEvent(webEvent);
 }
@@ -1723,6 +1747,11 @@ void WebViewImpl::centerSelectionInVisibleArea()
 void WebViewImpl::selectionDidChange()
 {
     updateFontPanelIfNeeded();
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+    updateWebViewImplAdditions();
+    if (!m_page->editorState().isMissingPostLayoutData)
+        requestCandidatesForSelectionIfNeeded();
+#endif
 }
 
 void WebViewImpl::startObservingFontPanel()
@@ -2087,6 +2116,111 @@ void WebViewImpl::capitalizeWord()
 {
     m_page->capitalizeWord();
 }
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+void WebViewImpl::requestCandidatesForSelectionIfNeeded()
+{
+    const EditorState& editorState = m_page->editorState();
+    if (!editorState.isContentEditable)
+        return;
+
+    if (editorState.isMissingPostLayoutData)
+        return;
+
+    auto& postLayoutData = editorState.postLayoutData();
+    m_lastStringForCandidateRequest = postLayoutData.stringForCandidateRequest;
+
+    NSRange rangeForCandidates = NSMakeRange(postLayoutData.candidateRequestStartPosition, postLayoutData.selectedTextLength);
+    NSTextCheckingTypes checkingTypes = NSTextCheckingTypeSpelling | NSTextCheckingTypeReplacement | NSTextCheckingTypeCorrection;
+    auto weakThis = createWeakPtr();
+    [[NSSpellChecker sharedSpellChecker] requestCandidatesForSelectedRange:rangeForCandidates inString:postLayoutData.paragraphContextForCandidateRequest types:checkingTypes options:nil inSpellDocumentWithTag:spellCheckerDocumentTag() completionHandler:[weakThis](NSInteger sequenceNumber, NSArray<NSTextCheckingResult *> *candidates) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!weakThis)
+                return;
+            weakThis->handleRequestedCandidates(sequenceNumber, candidates);
+        });
+    }];
+}
+
+void WebViewImpl::handleRequestedCandidates(NSInteger sequenceNumber, NSArray<NSTextCheckingResult *> *candidates)
+{
+    const EditorState& editorState = m_page->editorState();
+    if (!editorState.isContentEditable)
+        return;
+
+    // FIXME: It's pretty lame that we have to depend on the most recent EditorState having post layout data,
+    // and that we just bail if it is missing.
+    if (editorState.isMissingPostLayoutData)
+        return;
+
+    auto& postLayoutData = editorState.postLayoutData();
+    if (m_lastStringForCandidateRequest != postLayoutData.stringForCandidateRequest)
+        return;
+
+    auto weakThis = createWeakPtr();
+    showCandidates(candidates, postLayoutData.stringForCandidateRequest, postLayoutData.selectionClipRect, m_view, [weakThis](NSTextCheckingResult *acceptedCandidate) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (!weakThis)
+                return;
+            weakThis->handleAcceptedCandidate(acceptedCandidate);
+        });
+    });
+}
+
+static WebCore::TextCheckingResult textCheckingResultFromNSTextCheckingResult(NSTextCheckingResult *nsResult)
+{
+    WebCore::TextCheckingResult result;
+
+    // FIXME: Right now we only request candidates for spelling, replacement, and correction, but we plan to
+    // support more types, and we will have to update this at that time.
+    switch ([nsResult resultType]) {
+    case NSTextCheckingTypeSpelling:
+        result.type = WebCore::TextCheckingTypeSpelling;
+        break;
+    case NSTextCheckingTypeReplacement:
+        result.type = WebCore::TextCheckingTypeReplacement;
+        break;
+    case NSTextCheckingTypeCorrection:
+        result.type = WebCore::TextCheckingTypeCorrection;
+        break;
+    default:
+        result.type = WebCore::TextCheckingTypeNone;
+    }
+
+    NSRange resultRange = [nsResult range];
+    result.location = resultRange.location;
+    result.length = resultRange.length;
+    result.replacement = [nsResult replacementString];
+
+    return result;
+}
+
+void WebViewImpl::handleAcceptedCandidate(NSTextCheckingResult *acceptedCandidate)
+{
+    const EditorState& editorState = m_page->editorState();
+    if (!editorState.isContentEditable)
+        return;
+
+    // FIXME: It's pretty lame that we have to depend on the most recent EditorState having post layout data,
+    // and that we just bail if it is missing.
+    if (editorState.isMissingPostLayoutData)
+        return;
+
+    auto& postLayoutData = editorState.postLayoutData();
+    if (m_lastStringForCandidateRequest != postLayoutData.stringForCandidateRequest)
+        return;
+
+    NSRange range = [acceptedCandidate range];
+    if (acceptedCandidate.replacementString && [acceptedCandidate.replacementString length] > 0) {
+        NSRange replacedRange = NSMakeRange(range.location, [acceptedCandidate.replacementString length]);
+        NSRange softSpaceRange = NSMakeRange(NSMaxRange(replacedRange) - 1, 1);
+        if ([acceptedCandidate.replacementString hasSuffix:@" "])
+            m_softSpaceRange = softSpaceRange;
+    }
+
+    m_page->handleAcceptedCandidate(textCheckingResultFromNSTextCheckingResult(acceptedCandidate));
+}
+#endif // __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 
 void WebViewImpl::preferencesDidChange()
 {
@@ -3385,13 +3519,22 @@ void WebViewImpl::insertText(id string, NSRange replacementRange)
     } else
         text = string;
 
+    BOOL needToRemoveSoftSpace = NO;
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+    if (m_softSpaceRange.location != NSNotFound && (replacementRange.location == NSMaxRange(m_softSpaceRange) || replacementRange.location == NSNotFound) && replacementRange.length == 0 && [[NSSpellChecker sharedSpellChecker] deletesAutospaceBeforeString:text language:nil]) {
+        replacementRange = m_softSpaceRange;
+        needToRemoveSoftSpace = YES;
+    }
+#endif
+    m_softSpaceRange = NSMakeRange(NSNotFound, 0);
+
     // insertText can be called for several reasons:
     // - If it's from normal key event processing (including key bindings), we save the action to perform it later.
     // - If it's from an input method, then we should insert the text now.
     // - If it's sent outside of keyboard event processing (e.g. from Character Viewer, or when confirming an inline input area with a mouse),
     // then we also execute it immediately, as there will be no other chance.
     Vector<WebCore::KeypressCommand>* keypressCommands = m_collectedKeypressCommands;
-    if (keypressCommands) {
+    if (keypressCommands && !needToRemoveSoftSpace) {
         ASSERT(replacementRange.location == NSNotFound);
         WebCore::KeypressCommand command("insertText:", text);
         keypressCommands->append(command);
@@ -3846,6 +3989,15 @@ void WebViewImpl::mouseDragged(NSEvent *event)
     mouseDraggedInternal(event);
 }
 
+bool WebViewImpl::windowIsFrontWindowUnderMouse(NSEvent *event)
+{
+    NSRect eventScreenPosition = [m_view.window convertRectToScreen:NSMakeRect(event.locationInWindow.x, event.locationInWindow.y, 0, 0)];
+    NSInteger eventWindowNumber = [NSWindow windowNumberAtPoint:eventScreenPosition.origin belowWindowWithWindowNumber:0];
+        
+    return m_view.window.windowNumber != eventWindowNumber;
+}
+
+    
 } // namespace WebKit
 
 #endif // PLATFORM(MAC)

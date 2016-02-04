@@ -26,6 +26,7 @@
 #import "GraphicsContext.h"
 #import "IntRect.h"
 #import "LocalCurrentGraphicsContext.h"
+#import "UTIUtilities.h"
 #import <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
 
@@ -70,6 +71,29 @@ PassRefPtr<Icon> Icon::createIconForFiles(const Vector<String>& filenames)
         return nullptr;
 
     return adoptRef(new Icon(image));
+}
+
+RefPtr<Icon> Icon::createIconForFileExtension(const String& fileExtension)
+{
+    NSImage *image = [[NSWorkspace sharedWorkspace] iconForFileType:[@"." stringByAppendingString:fileExtension]];
+    if (!image)
+        return nullptr;
+
+    return adoptRef(new Icon(image));
+}
+
+RefPtr<Icon> Icon::createIconForUTI(const String& UTI)
+{
+    NSImage *image = [[NSWorkspace sharedWorkspace] iconForFileType:UTI];
+    if (!image)
+        return nullptr;
+
+    return adoptRef(new Icon(image));
+}
+
+RefPtr<Icon> Icon::createIconForMIMEType(const String& MIMEType)
+{
+    return createIconForUTI(UTIFromMIMEType(MIMEType.createCFString().get()).get());
 }
 
 void Icon::paint(GraphicsContext& context, const FloatRect& rect)

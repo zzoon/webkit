@@ -104,6 +104,8 @@ public:
     void pruneMemoryCacheToSize(unsigned size);
     unsigned memoryCacheSize() const;
 
+    size_t imageFrameIndex(Element*, ExceptionCode&);
+
     void clearPageCache();
     unsigned pageCacheSize() const;
 
@@ -169,13 +171,14 @@ public:
 
     void setPagination(const String& mode, int gap, ExceptionCode& ec) { setPagination(mode, gap, 0, ec); }
     void setPagination(const String& mode, int gap, int pageLength, ExceptionCode&);
+    void setPaginationLineGridEnabled(bool, ExceptionCode&);
     String configurationForViewport(float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode&);
 
     bool wasLastChangeUserEdit(Element* textField, ExceptionCode&);
     bool elementShouldAutoComplete(Element* inputElement, ExceptionCode&);
     void setEditingValue(Element* inputElement, const String&, ExceptionCode&);
     void setAutofilled(Element*, bool enabled, ExceptionCode&);
-    void setShowAutoFillButton(Element*, bool enabled, ExceptionCode&);
+    void setShowAutoFillButton(Element*, const String& autoFillButtonType, ExceptionCode&);
     void scrollElementToRect(Element*, long x, long y, long w, long h, ExceptionCode&);
 
     void paintControlTints(ExceptionCode&);
@@ -218,6 +221,8 @@ public:
     void setAutomaticTextReplacementEnabled(bool enabled, ExceptionCode&);
     void setAutomaticSpellingCorrectionEnabled(bool enabled, ExceptionCode&);
 
+    void handleAcceptedCandidate(const String& candidate, ExceptionCode&);
+
     bool isOverwriteModeEnabled(ExceptionCode&);
     void toggleOverwriteModeEnabled(ExceptionCode&);
 
@@ -251,9 +256,20 @@ public:
     String mainThreadScrollingReasons(ExceptionCode&) const;
     RefPtr<ClientRectList> nonFastScrollableRects(ExceptionCode&) const;
 
-    void garbageCollectDocumentResources(ExceptionCode&) const;
+    void setElementUsesDisplayListDrawing(Element*, bool usesDisplayListDrawing, ExceptionCode&);
+    void setElementTracksDisplayListReplay(Element*, bool isTrackingReplay, ExceptionCode&);
 
-    void allowRoundingHacks() const;
+    enum {
+        // Values need to be kept in sync with Internals.idl.
+        DISPLAY_LIST_INCLUDES_PLATFORM_OPERATIONS = 1,
+    };
+    String displayListForElement(Element*, unsigned flags, ExceptionCode&);
+    String displayListForElement(Element*, ExceptionCode&);
+
+    String replayDisplayListForElement(Element*, unsigned flags, ExceptionCode&);
+    String replayDisplayListForElement(Element*, ExceptionCode&);
+
+    void garbageCollectDocumentResources(ExceptionCode&) const;
 
     void insertAuthorCSS(const String&, ExceptionCode&) const;
     void insertUserCSS(const String&, ExceptionCode&) const;

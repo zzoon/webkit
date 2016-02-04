@@ -1,3 +1,1009 @@
+2016-02-03  Darin Adler  <darin@apple.com>
+
+        Convert another batch of String::lower callsites to something better, typically convertToASCIILowercase
+        https://bugs.webkit.org/show_bug.cgi?id=153789
+
+        Reviewed by Sam Weinig.
+
+        * wtf/text/StringView.h:
+        (WTF::StringView::toInt): Added an overload without the out parameter.
+
+2016-02-03  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [GTK][EFL] Switch FTL to B3
+        https://bugs.webkit.org/show_bug.cgi?id=153478
+
+        Reviewed by Csaba Osztrogonác.
+
+        Enable B3 by default on all x86.
+
+        * wtf/Platform.h:
+
+2016-02-03  Anders Carlsson  <andersca@apple.com>
+
+        Fix BlockPtr's call operator
+        https://bugs.webkit.org/show_bug.cgi?id=153836
+
+        Reviewed by Enrica Casucci.
+
+        * wtf/BlockPtr.h:
+
+2016-02-01  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        Cache the Path instead of creating it every time it is required
+        https://bugs.webkit.org/show_bug.cgi?id=152939
+
+        Reviewed by Darin Adler.
+
+        If the key type of an LRU cache can't to be strongly tided to a specific
+        data type; e.g. FloatRect -> Path, we need to be able to pass the policy
+        type to the TinyLRUCache template instead of just specializing it. This
+        will make the code more readable and will allow different caches for the
+        same key type.
+
+        * wtf/TinyLRUCache.h:
+        (WebCore::TinyLRUCache::get):
+
+2016-02-01  Alex Christensen  <achristensen@webkit.org>
+
+        [Win] WTFHeaderDetection.h no longer needed
+        https://bugs.webkit.org/show_bug.cgi?id=153753
+        rdar://problem/24434627
+
+        Reviewed by Darin Adler.
+
+        * wtf/Platform.h:
+        * wtf/PlatformWin.cmake:
+
+2016-01-31  Darin Adler  <darin@apple.com>
+
+        Cut down on calls to String::lower; mostly replace with convertToASCIILowercase
+        https://bugs.webkit.org/show_bug.cgi?id=153732
+
+        Reviewed by Dean Jackson.
+
+        * wtf/text/StringView.h: Added toIntStrict. Not thrilled about the name of this
+        function, but generally it seems likely to be useful more often than toInt.
+        And it's needed for one call site in WebCore that was using String::lower.
+
+2016-01-31  Darin Adler  <darin@apple.com>
+
+        Get rid of most calls to String::upper; mostly replace them with convertToASCIIUppercase
+        https://bugs.webkit.org/show_bug.cgi?id=153715
+
+        Reviewed by Gyuyoung Kim.
+
+        * wtf/text/AtomicString.h:
+        (WTF::AtomicString::upper): Deleted.
+
+2016-01-31  Dan Bernstein  <mitz@apple.com>
+
+        [Cocoa] Remove unused definition of HAVE_HEADER_DETECTION_H
+        https://bugs.webkit.org/show_bug.cgi?id=153729
+
+        Reviewed by Sam Weinig.
+
+        After r141700, HAVE_HEADER_DETECTION_H is no longer used.
+
+        * Configurations/Base.xcconfig:
+
+2016-01-31  Darin Adler  <darin@apple.com>
+
+        Replace CaseFoldingHash with ASCIICaseInsensitiveHash
+        https://bugs.webkit.org/show_bug.cgi?id=153639
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/text/StringHash.h: Renamed CaseFoldingHash to ASCIICaseInsensitiveHash.
+        (WTF::ASCIICaseInsensitiveHash::foldCase): Use toASCIILower.
+        (WTF::ASCIICaseInsensitiveHash::equal): Use equalIgnoringASCIICase.
+        Also added some assertions.
+
+        * wtf/text/StringImpl.cpp: Made the latin1CaseFoldTable private to this file,
+        since it's no longer needed by CaseFoldingHash. Moved it up before its first use.
+        (WTF::equalCompatibilityCaseless): Fixed typo in the name of this function.
+        (WTF::equalCompatibiltyCaselessNonNull): Deleted.
+
+        * wtf/text/StringImpl.h: Removed declarations of latin1CaseFoldTable and
+        equalCompatibiltyCaselessNonNull
+
+2016-01-30  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r195911.
+        https://bugs.webkit.org/show_bug.cgi?id=153723
+
+        Caused frequent assertion failures on bots (Requested by ap on
+        #webkit).
+
+        Reverted changeset:
+
+        "Replace CaseFoldingHash with ASCIICaseInsensitiveHash"
+        https://bugs.webkit.org/show_bug.cgi?id=153639
+        http://trac.webkit.org/changeset/195911
+
+2016-01-30  Darin Adler  <darin@apple.com>
+
+        Replace CaseFoldingHash with ASCIICaseInsensitiveHash
+        https://bugs.webkit.org/show_bug.cgi?id=153639
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/text/StringHash.h: Renamed CaseFoldingHash to ASCIICaseInsensitiveHash.
+        (WTF::ASCIICaseInsensitiveHash::foldCase): Use toASCIILower.
+        (WTF::ASCIICaseInsensitiveHash::equal): Use equalIgnoringASCIICase.
+        Also added some assertions.
+
+        * wtf/text/StringImpl.cpp: Made the latin1CaseFoldTable private to this file,
+        since it's no longer needed by CaseFoldingHash. Moved it up before its first use.
+        (WTF::equalCompatibilityCaseless): Fixed typo in the name of this function.
+        (WTF::equalCompatibiltyCaselessNonNull): Deleted.
+
+        * wtf/text/StringImpl.h: Removed declarations of latin1CaseFoldTable and
+        equalCompatibiltyCaselessNonNull
+
+2016-01-29  Ada Chan  <adachan@apple.com>
+
+        Enable VIDEO_PRESENTATION_MODE only in Debug and Release builds on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=153665
+
+        Reviewed by Dan Bernstein.
+
+        * wtf/Platform.h:
+        Remove this as the flag is already defined in FeatureDefines.xcconfig files.
+
+2016-01-30  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Enable SamplingProfiler on POSIX environment
+        https://bugs.webkit.org/show_bug.cgi?id=153584
+
+        Reviewed by Michael Saboff.
+
+        Use __GLIBC__ since mcontext_t layout depends on it.
+
+        * wtf/Platform.h:
+
+2016-01-28  Darin Adler  <darin@apple.com>
+
+        Remove equalIgnoringCase since all callers really wanted equalIgnoringASCIICase
+        https://bugs.webkit.org/show_bug.cgi?id=153411
+
+        Reviewed by Ryosuke Niwa.
+
+        * wtf/text/AtomicString.h: Removed equalIgnoringCase.
+        Added some overloads for equalIgnoringASCIICase and moved the function bodies to
+        bottom of the file to make the function declarations easier to read and scan through.
+        I plan to do this for more of the functions in this class in the future.
+
+        * wtf/text/StringCommon.h: Added overloads for equalIgnoringASCIICase,
+        equalPossiblyIgnoringASCIICase, and a helper named equalIgnoringASCIICaseCommon.
+        Added an overload for equalLettersIgnoringASCIICase.
+
+        * wtf/text/StringImpl.cpp:
+        (WTF::equalIgnoringCase): Made the few remaining versions of this function private
+        to this file. Once we get done moving every client that should be using ASCII case
+        instead to new functions, these will almost certainly be deleted.
+        (WTF::equalIgnoringASCIICaseNonNull): Tweaked implementation a tiny bit.
+
+        * wtf/text/StringImpl.h: Sorted forward declarations at the top of the file.
+        Fixed some small formatting mistakes. Removed equalIgnoringCase, but left
+        equalIgnoringCaseNonNull behind for use by CaseFoldingHash until it is replaced
+        with ASCIICaseFoldingHash. Improved equalIgnoringASCIICase implementation.
+        Removed unneeded using for equalIgnoringASCIICase now that StringCommon.h takes
+        care of it.
+
+        * wtf/text/StringView.cpp:
+        (WTF::equalIgnoringASCIICase): Deleted. We no longer pass in the length for this,
+        so the arguments have changed and the implementation is also now in ASCIICommon.h
+        so it's an inline in the header file.
+
+        * wtf/text/StringView.h: Added an overload of equalIgnoringASCIICase,while
+        removing another.
+
+        * wtf/text/WTFString.h: Removed some unneeded forward delcarations. Fixed formatting
+        of the type name NSString *. Improved some comments. Removed equalIgnoringCase.
+        Separated declaration from implementation in a few cases to start making the
+        function declarations easier to read and scan through. I plan to do more in the future.
+
+2016-01-27  Chris Dumez  <cdumez@apple.com>
+
+        window.atob() should ignore spaces in input
+        https://bugs.webkit.org/show_bug.cgi?id=153522
+        <rdar://problem/24357822>
+
+        Reviewed by Benjamin Poulain.
+
+        Turn Base64DecodePolicy enum into flags so that the caller can indicate
+        to both validate padding AND ignore spaces.
+
+        Also make sure that the output Vector size is properly shrunk when
+        spaces are ignored.
+
+        * wtf/text/Base64.cpp:
+        (WTF::base64DecodeInternal):
+        (WTF::base64Decode):
+        (WTF::base64URLDecode):
+        * wtf/text/Base64.h:
+
+2016-01-27  Alexey Proskuryakov  <ap@apple.com>
+
+        Remove ENABLE_CURRENTSRC
+        https://bugs.webkit.org/show_bug.cgi?id=153545
+
+        Reviewed by Simon Fraser.
+
+        * wtf/FeatureDefines.h:
+
+2016-01-26  I-Ting Liu  <iting_liu@apple.com>
+
+        Implement wildcard matching for plug-in policy host.
+        https://bugs.webkit.org/show_bug.cgi?id=153090
+
+        Reviewed by Darin Adler.
+
+        * wtf/text/AtomicString.h:
+        (WTF::AtomicString::AtomicString):
+        Add __bridge to allow compilation.
+
+2016-01-26  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Generalize ResourceUsageData gathering to be used outside of ResourceUsageOverlay
+        https://bugs.webkit.org/show_bug.cgi?id=153509
+        <rdar://problem/24354291>
+
+        Reviewed by Andreas Kling.
+
+        * wtf/Platform.h:
+        Rename the ENABLE flag.
+
+2016-01-26  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        Make HashTable iterators STL iterators compatible
+        https://bugs.webkit.org/show_bug.cgi?id=153512
+
+        Reviewed by Alex Christensen.
+
+        While r178581 makes many hash table iterators STL compatible, still several iterators are not.
+        This patch fixes that; inheriting std::iterator correctly to meet STL iterator requirements (like iterator_category etc.)
+        It could recover Windows build failure.
+
+        * wtf/HashTable.h:
+
+2016-01-26  Anders Carlsson  <andersca@apple.com>
+
+        BlockPtr needs boolean operators
+        https://bugs.webkit.org/show_bug.cgi?id=153506
+
+        Reviewed by Tim Horton.
+
+        * wtf/BlockPtr.h:
+
+2016-01-25  Filip Pizlo  <fpizlo@apple.com>
+
+        FTLB3Output should maintain good block order like the LLVM one does
+        https://bugs.webkit.org/show_bug.cgi?id=152222
+
+        Reviewed by Geoffrey Garen.
+
+        In the FTL we need to be able to construct a list by inserting elements before other
+        specific elements. We didn't already have a scalable way to do this, so this adds such a
+        data structure to WTF. This also has changes to SentinelLinkedList to make it support
+        these kinds of insertions.
+
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/OrderMaker.h: Added.
+        (WTF::OrderMaker::Node::Node):
+        (WTF::OrderMaker::OrderMaker):
+        (WTF::OrderMaker::prepend):
+        (WTF::OrderMaker::append):
+        (WTF::OrderMaker::insertBefore):
+        (WTF::OrderMaker::insertAfter):
+        (WTF::OrderMaker::iterator::iterator):
+        (WTF::OrderMaker::iterator::operator*):
+        (WTF::OrderMaker::iterator::operator++):
+        (WTF::OrderMaker::iterator::operator==):
+        (WTF::OrderMaker::iterator::operator!=):
+        (WTF::OrderMaker::begin):
+        (WTF::OrderMaker::end):
+        (WTF::OrderMaker::newNode):
+        * wtf/SentinelLinkedList.h:
+        (WTF::BasicRawSentinelNode::isOnList):
+        (WTF::BasicRawSentinelNode<T>::remove):
+        (WTF::BasicRawSentinelNode<T>::prepend):
+        (WTF::BasicRawSentinelNode<T>::append):
+        (WTF::RawNode>::SentinelLinkedList):
+        (WTF::RawNode>::push):
+        (WTF::RawNode>::append):
+        (WTF::RawNode>::remove):
+        (WTF::RawNode>::prepend):
+        (WTF::RawNode>::isOnList):
+
+2016-01-25  Alex Christensen  <achristensen@webkit.org>
+
+        [Win] Copy forwarding headers before building a project
+        https://bugs.webkit.org/show_bug.cgi?id=153434
+
+        Reviewed by Brent Fulgham.
+
+        * wtf/CMakeLists.txt:
+        * wtf/PlatformWin.cmake:
+
+2016-01-20  Ryosuke Niwa  <rniwa@webkit.org>
+
+        HTMLElement::nodeName should not upper case non-ASCII characters
+        https://bugs.webkit.org/show_bug.cgi?id=153231
+
+        Reviewed by Darin Adler.
+
+        Added convertToASCIIUppercase to AtomicString, String, and StringImpl. 
+
+        * wtf/text/AtomicString.cpp:
+        (WTF::AtomicString::convertASCIICase): Generalized from convertToASCIILowercase.
+        (WTF::AtomicString::convertToASCIILowercase):
+        (WTF::AtomicString::convertToASCIIUppercase):
+        * wtf/text/AtomicString.h:
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::convertASCIICase): Generalized from convertToASCIILowercase.
+        (WTF::StringImpl::convertToASCIILowercase):
+        (WTF::StringImpl::convertToASCIIUppercase):
+        * wtf/text/StringImpl.h:
+        * wtf/text/WTFString.cpp:
+        (WTF::String::convertToASCIIUppercase): Added.
+        * wtf/text/WTFString.h:
+
+2016-01-22  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed attempt to fix the Windows build after r195452.
+
+        * wtf/text/WTFString.h:
+
+2016-01-22  Darin Adler  <darin@apple.com>
+
+        Reduce use of equalIgnoringCase to just ignore ASCII case
+        https://bugs.webkit.org/show_bug.cgi?id=153266
+
+        Reviewed by Ryosuke Niwa.
+
+        * wtf/ASCIICType.h:
+        (WTF::isASCIIAlphaCaselessEqual): Loosened the assertion in this function
+        so it can work with ASCII spaces, numeric digits, and some punctuation.
+        Commented that we might want to change its name later.
+
+        * wtf/Assertions.cpp:
+        (WTFInitializeLogChannelStatesFromString): Use equalLettersIgnoringASCIICase.
+
+        * wtf/text/AtomicString.h:
+        (WTF::equalLettersIgnoringASCIICase): Added. Calls the version that takes a String.
+
+        * wtf/text/StringCommon.h:
+        (WTF::equalLettersIgnoringASCIICase): Added. Takes a pointer to characters.
+        (WTF::equalLettersIgnoringASCIICaseCommonWithoutLength): Added.
+        (WTF::equalLettersIgnoringASCIICaseCommon): Added.
+
+        * wtf/text/StringImpl.h:
+        (WTF::equalLettersIgnoringASCIICase): Added. Calls equalLettersIgnoringASCIICaseCommon.
+
+        * wtf/text/StringView.h:
+        (WTF::equalLettersIgnoringASCIICase): Added. Calls equalLettersIgnoringASCIICaseCommon.
+
+        * wtf/text/WTFString.h: Reordered/reformatted a little.
+        (WTF::equalIgnoringASCIICase): Added. Calls the version that takes a StringImpl.
+
+2016-01-22  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Buildfix for older GCCs after r195142
+        https://bugs.webkit.org/show_bug.cgi?id=153351
+
+        Unreviewed buildfix.
+
+        * wtf/SystemTracing.h:
+
+2016-01-21  Filip Pizlo  <fpizlo@apple.com>
+
+        REGRESSION(r195417): many tests crash
+        https://bugs.webkit.org/show_bug.cgi?id=153316
+
+        Reviewed by Saam Barati.
+
+        This rolls out the StdLibExtras.h change, and simplifies RangeSet to not use binary search.
+        That's fine for now, since B3 doesn't stress RangeSet enough right now.
+
+        * wtf/RangeSet.h:
+        (WTF::RangeSet::contains):
+        (WTF::RangeSet::overlaps):
+        (WTF::RangeSet::clear):
+        (WTF::RangeSet::findRange):
+        * wtf/StdLibExtras.h:
+        (WTF::binarySearchImpl):
+        (WTF::binarySearch):
+        (WTF::tryBinarySearch):
+        (WTF::approximateBinarySearch):
+
+2016-01-21  Filip Pizlo  <fpizlo@apple.com>
+
+        B3 should have load elimination
+        https://bugs.webkit.org/show_bug.cgi?id=153288
+
+        Reviewed by Geoffrey Garen.
+
+        I needed a way to track sets of ranges, where there is a high likelihood that all of the
+        ranges overlap. So I created RangeSet. It's a usually-sorted list of coalesced ranges.
+        Practically this means that right now, FTL B3 will end up with two kinds of range sets: a set
+        that just contains top and a set that contains nothing. In the future, most sets will either
+        be top of empty but some of them will contain a handful of other things.
+
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/MathExtras.h:
+        (WTF::leftShiftWithSaturation):
+        (WTF::nonEmptyRangesOverlap):
+        (WTF::rangesOverlap):
+        * wtf/RangeSet.h: Added.
+        (WTF::RangeSet::RangeSet):
+        (WTF::RangeSet::~RangeSet):
+        (WTF::RangeSet::add):
+        (WTF::RangeSet::contains):
+        (WTF::RangeSet::overlaps):
+        (WTF::RangeSet::clear):
+        (WTF::RangeSet::dump):
+        (WTF::RangeSet::dumpRaw):
+        (WTF::RangeSet::compact):
+        (WTF::RangeSet::overlapsNonEmpty):
+        (WTF::RangeSet::subsumesNonEmpty):
+        (WTF::RangeSet::findRange):
+        * wtf/StdLibExtras.h:
+        (WTF::binarySearchImpl):
+        (WTF::binarySearch):
+        (WTF::tryBinarySearch):
+        (WTF::approximateBinarySearch):
+
+2016-01-19  Ada Chan  <adachan@apple.com>
+
+        Make it possible to enable VIDEO_PRESENTATION_MODE on other Cocoa platforms.
+        https://bugs.webkit.org/show_bug.cgi?id=153218
+
+        Reviewed by Eric Carlson.
+
+        * wtf/Platform.h:
+
+2016-01-19  Filip Pizlo  <fpizlo@apple.com>
+
+        B3 should have basic path specialization
+        https://bugs.webkit.org/show_bug.cgi?id=153200
+
+        Reviewed by Benjamin Poulain.
+
+        * wtf/GraphNodeWorklist.h:
+        (WTF::GraphNodeWorklist::push):
+        (WTF::GraphNodeWorklist::pushAll):
+        (WTF::GraphNodeWorklist::isEmpty):
+        (WTF::GraphNodeWorklist::notEmpty):
+
+2016-01-20  Said Abou-Hallawa  <sabouhallawa@apple.com>
+
+        Refactor AtomicStringKeyedMRUCache to be a generic LRU cache
+        https://bugs.webkit.org/show_bug.cgi?id=153109
+
+        Reviewed by Darin Adler.
+
+        Refactor AtomicStringKeyedMRUCache, move it to WTF project and rename it
+        to be TinyLRUCache. Define another template and call it TinyLRUCachePolicy.
+        This one can be overridden for different keys and values. Its function is 
+        creating the cached values.
+
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/TinyLRUCache.h: Added.
+        (WebCore::TinyLRUCachePolicy::isKeyNull):
+        (WebCore::TinyLRUCachePolicy::createValueForNullKey):
+        (WebCore::TinyLRUCachePolicy::createValueForKey):
+        (WebCore::TinyLRUCache::get):
+
+2016-01-19  Saam barati  <sbarati@apple.com>
+
+        WTF::Bag should be non-copyable
+        https://bugs.webkit.org/show_bug.cgi?id=153253
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/Bag.h:
+        * wtf/SegmentedVector.h:
+        (WTF::SegmentedVector::append):
+        (WTF::SegmentedVector::alloc):
+
+2016-01-19  Enrica Casucci  <enrica@apple.com>
+
+        Add support for DataDetectors in WK (iOS).
+        https://bugs.webkit.org/show_bug.cgi?id=152989
+        rdar://problem/22855960
+
+        Reviewed by Tim Horton.
+
+        Adding feature definition for data detection.
+
+        * wtf/FeatureDefines.h:
+
+2016-01-19  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r195300.
+        https://bugs.webkit.org/show_bug.cgi?id=153244
+
+        enrica wants more time to fix Windows (Requested by thorton on
+        #webkit).
+
+        Reverted changeset:
+
+        "Add support for DataDetectors in WK (iOS)."
+        https://bugs.webkit.org/show_bug.cgi?id=152989
+        http://trac.webkit.org/changeset/195300
+
+2016-01-19  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r195141.
+
+        Seems to cause crashes on iOS9 64bit
+
+        Reverted changeset:
+
+        "Fragmentation-free allocator for timeless and/or coupled
+        allocations."
+        https://bugs.webkit.org/show_bug.cgi?id=152696
+        http://trac.webkit.org/changeset/195141
+
+2016-01-19  Enrica Casucci  <enrica@apple.com>
+
+        Add support for DataDetectors in WK (iOS).
+        https://bugs.webkit.org/show_bug.cgi?id=152989
+        rdar://problem/22855960
+
+        Reviewed by Tim Horton.
+
+        Adding feature definition for data detection.
+
+        * wtf/FeatureDefines.h:
+
+2016-01-17  Filip Pizlo  <fpizlo@apple.com>
+
+        FTL B3 should be just as fast as FTL LLVM on Octane/crypto
+        https://bugs.webkit.org/show_bug.cgi?id=153113
+
+        Reviewed by Saam Barati.
+
+        * wtf/IndexSparseSet.h:
+        (WTF::IndexSparseSet<OverflowHandler>::IndexSparseSet):
+        (WTF::IndexSparseSet<OverflowHandler>::add):
+        (WTF::IndexSparseSet<OverflowHandler>::remove):
+        * wtf/StringPrintStream.h:
+        (WTF::StringPrintStream::length):
+
+2016-01-17  Michael Catanzaro  <mcatanzaro@igalia.com>
+
+        [CMake] Do not build bmalloc when USE_SYSTEM_MALLOC is ON
+        https://bugs.webkit.org/show_bug.cgi?id=153190
+
+        Reviewed by Csaba Osztrogonác.
+
+        Build bmalloc when NOT USE_SYSTEM_MALLOC rather than when NOT WIN32.
+
+        * wtf/CMakeLists.txt:
+
+2016-01-15  Simon Fraser  <simon.fraser@apple.com>
+
+        Add kdebug_trace signposts for a few WebCore operations
+        https://bugs.webkit.org/show_bug.cgi?id=153136
+        rdar://problem/24208487
+
+        Reviewed by Sam Weinig.
+        
+        New header with the reserved WebKit component code, trace point codes, and
+        a stack-based helper that traces scope entry and exit.
+        
+        The available range of trace point codes is arbitrarily segmented into WTF, JSC,
+        WebCore, WebKit and WebKit2.
+
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/SystemTracing.h: Added.
+        (WTF::TraceScope::TraceScope):
+        (WTF::TraceScope::~TraceScope):
+
+2016-01-15  Andreas Kling  <akling@apple.com>
+
+        Fragmentation-free allocator for timeless and/or coupled allocations.
+        <https://webkit.org/b/152696>
+
+        Reviewed by Antti Koivisto.
+
+        Introduce BumpArena, a space-efficient memory allocator for situations where
+        you feel pretty confident betting on allocation lifetimes.
+
+        Basic design:
+
+            - Reserves 128MB range of memory at startup.
+            - Allocates 4kB-aligned blocks of 4kB from VM at a time.
+            - Bump-pointer allocates out of a block until it reaches end.
+            - Each allocation increments the ref-count of its block.
+            - Each deallocation decrements the ref-count of its block.
+            - Transparently falls back to fastMalloc()/fastFree() when needed.
+
+        Interface:
+
+            - BumpArena::create()
+
+                Create your very own BumpArena!
+
+            - BumpArena::allocate(BumpArena* arena, size_t size)
+
+                Allocates 'size' bytes of memory from 'arena'.
+                If 'arena' is null, falls back to fastMalloc().
+
+            - BumpArena::deallocate(void* ptr)
+
+                If 'ptr' is BumpArena allocation, decrements block ref-count.
+                If 'ptr' is FastMalloc allocation, calls fastFree() on it.
+
+            - WTF_MAKE_BUMPARENA_ALLOCATED;
+
+                Macro that gives a class or struct custom operators new and delete
+                for allocation out of BumpArena. Just like WTF_MAKE_FAST_ALLOCATED;
+
+        Note that while the name of this patch says "fragmentation-free allocator"
+        it will only be fragmentation-free when used for appropriate things.
+        This is not meant to be a general-purpose allocator. Only use it for sets of
+        allocations that are known to die roughly at the same time.
+
+        BumpArena will never resume allocating from a block that has been filled,
+        so it's even more important than usual that everything gets deallocated.
+
+        BumpArena redirects allocations to FastMalloc in three cases:
+
+            - When invoked with a null BumpArena*
+            - When allocation request is larger than BumpArena's block size (4kB)
+            - When BumpArena has exhausted all of its pre-reserved VM. (128MB)
+
+        The VM allocator will eagerly return blocks of VM to the kernel by calling
+        madvise(). Average time spent in madvise is around 0.007ms on my box.
+
+        * WTF.vcxproj/WTF.vcxproj:
+        * WTF.vcxproj/WTF.vcxproj.filters:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/BumpArena.cpp: Added.
+        (WTF::BumpArena::Block::capacity):
+        (WTF::BumpArena::Block::arena):
+        (WTF::BumpArena::Block::payloadStart):
+        (WTF::arenas):
+        (WTF::BumpArena::Block::Block):
+        (WTF::BumpArena::Block::~Block):
+        (WTF::BumpArena::Block::ref):
+        (WTF::BlockAllocator::BlockAllocator):
+        (WTF::BlockAllocator::isAllocation):
+        (WTF::blockAllocator):
+        (WTF::BlockAllocator::allocateBlock):
+        (WTF::BlockAllocator::deallocateBlock):
+        (WTF::BumpArena::Block::deref):
+        (WTF::BumpArena::Block::create):
+        (WTF::BumpArena::Block::dump):
+        (WTF::BumpArena::dump):
+        (WTF::BumpArena::create):
+        (WTF::BumpArena::BumpArena):
+        (WTF::BumpArena::~BumpArena):
+        (WTF::BumpArena::allocateSlow):
+        (WTF::BumpArena::allocate):
+        (WTF::BumpArena::deallocate):
+        (WTF::BumpArena::Block::blockFor):
+        (WTF::BumpArena::arenaFor):
+        * wtf/BumpArena.h: Added.
+        * wtf/CMakeLists.txt:
+
+2016-01-15  Konstantin Tokarev  <annulen@yandex.ru>
+
+        [EFL] WorkQueue methods should be defined inside WTF namespace.
+        https://bugs.webkit.org/show_bug.cgi?id=153097
+
+        Reviewed by Gyuyoung Kim.
+
+        * wtf/efl/WorkQueueEfl.cpp:
+
+2016-01-14  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r195035.
+
+        Caused 1-3% PLT regression on iOS
+
+        Reverted changeset:
+
+        "Part 2/2: Stop using USE(CFNETWORK) path on iOS"
+        https://bugs.webkit.org/show_bug.cgi?id=142540
+        http://trac.webkit.org/changeset/195035
+
+2016-01-14  David Kilzer  <ddkilzer@apple.com>
+
+        Part 2/2: Stop using USE(CFNETWORK) path on iOS
+        <https://webkit.org/b/142540>
+
+        Original patch by Antti Koivisto <antti@apple.com> on 2015-03-10
+        Reviewed by Chris Dumez.
+
+        * wtf/Platform.h: Turn off USE(CFNETWORK) for PLATFORM(IOS).
+
+2016-01-14  Per Arne Vollan  <peavo@outlook.com>
+
+        [Win] Remove workarounds for fixed bugs in fmod and pow.
+        https://bugs.webkit.org/show_bug.cgi?id=153071
+
+        Reviewed by Brent Fulgham.
+
+        The bugs have been fixed in the MSVC CRT, and we can remove the workarounds.
+
+        * wtf/MathExtras.h:
+        (wtf_fmod): Deleted.
+        (wtf_pow): Deleted.
+
+2016-01-13  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r194963.
+        https://bugs.webkit.org/show_bug.cgi?id=153079
+
+        This change causes ASan tests to crash and exit early
+        (Requested by ryanhaddad on #webkit).
+
+        Reverted changeset:
+
+        "Fragmentation-free allocator for timeless and/or coupled
+        allocations."
+        https://bugs.webkit.org/show_bug.cgi?id=152696
+        http://trac.webkit.org/changeset/194963
+
+2016-01-13  Andreas Kling  <akling@apple.com>
+
+        Fragmentation-free allocator for timeless and/or coupled allocations.
+        <https://webkit.org/b/152696>
+
+        Reviewed by Antti Koivisto.
+
+        Introduce BumpArena, a space-efficient memory allocator for situations where
+        you feel pretty confident betting on allocation lifetimes.
+
+        Basic design:
+
+            - Allocates 4kB-aligned blocks of 4kB from bmalloc at a time.
+            - Bump-pointer allocates out of a block until it reaches end.
+            - Each allocation increments the ref-count of its block.
+            - Each deallocation decrements the ref-count of its block.
+
+        Interface:
+
+            - BumpArena::create()
+
+                Create your very own BumpArena!
+
+            - BumpArena::allocate(BumpArena* arena, size_t size)
+
+                Allocates 'size' bytes of memory from 'arena'.
+                If 'arena' is null, allocation comes out of the shared global BumpArena.
+
+            - BumpArena::deallocate(void* ptr)
+
+                Deallocates 'ptr', decrementing the ref-count of its block.
+
+            - WTF_MAKE_BUMPARENA_ALLOCATED;
+
+                Macro that gives a class or struct custom operators new and delete
+                for allocation out of BumpArena. Just like WTF_MAKE_FAST_ALLOCATED;
+
+        Note that while the name of this patch says "fragmentation-free allocator"
+        it will only be fragmentation-free when used for appropriate things.
+        This is not meant to be a general-purpose allocator. Only use it for sets of
+        allocations that are known to die roughly at the same time.
+
+        BumpArena will never resume allocating from a block that has been filled,
+        so it's even more important than usual that everything gets deallocated.
+
+        As noted above, calling allocate() with a null BumpArena will allocate out
+        of a global shared arena. Ideally you're always allocating out of a specific,
+        controlled arena, but there are situations where you may not have one.
+
+        * WTF.vcxproj/WTF.vcxproj:
+        * WTF.vcxproj/WTF.vcxproj.filters:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/BumpArena.cpp: Added.
+        (WTF::BumpArena::Block::defaultCapacity):
+        (WTF::BumpArena::Block::arena):
+        (WTF::BumpArena::Block::payloadStart):
+        (WTF::globalArena):
+        (WTF::arenas):
+        (WTF::BumpArena::Block::Block):
+        (WTF::BumpArena::Block::~Block):
+        (WTF::BumpArena::Block::ref):
+        (WTF::BumpArena::Block::deref):
+        (WTF::BumpArena::Block::create):
+        (WTF::BumpArena::Block::dump):
+        (WTF::BumpArena::dump):
+        (WTF::BumpArena::create):
+        (WTF::BumpArena::BumpArena):
+        (WTF::BumpArena::~BumpArena):
+        (WTF::BumpArena::allocateSlow):
+        (WTF::BumpArena::allocate):
+        (WTF::BumpArena::deallocate):
+        (WTF::BumpArena::Block::blockFor):
+        (WTF::BumpArena::arenaFor):
+        * wtf/BumpArena.h: Added.
+        * wtf/CMakeLists.txt:
+
+2016-01-08  Andy Estes  <aestes@apple.com>
+
+        [Content Filtering] Lazily load platform frameworks
+        https://bugs.webkit.org/show_bug.cgi?id=152881
+        rdar://problem/23270886
+
+        Reviewed by Brady Eidson.
+
+        * wtf/Platform.h: Moved definition of HAVE_NETWORK_EXTENSION to here from WebCore/platform/cocoa/NetworkExtensionContentFilter.h.
+
+2016-01-12  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add a build flag for custom element
+        https://bugs.webkit.org/show_bug.cgi?id=153005
+
+        Reviewed by Alex Christensen.
+
+        * wtf/FeatureDefines.h:
+
+2016-01-11  Andreas Kling  <akling@apple.com>
+
+        NeverDestroyed should relax adoption requirements on all RefCountedBase subclasses.
+        <https://webkit.org/b/152960>
+
+        Reviewed by Antti Koivisto.
+
+        Instead of relaxing on subclasses of RefCounted<T>, relax on subclasses of RefCountedBase.
+        This allows e.g NeverDestroyed<CSSPrimitiveValue> to relax its pointee despite the class
+        hierarchy starting with RefCounted<CSSValue> (not RefCounted<CSSPrimitiveValue>.)
+
+        * wtf/NeverDestroyed.h:
+
+2016-01-10  Saam barati  <sbarati@apple.com>
+
+        Implement a sampling profiler
+        https://bugs.webkit.org/show_bug.cgi?id=151713
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/MetaAllocator.cpp:
+        (WTF::MetaAllocator::decrementPageOccupancy):
+        (WTF::MetaAllocator::isInAllocatedMemory):
+        (WTF::MetaAllocator::roundUp):
+        * wtf/MetaAllocator.h:
+        (WTF::MetaAllocator::getLock):
+        * wtf/Platform.h:
+
+2016-01-10  Filip Pizlo  <fpizlo@apple.com>
+
+        It should be possible to run liveness over registers without also tracking Tmps
+        https://bugs.webkit.org/show_bug.cgi?id=152963
+
+        Reviewed by Saam Barati.
+
+        Add set methods (add/contains/remove) to BitVector, since it gets used as a set in a lot of
+        places. This also makes BitVector a drop-in replacement for HashSet<unsigned> in a lot of
+        places.
+
+        Also made the iterator methods of BitVector live on BitVector directly rather than behind the
+        thing returned from setBits(). This makes sense since that makes BitVector even more of a
+        drop-in for HashSet. It's not harmful since we've never added any other mode of iterating a
+        BitVector other than this, so it doesn't make sense to make it harder to access.
+
+        * wtf/BitVector.h:
+        (WTF::BitVector::get):
+        (WTF::BitVector::contains):
+        (WTF::BitVector::set):
+        (WTF::BitVector::add):
+        (WTF::BitVector::ensureSizeAndSet):
+        (WTF::BitVector::clear):
+        (WTF::BitVector::remove):
+        (WTF::BitVector::hash):
+        (WTF::BitVector::iterator::iterator):
+        (WTF::BitVector::iterator::operator*):
+        (WTF::BitVector::iterator::operator++):
+        (WTF::BitVector::iterator::operator==):
+        (WTF::BitVector::iterator::operator!=):
+        (WTF::BitVector::begin):
+        (WTF::BitVector::end):
+        (WTF::BitVector::bitsInPointer):
+        (WTF::BitVector::SetBitsIterable::SetBitsIterable): Deleted.
+        (WTF::BitVector::SetBitsIterable::iterator::iterator): Deleted.
+        (WTF::BitVector::SetBitsIterable::iterator::operator*): Deleted.
+        (WTF::BitVector::SetBitsIterable::iterator::operator++): Deleted.
+        (WTF::BitVector::SetBitsIterable::iterator::operator==): Deleted.
+        (WTF::BitVector::SetBitsIterable::iterator::operator!=): Deleted.
+        (WTF::BitVector::SetBitsIterable::begin): Deleted.
+        (WTF::BitVector::SetBitsIterable::end): Deleted.
+        (WTF::BitVector::setBits): Deleted.
+
+2016-01-09  Andreas Kling  <akling@apple.com>
+
+        Use NeverDestroyed instead of DEPRECATED_DEFINE_STATIC_LOCAL
+        <https://webkit.org/b/152902>
+
+        Reviewed by Anders Carlsson.
+
+        Mostly mechanical conversion to NeverDestroyed throughout WTF.
+
+        * wtf/RunLoop.cpp:
+        (WTF::RunLoop::current):
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::threadMapMutex):
+        (WTF::threadMap):
+
+2016-01-08  Anders Carlsson  <andersca@apple.com>
+
+        Nullopt and InPlace should be structs, not enum values
+        https://bugs.webkit.org/show_bug.cgi?id=152915
+
+        Reviewed by Andreas Kling.
+
+        Without this, 
+
+        Optional<int> o = flag ? 1 : Nullopt;
+
+        would cause Nullopt to be treated as an integer, causing o to be initialized to 0,
+        instead of Nullopt. With this change, the above code now causes a compile error.
+
+        Also, get rid of the CONSTEXPR macro since all compilers support constexpr properly,
+        and add a WTF::makeOptional to match the current iteration of std::experimental::optional.
+
+        * wtf/Compiler.h:
+        * wtf/Forward.h:
+        * wtf/Optional.h:
+        (WTF::NulloptTag::NulloptTag):
+        (WTF::makeOptional):
+        * wtf/StdLibExtras.h:
+        (std::literals::chrono_literals::operator _s):
+        (std::literals::chrono_literals::operator _ms):
+        (std::move):
+
+2016-01-06  Anders Carlsson  <andersca@apple.com>
+
+        Add a smart block pointer
+        https://bugs.webkit.org/show_bug.cgi?id=152799
+
+        Reviewed by Tim Horton.
+
+        Introduce WTF::BlockPtr, a smart block pointer.
+
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/BlockPtr.h: Added.
+        (WTF::makeBlockPtr):
+
+2016-01-04  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Allow to save and restore session
+        https://bugs.webkit.org/show_bug.cgi?id=115600
+
+        Reviewed by Michael Catanzaro.
+
+        Add GVariantIter specialization of GUniquePtr.
+
+        * wtf/glib/GTypedefs.h:
+        * wtf/glib/GUniquePtr.h:
+
+2016-01-04  Tim Horton  <timothy_horton@apple.com>
+
+        Turn on gesture events when building for Yosemite
+        https://bugs.webkit.org/show_bug.cgi?id=152704
+        rdar://problem/24042472
+
+        Reviewed by Anders Carlsson.
+
+        * wtf/FeatureDefines.h:
+
+2016-01-04  Benjamin Poulain  <bpoulain@apple.com>
+
+        [JSC] Build B3 by default on iOS ARM64
+        https://bugs.webkit.org/show_bug.cgi?id=152525
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/Platform.h:
+
 2016-01-03  Andreas Kling  <akling@apple.com>
 
         Unreviewed, rolling out r194510.

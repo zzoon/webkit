@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003-2009, 2012-2015 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003-2009, 2012-2016 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -936,6 +936,9 @@ public:
     {
         return sizeof(JSObject) + inlineCapacity * sizeof(WriteBarrierBase<Unknown>);
     }
+
+    static inline const TypeInfo typeInfo() { return TypeInfo(FinalObjectType, StructureFlags); }
+    static const IndexingType defaultIndexingType = NonArray;
         
     static const unsigned defaultSize = 64;
     static inline unsigned defaultInlineCapacity()
@@ -953,7 +956,7 @@ public:
     static JSFinalObject* create(VM&, Structure*);
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype, unsigned inlineCapacity)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(FinalObjectType, StructureFlags), info(), NonArray, inlineCapacity);
+        return Structure::create(vm, globalObject, prototype, typeInfo(), info(), defaultIndexingType, inlineCapacity);
     }
 
     JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
@@ -1477,15 +1480,27 @@ ALWAYS_INLINE Identifier makeIdentifier(VM&, const Identifier& name)
         vm, globalObject, makeIdentifier(vm, (jsName)), (length), cppName, \
         (intrinsic), (attributes))
 
+#define JSC_NATIVE_INTRINSIC_FUNCTION_WITHOUT_TRANSITION(jsName, cppName, attributes, length, intrinsic) \
+    putDirectNativeFunctionWithoutTransition(\
+        vm, globalObject, makeIdentifier(vm, (jsName)), (length), cppName, \
+        (intrinsic), (attributes))
+
 // As above, but this assumes that the function you're defining doesn't have an
 // intrinsic.
 #define JSC_NATIVE_FUNCTION(jsName, cppName, attributes, length) \
     JSC_NATIVE_INTRINSIC_FUNCTION(jsName, cppName, (attributes), (length), NoIntrinsic)
 
+#define JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(jsName, cppName, attributes, length) \
+    JSC_NATIVE_INTRINSIC_FUNCTION_WITHOUT_TRANSITION(jsName, cppName, (attributes), (length), NoIntrinsic)
+
 // Identical helpers but for builtins. Note that currently, we don't support builtins that are
 // also intrinsics, but we probably will do that eventually.
 #define JSC_BUILTIN_FUNCTION(jsName, generatorName, attributes) \
     putDirectBuiltinFunction(\
+        vm, globalObject, makeIdentifier(vm, (jsName)), (generatorName)(vm), (attributes))
+
+#define JSC_BUILTIN_FUNCTION_WITHOUT_TRANSITION(jsName, generatorName, attributes) \
+    putDirectBuiltinFunctionWithoutTransition(\
         vm, globalObject, makeIdentifier(vm, (jsName)), (generatorName)(vm), (attributes))
 
 // Helper for defining native getters on properties.

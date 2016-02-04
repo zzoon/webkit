@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,35 +28,38 @@
 
 #if ENABLE(B3_JIT)
 
-#include "B3StackSlotValue.h"
+#include "B3StackSlot.h"
 
 namespace JSC { namespace B3 { namespace Air {
 
 void StackSlot::setOffsetFromFP(intptr_t value)
 {
     m_offsetFromFP = value;
-    if (m_value)
-        m_value->m_offsetFromFP = value;
+    if (m_b3Slot)
+        m_b3Slot->m_offsetFromFP = value;
 }
 
 void StackSlot::dump(PrintStream& out) const
 {
-    out.print("stack", m_index);
+    if (isSpill())
+        out.print("spill");
+    else
+        out.print("stack");
+    out.print(m_index);
 }
 
 void StackSlot::deepDump(PrintStream& out) const
 {
     out.print("byteSize = ", m_byteSize, ", offsetFromFP = ", m_offsetFromFP, ", kind = ", m_kind);
-    if (m_value)
-        out.print(", value = ", *m_value);
+    if (m_b3Slot)
+        out.print(", b3Slot = ", *m_b3Slot, ": (", B3::deepDump(m_b3Slot), ")");
 }
 
-StackSlot::StackSlot(unsigned byteSize, unsigned index, StackSlotKind kind, StackSlotValue* value)
+StackSlot::StackSlot(unsigned byteSize, StackSlotKind kind, B3::StackSlot* b3Slot)
     : m_byteSize(byteSize)
-    , m_index(index)
-    , m_offsetFromFP(value ? value->offsetFromFP() : 0)
+    , m_offsetFromFP(b3Slot ? b3Slot->offsetFromFP() : 0)
     , m_kind(kind)
-    , m_value(value)
+    , m_b3Slot(b3Slot)
 {
     ASSERT(byteSize);
 }

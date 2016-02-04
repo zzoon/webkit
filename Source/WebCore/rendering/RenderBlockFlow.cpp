@@ -144,7 +144,7 @@ void RenderBlockFlow::insertedIntoTree()
 void RenderBlockFlow::willBeDestroyed()
 {
     if (renderNamedFlowFragment())
-        setRenderNamedFlowFragment(0);
+        setRenderNamedFlowFragment(nullptr);
 
     // Make sure to destroy anonymous children first while they are still connected to the rest of the tree, so that they will
     // properly dirty line boxes that they are removed from. Effects that do :before/:after only on hover could crash otherwise.
@@ -1490,9 +1490,9 @@ LayoutUnit RenderBlockFlow::applyBeforeBreak(RenderBox& child, LayoutUnit logica
     bool checkColumnBreaks = flowThread && flowThread->shouldCheckColumnBreaks();
     bool checkPageBreaks = !checkColumnBreaks && view().layoutState()->m_pageLogicalHeight; // FIXME: Once columns can print we have to check this.
     bool checkRegionBreaks = flowThread && flowThread->isRenderNamedFlowThread();
-    bool checkBeforeAlways = (checkColumnBreaks && child.style().columnBreakBefore() == PBALWAYS)
-        || (checkPageBreaks && child.style().pageBreakBefore() == PBALWAYS)
-        || (checkRegionBreaks && child.style().regionBreakBefore() == PBALWAYS);
+    bool checkBeforeAlways = (checkColumnBreaks && child.style().breakBefore() == ColumnBreakBetween)
+        || (checkPageBreaks && alwaysPageBreak(child.style().breakBefore()))
+        || (checkRegionBreaks && child.style().breakBefore() == RegionBreakBetween);
     if (checkBeforeAlways && inNormalFlow(child) && hasNextPage(logicalOffset, IncludePageBoundary)) {
         if (checkColumnBreaks) {
             if (isInsideMulticolFlowThread)
@@ -1516,9 +1516,9 @@ LayoutUnit RenderBlockFlow::applyAfterBreak(RenderBox& child, LayoutUnit logical
     bool checkColumnBreaks = flowThread && flowThread->shouldCheckColumnBreaks();
     bool checkPageBreaks = !checkColumnBreaks && view().layoutState()->m_pageLogicalHeight; // FIXME: Once columns can print we have to check this.
     bool checkRegionBreaks = flowThread && flowThread->isRenderNamedFlowThread();
-    bool checkAfterAlways = (checkColumnBreaks && child.style().columnBreakAfter() == PBALWAYS)
-        || (checkPageBreaks && child.style().pageBreakAfter() == PBALWAYS)
-        || (checkRegionBreaks && child.style().regionBreakAfter() == PBALWAYS);
+    bool checkAfterAlways = (checkColumnBreaks && child.style().breakAfter() == ColumnBreakBetween)
+        || (checkPageBreaks && alwaysPageBreak(child.style().breakAfter()))
+        || (checkRegionBreaks && child.style().breakAfter() == RegionBreakBetween);
     if (checkAfterAlways && inNormalFlow(child) && hasNextPage(logicalOffset, IncludePageBoundary)) {
         LayoutUnit marginOffset = marginInfo.canCollapseWithMarginBefore() ? LayoutUnit() : marginInfo.margin();
 
@@ -3151,8 +3151,8 @@ void RenderBlockFlow::createRenderNamedFlowFragmentIfNeeded()
     if (style().isDisplayRegionType() && style().hasFlowFrom() && !style().specifiesColumns()) {
         RenderNamedFlowFragment* flowFragment = new RenderNamedFlowFragment(document(), RenderNamedFlowFragment::createStyle(style()));
         flowFragment->initializeStyle();
+        addChild(flowFragment);
         setRenderNamedFlowFragment(flowFragment);
-        addChild(renderNamedFlowFragment());
     }
 }
 
@@ -3198,8 +3198,8 @@ void RenderBlockFlow::updateLogicalHeight()
 void RenderBlockFlow::setRenderNamedFlowFragment(RenderNamedFlowFragment* flowFragment)
 {
     RenderBlockFlowRareData& rareData = ensureRareBlockFlowData();
-    if (rareData.m_renderNamedFlowFragment)
-        rareData.m_renderNamedFlowFragment->destroy();
+    if (auto* flowFragmentOnFlow = std::exchange(rareData.m_renderNamedFlowFragment, nullptr))
+        flowFragmentOnFlow->destroy();
     rareData.m_renderNamedFlowFragment = flowFragment;
 }
 
@@ -3766,7 +3766,7 @@ RenderObject* RenderBlockFlow::layoutSpecialExcludedChild(bool relayoutChildren)
         for (RenderMultiColumnSet* columnSet = flowThread->firstMultiColumnSet(); columnSet; columnSet = columnSet->nextSiblingMultiColumnSet())
             columnSet->prepareForLayout(!flowThread->inBalancingPass());
 
-        flowThread->invalidateRegions();
+        flowThread->invalidateRegions(MarkOnlyThis);
         flowThread->setNeedsHeightsRecalculation(true);
         flowThread->layout();
     } else {

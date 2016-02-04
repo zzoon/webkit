@@ -23,6 +23,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// @conditional=ENABLE(MEDIA_STREAM)
+
 function webkitGetUserMedia(options, successCallback, errorCallback)
 {
     "use strict";
@@ -42,5 +44,5 @@ function webkitGetUserMedia(options, successCallback, errorCallback)
     if (typeof errorCallback !== "function")
         throw new @TypeError("Argument 3 ('errorCallback') to Navigator.webkitGetUserMedia must be a function");
 
-    this.mediaDevices.@getUserMediaFromJS(options).then(successCallback, errorCallback);
+    this.mediaDevices.@getUserMediaFromJS(options).@then(successCallback, errorCallback);
 }

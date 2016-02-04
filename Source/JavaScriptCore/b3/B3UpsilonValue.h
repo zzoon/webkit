@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,20 +49,20 @@ public:
 protected:
     void dumpMeta(CommaPrinter&, PrintStream&) const override;
 
+    Value* cloneImpl() const override;
+
 private:
     friend class Procedure;
 
     // Note that passing the Phi during construction is optional. A valid pattern is to first create
     // the Upsilons without the Phi, then create the Phi, then go back and tell the Upsilons about
     // the Phi. This allows you to emit code in its natural order.
-    UpsilonValue(unsigned index, Origin origin, Value* value, Value* phi = nullptr)
-        : Value(index, CheckedOpcode, Upsilon, Void, origin, value)
+    UpsilonValue(Origin origin, Value* value, Value* phi = nullptr)
+        : Value(CheckedOpcode, Upsilon, Void, origin, value)
         , m_phi(phi)
     {
-        if (phi) {
+        if (phi)
             ASSERT(value->type() == phi->type());
-            ASSERT(phi->opcode() == Phi);
-        }
     }
 
     Value* m_phi;

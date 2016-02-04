@@ -1,4 +1,4 @@
-CONSOLE MESSAGE: line 17: XMLHttpRequest cannot load http://127.0.0.1:8000/xmlhttprequest/resources/access-control-sandboxed-iframe-denied.cgi. Cannot make any requests from null.
+CONSOLE MESSAGE: line 17: XMLHttpRequest cannot load http://127.0.0.1:8000/xmlhttprequest/resources/access-control-sandboxed-iframe-denied.cgi. Origin null is not allowed by Access-Control-Allow-Origin.
 This test verifies that sandboxed iframe does not have XmlHttpRequest access to its server. It will print "PASS" on success.
 
 
@@ -6,4 +6,4 @@ This test verifies that sandboxed iframe does not have XmlHttpRequest access to 
 --------
 Frame: '<!--framePath //<!--frame0-->-->'
 --------
-PASS: Exception thrown. Sandboxed iframe XHR access was denied in 'send'. [NETWORK_ERR: XMLHttpRequest Exception 101].
+PASS: Exception thrown. Sandboxed iframe XHR access was denied in 'send'. [NetworkError: DOM Exception 19].

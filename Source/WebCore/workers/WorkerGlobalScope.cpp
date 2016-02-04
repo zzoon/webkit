@@ -49,7 +49,6 @@
 #include "WorkerScriptLoader.h"
 #include "WorkerThread.h"
 #include "WorkerThreadableLoader.h"
-#include "XMLHttpRequestException.h"
 #include <bindings/ScriptValue.h>
 #include <inspector/ConsoleMessage.h>
 #include <inspector/ScriptCallStack.h>
@@ -73,6 +72,7 @@ WorkerGlobalScope::WorkerGlobalScope(const URL& url, const String& userAgent, Wo
     , m_topOrigin(topOrigin)
 {
     setSecurityOriginPolicy(SecurityOriginPolicy::create(SecurityOrigin::create(url)));
+    setContentSecurityPolicy(std::make_unique<ContentSecurityPolicy>(*this));
 }
 
 WorkerGlobalScope::~WorkerGlobalScope()
@@ -86,10 +86,9 @@ WorkerGlobalScope::~WorkerGlobalScope()
     thread().workerReportingProxy().workerGlobalScopeDestroyed();
 }
 
-void WorkerGlobalScope::applyContentSecurityPolicyFromString(const String& policy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType)
+void WorkerGlobalScope::applyContentSecurityPolicyResponseHeaders(const ContentSecurityPolicyResponseHeaders& contentSecurityPolicyResponseHeaders)
 {
-    setContentSecurityPolicy(std::make_unique<ContentSecurityPolicy>(this));
-    contentSecurityPolicy()->didReceiveHeader(policy, contentSecurityPolicyType);
+    contentSecurityPolicy()->didReceiveHeaders(contentSecurityPolicyResponseHeaders);
 }
 
 URL WorkerGlobalScope::completeURL(const String& url) const
@@ -188,7 +187,7 @@ void WorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionCode&
 
         // If the fetching attempt failed, throw a NETWORK_ERR exception and abort all these steps.
         if (scriptLoader->failed()) {
-            ec = XMLHttpRequestException::NETWORK_ERR;
+            ec = NETWORK_ERR;
             return;
         }
 

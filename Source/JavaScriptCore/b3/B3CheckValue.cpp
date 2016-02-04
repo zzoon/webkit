@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,9 +40,14 @@ void CheckValue::convertToAdd()
     m_opcode = CheckAdd;
 }
 
+Value* CheckValue::cloneImpl() const
+{
+    return new CheckValue(*this);
+}
+
 // Use this form for CheckAdd, CheckSub, and CheckMul.
-CheckValue::CheckValue(unsigned index, Opcode opcode, Origin origin, Value* left, Value* right)
-    : StackmapValue(index, CheckedOpcode, opcode, left->type(), origin)
+CheckValue::CheckValue(Opcode opcode, Origin origin, Value* left, Value* right)
+    : StackmapValue(CheckedOpcode, opcode, left->type(), origin)
 {
     ASSERT(B3::isInt(type()));
     ASSERT(left->type() == right->type());
@@ -52,8 +57,8 @@ CheckValue::CheckValue(unsigned index, Opcode opcode, Origin origin, Value* left
 }
 
 // Use this form for Check.
-CheckValue::CheckValue(unsigned index, Opcode opcode, Origin origin, Value* predicate)
-    : StackmapValue(index, CheckedOpcode, opcode, Void, origin)
+CheckValue::CheckValue(Opcode opcode, Origin origin, Value* predicate)
+    : StackmapValue(CheckedOpcode, opcode, Void, origin)
 {
     ASSERT(opcode == Check);
     append(ConstrainedValue(predicate, ValueRep::WarmAny));

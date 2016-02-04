@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,14 +28,16 @@
 
 #if ENABLE(B3_JIT)
 
-#include "B3StackSlotKind.h"
+#include "AirStackSlotKind.h"
+#include "B3SparseCollection.h"
+#include <limits.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PrintStream.h>
 
 namespace JSC { namespace B3 {
 
-class StackSlotValue;
+class StackSlot;
 
 namespace Air {
 
@@ -46,7 +48,14 @@ public:
     unsigned byteSize() const { return m_byteSize; }
     StackSlotKind kind() const { return m_kind; }
     bool isLocked() const { return m_kind == StackSlotKind::Locked; }
+    bool isSpill() const { return m_kind == StackSlotKind::Spill; }
     unsigned index() const { return m_index; }
+
+    void ensureSize(unsigned requestedSize)
+    {
+        ASSERT(!m_offsetFromFP);
+        m_byteSize = std::max(m_byteSize, requestedSize);
+    }
 
     unsigned alignment() const
     {
@@ -59,7 +68,7 @@ public:
         return 8;
     }
 
-    StackSlotValue* value() const { return m_value; }
+    B3::StackSlot* b3Slot() const { return m_b3Slot; }
 
     // Zero means that it's not yet assigned.
     intptr_t offsetFromFP() const { return m_offsetFromFP; }
@@ -73,14 +82,15 @@ public:
 
 private:
     friend class Code;
+    friend class SparseCollection<StackSlot>;
 
-    StackSlot(unsigned byteSize, unsigned index, StackSlotKind, StackSlotValue*);
+    StackSlot(unsigned byteSize, StackSlotKind, B3::StackSlot*);
     
-    unsigned m_byteSize;
-    unsigned m_index;
-    intptr_t m_offsetFromFP;
-    StackSlotKind m_kind;
-    StackSlotValue* m_value;
+    unsigned m_byteSize { 0 };
+    unsigned m_index { UINT_MAX };
+    intptr_t m_offsetFromFP { 0 };
+    StackSlotKind m_kind { StackSlotKind::Locked };
+    B3::StackSlot* m_b3Slot { nullptr };
 };
 
 class DeepStackSlotDump {
@@ -113,7 +123,7 @@ namespace WTF {
 
 inline void printInternal(PrintStream& out, JSC::B3::Air::StackSlot* stackSlot)
 {
-    out.print(*stackSlot);
+    out.print(pointerDump(stackSlot));
 }
 
 } // namespace WTF

@@ -850,6 +850,19 @@ RegisterID* BytecodeIntrinsicNode::emit_intrinsic_toString(BytecodeGenerator& ge
     return generator.moveToDestinationIfNeeded(dst, generator.emitToString(generator.tempDestination(dst), src.get()));
 }
 
+
+#define JSC_DECLARE_BYTECODE_INTRINSIC_CONSTANT_GENERATORS(name) \
+    RegisterID* BytecodeIntrinsicNode::emit_intrinsic_##name(BytecodeGenerator& generator, RegisterID* dst) \
+    { \
+        ASSERT(!m_args); \
+        ASSERT(type() == Type::Constant); \
+        if (dst == generator.ignoredResult()) \
+            return nullptr; \
+        return generator.emitLoad(dst, generator.vm()->bytecodeIntrinsicRegistry().name##Value(generator)); \
+    }
+    JSC_COMMON_BYTECODE_INTRINSIC_CONSTANTS_EACH_NAME(JSC_DECLARE_BYTECODE_INTRINSIC_CONSTANT_GENERATORS)
+#undef JSC_DECLARE_BYTECODE_INTRINSIC_CONSTANT_GENERATORS
+
 // ------------------------------ FunctionCallBracketNode ----------------------------------
 
 RegisterID* FunctionCallBracketNode::emitBytecode(BytecodeGenerator& generator, RegisterID* dst)
@@ -2927,7 +2940,8 @@ void TryNode::emitBytecode(BytecodeGenerator& generator, RegisterID* dst)
             tryData = generator.pushTry(here.get());
         }
 
-        generator.emitPushCatchScope(m_thrownValueIdent, thrownValueRegister.get(), m_lexicalVariables);
+        generator.emitPushCatchScope(m_lexicalVariables);
+        m_catchPattern->bindValue(generator, thrownValueRegister.get());
         generator.emitProfileControlFlow(m_tryBlock->endOffset() + 1);
         if (m_finallyBlock)
             generator.emitNode(dst, m_catchBlock);
@@ -3228,7 +3242,8 @@ RegisterID* ClassExprNode::emitBytecode(BytecodeGenerator& generator, RegisterID
 
         RefPtr<Label> protoParentIsObjectOrNullLabel = generator.newLabel();
         generator.emitJumpIfTrue(generator.emitUnaryOp(op_is_object_or_null, tempRegister.get(), protoParent.get()), protoParentIsObjectOrNullLabel.get());
-        generator.emitThrowTypeError(ASCIILiteral("The superclass's prototype is not an object."));
+        generator.emitJumpIfTrue(generator.emitUnaryOp(op_is_function, tempRegister.get(), protoParent.get()), protoParentIsObjectOrNullLabel.get());
+        generator.emitThrowTypeError(ASCIILiteral("The value of the superclass's prototype property is not an object."));
         generator.emitLabel(protoParentIsObjectOrNullLabel.get());
 
         generator.emitDirectPutById(constructor.get(), generator.propertyNames().underscoreProto, superclass.get(), PropertyNode::Unknown);

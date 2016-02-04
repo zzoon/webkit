@@ -720,6 +720,16 @@ double WKPageGetGapBetweenPages(WKPageRef pageRef)
     return toImpl(pageRef)->gapBetweenPages();
 }
 
+void WKPageSetPaginationLineGridEnabled(WKPageRef pageRef, bool lineGridEnabled)
+{
+    toImpl(pageRef)->setPaginationLineGridEnabled(lineGridEnabled);
+}
+
+bool WKPageGetPaginationLineGridEnabled(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->paginationLineGridEnabled();
+}
+
 unsigned WKPageGetPageCount(WKPageRef pageRef)
 {
     return toImpl(pageRef)->pageCount();
@@ -2361,6 +2371,13 @@ void WKPageGetContentsAsString(WKPageRef pageRef, void* context, WKPageGetConten
 void WKPageGetBytecodeProfile(WKPageRef pageRef, void* context, WKPageGetBytecodeProfileFunction callback)
 {
     toImpl(pageRef)->getBytecodeProfile(toGenericCallbackFunction(context, callback));
+}
+
+void WKPageIsWebProcessResponsive(WKPageRef pageRef, void* context, WKPageIsWebProcessResponsiveFunction callback)
+{
+    toImpl(pageRef)->isWebProcessResponsive([context, callback](bool isWebProcessResponsive) {
+        callback(isWebProcessResponsive, context);
+    });
 }
 
 void WKPageGetSelectionAsWebArchiveData(WKPageRef pageRef, void* context, WKPageGetSelectionAsWebArchiveDataFunction callback)

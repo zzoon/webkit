@@ -44,18 +44,22 @@ Ref<IDBCursor> IDBCursor::create(IDBTransaction& transaction, IDBIndex& index, c
     return adoptRef(*new IDBCursor(transaction, index, info));
 }
 
-IDBCursor::IDBCursor(IDBTransaction&, IDBObjectStore& objectStore, const IDBCursorInfo& info)
-    : m_info(info)
+IDBCursor::IDBCursor(IDBTransaction& transaction, IDBObjectStore& objectStore, const IDBCursorInfo& info)
+    : ActiveDOMObject(transaction.scriptExecutionContext())
+    , m_info(info)
     , m_source(IDBAny::create(objectStore).leakRef())
     , m_objectStore(&objectStore)
 {
+    suspendIfNeeded();
 }
 
-IDBCursor::IDBCursor(IDBTransaction&, IDBIndex& index, const IDBCursorInfo& info)
-    : m_info(info)
+IDBCursor::IDBCursor(IDBTransaction& transaction, IDBIndex& index, const IDBCursorInfo& info)
+    : ActiveDOMObject(transaction.scriptExecutionContext())
+    , m_info(info)
     , m_source(IDBAny::create(index).leakRef())
     , m_index(&index)
 {
+    suspendIfNeeded();
 }
 
 IDBCursor::~IDBCursor()
@@ -116,6 +120,7 @@ RefPtr<WebCore::IDBRequest> IDBCursor::update(JSC::ExecState& exec, Deprecated::
 
     if (sourcesDeleted()) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'update' on 'IDBCursor': The cursor's source or effective object store has been deleted.");
         return nullptr;
     }
 
@@ -162,6 +167,8 @@ RefPtr<WebCore::IDBRequest> IDBCursor::update(JSC::ExecState& exec, Deprecated::
 
     ASSERT(request);
     request->setSource(*this);
+    ++m_outstandingRequestCount;
+
     return request;
 }
 
@@ -182,6 +189,7 @@ void IDBCursor::advance(unsigned long count, ExceptionCodeWithMessage& ec)
 
     if (sourcesDeleted()) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'advance' on 'IDBCursor': The cursor's source or effective object store has been deleted.");
         return;
     }
 
@@ -199,7 +207,7 @@ void IDBCursor::advance(unsigned long count, ExceptionCodeWithMessage& ec)
 
     m_gotValue = false;
 
-    uncheckedIteratorCursor(IDBKeyData(), count);
+    uncheckedIterateCursor(IDBKeyData(), count);
 }
 
 void IDBCursor::continueFunction(ScriptExecutionContext* context, ExceptionCodeWithMessage& ec)
@@ -238,6 +246,7 @@ void IDBCursor::continueFunction(const IDBKeyData& key, ExceptionCodeWithMessage
 
     if (sourcesDeleted()) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'continue' on 'IDBCursor': The cursor's source or effective object store has been deleted.");
         return;
     }
 
@@ -273,11 +282,13 @@ void IDBCursor::continueFunction(const IDBKeyData& key, ExceptionCodeWithMessage
 
     m_gotValue = false;
 
-    uncheckedIteratorCursor(key, 0);
+    uncheckedIterateCursor(key, 0);
 }
 
-void IDBCursor::uncheckedIteratorCursor(const IDBKeyData& key, unsigned long count)
+void IDBCursor::uncheckedIterateCursor(const IDBKeyData& key, unsigned long count)
 {
+    ++m_outstandingRequestCount;
+
     m_request->willIterateCursor(*this);
     transaction().iterateCursor(*this, key, count);
 }
@@ -293,6 +304,7 @@ RefPtr<WebCore::IDBRequest> IDBCursor::deleteFunction(ScriptExecutionContext* co
 
     if (sourcesDeleted()) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'delete' on 'IDBCursor': The cursor's source or effective object store has been deleted.");
         return nullptr;
     }
 
@@ -320,12 +332,20 @@ RefPtr<WebCore::IDBRequest> IDBCursor::deleteFunction(ScriptExecutionContext* co
         return nullptr;
     }
 
-    return effectiveObjectStore().deleteFunction(context, m_deprecatedCurrentPrimaryKey.jsValue(), ec);
+    auto request = effectiveObjectStore().modernDelete(context, m_deprecatedCurrentPrimaryKey.jsValue(), ec);
+    if (ec.code)
+        return nullptr;
+
+    ASSERT(request);
+    request->setSource(*this);
+    ++m_outstandingRequestCount;
+
+    return request;
 }
 
 void IDBCursor::setGetResult(IDBRequest& request, const IDBGetResult& getResult)
 {
-    LOG(IndexedDB, "IDBCursor::setGetResult - current key %s", getResult.keyData().loggingString().utf8().data());
+    LOG(IndexedDB, "IDBCursor::setGetResult - current key %s", getResult.keyData().loggingString().substring(0, 100).utf8().data());
 
     auto* context = request.scriptExecutionContext();
     if (!context)
@@ -353,6 +373,27 @@ void IDBCursor::setGetResult(IDBRequest& request, const IDBGetResult& getResult)
         m_deprecatedCurrentValue = deserializeIDBValueData(*context, getResult.valueBuffer());
 
     m_gotValue = true;
+}
+
+const char* IDBCursor::activeDOMObjectName() const
+{
+    return "IDBCursor";
+}
+
+bool IDBCursor::canSuspendForDocumentSuspension() const
+{
+    return false;
+}
+
+bool IDBCursor::hasPendingActivity() const
+{
+    return m_outstandingRequestCount;
+}
+
+void IDBCursor::decrementOutstandingRequestCount()
+{
+    ASSERT(m_outstandingRequestCount);
+    --m_outstandingRequestCount;
 }
 
 } // namespace IDBClient

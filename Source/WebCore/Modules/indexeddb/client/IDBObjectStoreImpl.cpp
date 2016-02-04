@@ -117,6 +117,7 @@ RefPtr<WebCore::IDBRequest> IDBObjectStore::openCursor(ScriptExecutionContext* c
 
     if (m_deleted) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'openCursor' on 'IDBObjectStore': The object store has been deleted.");
         return nullptr;
     }
 
@@ -163,6 +164,7 @@ RefPtr<WebCore::IDBRequest> IDBObjectStore::get(ScriptExecutionContext* context,
 
     if (m_deleted) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'get' on 'IDBObjectStore': The object store has been deleted.");
         return nullptr;
     }
 
@@ -194,6 +196,7 @@ RefPtr<WebCore::IDBRequest> IDBObjectStore::get(ScriptExecutionContext* context,
 
     if (m_deleted) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'get' on 'IDBObjectStore': The object store has been deleted.");
         return nullptr;
     }
 
@@ -242,6 +245,17 @@ RefPtr<IDBRequest> IDBObjectStore::putOrAdd(JSC::ExecState& state, JSC::JSValue 
 {
     LOG(IndexedDB, "IDBObjectStore::putOrAdd");
 
+    // The IDB spec for several IDBObjectStore methods states that transaction related exceptions should fire before
+    // the exception for an object store being deleted.
+    // However, a handful of W3C IDB tests expect the deleted exception even though the transaction inactive exception also applies.
+    // Additionally, Chrome and Edge agree with the test, as does Legacy IDB in WebKit.
+    // Until this is sorted out, we'll agree with the test and the majority share browsers.
+    if (m_deleted) {
+        ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to store record in an IDBObjectStore: The object store has been deleted.");
+        return nullptr;
+    }
+
     if (!m_transaction->isActive()) {
         ec.code = IDBDatabaseException::TransactionInactiveError;
         ec.message = ASCIILiteral("Failed to store record in an IDBObjectStore: The transaction is inactive or finished.");
@@ -254,13 +268,11 @@ RefPtr<IDBRequest> IDBObjectStore::putOrAdd(JSC::ExecState& state, JSC::JSValue 
         return nullptr;
     }
 
-    if (m_deleted) {
-        ec.code = IDBDatabaseException::InvalidStateError;
-        return nullptr;
-    }
-
     RefPtr<SerializedScriptValue> serializedValue = SerializedScriptValue::create(&state, value, nullptr, nullptr);
     if (state.hadException()) {
+        // Clear the DOM exception from the serializer so we can give a more targeted exception.
+        state.clearException();
+
         ec.code = IDBDatabaseException::DataCloneError;
         ec.message = ASCIILiteral("Failed to store record in an IDBObjectStore: An object could not be cloned.");
         return nullptr;
@@ -328,10 +340,25 @@ RefPtr<IDBRequest> IDBObjectStore::putOrAdd(JSC::ExecState& state, JSC::JSValue 
     return adoptRef(request.leakRef());
 }
 
-
 RefPtr<WebCore::IDBRequest> IDBObjectStore::deleteFunction(ScriptExecutionContext* context, IDBKeyRange* keyRange, ExceptionCodeWithMessage& ec)
 {
+    return doDelete(context, keyRange, ec);
+}
+
+RefPtr<IDBRequest> IDBObjectStore::doDelete(ScriptExecutionContext* context, IDBKeyRange* keyRange, ExceptionCodeWithMessage& ec)
+{
     LOG(IndexedDB, "IDBObjectStore::deleteFunction");
+
+    // The IDB spec for several IDBObjectStore methods states that transaction related exceptions should fire before
+    // the exception for an object store being deleted.
+    // However, a handful of W3C IDB tests expect the deleted exception even though the transaction inactive exception also applies.
+    // Additionally, Chrome and Edge agree with the test, as does Legacy IDB in WebKit.
+    // Until this is sorted out, we'll agree with the test and the majority share browsers.
+    if (m_deleted) {
+        ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'delete' on 'IDBObjectStore': The object store has been deleted.");
+        return nullptr;
+    }
 
     if (!m_transaction->isActive()) {
         ec.code = IDBDatabaseException::TransactionInactiveError;
@@ -342,11 +369,6 @@ RefPtr<WebCore::IDBRequest> IDBObjectStore::deleteFunction(ScriptExecutionContex
     if (m_transaction->isReadOnly()) {
         ec.code = IDBDatabaseException::ReadOnlyError;
         ec.message = ASCIILiteral("Failed to execute 'delete' on 'IDBObjectStore': The transaction is read-only.");
-        return nullptr;
-    }
-
-    if (m_deleted) {
-        ec.code = IDBDatabaseException::InvalidStateError;
         return nullptr;
     }
 
@@ -363,10 +385,10 @@ RefPtr<WebCore::IDBRequest> IDBObjectStore::deleteFunction(ScriptExecutionContex
 
 RefPtr<WebCore::IDBRequest> IDBObjectStore::deleteFunction(ScriptExecutionContext* context, const Deprecated::ScriptValue& key, ExceptionCodeWithMessage& ec)
 {
-    return deleteFunction(context, key.jsValue(), ec);
+    return modernDelete(context, key.jsValue(), ec);
 }
 
-RefPtr<WebCore::IDBRequest> IDBObjectStore::deleteFunction(ScriptExecutionContext* context, JSC::JSValue key, ExceptionCodeWithMessage& ec)
+RefPtr<IDBRequest> IDBObjectStore::modernDelete(ScriptExecutionContext* context, JSC::JSValue key, ExceptionCodeWithMessage& ec)
 {
     DOMRequestState requestState(context);
     RefPtr<IDBKey> idbKey = scriptValueToIDBKey(&requestState, key);
@@ -376,12 +398,23 @@ RefPtr<WebCore::IDBRequest> IDBObjectStore::deleteFunction(ScriptExecutionContex
         return nullptr;
     }
 
-    return deleteFunction(context, &IDBKeyRange::create(idbKey.get()).get(), ec);
+    return doDelete(context, &IDBKeyRange::create(idbKey.get()).get(), ec);
 }
 
 RefPtr<WebCore::IDBRequest> IDBObjectStore::clear(ScriptExecutionContext* context, ExceptionCodeWithMessage& ec)
 {
     LOG(IndexedDB, "IDBObjectStore::clear");
+
+    // The IDB spec for several IDBObjectStore methods states that transaction related exceptions should fire before
+    // the exception for an object store being deleted.
+    // However, a handful of W3C IDB tests expect the deleted exception even though the transaction inactive exception also applies.
+    // Additionally, Chrome and Edge agree with the test, as does Legacy IDB in WebKit.
+    // Until this is sorted out, we'll agree with the test and the majority share browsers.
+    if (m_deleted) {
+        ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'clear' on 'IDBObjectStore': The object store has been deleted.");
+        return nullptr;
+    }
 
     if (!m_transaction->isActive()) {
         ec.code = IDBDatabaseException::TransactionInactiveError;
@@ -392,11 +425,6 @@ RefPtr<WebCore::IDBRequest> IDBObjectStore::clear(ScriptExecutionContext* contex
     if (m_transaction->isReadOnly()) {
         ec.code = IDBDatabaseException::ReadOnlyError;
         ec.message = ASCIILiteral("Failed to execute 'clear' on 'IDBObjectStore': The transaction is read-only.");
-        return nullptr;
-    }
-
-    if (m_deleted) {
-        ec.code = IDBDatabaseException::InvalidStateError;
         return nullptr;
     }
 
@@ -415,6 +443,7 @@ RefPtr<WebCore::IDBIndex> IDBObjectStore::createIndex(ScriptExecutionContext* co
 
     if (m_deleted) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'createIndex' on 'IDBObjectStore': The object store has been deleted.");
         return nullptr;
     }
 
@@ -469,6 +498,7 @@ RefPtr<WebCore::IDBIndex> IDBObjectStore::index(const String& indexName, Excepti
 
     if (m_deleted) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'index' on 'IDBObjectStore': The object store has been deleted.");
         return nullptr;
     }
 
@@ -501,6 +531,7 @@ void IDBObjectStore::deleteIndex(const String& name, ExceptionCodeWithMessage& e
 
     if (m_deleted) {
         ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'deleteIndex' on 'IDBObjectStore': The object store has been deleted.");
         return;
     }
 
@@ -580,14 +611,20 @@ RefPtr<WebCore::IDBRequest> IDBObjectStore::count(ScriptExecutionContext* contex
 
 RefPtr<WebCore::IDBRequest> IDBObjectStore::doCount(ScriptExecutionContext& context, const IDBKeyRangeData& range, ExceptionCodeWithMessage& ec)
 {
-    if (!m_transaction->isActive()) {
-        ec.code = IDBDatabaseException::TransactionInactiveError;
-        ec.message = ASCIILiteral("Failed to execute 'count' on 'IDBObjectStore': The transaction is inactive or finished.");
+    // The IDB spec for several IDBObjectStore methods states that transaction related exceptions should fire before
+    // the exception for an object store being deleted.
+    // However, a handful of W3C IDB tests expect the deleted exception even though the transaction inactive exception also applies.
+    // Additionally, Chrome and Edge agree with the test, as does Legacy IDB in WebKit.
+    // Until this is sorted out, we'll agree with the test and the majority share browsers.
+    if (m_deleted) {
+        ec.code = IDBDatabaseException::InvalidStateError;
+        ec.message = ASCIILiteral("Failed to execute 'count' on 'IDBObjectStore': The object store has been deleted.");
         return nullptr;
     }
 
-    if (m_deleted) {
-        ec.code = IDBDatabaseException::InvalidStateError;
+    if (!m_transaction->isActive()) {
+        ec.code = IDBDatabaseException::TransactionInactiveError;
+        ec.message = ASCIILiteral("Failed to execute 'count' on 'IDBObjectStore': The transaction is inactive or finished.");
         return nullptr;
     }
 

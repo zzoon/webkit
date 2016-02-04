@@ -38,6 +38,7 @@
 namespace JSC {
 
 class CallFrameShuffler {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     CallFrameShuffler(CCallHelpers&, const CallFrameShuffleData&);
 
@@ -141,7 +142,7 @@ public:
     void assumeCalleeIsCell()
     {
 #if USE(JSVALUE32_64)
-        CachedRecovery& calleeCachedRecovery { *getNew(VirtualRegister(JSStack::Callee)) };
+        CachedRecovery& calleeCachedRecovery = *getNew(VirtualRegister(JSStack::Callee));
         switch (calleeCachedRecovery.recovery().technique()) {
         case InPair:
             updateRecovery(

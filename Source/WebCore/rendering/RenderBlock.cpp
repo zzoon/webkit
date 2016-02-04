@@ -59,6 +59,7 @@
 #include "RenderNamedFlowFragment.h"
 #include "RenderNamedFlowThread.h"
 #include "RenderRegion.h"
+#include "RenderSVGResourceClipper.h"
 #include "RenderTableCell.h"
 #include "RenderTextFragment.h"
 #include "RenderTheme.h"
@@ -1469,7 +1470,7 @@ void RenderBlock::paintChildren(PaintInfo& paintInfo, const LayoutPoint& paintOf
 bool RenderBlock::paintChild(RenderBox& child, PaintInfo& paintInfo, const LayoutPoint& paintOffset, PaintInfo& paintInfoForChild, bool usePrintRect, PaintBlockType paintType)
 {
     // Check for page-break-before: always, and if it's set, break and bail.
-    bool checkBeforeAlways = !childrenInline() && (usePrintRect && child.style().pageBreakBefore() == PBALWAYS);
+    bool checkBeforeAlways = !childrenInline() && (usePrintRect && alwaysPageBreak(child.style().breakBefore()));
     LayoutUnit absoluteChildY = paintOffset.y() + child.y();
     if (checkBeforeAlways
         && absoluteChildY > paintInfo.rect.y()
@@ -1498,7 +1499,7 @@ bool RenderBlock::paintChild(RenderBox& child, PaintInfo& paintInfo, const Layou
     }
 
     // Check for page-break-after: always, and if it's set, break and bail.
-    bool checkAfterAlways = !childrenInline() && (usePrintRect && child.style().pageBreakAfter() == PBALWAYS);
+    bool checkAfterAlways = !childrenInline() && (usePrintRect && alwaysPageBreak(child.style().breakAfter()));
     if (checkAfterAlways
         && (absoluteChildY + child.height()) > paintInfo.rect.y()
         && (absoluteChildY + child.height()) < paintInfo.rect.maxY()) {
@@ -1660,8 +1661,8 @@ RenderBlock* RenderBlock::blockElementContinuation() const
     
 static ContinuationOutlineTableMap* continuationOutlineTable()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(ContinuationOutlineTableMap, table, ());
-    return &table;
+    static NeverDestroyed<ContinuationOutlineTableMap> table;
+    return &table.get();
 }
 
 void RenderBlock::addContinuationWithOutline(RenderInline* flow)
@@ -2462,8 +2463,18 @@ bool RenderBlock::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
                 return false;
             break;
         }
-        // FIXME: handle Reference/Box
-        case ClipPathOperation::Reference:
+        case ClipPathOperation::Reference: {
+            const auto& referenceClipPathOperation = downcast<ReferenceClipPathOperation>(*style().clipPath());
+            auto* element = document().getElementById(referenceClipPathOperation.fragment());
+            if (!element || !element->renderer())
+                break;
+            if (!is<SVGClipPathElement>(*element))
+                break;
+            auto& clipper = downcast<RenderSVGResourceClipper>(*element->renderer());
+            if (!clipper.hitTestClipContent(FloatRect(borderBoxRect()), FloatPoint(locationInContainer.point() - localOffset)))
+                return false;
+            break;
+        }
         case ClipPathOperation::Box:
             break;
         }
@@ -2690,11 +2701,6 @@ void RenderBlock::computePreferredLogicalWidths()
         m_minPreferredLogicalWidth = std::min(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(styleToUse.logicalMaxWidth().value()));
     }
     
-    // Table layout uses float, fudge the preferred widths to ensure that they can contain the contents.
-    if (isTableCell()) {
-        m_minPreferredLogicalWidth = m_minPreferredLogicalWidth + LayoutUnit::epsilon();
-        m_maxPreferredLogicalWidth = m_maxPreferredLogicalWidth + LayoutUnit::epsilon();
-    }
     LayoutUnit borderAndPadding = borderAndPaddingLogicalWidth();
     m_minPreferredLogicalWidth += borderAndPadding;
     m_maxPreferredLogicalWidth += borderAndPadding;
@@ -2751,26 +2757,15 @@ void RenderBlock::computeBlockPreferredLogicalWidths(LayoutUnit& minLogicalWidth
             childBox.computeLogicalHeight(childBox.borderAndPaddingLogicalHeight(), 0, computedValues);
             childMinPreferredLogicalWidth = childMaxPreferredLogicalWidth = computedValues.m_extent;
         } else {
-            if (is<RenderBlock>(*child) && !is<RenderTable>(*child)) {
+            childMinPreferredLogicalWidth = child->minPreferredLogicalWidth();
+            childMaxPreferredLogicalWidth = child->maxPreferredLogicalWidth();
+
+            if (is<RenderBlock>(*child)) {
                 const Length& computedInlineSize = child->style().logicalWidth();
-                if (computedInlineSize.isFitContent() || computedInlineSize.isFillAvailable() || computedInlineSize.isAuto()
-                    || computedInlineSize.isPercentOrCalculated()) {
-                    // FIXME: we could do a lot better for percents (we're considering them always indefinite)
-                    // but we need https://bugs.webkit.org/show_bug.cgi?id=152262 to be fixed first
-                    childMinPreferredLogicalWidth = child->minPreferredLogicalWidth();
-                    childMaxPreferredLogicalWidth = child->maxPreferredLogicalWidth();
-                } else {
-                    ASSERT(computedInlineSize.isMinContent() || computedInlineSize.isMaxContent() || computedInlineSize.isFixed());
-                    LogicalExtentComputedValues computedValues;
-                    downcast<RenderBlock>(*child).computeLogicalWidthInRegion(computedValues);
-                    childMinPreferredLogicalWidth = childMaxPreferredLogicalWidth = computedValues.m_extent;
-                    child->setPreferredLogicalWidthsDirty(false);
-                }
-            } else {
-                // FIXME: we leave the original implementation as default fallback. Still need to specialcase
-                // some other situations: https://drafts.csswg.org/css-sizing/#intrinsic
-                childMinPreferredLogicalWidth = child->minPreferredLogicalWidth();
-                childMaxPreferredLogicalWidth = child->maxPreferredLogicalWidth();
+                if (computedInlineSize.isMaxContent())
+                    childMinPreferredLogicalWidth = childMaxPreferredLogicalWidth;
+                else if (computedInlineSize.isMinContent())
+                    childMaxPreferredLogicalWidth = childMinPreferredLogicalWidth;
             }
         }
 
@@ -3538,9 +3533,10 @@ bool RenderBlock::childBoxIsUnsplittableForFragmentation(const RenderBox& child)
     bool checkColumnBreaks = flowThread && flowThread->shouldCheckColumnBreaks();
     bool checkPageBreaks = !checkColumnBreaks && view().layoutState()->m_pageLogicalHeight;
     bool checkRegionBreaks = flowThread && flowThread->isRenderNamedFlowThread();
-    return child.isUnsplittableForPagination() || (checkColumnBreaks && child.style().columnBreakInside() == PBAVOID)
-        || (checkPageBreaks && child.style().pageBreakInside() == PBAVOID)
-        || (checkRegionBreaks && child.style().regionBreakInside() == PBAVOID);
+    return child.isUnsplittableForPagination() || child.style().breakInside() == AvoidBreakInside
+        || (checkColumnBreaks && child.style().breakInside() == AvoidColumnBreakInside)
+        || (checkPageBreaks && child.style().breakInside() == AvoidPageBreakInside)
+        || (checkRegionBreaks && child.style().breakInside() == AvoidRegionBreakInside);
 }
 
 void RenderBlock::computeRegionRangeForBoxChild(const RenderBox& box) const

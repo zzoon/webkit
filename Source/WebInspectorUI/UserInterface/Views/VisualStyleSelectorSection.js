@@ -55,9 +55,10 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
         selectorSection.element.appendChild(selectorListElement);
 
         this._selectors = new WebInspector.TreeOutline(selectorListElement);
+        this._selectors.disclosureButtons = false;
         this._selectors.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._selectorChanged, this);
 
-        this._focusNextNewInspectorRule = false;
+        this._newInspectorRuleSelector = null;
 
         let addGlyphElement = useSVGSymbol("Images/Plus13.svg", "visual-style-selector-section-add-rule", WebInspector.UIString("Click to add a new rule."));
         addGlyphElement.addEventListener("click", this._addNewRule.bind(this));
@@ -96,16 +97,15 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
             orderedPseudoRules.reverse();
 
         function createSelectorItem(style, title, subtitle) {
-            let selector = new WebInspector.VisualStyleSelectorTreeItem(style, title, subtitle);
-            selector.addEventListener(WebInspector.VisualStyleSelectorTreeItem.Event.StyleTextReset, this._styleTextReset, this);
+            let selector = new WebInspector.VisualStyleSelectorTreeItem(this, style, title, subtitle);
             selector.addEventListener(WebInspector.VisualStyleSelectorTreeItem.Event.CheckboxChanged, this._treeElementCheckboxToggled, this);
             this._selectors.appendChild(selector);
 
-            if (this._focusNextNewInspectorRule && style.ownerRule && style.ownerRule.type === WebInspector.CSSStyleSheet.Type.Inspector) {
+            if (style.isInspectorRule() && this._newInspectorRuleSelector === style.selectorText && !style.hasProperties()) {
                 selector.select(true);
                 selector.element.scrollIntoView();
                 this._nodeStyles[WebInspector.VisualStyleSelectorSection.LastSelectedRuleSymbol] = style;
-                this._focusNextNewInspectorRule = false;
+                this._newInspectorRuleSelector = null;
                 return;
             }
 
@@ -201,7 +201,7 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
             }
         }
 
-        this._focusNextNewInspectorRule = false;
+        this._newInspectorRuleSelector = null;
     }
 
     currentStyle()
@@ -210,6 +210,28 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
             return;
 
         return this._selectors.selectedTreeElement.representedObject;
+    }
+
+    treeItemForStyle(style)
+    {
+        for (let item of this._selectors.children) {
+            if (item.representedObject === style)
+                return item;
+        }
+        return null;
+    }
+
+    selectEmptyStyleTreeItem(style)
+    {
+        if (style.hasProperties())
+            return false;
+
+        let treeItem = this.treeItemForStyle(style);
+        if (!treeItem)
+            return false;
+
+        treeItem.select(true, true);
+        return true;
     }
 
     // Private
@@ -235,18 +257,20 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
         this.dispatchEventToListeners(WebInspector.VisualStyleSelectorSection.Event.SelectorChanged);
     }
 
-    _styleTextReset()
-    {
-        this.dispatchEventToListeners(WebInspector.VisualStyleSelectorSection.Event.StyleTextChanged);
-    }
-
     _addNewRule(event)
     {
-        if (!this._nodeStyles)
+        if (!this._nodeStyles || this._nodeStyles.node.isInShadowTree())
             return;
 
-        this._nodeStyles.addRule();
-        this._focusNextNewInspectorRule = true;
+        let selector = this.currentStyle().selectorText;
+        let existingRules = this._nodeStyles.rulesForSelector(selector);
+        for (let rule of existingRules) {
+            if (this.selectEmptyStyleTreeItem(rule.style))
+                return;
+        }
+
+        this._newInspectorRuleSelector = selector;
+        this._nodeStyles.addRule(selector);
     }
 
     _treeElementCheckboxToggled(event)
@@ -279,6 +303,9 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
             return;
 
         let style = this.currentStyle();
+        if (!style)
+            return;
+
         if (!style.ownerRule) {
             WebInspector.domTreeManager.highlightDOMNode(style.node.id);
             return;
@@ -299,6 +326,5 @@ WebInspector.VisualStyleSelectorSection = class VisualStyleSelectorSection exten
 WebInspector.VisualStyleSelectorSection.LastSelectedRuleSymbol = Symbol("visual-style-selector-section-last-selected-rule");
 
 WebInspector.VisualStyleSelectorSection.Event = {
-    SelectorChanged: "visual-style-selector-section-selector-changed",
-    StyleTextChanged: "visual-style-selector-section-style-text-changed"
+    SelectorChanged: "visual-style-selector-section-selector-changed"
 }

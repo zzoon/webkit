@@ -210,6 +210,8 @@ private:
     void initializeWebProcess(WebProcessCreationParameters&&);
     void platformInitializeWebProcess(WebProcessCreationParameters&&);
 
+    void clearCachedCredentials();
+
     void platformTerminate();
     void registerURLSchemeAsEmptyDocument(const String&);
     void registerURLSchemeAsSecure(const String&) const;
@@ -219,6 +221,7 @@ private:
     void registerURLSchemeAsNoAccess(const String&) const;
     void registerURLSchemeAsDisplayIsolated(const String&) const;
     void registerURLSchemeAsCORSEnabled(const String&) const;
+    void registerURLSchemeAsAlwaysRevalidated(const String&) const;
 #if ENABLE(CACHE_PARTITIONING)
     void registerURLSchemeAsCachePartitioned(const String&) const;
 #endif

@@ -62,7 +62,7 @@ using namespace HTMLNames;
 
 static LinkEventSender& linkLoadEventSender()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(LinkEventSender, sharedLoadEventSender, (eventNames().loadEvent));
+    static NeverDestroyed<LinkEventSender> sharedLoadEventSender(eventNames().loadEvent);
     return sharedLoadEventSender;
 }
 
@@ -164,7 +164,7 @@ void HTMLLinkElement::parseAttribute(const QualifiedName& name, const AtomicStri
         return;
     }
     if (name == mediaAttr) {
-        m_media = value.string().lower();
+        m_media = value.string().convertToASCIILowercase();
         process();
         if (m_sheet && !isDisabled())
             document().styleResolverChanged(DeferRecalcStyle);

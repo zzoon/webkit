@@ -61,14 +61,7 @@ function rewrite_headers () {
         -e 's/WK_ARRAY\(([^\)]+)\)/NSArray<\1>/g'
         -e 's/WK_DICTIONARY\(([^\)]+)\)/NSDictionary<\1>/g'
         -e 's/WK_SET\(([^\)]+)\)/NSSet<\1>/g'
-        -e s/WK_ASSUME_NONNULL_BEGIN/NS_ASSUME_NONNULL_BEGIN/
-        -e s/WK_ASSUME_NONNULL_END/NS_ASSUME_NONNULL_END/
-        -e s/WK_DESIGNATED_INITIALIZER/NS_DESIGNATED_INITIALIZER/
-        -e s/WK_NULLABLE_PROPERTY/nullable,/
-        -e s/WK_NULLABLE_SPECIFIER/__nullable/g
-        -e s/WK_NULLABLE/nullable/g
-        -e s/WK_NULL_UNSPECIFIED/null_unspecified/
-        -e s/WK_UNAVAILABLE/NS_UNAVAILABLE/
+        -e s/WK_NULLABLE_SPECIFIER/_Nullable/g
     )
 
     if [[ -n "$OSX_VERSION" && -n "$IOS_VERSION" ]]; then
@@ -87,11 +80,11 @@ function rewrite_headers () {
 
     SED_OPTIONS+=(${OTHER_SED_OPTIONS[*]})
 
-    for HEADER_PATH in $1/*.h; do
-        if [[ $HEADER_PATH -nt $TIMESTAMP_PATH ]]; then
-            ditto ${HEADER_PATH} ${TARGET_TEMP_DIR}/${HEADER_PATH##*/}
-            sed -i .tmp -E ${SED_OPTIONS[*]} ${TARGET_TEMP_DIR}/${HEADER_PATH##*/} || exit $?
-            mv ${TARGET_TEMP_DIR}/${HEADER_PATH##*/} $HEADER_PATH
+    for HEADER_PATH in "${1}/"*.h; do
+        if [[ "$HEADER_PATH" -nt $TIMESTAMP_PATH ]]; then
+            ditto "${HEADER_PATH}" "${TARGET_TEMP_DIR}/${HEADER_PATH##*/}"
+            sed -i .tmp -E ${SED_OPTIONS[*]} "${TARGET_TEMP_DIR}/${HEADER_PATH##*/}" || exit $?
+            mv "${TARGET_TEMP_DIR}/${HEADER_PATH##*/}" "$HEADER_PATH"
         fi
     done
 }
@@ -100,7 +93,7 @@ DEFINITIONS_PATH=usr/local/include/WebKitAdditions/Scripts/postprocess-framework
 
 process_definitions "${BUILT_PRODUCTS_DIR}/${DEFINITIONS_PATH}" || process_definitions "${SDKROOT}/${DEFINITIONS_PATH}"
 
-rewrite_headers ${TARGET_BUILD_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}
-rewrite_headers ${TARGET_BUILD_DIR}/${PRIVATE_HEADERS_FOLDER_PATH}
+rewrite_headers "${TARGET_BUILD_DIR}/${PUBLIC_HEADERS_FOLDER_PATH}"
+rewrite_headers "${TARGET_BUILD_DIR}/${PRIVATE_HEADERS_FOLDER_PATH}"
 
 touch ${TIMESTAMP_PATH}
