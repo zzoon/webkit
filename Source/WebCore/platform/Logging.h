@@ -65,6 +65,7 @@ namespace WebCore {
     M(Media) \
     M(MediaSource) \
     M(MediaSourceSamples) \
+    M(MediaStream) \
     M(MemoryPressure) \
     M(Network) \
     M(NotYetImplemented) \
