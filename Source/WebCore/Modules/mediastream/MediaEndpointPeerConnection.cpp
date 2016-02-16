@@ -683,31 +683,32 @@ void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::St
 
 void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, MediaStreamTrack& withTrack, PeerConnection::VoidPromise&& promise)
 {
+    size_t mdescIndex = notFound;
+    SessionDescription* localDescription = internalLocalDescription();
+
+    if (localDescription)
+        mdescIndex = indexOfMediaDescriptionWithTrackId(localDescription->configuration()->mediaDescriptions(), sender.trackId());
+
+    if (mdescIndex == notFound) {
+        sender.setTrack(withTrack);
+        promise.resolve(nullptr);
+        return;
+    }
+
     RefPtr<RTCRtpSender> protectedSender = &sender;
     RefPtr<MediaStreamTrack> protectedTrack = &withTrack;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
 
-    runTask([this, protectedSender, protectedTrack, wrappedPromise]() {
-        replaceTrackTask(*protectedSender, *protectedTrack, wrappedPromise->promise());
+    runTask([this, protectedSender, mdescIndex, protectedTrack, wrappedPromise]() {
+        replaceTrackTask(*protectedSender, mdescIndex, *protectedTrack, wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, MediaStreamTrack& withTrack, PeerConnection::VoidPromise& promise)
+void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, size_t mdescIndex, MediaStreamTrack& withTrack, PeerConnection::VoidPromise& promise)
 {
-    if (!internalRemoteDescription())
-        return;
-
-    SessionDescription* localDescription = internalLocalDescription();
-    if (!localDescription)
-        return;
-
-    const MediaDescriptionVector& mediaDescriptions = localDescription->configuration()->mediaDescriptions();
-    size_t mdescIndex = indexOfMediaDescriptionWithTrackId(mediaDescriptions, sender.trackId());
-    if (mdescIndex == notFound)
-        return;
-
     m_mediaEndpoint->replaceSendSource(withTrack.source(), mdescIndex);
 
+    sender.setTrack(withTrack);
     promise.resolve(nullptr);
 }
 

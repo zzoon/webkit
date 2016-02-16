@@ -57,6 +57,7 @@ public:
     const Vector<String>& mediaStreamIds() const { return m_mediaStreamIds; }
 
     void stop() { m_client = nullptr; }
+    void setTrack(MediaStreamTrack& track) { m_track = &track; }
 
     void replaceTrack(MediaStreamTrack*, PeerConnection::VoidPromise&&, ExceptionCode&);
 

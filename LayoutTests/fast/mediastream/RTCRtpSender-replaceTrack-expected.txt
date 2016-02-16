@@ -12,8 +12,7 @@ PASS promise sender.replaceTrack(null) rejected with TypeError: Type error
 PASS promise sender.replaceTrack({}) rejected with TypeError: Argument 1 ('withTrack') to RTCRtpSender.replaceTrack must be an instance of MediaStreamTrack
 Test mismatching track kind
 PASS promise sender.replaceTrack(videoTrack) rejected with TypeError: Type error
-This is a valid call but will be rejected until the PeerConnectionBackend implementation has proper support
-PASS promise sender.replaceTrack(audioTrack2) rejected with [object DOMError]
+PASS promise sender.replaceTrack(audioTrack2) fulfilled with undefined
 Stop sender, and try replacing the track
 PASS promise sender.replaceTrack(audioTrack2) rejected with [object DOMError]
 End of promise chain

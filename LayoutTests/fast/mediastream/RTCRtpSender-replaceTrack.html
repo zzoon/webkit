@@ -48,10 +48,9 @@
                     return promiseShouldReject("sender.replaceTrack(videoTrack)");
                 })
                 .catch(function () {
-                    debug("This is a valid call but will be rejected until the PeerConnectionBackend implementation has proper support");
-                    return promiseShouldReject("sender.replaceTrack(audioTrack2)");
+                    return promiseShouldResolve("sender.replaceTrack(audioTrack2)");
                 })
-                .catch(function () {
+                .then(function () {
                     debug("Stop sender, and try replacing the track");
                     pc.removeTrack(sender);
                     return promiseShouldReject("sender.replaceTrack(audioTrack2)");
@@ -65,6 +64,33 @@
                 testFailed("getUserMedia error: " + error);
                 finishJSTest();
             });
+
+            function promiseShouldResolve(expr) {
+                var p;
+                try {
+                    p = eval(expr);
+                } catch (e) {
+                    testFailed("evaluating " + expr + " threw exception " + e);
+                    return Promise.reject();
+                }
+
+                if (!(p instanceof Promise)) {
+                    testFailed(expr + " does not evaluate to a promise.");
+                    return Promise.reject();
+                }
+
+                p.then(function (result) {
+                    testPassed("promise " + expr + " fulfilled with " + result);
+                });
+
+                p.catch(function (reason) {
+                    testFailed("promise " + expr + " rejected unexpectedly with " + reason);
+                    if (window.jsTestIsAsync)
+                        finishJSTest();
+                });
+
+                return p;
+            }
 
             function promiseShouldReject(expr) {
                 var p;
@@ -82,6 +108,8 @@
 
                 p.then(function () {
                     testFailed("promise " + expr + " fulfilled unexpectedly.");
+                    if (window.jsTestIsAsync)
+                        finishJSTest();
                 });
 
                 p.catch(function (reason) {

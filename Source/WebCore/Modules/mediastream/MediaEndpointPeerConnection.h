@@ -91,7 +91,7 @@ private:
 
     void addIceCandidateTask(RTCIceCandidate&, PeerConnection::VoidPromise&);
 
-    void replaceTrackTask(RTCRtpSender&, MediaStreamTrack&, PeerConnection::VoidPromise&);
+    void replaceTrackTask(RTCRtpSender&, size_t mdescIndex, MediaStreamTrack&, PeerConnection::VoidPromise&);
 
     bool localDescriptionTypeValidForState(SessionDescription::Type) const;
     bool remoteDescriptionTypeValidForState(SessionDescription::Type) const;
