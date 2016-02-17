@@ -56,7 +56,7 @@ MockMediaEndpoint::~MockMediaEndpoint()
     stop();
 }
 
-void MockMediaEndpoint::setConfiguration(RefPtr<MediaEndpointInit>&& configuration)
+void MockMediaEndpoint::setConfiguration(RefPtr<MediaEndpointConfiguration>&& configuration)
 {
     UNUSED_PARAM(configuration);
 }

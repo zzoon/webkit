@@ -28,8 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MediaEndpointInit_h
-#define MediaEndpointInit_h
+#ifndef MediaEndpointConfiguration_h
+#define MediaEndpointConfiguration_h
 
 #if ENABLE(MEDIA_STREAM)
 
@@ -61,11 +61,11 @@ private:
     String m_username;
 };
 
-class MediaEndpointInit : public RefCounted<MediaEndpointInit> {
+class MediaEndpointConfiguration : public RefCounted<MediaEndpointConfiguration> {
 public:
-    static RefPtr<MediaEndpointInit> create(Vector<RefPtr<IceServerInfo>>& iceServers, const String& iceTransportPolicy, const String& bundlePolicy)
+    static RefPtr<MediaEndpointConfiguration> create(Vector<RefPtr<IceServerInfo>>& iceServers, const String& iceTransportPolicy, const String& bundlePolicy)
     {
-        return adoptRef(new MediaEndpointInit(iceServers, iceTransportPolicy, bundlePolicy));
+        return adoptRef(new MediaEndpointConfiguration(iceServers, iceTransportPolicy, bundlePolicy));
     }
 
     enum class IceTransportPolicy {
@@ -85,7 +85,7 @@ public:
     BundlePolicy bundlePolicy() const { return m_bundlePolicy; }
 
 private:
-    MediaEndpointInit(Vector<RefPtr<IceServerInfo>>&, const String& iceTransportPolicy, const String& bundlePolicy);
+    MediaEndpointConfiguration(Vector<RefPtr<IceServerInfo>>&, const String& iceTransportPolicy, const String& bundlePolicy);
 
     Vector<RefPtr<IceServerInfo>> m_iceServers;
     IceTransportPolicy m_iceTransportPolicy;
@@ -96,4 +96,4 @@ private:
 
 #endif // ENABLE(MEDIA_STREAM)
 
-#endif // MediaEndpointInit_h
+#endif // MediaEndpointConfiguration_h

@@ -79,7 +79,7 @@ MediaEndpointOwr::~MediaEndpointOwr()
     g_free(m_dtlsCertificate);
 }
 
-void MediaEndpointOwr::setConfiguration(RefPtr<MediaEndpointInit>&& configuration)
+void MediaEndpointOwr::setConfiguration(RefPtr<MediaEndpointConfiguration>&& configuration)
 {
     m_configuration = configuration;
 }

@@ -44,7 +44,7 @@ public:
     MockMediaEndpoint(MediaEndpointClient*);
     ~MockMediaEndpoint();
 
-    virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) override;
+    virtual void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override;
 
     virtual void generateDtlsInfo() override;
     virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;

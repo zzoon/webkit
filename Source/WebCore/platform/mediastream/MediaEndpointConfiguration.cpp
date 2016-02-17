@@ -29,7 +29,7 @@
  */
 
 #include "config.h"
-#include "MediaEndpointInit.h"
+#include "MediaEndpointConfiguration.h"
 
 #if ENABLE(MEDIA_STREAM)
 
@@ -44,7 +44,7 @@ IceServerInfo::IceServerInfo(const Vector<String>& urls, const String& credentia
         m_urls.append(URL(URL(), url));
 }
 
-MediaEndpointInit::MediaEndpointInit(Vector<RefPtr<IceServerInfo>>& iceServers, const String& iceTransportPolicy, const String& bundlePolicy)
+MediaEndpointConfiguration::MediaEndpointConfiguration(Vector<RefPtr<IceServerInfo>>& iceServers, const String& iceTransportPolicy, const String& bundlePolicy)
     : m_iceServers(iceServers)
 {
     if (iceTransportPolicy == "none")

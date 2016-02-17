@@ -108,13 +108,13 @@ static String randomString(size_t length)
     return base64Encode(randomValues, size);
 }
 
-static RefPtr<MediaEndpointInit> createMediaEndpointInit(RTCConfiguration& rtcConfig)
+static RefPtr<MediaEndpointConfiguration> createMediaEndpointConfiguration(RTCConfiguration& rtcConfig)
 {
     Vector<RefPtr<IceServerInfo>> iceServers;
     for (auto& server : rtcConfig.iceServers())
         iceServers.append(IceServerInfo::create(server->urls(), server->credential(), server->username()));
 
-    return MediaEndpointInit::create(iceServers, rtcConfig.iceTransportPolicy(), rtcConfig.bundlePolicy());
+    return MediaEndpointConfiguration::create(iceServers, rtcConfig.iceTransportPolicy(), rtcConfig.bundlePolicy());
 }
 
 MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendClient* client)
@@ -639,7 +639,7 @@ void MediaEndpointPeerConnection::setConfiguration(RTCConfiguration& configurati
 {
     // FIXME: updateIce() might be renamed to setConfiguration(). It's also possible
     // that its current behavior with update deltas will change.
-    m_mediaEndpoint->setConfiguration(createMediaEndpointInit(configuration));
+    m_mediaEndpoint->setConfiguration(createMediaEndpointConfiguration(configuration));
 }
 
 void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate& rtcCandidate, PeerConnection::VoidPromise&& promise)

@@ -33,8 +33,7 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-// #include "RTCConfigurationPrivate.h"
-#include "MediaEndpointInit.h"
+#include "MediaEndpointConfiguration.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -68,8 +67,7 @@ public:
         Failed
     };
 
-    // FIMXE: look over naming
-    virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) = 0;
+    virtual void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) = 0;
 
     virtual void generateDtlsInfo() = 0;
     virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() = 0;
