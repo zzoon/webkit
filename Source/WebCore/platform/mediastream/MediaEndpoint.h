@@ -41,7 +41,7 @@ namespace WebCore {
 
 class IceCandidate;
 class MediaEndpoint;
-class MediaEndpointConfiguration;
+class MediaEndpointSessionConfiguration;
 class MediaPayload;
 class RealtimeMediaSource;
 
@@ -75,8 +75,8 @@ public:
     virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() = 0;
     virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() = 0;
 
-    virtual MediaEndpointPrepareResult prepareToReceive(MediaEndpointConfiguration*, bool isInitiator) = 0;
-    virtual MediaEndpointPrepareResult prepareToSend(MediaEndpointConfiguration*, bool isInitiator) = 0;
+    virtual MediaEndpointPrepareResult prepareToReceive(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
+    virtual MediaEndpointPrepareResult prepareToSend(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
 
     virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) = 0;
 

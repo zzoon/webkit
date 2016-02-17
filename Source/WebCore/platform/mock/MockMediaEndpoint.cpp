@@ -129,7 +129,7 @@ Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultVideoPayloads()
     return payloads;
 }
 
-MediaEndpointPrepareResult MockMediaEndpoint::prepareToReceive(MediaEndpointConfiguration* configuration, bool isInitiator)
+MediaEndpointPrepareResult MockMediaEndpoint::prepareToReceive(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     UNUSED_PARAM(configuration);
     UNUSED_PARAM(isInitiator);
@@ -137,7 +137,7 @@ MediaEndpointPrepareResult MockMediaEndpoint::prepareToReceive(MediaEndpointConf
     return MediaEndpointPrepareResult::Success;
 }
 
-MediaEndpointPrepareResult MockMediaEndpoint::prepareToSend(MediaEndpointConfiguration* configuration, bool isInitiator)
+MediaEndpointPrepareResult MockMediaEndpoint::prepareToSend(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     UNUSED_PARAM(configuration);
     UNUSED_PARAM(isInitiator);

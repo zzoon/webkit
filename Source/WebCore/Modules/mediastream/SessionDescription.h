@@ -38,7 +38,7 @@
 
 namespace WebCore {
 
-class MediaEndpointConfiguration;
+class MediaEndpointSessionConfiguration;
 
 class SessionDescription : public RefCounted<SessionDescription> {
 public:
@@ -49,25 +49,25 @@ public:
         Rollback = 4
     };
 
-    static RefPtr<SessionDescription> create(Type type, RefPtr<MediaEndpointConfiguration>&& configuration)
+    static RefPtr<SessionDescription> create(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration)
     {
         return adoptRef(new SessionDescription(type, WTFMove(configuration)));
     }
     virtual ~SessionDescription() { }
 
     Type type() const { return m_type; }
-    MediaEndpointConfiguration* configuration() const { return m_configuration.get(); }
+    MediaEndpointSessionConfiguration* configuration() const { return m_configuration.get(); }
 
     bool isLaterThan(SessionDescription* other) { return !other || configuration()->sessionVersion() > other->configuration()->sessionVersion(); }
 
 private:
-    SessionDescription(Type type, RefPtr<MediaEndpointConfiguration>&& configuration)
+    SessionDescription(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration)
         : m_type(type)
         , m_configuration(configuration)
     { }
 
     Type m_type;
-    RefPtr<MediaEndpointConfiguration> m_configuration;
+    RefPtr<MediaEndpointSessionConfiguration> m_configuration;
 };
 
 } // namespace WebCore

@@ -236,8 +236,8 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
-    RefPtr<MediaEndpointConfiguration> configurationSnapshot = internalLocalDescription() ?
-        internalLocalDescription()->configuration()->clone() : MediaEndpointConfiguration::create();
+    RefPtr<MediaEndpointSessionConfiguration> configurationSnapshot = internalLocalDescription() ?
+        internalLocalDescription()->configuration()->clone() : MediaEndpointSessionConfiguration::create();
 
     configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
@@ -296,8 +296,8 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
         return;
     }
 
-    RefPtr<MediaEndpointConfiguration> configurationSnapshot = internalLocalDescription() ?
-        internalLocalDescription()->configuration()->clone() : MediaEndpointConfiguration::create();
+    RefPtr<MediaEndpointSessionConfiguration> configurationSnapshot = internalLocalDescription() ?
+        internalLocalDescription()->configuration()->clone() : MediaEndpointSessionConfiguration::create();
 
     configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
@@ -389,7 +389,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
         return;
     }
 
-    RefPtr<MediaEndpointConfiguration> parsedConfiguration;
+    RefPtr<MediaEndpointSessionConfiguration> parsedConfiguration;
     SDPProcessor::Result result = m_sdpProcessor->parse(description.sdp(), parsedConfiguration);
     if (result != SDPProcessor::Result::Success) {
         if (result == SDPProcessor::Result::ParseError)
@@ -542,7 +542,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
         return;
     }
 
-    RefPtr<MediaEndpointConfiguration> parsedConfiguration;
+    RefPtr<MediaEndpointSessionConfiguration> parsedConfiguration;
     SDPProcessor::Result result = m_sdpProcessor->parse(description.sdp(), parsedConfiguration);
     if (result != SDPProcessor::Result::Success) {
         if (result == SDPProcessor::Result::ParseError)

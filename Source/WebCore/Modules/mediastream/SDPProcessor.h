@@ -35,7 +35,7 @@
 
 #include "ContextDestructionObserver.h"
 #include "IceCandidate.h"
-#include "MediaEndpointConfiguration.h"
+#include "MediaEndpointSessionConfiguration.h"
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
 
@@ -54,8 +54,8 @@ public:
 
     SDPProcessor(ScriptExecutionContext*);
 
-    Result generate(const MediaEndpointConfiguration&, String& outSdpString) const;
-    Result parse(const String& sdp, RefPtr<MediaEndpointConfiguration>&) const;
+    Result generate(const MediaEndpointSessionConfiguration&, String& outSdpString) const;
+    Result parse(const String& sdp, RefPtr<MediaEndpointSessionConfiguration>&) const;
 
     Result generateCandidateLine(const IceCandidate&, String& outCandidateLine) const;
     Result parseCandidateLine(const String& candidateLine, RefPtr<IceCandidate>&) const;

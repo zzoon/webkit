@@ -51,9 +51,9 @@ SDPProcessor::SDPProcessor(ScriptExecutionContext* context)
 {
 }
 
-// Note that MediaEndpointConfiguration is a "flatter" structure that the JSON representation. For
+// Note that MediaEndpointSessionConfiguration is a "flatter" structure that the JSON representation. For
 // example, the JSON representation has an "ice" object which collects a set of properties under a
-// namespace. MediaEndpointConfiguration has "ice"-prefixes on the corresponding properties.
+// namespace. MediaEndpointSessionConfiguration has "ice"-prefixes on the corresponding properties.
 
 static RefPtr<InspectorObject> createCandidateObject(const IceCandidate& candidate)
 {
@@ -115,7 +115,7 @@ static RefPtr<IceCandidate> createCandidate(const InspectorObject& candidateObje
     return candidate;
 }
 
-static RefPtr<MediaEndpointConfiguration> configurationFromJSON(const String& json)
+static RefPtr<MediaEndpointSessionConfiguration> configurationFromJSON(const String& json)
 {
     RefPtr<InspectorValue> value;
     if (!InspectorValue::parseJSON(json, value))
@@ -125,7 +125,7 @@ static RefPtr<MediaEndpointConfiguration> configurationFromJSON(const String& js
     if (!value->asObject(object))
         return nullptr;
 
-    RefPtr<MediaEndpointConfiguration> configuration = MediaEndpointConfiguration::create();
+    RefPtr<MediaEndpointSessionConfiguration> configuration = MediaEndpointSessionConfiguration::create();
 
     String stringValue;
     unsigned intValue;
@@ -285,7 +285,7 @@ static RefPtr<IceCandidate> iceCandidateFromJSON(const String& json)
     return createCandidate(*candidateObject);
 }
 
-static String configurationToJSON(const MediaEndpointConfiguration& configuration)
+static String configurationToJSON(const MediaEndpointSessionConfiguration& configuration)
 {
     RefPtr<InspectorObject> object = InspectorObject::create();
 
@@ -377,7 +377,7 @@ static String iceCandidateToJSON(const IceCandidate& candidate)
     return createCandidateObject(candidate)->toJSONString();
 }
 
-SDPProcessor::Result SDPProcessor::generate(const MediaEndpointConfiguration& configuration, String& outSdpString) const
+SDPProcessor::Result SDPProcessor::generate(const MediaEndpointSessionConfiguration& configuration, String& outSdpString) const
 {
     String sdpString;
     if (!callScript("generate", configurationToJSON(configuration), sdpString))
@@ -387,7 +387,7 @@ SDPProcessor::Result SDPProcessor::generate(const MediaEndpointConfiguration& co
     return Result::Success;
 }
 
-SDPProcessor::Result SDPProcessor::parse(const String& sdp, RefPtr<MediaEndpointConfiguration>& outConfiguration) const
+SDPProcessor::Result SDPProcessor::parse(const String& sdp, RefPtr<MediaEndpointSessionConfiguration>& outConfiguration) const
 {
     String scriptOutput;
     if (!callScript("parse", sdp, scriptOutput))
@@ -396,7 +396,7 @@ SDPProcessor::Result SDPProcessor::parse(const String& sdp, RefPtr<MediaEndpoint
     if (scriptOutput == "ParseError")
         return Result::ParseError;
 
-    RefPtr<MediaEndpointConfiguration> configuration = configurationFromJSON(scriptOutput);
+    RefPtr<MediaEndpointSessionConfiguration> configuration = configurationFromJSON(scriptOutput);
     if (!configuration)
         return Result::InternalError;
 

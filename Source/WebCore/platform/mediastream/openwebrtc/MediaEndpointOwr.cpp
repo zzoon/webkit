@@ -33,7 +33,7 @@
 #if ENABLE(MEDIA_STREAM)
 #include "MediaEndpointOwr.h"
 
-#include "MediaEndpointConfiguration.h"
+#include "MediaEndpointSessionConfiguration.h"
 #include "MediaPayload.h"
 #include "OpenWebRTCUtilities.h"
 #include "RealtimeMediaSourceOwr.h"
@@ -156,7 +156,7 @@ Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultVideoPayloads()
     return payloads;
 }
 
-MediaEndpointPrepareResult MediaEndpointOwr::prepareToReceive(MediaEndpointConfiguration* configuration, bool isInitiator)
+MediaEndpointPrepareResult MediaEndpointOwr::prepareToReceive(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     Vector<SessionConfig> sessionConfigs;
     for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {
@@ -189,7 +189,7 @@ static RefPtr<MediaPayload> findRtxPayload(Vector<RefPtr<MediaPayload>> payloads
     return nullptr;
 }
 
-MediaEndpointPrepareResult MediaEndpointOwr::prepareToSend(MediaEndpointConfiguration* configuration, bool isInitiator)
+MediaEndpointPrepareResult MediaEndpointOwr::prepareToSend(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     Vector<SessionConfig> sessionConfigs;
     for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {

@@ -28,8 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MediaEndpointConfiguration_h
-#define MediaEndpointConfiguration_h
+#ifndef MediaEndpointSessionConfiguration_h
+#define MediaEndpointSessionConfiguration_h
 
 #if ENABLE(MEDIA_STREAM)
 
@@ -38,13 +38,13 @@
 
 namespace WebCore {
 
-class MediaEndpointConfiguration : public RefCounted<MediaEndpointConfiguration> {
+class MediaEndpointSessionConfiguration : public RefCounted<MediaEndpointSessionConfiguration> {
 public:
-    static RefPtr<MediaEndpointConfiguration> create()
+    static RefPtr<MediaEndpointSessionConfiguration> create()
     {
-        return adoptRef(new MediaEndpointConfiguration());
+        return adoptRef(new MediaEndpointSessionConfiguration());
     }
-    virtual ~MediaEndpointConfiguration() { }
+    virtual ~MediaEndpointSessionConfiguration() { }
 
     uint64_t sessionId() const { return m_sessionId; }
     void setSessionId(uint64_t sessionId) { m_sessionId = sessionId; }
@@ -55,9 +55,9 @@ public:
     const Vector<RefPtr<PeerMediaDescription>>& mediaDescriptions() const { return m_mediaDescriptions; }
     void addMediaDescription(RefPtr<PeerMediaDescription>&& description) { m_mediaDescriptions.append(WTFMove(description)); }
 
-    RefPtr<MediaEndpointConfiguration> clone() const
+    RefPtr<MediaEndpointSessionConfiguration> clone() const
     {
-        RefPtr<MediaEndpointConfiguration> copy = create();
+        RefPtr<MediaEndpointSessionConfiguration> copy = create();
         copy->m_sessionId = m_sessionId;
         copy->m_sessionVersion = m_sessionVersion;
 
@@ -68,7 +68,7 @@ public:
     }
 
 private:
-    MediaEndpointConfiguration()
+    MediaEndpointSessionConfiguration()
         : m_sessionId(cryptographicallyRandomNumber()) // FIXME: should be 64 bits
         , m_sessionVersion(0)
     { }
@@ -83,4 +83,4 @@ private:
 
 #endif // ENABLE(MEDIA_STREAM)
 
-#endif // MediaEndpointConfiguration_h
+#endif // MediaEndpointSessionConfiguration_h
