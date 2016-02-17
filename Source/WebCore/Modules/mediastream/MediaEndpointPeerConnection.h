@@ -34,7 +34,6 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "MediaEndpoint.h"
-#include "MediaEndpointSessionConfiguration.h"
 #include "PeerConnectionBackend.h"
 #include "SessionDescription.h"
 #include <wtf/RefCounted.h>

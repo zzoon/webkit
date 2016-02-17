@@ -33,6 +33,7 @@
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "MediaEndpointSessionConfiguration.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 

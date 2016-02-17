@@ -37,6 +37,7 @@
 #include "DOMError.h"
 #include "JSDOMError.h"
 #include "JSRTCSessionDescription.h"
+#include "MediaEndpointSessionConfiguration.h"
 #include "MediaStreamTrack.h"
 #include "PeerConnectionBackend.h"
 #include "PeerMediaDescription.h"
