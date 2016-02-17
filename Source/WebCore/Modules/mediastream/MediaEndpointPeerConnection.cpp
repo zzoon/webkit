@@ -270,8 +270,10 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
 
     String sdpString;
     SDPProcessor::Result result = m_sdpProcessor->generate(*configurationSnapshot, sdpString);
-    if (result != SDPProcessor::Result::Success)
+    if (result != SDPProcessor::Result::Success) {
+        LOG_ERROR("SDPProcessor internal error");
         return;
+    }
 
     promise.resolve(RTCSessionDescription::create("offer", sdpString));
 }
@@ -339,8 +341,10 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
 
     String sdpString;
     SDPProcessor::Result result = m_sdpProcessor->generate(*configurationSnapshot, sdpString);
-    if (result != SDPProcessor::Result::Success)
+    if (result != SDPProcessor::Result::Success) {
+        LOG_ERROR("SDPProcessor internal error");
         return;
+    }
 
     promise.resolve(RTCSessionDescription::create("answer", sdpString));
 }
@@ -394,6 +398,8 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     if (result != SDPProcessor::Result::Success) {
         if (result == SDPProcessor::Result::ParseError)
             promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
+        else
+            LOG_ERROR("SDPProcessor internal error");
         return;
     }
 
@@ -547,6 +553,8 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
     if (result != SDPProcessor::Result::Success) {
         if (result == SDPProcessor::Result::ParseError)
             promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
+        else
+            LOG_ERROR("SDPProcessor internal error");
         return;
     }
 
@@ -656,6 +664,8 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
     if (result != SDPProcessor::Result::Success) {
         if (result == SDPProcessor::Result::ParseError)
             promise.reject(DOMError::create("SyntaxError (malformed candidate)"));
+        else
+            LOG_ERROR("SDPProcessor internal error");
         return;
     }
 
@@ -811,8 +821,11 @@ RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::createRTCSessionDescr
 
     String sdpString;
     SDPProcessor::Result result = m_sdpProcessor->generate(*description->configuration(), sdpString);
-    if (result != SDPProcessor::Result::Success)
+    if (result != SDPProcessor::Result::Success) {
+        LOG_ERROR("SDPProcessor internal error");
         return nullptr;
+    }
+
 
     return RTCSessionDescription::create(descriptionTypeToString(description->type()), sdpString);
 }
@@ -854,8 +867,10 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
 
     String candidateLine;
     SDPProcessor::Result result = m_sdpProcessor->generateCandidateLine(*candidate, candidateLine);
-    if (result != SDPProcessor::Result::Success)
+    if (result != SDPProcessor::Result::Success) {
+        LOG_ERROR("SDPProcessor internal error");
         return;
+    }
 
     RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateLine, "", mdescIndex);
 
