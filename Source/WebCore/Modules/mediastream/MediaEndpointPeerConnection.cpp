@@ -877,19 +877,12 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
     m_client->fireEvent(RTCIceCandidateEvent::create(false, false, WTFMove(iceCandidate)));
 }
 
-void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned mdescIndex)
+void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned)
 {
     ASSERT(isMainThread());
 
-    const MediaDescriptionVector& mediaDescriptions = internalLocalDescription()->configuration()->mediaDescriptions();
-    mediaDescriptions[mdescIndex]->setIceCandidateGatheringDone(true);
-
-    for (auto& mdesc : mediaDescriptions) {
-        if (!mdesc->iceCandidateGatheringDone())
-            return;
-    }
-
-    m_client->fireEvent(RTCIceCandidateEvent::create(false, false, nullptr));
+    // FIXME: Fire event when all media descriptions that are currently gathering have recevied
+    // this signal. Old broken implementation was removed.
 }
 
 void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&& source)

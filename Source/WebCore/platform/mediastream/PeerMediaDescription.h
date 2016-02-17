@@ -106,9 +106,6 @@ public:
     const Vector<RefPtr<IceCandidate>>& iceCandidates() const { return m_iceCandidates; }
     void addIceCandidate(RefPtr<IceCandidate>&& candidate) { m_iceCandidates.append(WTFMove(candidate)); }
 
-    bool iceCandidateGatheringDone() const { return m_iceCandidateGatheringDone; }
-    void setIceCandidateGatheringDone(bool iceCandidateGatheringDone) { m_iceCandidateGatheringDone = iceCandidateGatheringDone; }
-
     RealtimeMediaSource* source() const { return m_source.get(); }
     void setSource(RefPtr<RealtimeMediaSource>&& source) { m_source = source; }
 
@@ -153,7 +150,6 @@ private:
     PeerMediaDescription()
         : m_port(0)
         , m_rtcpMux(false)
-        , m_iceCandidateGatheringDone(false)
         , m_source(nullptr)
     { }
 
@@ -181,7 +177,6 @@ private:
     String m_iceUfrag;
     String m_icePassword;
     Vector<RefPtr<IceCandidate>> m_iceCandidates;
-    bool m_iceCandidateGatheringDone;
 
     RefPtr<RealtimeMediaSource> m_source;
 };
