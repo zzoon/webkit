@@ -156,7 +156,7 @@ Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultVideoPayloads()
     return payloads;
 }
 
-MediaEndpointPrepareResult MediaEndpointOwr::prepareToReceive(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
+MediaEndpoint::UpdateResult MediaEndpointOwr::updateReceiveConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     Vector<SessionConfig> sessionConfigs;
     for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {
@@ -176,7 +176,7 @@ MediaEndpointPrepareResult MediaEndpointOwr::prepareToReceive(MediaEndpointSessi
 
     m_numberOfReceivePreparedSessions = m_sessions.size();
 
-    return MediaEndpointPrepareResult::Success;
+    return UpdateResult::Success;
 }
 
 static RefPtr<MediaPayload> findRtxPayload(Vector<RefPtr<MediaPayload>> payloads, unsigned apt)
@@ -189,7 +189,7 @@ static RefPtr<MediaPayload> findRtxPayload(Vector<RefPtr<MediaPayload>> payloads
     return nullptr;
 }
 
-MediaEndpointPrepareResult MediaEndpointOwr::prepareToSend(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
+MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     Vector<SessionConfig> sessionConfigs;
     for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {
@@ -203,7 +203,7 @@ MediaEndpointPrepareResult MediaEndpointOwr::prepareToSend(MediaEndpointSessionC
 
     for (unsigned i = 0; i < m_sessions.size(); ++i) {
         if (i >= configuration->mediaDescriptions().size())
-            printf("prepareToSend: BAD missing configuration element for %d\n", i);
+            printf("updateSendConfiguration: BAD missing configuration element for %d\n", i);
 
         OwrSession* session = m_sessions[i];
         PeerMediaDescription& mdesc = *configuration->mediaDescriptions()[i];
@@ -231,8 +231,8 @@ MediaEndpointPrepareResult MediaEndpointOwr::prepareToSend(MediaEndpointSessionC
         }
 
         if (!payload) {
-            printf("prepareToSend: no payloads\n");
-            return MediaEndpointPrepareResult::Failed;
+            printf("updateSendConfiguration: no payloads\n");
+            return UpdateResult::Failed;
         }
 
         RefPtr<MediaPayload> rtxPayload = findRtxPayload(mdesc.payloads(), payload->type());
@@ -256,7 +256,7 @@ MediaEndpointPrepareResult MediaEndpointOwr::prepareToSend(MediaEndpointSessionC
         m_numberOfSendPreparedSessions = i + 1;
     }
 
-    return MediaEndpointPrepareResult::Success;
+    return UpdateResult::Success;
 }
 
 void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, unsigned mdescIndex, const String& ufrag, const String& password)

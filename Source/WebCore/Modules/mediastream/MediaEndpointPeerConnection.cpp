@@ -403,9 +403,9 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     bool isInitiator = descriptionType == SessionDescription::Type::Offer;
 
     if (hasNewMediaDescriptions) {
-        MediaEndpointPrepareResult prepareResult = m_mediaEndpoint->prepareToReceive(parsedConfiguration.get(), isInitiator);
+        MediaEndpoint::UpdateResult result = m_mediaEndpoint->updateReceiveConfiguration(parsedConfiguration.get(), isInitiator);
 
-        if (prepareResult == MediaEndpointPrepareResult::SuccessWithIceRestart) {
+        if (result == MediaEndpoint::UpdateResult::SuccessWithIceRestart) {
             if (m_client->internalIceGatheringState() != IceGatheringState::Gathering)
                 m_client->updateIceGatheringState(IceGatheringState::Gathering);
 
@@ -414,7 +414,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
 
             printf("ICE restart not implemented\n");
 
-        } else if (prepareResult == MediaEndpointPrepareResult::Failed) {
+        } else if (result == MediaEndpoint::UpdateResult::Failed) {
             // FIXME: Error type?
             promise.reject(DOMError::create("IncompatibleSessionDescriptionError (receive configuration)"));
             return;
@@ -424,7 +424,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     if (internalRemoteDescription()) {
         updateSendSources(parsedConfiguration->mediaDescriptions(), internalRemoteDescription()->configuration()->mediaDescriptions(), m_client->getSenders());
 
-        if (m_mediaEndpoint->prepareToSend(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpointPrepareResult::Failed) {
+        if (m_mediaEndpoint->updateSendConfiguration(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
             // FIXME: Error type?
             promise.reject(DOMError::create("IncompatibleSessionDescriptionError (send configuration)"));
             return;
@@ -565,7 +565,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
     if (internalLocalDescription())
         updateSendSources(internalLocalDescription()->configuration()->mediaDescriptions(), parsedConfiguration->mediaDescriptions(), senders);
 
-    if (m_mediaEndpoint->prepareToSend(parsedConfiguration.get(), isInitiator) == MediaEndpointPrepareResult::Failed) {
+    if (m_mediaEndpoint->updateSendConfiguration(parsedConfiguration.get(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
         // FIXME: Error type?
         promise.reject(DOMError::create("IncompatibleSessionDescriptionError (send configuration)"));
         return;

@@ -53,8 +53,8 @@ public:
     virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;
     virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() override;
 
-    virtual MediaEndpointPrepareResult prepareToReceive(MediaEndpointSessionConfiguration*, bool isInitiator) override;
-    virtual MediaEndpointPrepareResult prepareToSend(MediaEndpointSessionConfiguration*, bool isInitiator) override;
+    virtual UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
+    virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
 
     virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
 

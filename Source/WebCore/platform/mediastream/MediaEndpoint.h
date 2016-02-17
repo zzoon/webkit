@@ -57,16 +57,16 @@ public:
 
 typedef std::unique_ptr<MediaEndpoint> (*CreateMediaEndpoint)(MediaEndpointClient*);
 
-enum class MediaEndpointPrepareResult {
-    Success,
-    SuccessWithIceRestart,
-    Failed
-};
-
 class MediaEndpoint {
 public:
     WEBCORE_EXPORT static CreateMediaEndpoint create;
     virtual ~MediaEndpoint() { }
+
+    enum class UpdateResult {
+        Success,
+        SuccessWithIceRestart,
+        Failed
+    };
 
     // FIMXE: look over naming
     virtual void setConfiguration(RefPtr<MediaEndpointInit>&&) = 0;
@@ -75,8 +75,8 @@ public:
     virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() = 0;
     virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() = 0;
 
-    virtual MediaEndpointPrepareResult prepareToReceive(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
-    virtual MediaEndpointPrepareResult prepareToSend(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
+    virtual UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
+    virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
 
     virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) = 0;
 

@@ -129,20 +129,20 @@ Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultVideoPayloads()
     return payloads;
 }
 
-MediaEndpointPrepareResult MockMediaEndpoint::prepareToReceive(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
+MediaEndpoint::UpdateResult MockMediaEndpoint::updateReceiveConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     UNUSED_PARAM(configuration);
     UNUSED_PARAM(isInitiator);
 
-    return MediaEndpointPrepareResult::Success;
+    return UpdateResult::Success;
 }
 
-MediaEndpointPrepareResult MockMediaEndpoint::prepareToSend(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
+MediaEndpoint::UpdateResult MockMediaEndpoint::updateSendConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     UNUSED_PARAM(configuration);
     UNUSED_PARAM(isInitiator);
 
-    return MediaEndpointPrepareResult::Success;
+    return UpdateResult::Success;
 }
 
 void MockMediaEndpoint::addRemoteCandidate(IceCandidate& candidate, unsigned mdescIndex, const String& ufrag, const String& password)
