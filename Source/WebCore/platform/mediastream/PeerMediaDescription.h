@@ -150,6 +150,7 @@ private:
     PeerMediaDescription()
         : m_port(0)
         , m_rtcpMux(false)
+        , m_rtcpPort(0)
         , m_source(nullptr)
     { }
 
