@@ -154,6 +154,8 @@ list(APPEND WebCore_SOURCES
 
     platform/image-decoders/cairo/ImageDecoderCairo.cpp
 
+    platform/mediastream/gtk/SDPProcessorScriptResourceGtk.cpp
+
     platform/network/gtk/CredentialBackingStore.cpp
 
     platform/network/soup/AuthenticationChallengeSoup.cpp
