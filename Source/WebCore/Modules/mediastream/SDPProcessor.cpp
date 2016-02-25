@@ -68,7 +68,7 @@ static RefPtr<InspectorObject> createCandidateObject(const IceCandidate& candida
     candidateObject->setInteger(ASCIILiteral("port"), candidate.port());
     if (!candidate.tcpType().isEmpty())
         candidateObject->setString(ASCIILiteral("tcpType"), candidate.tcpType());
-    if (candidate.type().upper() != "HOST") {
+    if (candidate.type().convertToASCIIUppercase() != "HOST") {
         candidateObject->setString(ASCIILiteral("relatedAddress"), candidate.relatedAddress());
         candidateObject->setInteger(ASCIILiteral("relatedPort"), candidate.relatedPort());
     }

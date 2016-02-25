@@ -511,7 +511,7 @@ static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayl
     for (auto& remotePayload : remotePayloads) {
         MediaPayload* defaultPayload = nullptr;
         for (auto& p : defaultPayloads) {
-            if (p->encodingName() == remotePayload->encodingName().upper()) {
+            if (p->encodingName() == remotePayload->encodingName().convertToASCIIUppercase()) {
                 defaultPayload = p.get();
                 break;
             }

@@ -182,7 +182,7 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateReceiveConfiguration(MediaEn
 static RefPtr<MediaPayload> findRtxPayload(Vector<RefPtr<MediaPayload>> payloads, unsigned apt)
 {
     for (auto& payload : payloads) {
-        if (payload->encodingName().upper() == "RTX" && payload->parameters().contains("apt")
+        if (payload->encodingName().convertToASCIIUppercase() == "RTX" && payload->parameters().contains("apt")
             && (payload->parameters().get("apt") == apt))
             return payload;
     }
@@ -224,7 +224,7 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpo
 
         MediaPayload* payload = nullptr;
         for (auto& p : mdesc.payloads()) {
-            if (p->encodingName().upper() != "RTX") {
+            if (p->encodingName().convertToASCIIUppercase() != "RTX") {
                 payload = p.get();
                 break;
             }
@@ -238,8 +238,8 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpo
         RefPtr<MediaPayload> rtxPayload = findRtxPayload(mdesc.payloads(), payload->type());
         RealtimeMediaSourceOwr* source = static_cast<RealtimeMediaSourceOwr*>(mdesc.source());
 
-        ASSERT(codecTypes.find(payload->encodingName().upper()) != notFound);
-        OwrCodecType codecType = static_cast<OwrCodecType>(codecTypes.find(payload->encodingName().upper()));
+        ASSERT(codecTypes.find(payload->encodingName().convertToASCIIUppercase()) != notFound);
+        OwrCodecType codecType = static_cast<OwrCodecType>(codecTypes.find(payload->encodingName().convertToASCIIUppercase()));
 
         OwrPayload* sendPayload;
         if (mdesc.type() == "audio")
@@ -338,7 +338,7 @@ void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMe
     g_signal_connect(mediaSession, "on-incoming-source", G_CALLBACK(gotIncomingSource), this);
 
     for (auto& payload : mediaDescription->payloads()) {
-        if (payload->encodingName().upper() == "RTX")
+        if (payload->encodingName().convertToASCIIUppercase() == "RTX")
             continue;
 
         RefPtr<MediaPayload> rtxPayload = findRtxPayload(mediaDescription->payloads(), payload->type());
@@ -414,7 +414,7 @@ void MediaEndpointOwr::internalAddRemoteCandidate(OwrSession* session, IceCandid
     OwrComponentType componentId = static_cast<OwrComponentType>(candidate.componentId());
     OwrTransportType transportType;
 
-    if (candidate.transport().upper() == "UDP")
+    if (candidate.transport().convertToASCIIUppercase() == "UDP")
         transportType = OWR_TRANSPORT_TYPE_UDP;
     else {
         ASSERT(candidateTcpTypes.find(candidate.tcpType()) != notFound);
