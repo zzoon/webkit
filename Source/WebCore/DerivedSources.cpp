@@ -142,7 +142,6 @@
 #include "JSDOMPluginArray.cpp"
 #include "JSDOMSecurityPolicy.cpp"
 #include "JSDOMSelection.cpp"
-#include "JSDOMSettableTokenList.cpp"
 #include "JSDOMStringList.cpp"
 #include "JSDOMStringMap.cpp"
 #include "JSDOMTokenList.cpp"
@@ -157,6 +156,7 @@
 #include "JSFetchBody.cpp"
 #include "JSFetchHeaders.cpp"
 #include "JSFetchRequest.cpp"
+#include "JSFetchResponse.cpp"
 #include "JSFile.cpp"
 #include "JSFileError.cpp"
 #include "JSFileException.cpp"
@@ -164,9 +164,7 @@
 #include "JSFileReader.cpp"
 #include "JSFileReaderSync.cpp"
 #include "JSFocusEvent.cpp"
-#if ENABLE(FONT_LOAD_EVENTS)
-#include "JSFontLoader.cpp"
-#endif
+#include "JSFontFace.cpp"
 #include "JSGeolocation.cpp"
 #include "JSGeoposition.cpp"
 #include "JSHashChangeEvent.cpp"

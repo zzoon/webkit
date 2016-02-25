@@ -67,6 +67,7 @@
 #define SOFT_LINK_AVF(Lib, Name, Type) SOFT_LINK_DLL_IMPORT(Lib, Name, Type)
 #define SOFT_LINK_AVF_POINTER(Lib, Name, Type) SOFT_LINK_VARIABLE_DLL_IMPORT_OPTIONAL(Lib, Name, Type)
 #define SOFT_LINK_AVF_FRAMEWORK_IMPORT(Lib, Fun, ReturnType, Arguments, Signature) SOFT_LINK_DLL_IMPORT(Lib, Fun, ReturnType, __cdecl, Arguments, Signature)
+#define SOFT_LINK_AVF_FRAMEWORK_IMPORT_OPTIONAL(Lib, Fun, ReturnType, Arguments) SOFT_LINK_DLL_IMPORT_OPTIONAL(Lib, Fun, ReturnType, __cdecl, Arguments)
 
 // CoreText only needs to be soft-linked on Windows.
 SOFT_LINK_AVF_FRAMEWORK(CoreText)
@@ -76,8 +77,8 @@ SOFT_LINK_AVF_POINTER(CoreText, kCTFontNameAttribute, CFStringRef)
 
 #define CTFontDescriptorCopyAttribute softLink_CTFontDescriptorCopyAttribute
 
-typedef Boolean (*MTEnableCaption2015BehaviorPtrType) ();
-static MTEnableCaption2015BehaviorPtrType MTEnableCaption2015BehaviorPtr() { return nullptr; }
+SOFT_LINK_AVF_FRAMEWORK(CoreMedia)
+SOFT_LINK_AVF_FRAMEWORK_IMPORT_OPTIONAL(CoreMedia, MTEnableCaption2015Behavior, Boolean, ())
 
 #else
 
@@ -667,22 +668,32 @@ static String trackDisplayName(TextTrack* track)
     if (track == TextTrack::captionMenuAutomaticItem())
         return textTrackAutomaticMenuItemText();
 
-    StringBuilder displayName;
-    buildDisplayStringForTrackBase(displayName, *track);
+    StringBuilder displayNameBuilder;
+    buildDisplayStringForTrackBase(displayNameBuilder, *track);
 
-    if (displayName.isEmpty())
-        displayName.append(textTrackNoLabelText());
-    
-    if (track->isEasyToRead())
-        return easyReaderTrackMenuItemText(displayName.toString());
-    
-    if (track->isClosedCaptions())
-        return closedCaptionTrackMenuItemText(displayName.toString());
+    if (displayNameBuilder.isEmpty())
+        displayNameBuilder.append(textTrackNoLabelText());
+
+    String displayName = displayNameBuilder.toString();
+
+    if (track->isClosedCaptions()) {
+        displayName = closedCaptionTrackMenuItemText(displayName);
+        if (track->isEasyToRead())
+            displayName = easyReaderTrackMenuItemText(displayName);
+
+        return displayName;
+    }
 
     if (track->isSDH())
-        return sdhTrackMenuItemText(displayName.toString());
+        displayName = sdhTrackMenuItemText(displayName);
 
-    return displayName.toString();
+    if (track->containsOnlyForcedSubtitles())
+        displayName = forcedTrackMenuItemText(displayName);
+
+    if (track->isEasyToRead())
+        displayName = easyReaderTrackMenuItemText(displayName);
+
+    return displayName;
 }
 
 String CaptionUserPreferencesMediaAF::displayNameForTrack(TextTrack* track) const

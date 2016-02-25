@@ -49,7 +49,6 @@
 #include "WebGeolocationManager.h"
 #include "WebIconDatabaseProxy.h"
 #include "WebLoaderStrategy.h"
-#include "WebMediaCacheManager.h"
 #include "WebMediaKeyStorageManager.h"
 #include "WebMemorySampler.h"
 #include "WebPage.h"
@@ -179,7 +178,6 @@ WebProcess::WebProcess()
     // limited.
     addSupplement<WebGeolocationManager>();
     addSupplement<WebCookieManager>();
-    addSupplement<WebMediaCacheManager>();
     addSupplement<AuthenticationManager>();
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
@@ -254,7 +252,9 @@ void WebProcess::initializeWebProcess(WebProcessCreationParameters&& parameters)
 
     WTF::setCurrentThreadIsUserInitiated();
 
-    MemoryPressureHandler::singleton().install();
+    m_suppressMemoryPressureHandler = parameters.shouldSuppressMemoryPressureHandler;
+    if (!m_suppressMemoryPressureHandler)
+        MemoryPressureHandler::singleton().install();
 
     if (!parameters.injectedBundlePath.isEmpty())
         m_injectedBundle = InjectedBundle::create(parameters, transformHandlesToObjects(parameters.initializationUserData.object()).get());
@@ -468,16 +468,12 @@ void WebProcess::fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled)
 
 void WebProcess::ensurePrivateBrowsingSession(SessionID sessionID)
 {
-#if PLATFORM(COCOA) || USE(CFNETWORK) || USE(SOUP)
     WebFrameNetworkingContext::ensurePrivateBrowsingSession(sessionID);
-#endif
 }
 
 void WebProcess::destroyPrivateBrowsingSession(SessionID sessionID)
 {
-#if PLATFORM(COCOA) || USE(CFNETWORK) || USE(SOUP)
     SessionTracker::destroySession(sessionID);
-#endif
 }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -1181,7 +1177,9 @@ void WebProcess::resetAllGeolocationPermissions()
 
 void WebProcess::actualPrepareToSuspend(ShouldAcknowledgeWhenReadyToSuspend shouldAcknowledgeWhenReadyToSuspend)
 {
-    MemoryPressureHandler::singleton().releaseMemory(Critical::Yes, Synchronous::Yes);
+    if (!m_suppressMemoryPressureHandler)
+        MemoryPressureHandler::singleton().releaseMemory(Critical::Yes, Synchronous::Yes);
+
     setAllLayerTreeStatesFrozen(true);
 
     if (markAllLayersVolatileIfPossible()) {

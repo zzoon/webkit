@@ -96,23 +96,18 @@ public:
     }
 
 private:
-    IceCandidate()
-        : m_componentId(0)
-        , m_priority(0)
-        , m_port(0)
-        , m_relatedPort(0)
-    { }
+    IceCandidate() { }
 
     String m_type;
     String m_foundation;
-    unsigned m_componentId;
+    unsigned m_componentId { 0 };
     String m_transport;
-    int m_priority;
+    int m_priority { 0 };
     String m_address;
-    unsigned m_port;
+    unsigned m_port { 0 };
     String m_tcpType;
     String m_relatedAddress;
-    unsigned m_relatedPort;
+    unsigned m_relatedPort { 0 };
 };
 
 } // namespace WebCore

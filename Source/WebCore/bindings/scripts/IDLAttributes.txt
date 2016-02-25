@@ -61,7 +61,6 @@ DocumentEventHandler
 EnabledAtRuntime=*
 EnabledBySetting=*
 EnforceRange
-EventTarget
 ForwardDeclareInHeader
 GenerateIsReachable=|Impl|ImplWebGLRenderingContext|ImplDocument|ImplElementRoot|ImplFrame|ImplOwnerNodeRoot
 GetterRaisesException
@@ -71,6 +70,7 @@ Immutable
 ImplementationLacksVTable
 ImplementationNamespace=*
 ImplementedAs=*
+ImplicitThis
 InitializedByEventConstructor
 InterfaceName=*
 IsWeakCallback
@@ -121,7 +121,7 @@ StrictTypeChecking
 SuppressToJSObject
 TreatNullAs=NullString
 TreatReturnedNaNDateAs=Null|NaN
-TreatReturnedNullStringAs=Null|Undefined
+TreatReturnedNullStringAs=Undefined
 TreatUndefinedAs=NullString
 TypedArray=*
 URL

@@ -62,7 +62,7 @@
 #include "EventHandler.h"
 #include "ExtensionStyleSheets.h"
 #include "FocusController.h"
-#include "FontLoader.h"
+#include "FontFaceSet.h"
 #include "FormController.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
@@ -134,6 +134,7 @@
 #include "RenderLayerCompositor.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
+#include "ResourceLoadObserver.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SVGDocumentExtensions.h"
 #include "SVGElement.h"
@@ -766,19 +767,19 @@ void Document::invalidateAccessKeyMap()
     m_elementsByAccessKey.clear();
 }
 
-void Document::addImageElementByLowercasedUsemap(const AtomicStringImpl& name, HTMLImageElement& element)
+void Document::addImageElementByCaseFoldedUsemap(const AtomicStringImpl& name, HTMLImageElement& element)
 {
     return m_imagesByUsemap.add(name, element, *this);
 }
 
-void Document::removeImageElementByLowercasedUsemap(const AtomicStringImpl& name, HTMLImageElement& element)
+void Document::removeImageElementByCaseFoldedUsemap(const AtomicStringImpl& name, HTMLImageElement& element)
 {
     return m_imagesByUsemap.remove(name, element);
 }
 
-HTMLImageElement* Document::imageElementByLowercasedUsemap(const AtomicStringImpl& name) const
+HTMLImageElement* Document::imageElementByCaseFoldedUsemap(const AtomicStringImpl& name) const
 {
-    return m_imagesByUsemap.getElementByLowercasedUsemap(name, *this);
+    return m_imagesByUsemap.getElementByCaseFoldedUsemap(name, *this);
 }
 
 SelectorQuery* Document::selectorQueryForString(const String& selectorString, ExceptionCode& ec)
@@ -984,12 +985,15 @@ RefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCode& 
     }
 
     switch (importedNode->nodeType()) {
+    case DOCUMENT_FRAGMENT_NODE:
+        if (importedNode->isShadowRoot())
+            break;
+        FALLTHROUGH;
     case ELEMENT_NODE:
     case TEXT_NODE:
     case CDATA_SECTION_NODE:
     case PROCESSING_INSTRUCTION_NODE:
     case COMMENT_NODE:
-    case DOCUMENT_FRAGMENT_NODE:
         return importedNode->cloneNodeInternal(document(), deep ? CloningOperation::Everything : CloningOperation::OnlySelf);
 
     case ATTRIBUTE_NODE:
@@ -2431,6 +2435,17 @@ void Document::resumeDeviceMotionAndOrientationUpdates()
 #endif
 }
 
+bool Document::shouldBypassMainWorldContentSecurityPolicy() const
+{
+    JSC::CallFrame* callFrame = JSDOMWindow::commonVM().topCallFrame;
+    if (callFrame == JSC::CallFrame::noCaller())
+        return false;
+    DOMWrapperWorld& domWrapperWorld = currentWorld(callFrame);
+    if (domWrapperWorld.isNormal())
+        return false;
+    return true;
+}
+
 void Document::platformSuspendOrStopActiveDOMObjects()
 {
 #if PLATFORM(IOS)
@@ -2896,7 +2911,7 @@ void Document::writeln(const String& text, Document* ownerDocument)
 
 double Document::minimumTimerInterval() const
 {
-    Page* page = this->page();
+    auto* page = this->page();
     if (!page)
         return ScriptExecutionContext::minimumTimerInterval();
     return page->settings().minimumDOMTimerInterval();
@@ -2913,14 +2928,16 @@ void Document::setTimerThrottlingEnabled(bool shouldThrottle)
 
 double Document::timerAlignmentInterval(bool hasReachedMaxNestingLevel) const
 {
+    double alignmentInterval = ScriptExecutionContext::timerAlignmentInterval(hasReachedMaxNestingLevel);
+
     // Apply Document-level DOMTimer throttling only if timers have reached their maximum nesting level as the Page may still be visible.
     if (m_isTimerThrottlingEnabled && hasReachedMaxNestingLevel)
-        return DOMTimer::hiddenPageAlignmentInterval();
+        alignmentInterval = std::max(alignmentInterval, DOMTimer::hiddenPageAlignmentInterval());
 
-    Page* page = this->page();
-    if (!page)
-        return ScriptExecutionContext::timerAlignmentInterval(hasReachedMaxNestingLevel);
-    return page->settings().domTimerAlignmentInterval();
+    if (Page* page = this->page())
+        alignmentInterval = std::max(alignmentInterval, page->domTimerAlignmentInterval());
+
+    return alignmentInterval;
 }
 
 EventTarget* Document::errorEventTarget()
@@ -3259,19 +3276,19 @@ void Document::processHttpEquiv(const String& equiv, const String& content)
         break;
 
     case HTTPHeaderName::ContentSecurityPolicy:
-        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicyHeaderType::Enforce);
+        contentSecurityPolicy()->processHTTPEquiv(content, ContentSecurityPolicyHeaderType::Enforce);
         break;
 
     case HTTPHeaderName::ContentSecurityPolicyReportOnly:
-        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicyHeaderType::Report);
+        contentSecurityPolicy()->processHTTPEquiv(content, ContentSecurityPolicyHeaderType::Report);
         break;
 
     case HTTPHeaderName::XWebKitCSP:
-        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicyHeaderType::PrefixedEnforce);
+        contentSecurityPolicy()->processHTTPEquiv(content, ContentSecurityPolicyHeaderType::PrefixedEnforce);
         break;
 
     case HTTPHeaderName::XWebKitCSPReportOnly:
-        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicyHeaderType::PrefixedReport);
+        contentSecurityPolicy()->processHTTPEquiv(content, ContentSecurityPolicyHeaderType::PrefixedReport);
         break;
 
     default:
@@ -4066,6 +4083,11 @@ void Document::takeDOMWindowFrom(Document* document)
     ASSERT(m_domWindow->frame() == m_frame);
 }
 
+void Document::setAttributeEventListener(const AtomicString& eventType, const QualifiedName& attributeName, const AtomicString& attributeValue)
+{
+    setAttributeEventListener(eventType, JSLazyEventListener::create(*this, attributeName, attributeValue));
+}
+
 void Document::setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener> listener)
 {
     if (!m_domWindow)
@@ -4075,9 +4097,9 @@ void Document::setWindowAttributeEventListener(const AtomicString& eventType, Pa
 
 void Document::setWindowAttributeEventListener(const AtomicString& eventType, const QualifiedName& attributeName, const AtomicString& attributeValue)
 {
-    if (!m_frame)
+    if (!m_domWindow)
         return;
-    setWindowAttributeEventListener(eventType, JSLazyEventListener::createForDOMWindow(*m_frame, attributeName, attributeValue));
+    setWindowAttributeEventListener(eventType, JSLazyEventListener::create(*m_domWindow, attributeName, attributeValue));
 }
 
 EventListener* Document::getWindowAttributeEventListener(const AtomicString& eventType)
@@ -4134,21 +4156,21 @@ RefPtr<Event> Document::createEvent(const String& type, ExceptionCode& ec)
     // <https://dom.spec.whatwg.org/#dom-document-createevent>.
 
     if (equalLettersIgnoringASCIICase(type, "customevent"))
-        return CustomEvent::create();
+        return CustomEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "event") || equalLettersIgnoringASCIICase(type, "events") || equalLettersIgnoringASCIICase(type, "htmlevents"))
-        return Event::create();
+        return Event::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "keyboardevent") || equalLettersIgnoringASCIICase(type, "keyboardevents"))
-        return KeyboardEvent::create();
+        return KeyboardEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "messageevent"))
-        return MessageEvent::create();
+        return MessageEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "mouseevent") || equalLettersIgnoringASCIICase(type, "mouseevents"))
-        return MouseEvent::create();
+        return MouseEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "uievent") || equalLettersIgnoringASCIICase(type, "uievents"))
-        return UIEvent::create();
+        return UIEvent::createForBindings();
 
 #if ENABLE(TOUCH_EVENTS)
     if (equalLettersIgnoringASCIICase(type, "touchevent"))
-        return TouchEvent::create();
+        return TouchEvent::createForBindings();
 #endif
 
     // The following string comes from the SVG specifications
@@ -4158,7 +4180,7 @@ RefPtr<Event> Document::createEvent(const String& type, ExceptionCode& ec)
     // there is no practical value in this feature.
 
     if (equalLettersIgnoringASCIICase(type, "svgzoomevents"))
-        return SVGZoomEvent::create();
+        return SVGZoomEvent::createForBindings();
 
     // The following strings are for event classes where WebKit supplies an init function.
     // These strings are not part of the DOM specification and we would like to eliminate them.
@@ -4168,25 +4190,25 @@ RefPtr<Event> Document::createEvent(const String& type, ExceptionCode& ec)
     // both the string and the corresponding init function for that class.
 
     if (equalLettersIgnoringASCIICase(type, "compositionevent"))
-        return CompositionEvent::create();
+        return CompositionEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "hashchangeevent"))
-        return HashChangeEvent::create();
+        return HashChangeEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "mutationevent") || equalLettersIgnoringASCIICase(type, "mutationevents"))
-        return MutationEvent::create();
+        return MutationEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "overflowevent"))
-        return OverflowEvent::create();
+        return OverflowEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "storageevent"))
-        return StorageEvent::create();
+        return StorageEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "textevent"))
-        return TextEvent::create();
+        return TextEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "wheelevent"))
-        return WheelEvent::create();
+        return WheelEvent::createForBindings();
 
 #if ENABLE(DEVICE_ORIENTATION)
     if (equalLettersIgnoringASCIICase(type, "devicemotionevent"))
-        return DeviceMotionEvent::create();
+        return DeviceMotionEvent::createForBindings();
     if (equalLettersIgnoringASCIICase(type, "deviceorientationevent"))
-        return DeviceOrientationEvent::create();
+        return DeviceOrientationEvent::createForBindings();
 #endif
 
     ec = NOT_SUPPORTED_ERR;
@@ -4587,6 +4609,9 @@ void Document::setInPageCache(bool flag)
                 v->resetScrollbars();
         }
         m_styleRecalcTimer.stop();
+
+        clearStyleResolver();
+        clearSelectorQueryCache();
     } else {
         if (childNeedsStyleRecalc())
             scheduleStyleRecalc();
@@ -4715,7 +4740,7 @@ void Document::unregisterForPrivateBrowsingStateChangedCallbacks(Element* e)
 void Document::registerForCaptionPreferencesChangedCallbacks(Element* e)
 {
     if (page())
-        page()->group().captionPreferences()->setInterestedInCaptionPreferenceChanges();
+        page()->group().captionPreferences().setInterestedInCaptionPreferenceChanges();
 
     m_captionPreferencesChangedElements.add(e);
 }
@@ -5496,7 +5521,7 @@ void Document::enqueueHashchangeEvent(const String& oldURL, const String& newURL
 
 void Document::enqueuePopstateEvent(RefPtr<SerializedScriptValue>&& stateObject)
 {
-    enqueueWindowEvent(PopStateEvent::create(WTFMove(stateObject), m_domWindow ? m_domWindow->history() : nullptr));
+    dispatchWindowEvent(PopStateEvent::create(WTFMove(stateObject), m_domWindow ? m_domWindow->history() : nullptr));
 }
 
 void Document::addMediaCanStartListener(MediaCanStartListener* listener)
@@ -6385,6 +6410,9 @@ Document::RegionFixedPair Document::absoluteRegionForEventTargets(const EventTar
 
 void Document::updateLastHandledUserGestureTimestamp()
 {
+    if (!m_lastHandledUserGestureTimestamp)
+        ResourceLoadObserver::sharedObserver().logUserInteraction(*this);
+
     m_lastHandledUserGestureTimestamp = monotonicallyIncreasingTime();
 }
 
@@ -6661,14 +6689,10 @@ Document& Document::ensureTemplateDocument()
 }
 #endif
 
-#if ENABLE(FONT_LOAD_EVENTS)
-RefPtr<FontLoader> Document::fonts()
+Ref<FontFaceSet> Document::fonts()
 {
-    if (!m_fontloader)
-        m_fontloader = FontLoader::create(this);
-    return m_fontloader;
+    return fontSelector().fontFaceSet();
 }
-#endif
 
 float Document::deviceScaleFactor() const
 {

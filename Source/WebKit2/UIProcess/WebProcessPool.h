@@ -79,6 +79,7 @@ class PageConfiguration;
 namespace WebKit {
 
 class DownloadProxy;
+class WebAutomationSession;
 class WebContextSupplement;
 class WebIconDatabase;
 class WebPageGroup;
@@ -185,7 +186,8 @@ public:
     void clearPluginClientPolicies();
 #endif
 
-    PlatformProcessIdentifier networkProcessIdentifier();
+    pid_t networkProcessIdentifier();
+    pid_t databaseProcessIdentifier();
 
     void setAlwaysUsesComplexTextCodePath(bool);
     void setShouldUseFontSmoothing(bool);
@@ -254,6 +256,7 @@ public:
     void enableProcessTermination();
 
     void updateAutomationCapabilities() const;
+    void setAutomationSession(RefPtr<WebAutomationSession>&&);
 
     // Defaults to false.
     void setHTTPPipeliningEnabled(bool);
@@ -317,7 +320,7 @@ public:
     void registerSchemeForCustomProtocol(const String&);
     void unregisterSchemeForCustomProtocol(const String&);
 
-    static HashSet<String>& globalURLSchemesWithCustomProtocolHandlers();
+    static HashSet<String, ASCIICaseInsensitiveHash>& globalURLSchemesWithCustomProtocolHandlers();
     static void registerGlobalURLSchemeAsHavingCustomProtocolHandlers(const String&);
     static void unregisterGlobalURLSchemeAsHavingCustomProtocolHandlers(const String&);
 
@@ -425,6 +428,8 @@ private:
     std::unique_ptr<API::AutomationClient> m_automationClient;
     std::unique_ptr<API::DownloadClient> m_downloadClient;
     std::unique_ptr<API::LegacyContextHistoryClient> m_historyClient;
+
+    RefPtr<WebAutomationSession> m_automationSession;
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     PluginInfoStore m_pluginInfoStore;

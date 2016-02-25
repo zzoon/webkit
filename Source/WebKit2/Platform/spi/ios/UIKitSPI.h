@@ -24,7 +24,6 @@
  */
 
 #import <UIKit/UIKit.h>
-#import <UIKit/UITouch.h>
 
 #if USE(APPLE_INTERNAL_SDK)
 
@@ -233,7 +232,9 @@ typedef enum {
 
 @interface UIGestureRecognizer ()
 - (void)requireOtherGestureToFail:(UIGestureRecognizer *)gestureRecognizer;
+#if __IPHONE_OS_VERSION_MAX_ALLOWED < 90200
 @property(nonatomic, copy) NSArray<NSNumber *> *allowedTouchTypes;
+#endif
 @end
 
 @interface UILongPressGestureRecognizer ()
@@ -287,6 +288,7 @@ typedef enum {
 - (CADisplay *)_display;
 @end
 
+#if __IPHONE_OS_VERSION_MAX_ALLOWED < 90100
 typedef enum {
     UITouchTypeDirect
 } UITouchType;
@@ -294,6 +296,7 @@ typedef enum {
 @interface UITouch ()
 @property(nonatomic,readonly) UITouchType type;
 @end
+#endif
 
 @interface UIScrollView ()
 - (void)_stopScrollingAndZoomingAnimations;
@@ -313,7 +316,6 @@ typedef enum {
 
 @interface UITapGestureRecognizer ()
 @property (nonatomic, readonly) CGPoint location;
-@property (nonatomic, readonly) NSArray  *touches;
 @end
 
 @class WebEvent;

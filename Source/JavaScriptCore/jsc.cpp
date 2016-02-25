@@ -349,7 +349,7 @@ public:
     }
 
 private:
-    static EncodedJSValue customGetter(ExecState* exec, JSObject*, EncodedJSValue thisValue, PropertyName)
+    static EncodedJSValue customGetter(ExecState* exec, EncodedJSValue thisValue, PropertyName)
     {
         CustomGetter* thisObject = jsDynamicCast<CustomGetter*>(JSValue::decode(thisValue));
         if (!thisObject)
@@ -454,7 +454,7 @@ private:
     {
     }
 
-    static EncodedJSValue lengthGetter(ExecState* exec, JSObject*, EncodedJSValue thisValue, PropertyName)
+    static EncodedJSValue lengthGetter(ExecState* exec, EncodedJSValue thisValue, PropertyName)
     {
         RuntimeArray* thisObject = jsDynamicCast<RuntimeArray*>(JSValue::decode(thisValue));
         if (!thisObject)
@@ -752,11 +752,13 @@ protected:
         addFunction(vm, "samplingProfilerStackTraces", functionSamplingProfilerStackTraces, 0);
 #endif
 
-        JSArray* array = constructEmptyArray(globalExec(), 0);
-        for (size_t i = 0; i < arguments.size(); ++i)
-            array->putDirectIndex(globalExec(), i, jsString(globalExec(), arguments[i]));
-        putDirect(vm, Identifier::fromString(globalExec(), "arguments"), array);
-        
+        if (!arguments.isEmpty()) {
+            JSArray* array = constructEmptyArray(globalExec(), 0);
+            for (size_t i = 0; i < arguments.size(); ++i)
+                array->putDirectIndex(globalExec(), i, jsString(globalExec(), arguments[i]));
+            putDirect(vm, Identifier::fromString(globalExec(), "arguments"), array);
+        }
+
         putDirect(vm, Identifier::fromString(globalExec(), "console"), jsUndefined());
     }
 
@@ -777,7 +779,7 @@ protected:
 };
 
 const ClassInfo GlobalObject::s_info = { "global", &JSGlobalObject::s_info, nullptr, CREATE_METHOD_TABLE(GlobalObject) };
-const GlobalObjectMethodTable GlobalObject::s_globalObjectMethodTable = { &allowsAccessFrom, &supportsProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptRuntimeFlags, 0, &shouldInterruptScriptBeforeTimeout, &moduleLoaderResolve, &moduleLoaderFetch, nullptr, nullptr, nullptr };
+const GlobalObjectMethodTable GlobalObject::s_globalObjectMethodTable = { &allowsAccessFrom, &supportsLegacyProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptRuntimeFlags, 0, &shouldInterruptScriptBeforeTimeout, &moduleLoaderResolve, &moduleLoaderFetch, nullptr, nullptr, nullptr };
 
 
 GlobalObject::GlobalObject(VM& vm, Structure* structure)
@@ -1243,6 +1245,8 @@ EncodedJSValue JSC_HOST_CALL functionVersion(ExecState*)
 EncodedJSValue JSC_HOST_CALL functionRun(ExecState* exec)
 {
     String fileName = exec->argument(0).toString(exec)->value(exec);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
     Vector<char> script;
     if (!fetchScriptFromLocalFileSystem(fileName, script))
         return JSValue::encode(exec->vm().throwException(exec, createError(exec, ASCIILiteral("Could not open file."))));
@@ -1272,6 +1276,8 @@ EncodedJSValue JSC_HOST_CALL functionRun(ExecState* exec)
 EncodedJSValue JSC_HOST_CALL functionLoad(ExecState* exec)
 {
     String fileName = exec->argument(0).toString(exec)->value(exec);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
     Vector<char> script;
     if (!fetchScriptFromLocalFileSystem(fileName, script))
         return JSValue::encode(exec->vm().throwException(exec, createError(exec, ASCIILiteral("Could not open file."))));
@@ -1288,6 +1294,8 @@ EncodedJSValue JSC_HOST_CALL functionLoad(ExecState* exec)
 EncodedJSValue JSC_HOST_CALL functionReadFile(ExecState* exec)
 {
     String fileName = exec->argument(0).toString(exec)->value(exec);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
     Vector<char> script;
     if (!fillBufferWithContentsOfFile(fileName, script))
         return JSValue::encode(exec->vm().throwException(exec, createError(exec, ASCIILiteral("Could not open file."))));
@@ -1298,6 +1306,8 @@ EncodedJSValue JSC_HOST_CALL functionReadFile(ExecState* exec)
 EncodedJSValue JSC_HOST_CALL functionCheckSyntax(ExecState* exec)
 {
     String fileName = exec->argument(0).toString(exec)->value(exec);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
     Vector<char> script;
     if (!fetchScriptFromLocalFileSystem(fileName, script))
         return JSValue::encode(exec->vm().throwException(exec, createError(exec, ASCIILiteral("Could not open file."))));
@@ -1565,6 +1575,8 @@ EncodedJSValue JSC_HOST_CALL functionIs32BitPlatform(ExecState*)
 EncodedJSValue JSC_HOST_CALL functionLoadWebAssembly(ExecState* exec)
 {
     String fileName = exec->argument(0).toString(exec)->value(exec);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
     Vector<char> buffer;
     if (!fillBufferWithContentsOfFile(fileName, buffer))
         return JSValue::encode(exec->vm().throwException(exec, createError(exec, ASCIILiteral("Could not open file."))));
@@ -1584,6 +1596,8 @@ EncodedJSValue JSC_HOST_CALL functionLoadWebAssembly(ExecState* exec)
 EncodedJSValue JSC_HOST_CALL functionLoadModule(ExecState* exec)
 {
     String fileName = exec->argument(0).toString(exec)->value(exec);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
     Vector<char> script;
     if (!fetchScriptFromLocalFileSystem(fileName, script))
         return JSValue::encode(exec->vm().throwException(exec, createError(exec, ASCIILiteral("Could not open file."))));
@@ -1608,6 +1622,8 @@ EncodedJSValue JSC_HOST_CALL functionLoadModule(ExecState* exec)
 EncodedJSValue JSC_HOST_CALL functionCheckModuleSyntax(ExecState* exec)
 {
     String source = exec->argument(0).toString(exec)->value(exec);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
 
     StopWatch stopWatch;
     stopWatch.start();
@@ -2023,6 +2039,53 @@ void CommandLine::parseArguments(int argc, char** argv)
         jscExit(EXIT_SUCCESS);
 }
 
+// We make this function no inline so that globalObject won't be on the stack if we do a GC in jscmain.
+static int NEVER_INLINE runJSC(VM* vm, CommandLine options)
+{
+    JSLockHolder locker(vm);
+
+    int result;
+    if (options.m_profile && !vm->m_perBytecodeProfiler)
+        vm->m_perBytecodeProfiler = std::make_unique<Profiler::Database>(*vm);
+
+    GlobalObject* globalObject = GlobalObject::create(*vm, GlobalObject::createStructure(*vm, jsNull()), options.m_arguments);
+    bool success = runWithScripts(globalObject, options.m_scripts, options.m_dump, options.m_module);
+    if (options.m_interactive && success)
+        runInteractive(globalObject);
+
+    result = success ? 0 : 3;
+
+    if (options.m_exitCode)
+        printf("jsc exiting %d\n", result);
+
+    if (options.m_profile) {
+        if (!vm->m_perBytecodeProfiler->save(options.m_profilerOutput.utf8().data()))
+            fprintf(stderr, "could not save profiler output.\n");
+    }
+
+#if ENABLE(JIT)
+    if (Options::useExceptionFuzz())
+        printf("JSC EXCEPTION FUZZ: encountered %u checks.\n", numberOfExceptionFuzzChecks());
+    bool fireAtEnabled =
+    Options::fireExecutableAllocationFuzzAt() || Options::fireExecutableAllocationFuzzAtOrAfter();
+    if (Options::useExecutableAllocationFuzz() && (!fireAtEnabled || Options::verboseExecutableAllocationFuzz()))
+        printf("JSC EXECUTABLE ALLOCATION FUZZ: encountered %u checks.\n", numberOfExecutableAllocationFuzzChecks());
+    if (Options::useOSRExitFuzz()) {
+        printf("JSC OSR EXIT FUZZ: encountered %u static checks.\n", numberOfStaticOSRExitFuzzChecks());
+        printf("JSC OSR EXIT FUZZ: encountered %u dynamic checks.\n", numberOfOSRExitFuzzChecks());
+    }
+#endif
+    auto compileTimeStats = DFG::Plan::compileTimeStats();
+    Vector<CString> compileTimeKeys;
+    for (auto& entry : compileTimeStats)
+        compileTimeKeys.append(entry.key);
+    std::sort(compileTimeKeys.begin(), compileTimeKeys.end());
+    for (CString key : compileTimeKeys)
+        printf("%40s: %.3lf ms\n", key.data(), compileTimeStats.get(key));
+
+    return result;
+}
+
 int jscmain(int argc, char** argv)
 {
     // Note that the options parsing can affect VM creation, and thus
@@ -2037,48 +2100,14 @@ int jscmain(int argc, char** argv)
 
     VM* vm = &VM::create(LargeHeap).leakRef();
     int result;
-    {
+    result = runJSC(vm, options);
+
+    if (Options::gcAtEnd()) {
+        // We need to hold the API lock to do a GC.
         JSLockHolder locker(vm);
-
-        if (options.m_profile && !vm->m_perBytecodeProfiler)
-            vm->m_perBytecodeProfiler = std::make_unique<Profiler::Database>(*vm);
-    
-        GlobalObject* globalObject = GlobalObject::create(*vm, GlobalObject::createStructure(*vm, jsNull()), options.m_arguments);
-        bool success = runWithScripts(globalObject, options.m_scripts, options.m_dump, options.m_module);
-        if (options.m_interactive && success)
-            runInteractive(globalObject);
-
-        result = success ? 0 : 3;
-
-        if (options.m_exitCode)
-            printf("jsc exiting %d\n", result);
-    
-        if (options.m_profile) {
-            if (!vm->m_perBytecodeProfiler->save(options.m_profilerOutput.utf8().data()))
-                fprintf(stderr, "could not save profiler output.\n");
-        }
-        
-#if ENABLE(JIT)
-        if (Options::useExceptionFuzz())
-            printf("JSC EXCEPTION FUZZ: encountered %u checks.\n", numberOfExceptionFuzzChecks());
-        bool fireAtEnabled =
-            Options::fireExecutableAllocationFuzzAt() || Options::fireExecutableAllocationFuzzAtOrAfter();
-        if (Options::useExecutableAllocationFuzz() && (!fireAtEnabled || Options::verboseExecutableAllocationFuzz()))
-            printf("JSC EXECUTABLE ALLOCATION FUZZ: encountered %u checks.\n", numberOfExecutableAllocationFuzzChecks());
-        if (Options::useOSRExitFuzz()) {
-            printf("JSC OSR EXIT FUZZ: encountered %u static checks.\n", numberOfStaticOSRExitFuzzChecks());
-            printf("JSC OSR EXIT FUZZ: encountered %u dynamic checks.\n", numberOfOSRExitFuzzChecks());
-        }
-#endif
-        auto compileTimeStats = DFG::Plan::compileTimeStats();
-        Vector<CString> compileTimeKeys;
-        for (auto& entry : compileTimeStats)
-            compileTimeKeys.append(entry.key);
-        std::sort(compileTimeKeys.begin(), compileTimeKeys.end());
-        for (CString key : compileTimeKeys)
-            printf("%40s: %.3lf ms\n", key.data(), compileTimeStats.get(key));
+        vm->heap.collectAllGarbage();
     }
-    
+
     return result;
 }
 

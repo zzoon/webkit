@@ -490,7 +490,7 @@ public:
     // for painting/event handling.
     // Pass offsetFromRoot if known.
     void calculateRects(const ClipRectsContext&, const LayoutRect& paintDirtyRect, LayoutRect& layerBounds,
-        ClipRect& backgroundRect, ClipRect& foregroundRect, ClipRect& outlineRect, const LayoutSize& offsetFromRoot) const;
+        ClipRect& backgroundRect, ClipRect& foregroundRect, const LayoutSize& offsetFromRoot) const;
 
     LayoutRect childrenClipRect() const; // Returns the foreground clip rect of the layer in the document's coordinate space.
     LayoutRect selfClipRect() const; // Returns the background clip rect of the layer in the document's coordinate space.
@@ -884,6 +884,8 @@ private:
 #if ENABLE(CSS_SCROLL_SNAP)
     bool isScrollSnapInProgress() const override;
 #endif
+    bool usesMockScrollAnimator() const override;
+    void logMockScrollAnimatorMessage(const String&) const override;
 
 #if PLATFORM(IOS)
     void registerAsTouchEventListenerForScrolling();
@@ -1038,6 +1040,7 @@ private:
     bool m_hasVisibleContent : 1;
     bool m_visibleDescendantStatusDirty : 1;
     bool m_hasVisibleDescendant : 1;
+    bool m_registeredScrollableArea : 1;
 
     bool m_3DTransformedDescendantStatusDirty : 1;
     bool m_has3DTransformedDescendant : 1;  // Set on a stacking context layer that has 3D descendants anywhere

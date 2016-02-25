@@ -29,7 +29,7 @@
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "CSSValuePool.h"
-#include "DOMSettableTokenList.h"
+#include "DOMTokenList.h"
 #include "DocumentFragment.h"
 #include "ElementAncestorIterator.h"
 #include "Event.h"
@@ -809,7 +809,7 @@ void HTMLElement::setSpellcheck(bool enable)
 
 void HTMLElement::click()
 {
-    dispatchSimulatedClick(nullptr, SendNoEvents, DoNotShowPressedLook);
+    dispatchSimulatedClickForBindings(nullptr);
 }
 
 void HTMLElement::accessKeyAction(bool sendMouseEvents)

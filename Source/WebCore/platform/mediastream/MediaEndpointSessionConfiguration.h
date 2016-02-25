@@ -69,12 +69,13 @@ public:
 
 private:
     MediaEndpointSessionConfiguration()
-        : m_sessionId(cryptographicallyRandomNumber()) // FIXME: should be 64 bits
-        , m_sessionVersion(0)
-    { }
+    {
+        m_sessionId = cryptographicallyRandomNumber();
+        m_sessionId = m_sessionId << 32 | cryptographicallyRandomNumber();
+    }
 
     uint64_t m_sessionId;
-    unsigned m_sessionVersion;
+    unsigned m_sessionVersion { 0 };
 
     Vector<RefPtr<PeerMediaDescription>> m_mediaDescriptions;
 };

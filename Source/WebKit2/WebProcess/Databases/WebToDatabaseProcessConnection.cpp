@@ -28,6 +28,7 @@
 #include "WebToDatabaseProcessConnection.h"
 
 #include "DatabaseToWebProcessConnectionMessages.h"
+#include "WebIDBConnectionToServerMessages.h"
 #include "WebIDBServerConnection.h"
 #include "WebIDBServerConnectionMessages.h"
 #include "WebProcess.h"
@@ -52,6 +53,13 @@ WebToDatabaseProcessConnection::~WebToDatabaseProcessConnection()
 void WebToDatabaseProcessConnection::didReceiveMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
 {
 #if ENABLE(INDEXED_DATABASE)
+    if (decoder.messageReceiverName() == Messages::WebIDBConnectionToServer::messageReceiverName()) {
+        auto iterator = m_webIDBConnections.find(decoder.destinationID());
+        if (iterator != m_webIDBConnections.end())
+            iterator->value->didReceiveMessage(connection, decoder);
+        return;
+    }
+
     if (decoder.messageReceiverName() == Messages::WebIDBServerConnection::messageReceiverName()) {
         HashMap<uint64_t, WebIDBServerConnection*>::iterator connectionIterator = m_webIDBServerConnections.find(decoder.destinationID());
         if (connectionIterator != m_webIDBServerConnections.end())
@@ -87,6 +95,15 @@ void WebToDatabaseProcessConnection::removeWebIDBServerConnection(WebIDBServerCo
     send(Messages::DatabaseToWebProcessConnection::RemoveDatabaseProcessIDBConnection(connection.messageSenderDestinationID()));
 
     m_webIDBServerConnections.remove(connection.messageSenderDestinationID());
+}
+
+WebIDBConnectionToServer& WebToDatabaseProcessConnection::idbConnectionToServerForSession(const SessionID& sessionID)
+{
+    auto result = m_webIDBConnections.add(sessionID.sessionID(), nullptr);
+    if (result.isNewEntry)
+        result.iterator->value = WebIDBConnectionToServer::create();
+
+    return *result.iterator->value;
 }
 #endif
 

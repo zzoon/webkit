@@ -41,6 +41,10 @@
 #include <wtf/TypeCasts.h>
 #include <wtf/text/AtomicStringHash.h>
 
+namespace Inspector {
+class ConsoleMessage;
+}
+
 namespace WebCore {
 
     class Blob;
@@ -66,6 +70,8 @@ namespace WebCore {
         virtual String userAgent(const URL&) const override;
 
         virtual void disableEval(const String& errorMessage) override;
+
+        bool shouldBypassMainWorldContentSecurityPolicy() const override final { return m_shouldBypassMainWorldContentSecurityPolicy; }
 
         WorkerScriptController* script() { return m_script.get(); }
         void clearScript() { m_script = nullptr; }
@@ -122,6 +128,7 @@ namespace WebCore {
 
         virtual SecurityOrigin* topOrigin() const override { return m_topOrigin.get(); }
 
+        void addConsoleMessage(std::unique_ptr<Inspector::ConsoleMessage>);
         virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0) override;
 
 #if ENABLE(SUBTLE_CRYPTO)
@@ -130,10 +137,11 @@ namespace WebCore {
 #endif
 
     protected:
-        WorkerGlobalScope(const URL&, const String& userAgent, WorkerThread&, PassRefPtr<SecurityOrigin> topOrigin);
+        WorkerGlobalScope(const URL&, const String& userAgent, WorkerThread&, bool shouldBypassMainWorldContentSecurityPolicy, PassRefPtr<SecurityOrigin> topOrigin);
         void applyContentSecurityPolicyResponseHeaders(const ContentSecurityPolicyResponseHeaders&);
 
         virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, RefPtr<Inspector::ScriptCallStack>&&) override;
+        void addMessageToWorkerConsole(std::unique_ptr<Inspector::ConsoleMessage>);
         void addMessageToWorkerConsole(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, RefPtr<Inspector::ScriptCallStack>&&, JSC::ExecState* = 0, unsigned long requestIdentifier = 0);
 
     private:
@@ -159,6 +167,7 @@ namespace WebCore {
         WorkerThread& m_thread;
 
         bool m_closing;
+        bool m_shouldBypassMainWorldContentSecurityPolicy;
 
         HashSet<Observer*> m_workerObservers;
 

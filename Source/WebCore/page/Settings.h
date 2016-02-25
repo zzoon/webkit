@@ -146,21 +146,6 @@ public:
     WEBCORE_EXPORT void setPluginsEnabled(bool);
     bool arePluginsEnabled() const { return m_arePluginsEnabled; }
 
-    // When this option is set, WebCore will avoid storing any record of browsing activity
-    // that may persist on disk or remain displayed when the option is reset.
-    // This option does not affect the storage of such information in RAM.
-    // The following functions respect this setting:
-    //  - HTML5/DOM Storage
-    //  - Icon Database
-    //  - Console Messages
-    //  - MemoryCache
-    //  - Application Cache
-    //  - Back/Forward Page History
-    //  - Page Search Results
-    //  - HTTP Cookies
-    //  - Plug-ins (that support NPNVprivateModeBool)
-    void setPrivateBrowsingEnabled(bool);
-
     WEBCORE_EXPORT void setDNSPrefetchingEnabled(bool);
     bool dnsPrefetchingEnabled() const { return m_dnsPrefetchingEnabled; }
 
@@ -173,16 +158,13 @@ public:
     WEBCORE_EXPORT void setMinimumDOMTimerInterval(double); // Initialized to DOMTimer::defaultMinimumInterval().
     double minimumDOMTimerInterval() const { return m_minimumDOMTimerInterval; }
 
-    void setDOMTimerAlignmentInterval(double);
-    double domTimerAlignmentInterval() const { return m_domTimerAlignmentInterval; }
-
     WEBCORE_EXPORT void setLayoutInterval(std::chrono::milliseconds);
     std::chrono::milliseconds layoutInterval() const { return m_layoutInterval; }
 
-#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
     bool hiddenPageDOMTimerThrottlingEnabled() const { return m_hiddenPageDOMTimerThrottlingEnabled; }
     WEBCORE_EXPORT void setHiddenPageDOMTimerThrottlingEnabled(bool);
-#endif
+    bool hiddenPageDOMTimerThrottlingAutoIncreases() const { return m_hiddenPageDOMTimerThrottlingAutoIncreases; }
+    WEBCORE_EXPORT void setHiddenPageDOMTimerThrottlingAutoIncreases(bool);
 
     WEBCORE_EXPORT void setUsesPageCache(bool);
     bool usesPageCache() const { return m_usesPageCache; }
@@ -212,6 +194,8 @@ public:
 #if USE(AVFOUNDATION)
     WEBCORE_EXPORT static void setAVFoundationEnabled(bool flag);
     static bool isAVFoundationEnabled() { return gAVFoundationEnabled; }
+    WEBCORE_EXPORT static void setAVFoundationNSURLSessionEnabled(bool flag);
+    static bool isAVFoundationNSURLSessionEnabled() { return gAVFoundationNSURLSessionEnabled; }
 #endif
 
 #if PLATFORM(COCOA)
@@ -228,6 +212,9 @@ public:
 
     WEBCORE_EXPORT static void setUsesOverlayScrollbars(bool flag);
     static bool usesOverlayScrollbars();
+
+    WEBCORE_EXPORT static void setUsesMockScrollAnimator(bool);
+    static bool usesMockScrollAnimator();
 
 #if ENABLE(TOUCH_EVENTS)
     void setTouchEventEmulationEnabled(bool enabled) { m_touchEventEmulationEnabled = enabled; }
@@ -254,6 +241,9 @@ public:
 
     static bool lowPowerVideoAudioBufferSizeEnabled() { return gLowPowerVideoAudioBufferSizeEnabled; }
     WEBCORE_EXPORT static void setLowPowerVideoAudioBufferSizeEnabled(bool);
+
+    static bool resourceLoadStatisticsEnabled() { return gResourceLoadStatisticsEnabledEnabled; }
+    WEBCORE_EXPORT static void setResourceLoadStatisticsEnabled(bool);
 
 #if PLATFORM(IOS)
     WEBCORE_EXPORT static void setAudioSessionCategoryOverride(unsigned);
@@ -297,6 +287,10 @@ public:
     WEBCORE_EXPORT static float defaultMinimumZoomFontSize();
 #endif
 
+#if USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/SettingsGettersAndSetters.h>
+#endif
+
 private:
     explicit Settings(Page*);
 
@@ -310,7 +304,6 @@ private:
     SecurityOrigin::StorageBlockingPolicy m_storageBlockingPolicy;
     std::chrono::milliseconds m_layoutInterval;
     double m_minimumDOMTimerInterval;
-    double m_domTimerAlignmentInterval;
 
 #if ENABLE(TEXT_AUTOSIZING)
     float m_textAutosizingFontScaleFactor;
@@ -344,9 +337,7 @@ private:
     Timer m_setImageLoadingSettingsTimer;
     void imageLoadingSettingsTimerFired();
 
-#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
     bool m_hiddenPageDOMTimerThrottlingEnabled : 1;
-#endif
     bool m_hiddenPageCSSAnimationSuspensionEnabled : 1;
     bool m_fontFallbackPrefersPictographs : 1;
 
@@ -356,8 +347,11 @@ private:
     bool m_resourceUsageOverlayVisible { false };
 #endif
 
+    bool m_hiddenPageDOMTimerThrottlingAutoIncreases { false };
+
 #if USE(AVFOUNDATION)
     WEBCORE_EXPORT static bool gAVFoundationEnabled;
+    WEBCORE_EXPORT static bool gAVFoundationNSURLSessionEnabled;
 #endif
 
 #if PLATFORM(COCOA)
@@ -366,6 +360,7 @@ private:
 
     static bool gMockScrollbarsEnabled;
     static bool gUsesOverlayScrollbars;
+    static bool gMockScrollAnimatorEnabled;
 
 #if PLATFORM(WIN)
     static bool gShouldUseHighResolutionTimers;
@@ -389,6 +384,11 @@ private:
 #endif
 
     static bool gLowPowerVideoAudioBufferSizeEnabled;
+    static bool gResourceLoadStatisticsEnabledEnabled;
+
+#if USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/SettingsMembers.h>
+#endif
 };
 
 } // namespace WebCore

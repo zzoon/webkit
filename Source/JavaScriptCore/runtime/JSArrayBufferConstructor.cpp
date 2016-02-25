@@ -53,7 +53,7 @@ void JSArrayBufferConstructor::finishCreation(VM& vm, JSArrayBufferPrototype* pr
     Base::finishCreation(vm, ASCIILiteral("ArrayBuffer"));
     putDirectWithoutTransition(vm, vm.propertyNames->prototype, prototype, DontEnum | DontDelete | ReadOnly);
     putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(1), DontEnum | DontDelete | ReadOnly);
-    putDirectNonIndexAccessor(vm, vm.propertyNames->speciesSymbol, speciesSymbol, Accessor | ReadOnly | DontEnum | DontDelete);
+    putDirectNonIndexAccessor(vm, vm.propertyNames->speciesSymbol, speciesSymbol, Accessor | ReadOnly | DontEnum);
 
     JSGlobalObject* globalObject = this->globalObject();
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION(vm.propertyNames->isView, arrayBufferFuncIsView, DontEnum, 1);
@@ -97,9 +97,16 @@ static EncodedJSValue JSC_HOST_CALL constructArrayBuffer(ExecState* exec)
         return throwVMError(exec, createOutOfMemoryError(exec));
 
     Structure* arrayBufferStructure = InternalFunction::createSubclassStructure(exec, exec->newTarget(), constructor->globalObject()->arrayBufferStructure());
+    if (exec->hadException())
+        return JSValue::encode(JSValue());
     JSArrayBuffer* result = JSArrayBuffer::create(exec->vm(), arrayBufferStructure, buffer.release());
     
     return JSValue::encode(result);
+}
+
+static EncodedJSValue JSC_HOST_CALL callArrayBuffer(ExecState* exec)
+{
+    return JSValue::encode(throwConstructorCannotBeCalledAsFunctionTypeError(exec, "ArrayBuffer"));
 }
 
 ConstructType JSArrayBufferConstructor::getConstructData(
@@ -111,7 +118,7 @@ ConstructType JSArrayBufferConstructor::getConstructData(
 
 CallType JSArrayBufferConstructor::getCallData(JSCell*, CallData& callData)
 {
-    callData.native.function = constructArrayBuffer;
+    callData.native.function = callArrayBuffer;
     return CallTypeHost;
 }
 

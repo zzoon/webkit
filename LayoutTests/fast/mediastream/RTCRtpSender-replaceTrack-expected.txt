@@ -15,6 +15,10 @@ PASS promise sender.replaceTrack(videoTrack) rejected with TypeError: Type error
 PASS promise sender.replaceTrack(audioTrack2) fulfilled with undefined
 Stop sender, and try replacing the track
 PASS promise sender.replaceTrack(audioTrack2) rejected with [object DOMError]
+Create a new sender
+PASS sender = pc.addTrack(audioTrack2, stream) did not throw exception.
+Close pc and try replacing the track
+PASS promise sender.replaceTrack(audioTrack3) rejected with [object DOMError]
 End of promise chain
 PASS successfullyParsed is true
 

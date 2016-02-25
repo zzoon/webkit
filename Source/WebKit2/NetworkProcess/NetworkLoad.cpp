@@ -32,12 +32,9 @@
 #include "SessionTracker.h"
 #include "WebErrors.h"
 #include <WebCore/NotImplemented.h>
+#include <WebCore/ResourceHandle.h>
 #include <WebCore/SessionID.h>
 #include <wtf/MainThread.h>
-
-#if !USE(NETWORK_SESSION)
-#include <WebCore/ResourceHandle.h>
-#endif
 
 namespace WebKit {
 
@@ -52,13 +49,18 @@ NetworkLoad::NetworkLoad(NetworkLoadClient& client, const NetworkLoadParameters&
     , m_currentRequest(parameters.request)
 {
 #if USE(NETWORK_SESSION)
+    if (parameters.request.url().protocolIs("blob")) {
+        m_handle = ResourceHandle::create(nullptr, parameters.request, this, parameters.defersLoading, parameters.contentSniffingPolicy == SniffContent);
+        return;
+    }
     if (auto* networkSession = SessionTracker::networkSession(parameters.sessionID)) {
-        m_task = NetworkDataTask::create(*networkSession, *this, parameters.request, parameters.allowStoredCredentials);
+        m_task = NetworkDataTask::create(*networkSession, *this, parameters.request, parameters.allowStoredCredentials, parameters.contentSniffingPolicy, parameters.shouldClearReferrerOnHTTPSToHTTPRedirect);
         if (!parameters.defersLoading)
             m_task->resume();
     } else
         ASSERT_NOT_REACHED();
 #else
+    ASSERT(SessionTracker::storageSession(parameters.sessionID));
     m_handle = ResourceHandle::create(m_networkingContext.get(), parameters.request, this, parameters.defersLoading, parameters.contentSniffingPolicy == SniffContent);
 #endif
 }
@@ -69,23 +71,25 @@ NetworkLoad::~NetworkLoad()
 #if USE(NETWORK_SESSION)
     if (m_responseCompletionHandler)
         m_responseCompletionHandler(PolicyIgnore);
-#else
+    if (m_task)
+        m_task->clearClient();
+#endif
     if (m_handle)
         m_handle->clearClient();
-#endif
 }
 
 void NetworkLoad::setDefersLoading(bool defers)
 {
 #if USE(NETWORK_SESSION)
-    if (defers)
-        m_task->suspend();
-    else
-        m_task->resume();
-#else
+    if (m_task) {
+        if (defers)
+            m_task->suspend();
+        else
+            m_task->resume();
+    }
+#endif
     if (m_handle)
         m_handle->setDefersLoading(defers);
-#endif
 }
 
 void NetworkLoad::cancel()
@@ -93,10 +97,9 @@ void NetworkLoad::cancel()
 #if USE(NETWORK_SESSION)
     if (m_task)
         m_task->cancel();
-#else
+#endif
     if (m_handle)
         m_handle->cancel();
-#endif
 }
 
 void NetworkLoad::continueWillSendRequest(const WebCore::ResourceRequest& newRequest)
@@ -109,21 +112,18 @@ void NetworkLoad::continueWillSendRequest(const WebCore::ResourceRequest& newReq
 #endif
 
     if (m_currentRequest.isNull()) {
-#if USE(NETWORK_SESSION)
-        m_client.didFailLoading(cancelledError(m_currentRequest));
-#else
-        m_handle->cancel();
+        if (m_handle)
+            m_handle->cancel();
         didFail(m_handle.get(), cancelledError(m_currentRequest));
-        return;
-#endif
-    }
+    } else if (m_handle)
+        m_handle->continueWillSendRequest(m_currentRequest);
 
 #if USE(NETWORK_SESSION)
     ASSERT(m_redirectCompletionHandler);
-    m_redirectCompletionHandler(m_currentRequest);
-    m_redirectCompletionHandler = nullptr;
-#else
-    m_handle->continueWillSendRequest(m_currentRequest);
+    if (m_redirectCompletionHandler) {
+        m_redirectCompletionHandler(m_currentRequest);
+        m_redirectCompletionHandler = nullptr;
+    }
 #endif
 }
 
@@ -131,11 +131,13 @@ void NetworkLoad::continueDidReceiveResponse()
 {
 #if USE(NETWORK_SESSION)
     ASSERT(m_responseCompletionHandler);
-    m_responseCompletionHandler(PolicyUse);
-    m_responseCompletionHandler = nullptr;
-#else
-    m_handle->continueDidReceiveResponse();
+    if (m_responseCompletionHandler) {
+        m_responseCompletionHandler(PolicyUse);
+        m_responseCompletionHandler = nullptr;
+    }
 #endif
+    if (m_handle)
+        m_handle->continueDidReceiveResponse();
 }
 
 NetworkLoadClient::ShouldContinueDidReceiveResponse NetworkLoad::sharedDidReceiveResponse(const ResourceResponse& receivedResponse)
@@ -163,11 +165,14 @@ void NetworkLoad::sharedWillSendRedirectedRequest(const ResourceRequest& request
 
 void NetworkLoad::convertTaskToDownload(DownloadID downloadID)
 {
+    if (!m_task)
+        return;
+
     m_task->setPendingDownloadID(downloadID);
     
     ASSERT(m_responseCompletionHandler);
-    m_responseCompletionHandler(PolicyDownload);
-    m_responseCompletionHandler = nullptr;
+    if (m_responseCompletionHandler)
+        NetworkProcess::singleton().findPendingDownloadLocation(*m_task.get(), WTFMove(m_responseCompletionHandler));
 }
 
 void NetworkLoad::setPendingDownloadID(DownloadID downloadID)
@@ -212,11 +217,11 @@ void NetworkLoad::didReceiveChallenge(const AuthenticationChallenge& challenge, 
         m_client.canAuthenticateAgainstProtectionSpaceAsync(challenge.protectionSpace());
 }
 
-void NetworkLoad::didReceiveResponse(const ResourceResponse& response, ResponseCompletionHandler completionHandler)
+void NetworkLoad::didReceiveResponseNetworkSession(const ResourceResponse& response, ResponseCompletionHandler completionHandler)
 {
     ASSERT(isMainThread());
     if (m_task && m_task->pendingDownloadID().downloadID())
-        completionHandler(PolicyDownload);
+        NetworkProcess::singleton().findPendingDownloadLocation(*m_task.get(), completionHandler);
     else if (sharedDidReceiveResponse(response) == NetworkLoadClient::ShouldContinueDidReceiveResponse::Yes)
         completionHandler(PolicyUse);
     else
@@ -240,7 +245,7 @@ void NetworkLoad::didCompleteWithError(const ResourceError& error)
 
 void NetworkLoad::didBecomeDownload()
 {
-    m_client.didConvertToDownload();
+    m_client.didBecomeDownload();
 }
 
 void NetworkLoad::didSendData(uint64_t totalBytesSent, uint64_t totalBytesExpectedToSend)
@@ -258,7 +263,7 @@ void NetworkLoad::cannotShowURL()
     m_client.didFailLoading(cannotShowURLError(m_currentRequest));
 }
     
-#else
+#endif
 
 void NetworkLoad::didReceiveResponseAsync(ResourceHandle* handle, const ResourceResponse& receivedResponse)
 {
@@ -300,9 +305,7 @@ void NetworkLoad::willSendRequestAsync(ResourceHandle* handle, const ResourceReq
     sharedWillSendRedirectedRequest(request, redirectResponse);
 }
 
-#endif // USE(NETWORK_SESSION)
-
-#if USE(PROTECTION_SPACE_AUTH_CALLBACK) && !USE(NETWORK_SESSION)
+#if USE(PROTECTION_SPACE_AUTH_CALLBACK)
 void NetworkLoad::canAuthenticateAgainstProtectionSpaceAsync(ResourceHandle* handle, const ProtectionSpace& protectionSpace)
 {
     ASSERT(RunLoop::isMain());
@@ -331,6 +334,7 @@ void NetworkLoad::canAuthenticateAgainstProtectionSpaceAsync(ResourceHandle* han
 void NetworkLoad::continueCanAuthenticateAgainstProtectionSpace(bool result)
 {
 #if USE(NETWORK_SESSION)
+    ASSERT_WITH_MESSAGE(!m_handle, "Blobs should never give authentication challenges");
     ASSERT(m_challengeCompletionHandler);
     auto completionHandler = WTFMove(m_challengeCompletionHandler);
     if (!result) {
@@ -339,7 +343,7 @@ void NetworkLoad::continueCanAuthenticateAgainstProtectionSpace(bool result)
     }
     
     if (!m_challenge.protectionSpace().isPasswordBased()) {
-        completionHandler(AuthenticationChallengeDisposition::PerformDefaultHandling, Credential());
+        completionHandler(AuthenticationChallengeDisposition::UseCredential, serverTrustCredential(m_challenge));
         return;
     }
     
@@ -358,7 +362,7 @@ void NetworkLoad::continueCanAuthenticateAgainstProtectionSpace(bool result)
 }
 #endif
 
-#if USE(NETWORK_CFDATA_ARRAY_CALLBACK) && !USE(NETWORK_SESSION)
+#if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
 bool NetworkLoad::supportsDataArray()
 {
     notImplemented();
@@ -371,8 +375,6 @@ void NetworkLoad::didReceiveDataArray(ResourceHandle*, CFArrayRef)
     notImplemented();
 }
 #endif
-
-#if !USE(NETWORK_SESSION)
 
 void NetworkLoad::didSendData(ResourceHandle* handle, unsigned long long bytesSent, unsigned long long totalBytesToBeSent)
 {
@@ -436,7 +438,5 @@ void NetworkLoad::receivedCancellation(ResourceHandle* handle, const Authenticat
     m_handle->cancel();
     didFail(m_handle.get(), cancelledError(m_currentRequest));
 }
-
-#endif // !USE(NETWORK_SESSION)
 
 } // namespace WebKit

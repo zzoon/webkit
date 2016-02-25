@@ -34,7 +34,6 @@
 #import "ManagedConfigurationSPI.h"
 #import "NativeWebKeyboardEvent.h"
 #import "NativeWebTouchEvent.h"
-#import "SafariServicesSPI.h"
 #import "SmartMagnificationController.h"
 #import "TextInputSPI.h"
 #import "UIKitSPI.h"
@@ -434,7 +433,6 @@ static UIWebSelectionMode toUIWebSelectionMode(WKSelectionGranularity granularit
 {
     _doubleTapGestureRecognizer = adoptNS([[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_doubleTapRecognized:)]);
     [_doubleTapGestureRecognizer setNumberOfTapsRequired:2];
-    [_doubleTapGestureRecognizer setAllowedTouchTypes:@[@(UITouchTypeDirect)]];
     [_doubleTapGestureRecognizer setDelegate:self];
     [self addGestureRecognizer:_doubleTapGestureRecognizer.get()];
     [_singleTapGestureRecognizer requireOtherGestureToFail:_doubleTapGestureRecognizer.get()];
@@ -462,6 +460,12 @@ static UIWebSelectionMode toUIWebSelectionMode(WKSelectionGranularity granularit
     [_singleTapGestureRecognizer setGestureRecognizedTarget:self action:@selector(_singleTapRecognized:)];
     [_singleTapGestureRecognizer setResetTarget:self action:@selector(_singleTapDidReset:)];
     [self addGestureRecognizer:_singleTapGestureRecognizer.get()];
+
+    _nonBlockingDoubleTapGestureRecognizer = adoptNS([[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(_nonBlockingDoubleTapRecognized:)]);
+    [_nonBlockingDoubleTapGestureRecognizer setNumberOfTapsRequired:2];
+    [_nonBlockingDoubleTapGestureRecognizer setDelegate:self];
+    [_nonBlockingDoubleTapGestureRecognizer setEnabled:NO];
+    [self addGestureRecognizer:_nonBlockingDoubleTapGestureRecognizer.get()];
 
     [self _createAndConfigureDoubleTapGestureRecognizer];
 
@@ -496,6 +500,8 @@ static UIWebSelectionMode toUIWebSelectionMode(WKSelectionGranularity granularit
     [_actionSheetAssistant setDelegate:self];
     _smartMagnificationController = std::make_unique<SmartMagnificationController>(self);
     _isExpectingFastSingleTapCommit = NO;
+    _potentialTapInProgress = NO;
+    _isDoubleTapPending = NO;
     _showDebugTapHighlightsForFastClicking = [[NSUserDefaults standardUserDefaults] boolForKey:@"WebKitShowFastClickDebugTapHighlights"];
 }
 
@@ -534,6 +540,9 @@ static UIWebSelectionMode toUIWebSelectionMode(WKSelectionGranularity granularit
     [_doubleTapGestureRecognizer setDelegate:nil];
     [self removeGestureRecognizer:_doubleTapGestureRecognizer.get()];
 
+    [_nonBlockingDoubleTapGestureRecognizer setDelegate:nil];
+    [self removeGestureRecognizer:_nonBlockingDoubleTapGestureRecognizer.get()];
+
     [_twoFingerDoubleTapGestureRecognizer setDelegate:nil];
     [self removeGestureRecognizer:_twoFingerDoubleTapGestureRecognizer.get()];
 
@@ -561,6 +570,7 @@ static UIWebSelectionMode toUIWebSelectionMode(WKSelectionGranularity granularit
     [self removeGestureRecognizer:_singleTapGestureRecognizer.get()];
     [self removeGestureRecognizer:_highlightLongPressGestureRecognizer.get()];
     [self removeGestureRecognizer:_doubleTapGestureRecognizer.get()];
+    [self removeGestureRecognizer:_nonBlockingDoubleTapGestureRecognizer.get()];
     [self removeGestureRecognizer:_twoFingerDoubleTapGestureRecognizer.get()];
 }
 
@@ -570,6 +580,7 @@ static UIWebSelectionMode toUIWebSelectionMode(WKSelectionGranularity granularit
     [self addGestureRecognizer:_singleTapGestureRecognizer.get()];
     [self addGestureRecognizer:_highlightLongPressGestureRecognizer.get()];
     [self addGestureRecognizer:_doubleTapGestureRecognizer.get()];
+    [self addGestureRecognizer:_nonBlockingDoubleTapGestureRecognizer.get()];
     [self addGestureRecognizer:_twoFingerDoubleTapGestureRecognizer.get()];
 }
 
@@ -734,6 +745,7 @@ static UIWebSelectionMode toUIWebSelectionMode(WKSelectionGranularity granularit
 - (void)_inspectorNodeSearchRecognized:(UIGestureRecognizer *)gestureRecognizer
 {
     ASSERT(_inspectorNodeSearchEnabled);
+    [self _resetIsDoubleTapPending];
 
     CGPoint point = [gestureRecognizer locationInView:self];
 
@@ -922,7 +934,7 @@ static NSValue *nsSizeForTapHighlightBorderRadius(WebCore::IntSize borderRadius,
 
 - (void)_disableDoubleTapGesturesDuringTapIfNecessary:(uint64_t)requestID
 {
-    if (!_potentialTapInProgress || _latestTapID != requestID)
+    if (_latestTapID != requestID)
         return;
 
     [self _setDoubleTapGesturesEnabled:NO];
@@ -1051,6 +1063,12 @@ static inline bool isSamePair(UIGestureRecognizer *a, UIGestureRecognizer *b, UI
     if (isSamePair(gestureRecognizer, otherGestureRecognizer, _singleTapGestureRecognizer.get(), _textSelectionAssistant.get().singleTapGesture))
         return YES;
 
+    if (isSamePair(gestureRecognizer, otherGestureRecognizer, _singleTapGestureRecognizer.get(), _nonBlockingDoubleTapGestureRecognizer.get()))
+        return YES;
+
+    if (isSamePair(gestureRecognizer, otherGestureRecognizer, _highlightLongPressGestureRecognizer.get(), _nonBlockingDoubleTapGestureRecognizer.get()))
+        return YES;
+
     if (isSamePair(gestureRecognizer, otherGestureRecognizer, _highlightLongPressGestureRecognizer.get(), _previewSecondaryGestureRecognizer.get()))
         return YES;
 
@@ -1114,6 +1132,7 @@ static inline bool isSamePair(UIGestureRecognizer *a, UIGestureRecognizer *b, UI
 
     if (gestureRecognizer == _highlightLongPressGestureRecognizer
         || gestureRecognizer == _doubleTapGestureRecognizer
+        || gestureRecognizer == _nonBlockingDoubleTapGestureRecognizer
         || gestureRecognizer == _twoFingerDoubleTapGestureRecognizer
         || gestureRecognizer == _singleTapGestureRecognizer) {
 
@@ -1132,7 +1151,7 @@ static inline bool isSamePair(UIGestureRecognizer *a, UIGestureRecognizer *b, UI
             // This is a different node than the assisted one.
             // Prevent the gesture if there is no node.
             // Allow the gesture if it is a node that wants highlight or if there is an action for it.
-            if (!_positionInformation.isClickableElement)
+            if (!_positionInformation.isElement)
                 return NO;
             return [self _actionForLongPress] != nil;
         } else {
@@ -1235,6 +1254,7 @@ static inline bool isSamePair(UIGestureRecognizer *a, UIGestureRecognizer *b, UI
 - (void)_highlightLongPressRecognized:(UILongPressGestureRecognizer *)gestureRecognizer
 {
     ASSERT(gestureRecognizer == _highlightLongPressGestureRecognizer);
+    [self _resetIsDoubleTapPending];
 
     _lastInteractionLocation = gestureRecognizer.startPoint;
 
@@ -1246,7 +1266,7 @@ static inline bool isSamePair(UIGestureRecognizer *a, UIGestureRecognizer *b, UI
         _isTapHighlightIDValid = YES;
         break;
     case UIGestureRecognizerStateEnded:
-        if (_highlightLongPressCanClick && _positionInformation.isClickableElement) {
+        if (_highlightLongPressCanClick && _positionInformation.isElement) {
             [self _attemptClickAtLocation:[gestureRecognizer startPoint]];
             [self _finishInteraction];
         } else
@@ -1265,6 +1285,7 @@ static inline bool isSamePair(UIGestureRecognizer *a, UIGestureRecognizer *b, UI
 - (void)_longPressRecognized:(UILongPressGestureRecognizer *)gestureRecognizer
 {
     ASSERT(gestureRecognizer == _longPressGestureRecognizer);
+    [self _resetIsDoubleTapPending];
 
     _lastInteractionLocation = gestureRecognizer.startPoint;
 
@@ -1289,6 +1310,7 @@ static inline bool isSamePair(UIGestureRecognizer *a, UIGestureRecognizer *b, UI
 {
     ASSERT(gestureRecognizer == _singleTapGestureRecognizer);
     ASSERT(!_potentialTapInProgress);
+    [self _resetIsDoubleTapPending];
 
     _page->potentialTapAtPosition(gestureRecognizer.location, ++_latestTapID);
     _potentialTapInProgress = YES;
@@ -1316,6 +1338,22 @@ static void cancelPotentialTapIfNecessary(WKContentView* contentView)
     [self _cancelInteraction];
 }
 
+- (void)_didNotHandleTapAsClick:(const WebCore::IntPoint&)point
+{
+    // FIXME: we should also take into account whether or not the UI delegate
+    // has handled this notification.
+    if (_hasValidPositionInformation && point == _positionInformation.point && _positionInformation.isDataDetectorLink) {
+        [self _showDataDetectorsSheet];
+        return;
+    }
+
+    if (!_isDoubleTapPending)
+        return;
+
+    _smartMagnificationController->handleSmartMagnificationGesture(_lastInteractionLocation);
+    _isDoubleTapPending = NO;
+}
+
 - (void)_singleTapCommited:(UITapGestureRecognizer *)gestureRecognizer
 {
     ASSERT(gestureRecognizer == _singleTapGestureRecognizer);
@@ -1333,8 +1371,7 @@ static void cancelPotentialTapIfNecessary(WKContentView* contentView)
     // We don't want to clear the selection if it is in editable content.
     // The selection could have been set by autofocusing on page load and not
     // reflected in the UI process since the user was not interacting with the page.
-    UITouch *touch = [gestureRecognizer.touches lastObject];
-    if (!_page->editorState().isContentEditable && touch.type == UITouchTypeDirect)
+    if (!_page->editorState().isContentEditable)
         [_webSelectionAssistant clearSelection];
 
     _lastInteractionLocation = gestureRecognizer.location;
@@ -1354,13 +1391,26 @@ static void cancelPotentialTapIfNecessary(WKContentView* contentView)
 
 - (void)_doubleTapRecognized:(UITapGestureRecognizer *)gestureRecognizer
 {
+    [self _resetIsDoubleTapPending];
     _lastInteractionLocation = gestureRecognizer.location;
 
     _smartMagnificationController->handleSmartMagnificationGesture(gestureRecognizer.location);
 }
 
+- (void)_resetIsDoubleTapPending
+{
+    _isDoubleTapPending = NO;
+}
+
+- (void)_nonBlockingDoubleTapRecognized:(UITapGestureRecognizer *)gestureRecognizer
+{
+    _lastInteractionLocation = gestureRecognizer.location;
+    _isDoubleTapPending = YES;
+}
+
 - (void)_twoFingerDoubleTapRecognized:(UITapGestureRecognizer *)gestureRecognizer
 {
+    [self _resetIsDoubleTapPending];
     _lastInteractionLocation = gestureRecognizer.location;
 
     _smartMagnificationController->handleResetMagnificationGesture(gestureRecognizer.location);
@@ -1402,14 +1452,6 @@ static void cancelPotentialTapIfNecessary(WKContentView* contentView)
 - (void)clearSelection
 {
     _page->clearSelection();
-}
-
-- (void)_didNotHandleTapAsClick:(const WebCore::IntPoint&)point
-{
-    // FIXME: we should also take into account whether or not the UI delegate
-    // has handled this notification.
-    if (_hasValidPositionInformation && point == _positionInformation.point && _positionInformation.isDataDetectorLink)
-        [self _showDataDetectorsSheet];
 }
 
 - (void)_positionInformationDidChange:(const InteractionInformationAtPosition&)info
@@ -2463,6 +2505,8 @@ static void selectionChangedWithTouch(WKContentView *view, const WebCore::IntPoi
         _tapHighlightInformation.color = [self _tapHighlightColorForFastClick:YES];
 
     [_doubleTapGestureRecognizer setEnabled:enabled];
+    [_nonBlockingDoubleTapGestureRecognizer setEnabled:!enabled];
+    [self _resetIsDoubleTapPending];
 }
 
 - (void)accessoryAutoFill

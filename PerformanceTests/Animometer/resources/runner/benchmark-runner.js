@@ -1,12 +1,12 @@
-function BenchmarkRunnerState(suites)
-{
-    this._suites = suites;
-    this._suiteIndex = -1;
-    this._testIndex = 0;
-    this.next();
-}
+BenchmarkRunnerState = Utilities.createClass(
+    function(suites)
+    {
+        this._suites = suites;
+        this._suiteIndex = -1;
+        this._testIndex = 0;
+        this.next();
+    }, {
 
-BenchmarkRunnerState.prototype = {
     currentSuite: function()
     {
         return this._suites[this._suiteIndex];
@@ -49,16 +49,16 @@ BenchmarkRunnerState.prototype = {
         frame.src = "tests/" + test.url;
         return promise;
     }
-};
+});
 
-function BenchmarkRunner(suites, frameContainer, client)
-{
-    this._suites = suites;
-    this._client = client;
-    this._frameContainer = frameContainer;
-}
+BenchmarkRunner = Utilities.createClass(
+    function(suites, frameContainer, client)
+    {
+        this._suites = suites;
+        this._client = client;
+        this._frameContainer = frameContainer;
+    }, {
 
-BenchmarkRunner.prototype = {
     _appendFrame: function()
     {
         var frame = document.createElement("iframe");
@@ -94,10 +94,11 @@ BenchmarkRunner.prototype = {
         Utilities.extendObject(options, contentWindow.Utilities.parseParameters());
 
         var benchmark = new contentWindow.benchmarkClass(options);
-        benchmark.run().then(function(sampler) {
-            var samplers = self._suitesSamplers[suite.name] || {};
-            samplers[test.name] = sampler.process(options);
-            self._suitesSamplers[suite.name] = samplers;
+        document.body.style.backgroundColor = benchmark.backgroundColor();
+        benchmark.run().then(function(results) {
+            var suiteResults = self._suitesResults[suite.name] || {};
+            suiteResults[test.name] = results;
+            self._suitesResults[suite.name] = suiteResults;
 
             if (self._client && self._client.didRunTest)
                 self._client.didRunTest(suite, test);
@@ -115,7 +116,7 @@ BenchmarkRunner.prototype = {
     {
         if (!state) {
             state = new BenchmarkRunnerState(this._suites);
-            this._suitesSamplers = {};
+            this._suitesResults = {};
         }
 
         var suite = state.currentSuite();
@@ -153,8 +154,10 @@ BenchmarkRunner.prototype = {
             currentIteration++;
             if (currentIteration < self._client.iterationCount)
                 self.runAllSteps();
-            else if (this._client && this._client.didFinishLastIteration)
+            else if (this._client && this._client.didFinishLastIteration) {
+                document.body.style.backgroundColor = "";
                 self._client.didFinishLastIteration();
+            }
         }
 
         if (this._client && this._client.willStartFirstIteration)
@@ -168,9 +171,9 @@ BenchmarkRunner.prototype = {
         this._removeFrame();
 
         if (this._client && this._client.didRunSuites)
-            this._client.didRunSuites(this._suitesSamplers);
+            this._client.didRunSuites(this._suitesResults);
 
         if (this._runNextIteration)
             this._runNextIteration();
     }
-};
+});

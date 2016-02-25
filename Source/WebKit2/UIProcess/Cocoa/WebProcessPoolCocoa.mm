@@ -84,9 +84,7 @@ static NSString * const WebKitNetworkCacheSpeculativeRevalidationEnabledDefaults
 #endif
 #endif
 
-#if PLATFORM(MAC)
-NSString *WebKitTabSuspension = @"WebKitTabSuspension";
-#endif
+static NSString * const WebKitSuppressMemoryPressureHandlerDefaultsKey = @"WebKitSuppressMemoryPressureHandler";
 
 namespace WebKit {
 
@@ -105,15 +103,11 @@ static void registerUserDefaultsIfNeeded()
     [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitJSCJITEnabledDefaultsKey];
     [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitJSCFTLJITEnabledDefaultsKey];
 
-#if PLATFORM(MAC)
-    [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitTabSuspension];
-#endif
-
 #if ENABLE(NETWORK_CACHE)
     [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitNetworkCacheEnabledDefaultsKey];
     [registrationDictionary setObject:[NSNumber numberWithBool:NO] forKey:WebKitNetworkCacheEfficacyLoggingEnabledDefaultsKey];
 #if ENABLE(NETWORK_CACHE_SPECULATIVE_REVALIDATION)
-    [registrationDictionary setObject:[NSNumber numberWithBool:NO] forKey:WebKitNetworkCacheSpeculativeRevalidationEnabledDefaultsKey];
+    [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitNetworkCacheSpeculativeRevalidationEnabledDefaultsKey];
 #endif
 #endif
 
@@ -178,13 +172,12 @@ void WebProcessPool::platformInitializeWebProcess(WebProcessCreationParameters& 
     parameters.accessibilityEnhancedUserInterfaceEnabled = false;
 #endif
 
-#if PLATFORM(MAC)
-    parameters.shouldEnableTabSuspension = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitTabSuspension];
-#endif
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
 
-    parameters.shouldEnableJIT = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitJSCJITEnabledDefaultsKey];
-    parameters.shouldEnableFTLJIT = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitJSCFTLJITEnabledDefaultsKey];
-    parameters.shouldEnableMemoryPressureReliefLogging = [[NSUserDefaults standardUserDefaults] boolForKey:@"LogMemoryJetsamDetails"];
+    parameters.shouldEnableJIT = [defaults boolForKey:WebKitJSCJITEnabledDefaultsKey];
+    parameters.shouldEnableFTLJIT = [defaults boolForKey:WebKitJSCFTLJITEnabledDefaultsKey];
+    parameters.shouldEnableMemoryPressureReliefLogging = [defaults boolForKey:@"LogMemoryJetsamDetails"];
+    parameters.shouldSuppressMemoryPressureHandler = [defaults boolForKey:WebKitSuppressMemoryPressureHandlerDefaultsKey];
 
 #if PLATFORM(MAC)
     parameters.shouldRewriteConstAsVar = applicationIsIBooks();
@@ -259,6 +252,8 @@ void WebProcessPool::platformInitializeNetworkProcess(NetworkProcessCreationPara
     parameters.shouldEnableNetworkCacheSpeculativeRevalidation = [defaults boolForKey:WebKitNetworkCacheSpeculativeRevalidationEnabledDefaultsKey];
 #endif
 #endif
+
+    parameters.shouldSuppressMemoryPressureHandler = [defaults boolForKey:WebKitSuppressMemoryPressureHandlerDefaultsKey];
 
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
     RetainPtr<CFDataRef> cookieStorageData = adoptCF(CFHTTPCookieStorageCreateIdentifyingData(kCFAllocatorDefault, [[NSHTTPCookieStorage sharedHTTPCookieStorage] _cookieStorage]));

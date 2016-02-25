@@ -28,6 +28,7 @@
 #if PLATFORM(IOS) || __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
 
 #import "PlatformUtilities.h"
+#import <JavaScriptCore/InitializeThreading.h>
 #import <WebKit/WebView.h>
 #import <WebCore/FrameLoadRequest.h>
 #import <WebCore/MainFrame.h>
@@ -35,6 +36,7 @@
 #import <WebCore/PageConfiguration.h>
 #import <WebCore/Document.h>
 #import <WebCore/DocumentLoader.h>
+#import <WebCore/MediaResourceLoader.h>
 #import <WebCore/Settings.h>
 #import <WebCore/SubresourceLoader.h>
 #import <WebCore/WebCoreNSURLSession.h>
@@ -105,9 +107,13 @@ public:
     WebView *view { nil };
     Frame* frame { nullptr };
     TestNSURLSessionDataDelegate *delegate { nil };
+    RefPtr<MediaResourceLoader> loader;
 
     virtual void SetUp()
     {
+#if PLATFORM(IOS)
+        JSC::initializeThreading();
+#endif
         view = [[WebView alloc] initWithFrame:NSZeroRect];
         view.frameLoadDelegate = [[[TestNSURLSessionLoaderDelegate alloc] init] autorelease];
 
@@ -117,18 +123,20 @@ public:
 
         delegate = [[TestNSURLSessionDataDelegate alloc] init];
         frame = [view _mainCoreFrame];
+        loader = adoptRef(new MediaResourceLoader(*frame->document(), emptyString()));
     }
 
     virtual void TearDown()
     {
         [view release];
         [delegate release];
+        loader = nullptr;
     }
 };
 
 TEST_F(WebCoreNSURLSessionTest, BasicOperation)
 {
-    WebCoreNSURLSession* session = [[WebCoreNSURLSession alloc] initWithResourceLoader:frame->document()->loader()->cachedResourceLoader() delegate:delegate delegateQueue:[NSOperationQueue mainQueue]];
+    WebCoreNSURLSession* session = [[WebCoreNSURLSession alloc] initWithResourceLoader:*loader delegate:delegate delegateQueue:[NSOperationQueue mainQueue]];
     didRecieveResponse = false;
     didRecieveData = false;
     didComplete = false;
@@ -153,7 +161,7 @@ TEST_F(WebCoreNSURLSessionTest, BasicOperation)
 
 TEST_F(WebCoreNSURLSessionTest, InvalidateEmpty)
 {
-    WebCoreNSURLSession* session = [[WebCoreNSURLSession alloc] initWithResourceLoader:frame->document()->loader()->cachedResourceLoader() delegate:delegate delegateQueue:[NSOperationQueue mainQueue]];
+    WebCoreNSURLSession* session = [[WebCoreNSURLSession alloc] initWithResourceLoader:*loader delegate:delegate delegateQueue:[NSOperationQueue mainQueue]];
     didInvalidate = false;
     [session finishTasksAndInvalidate];
     TestWebKitAPI::Util::run(&didInvalidate);

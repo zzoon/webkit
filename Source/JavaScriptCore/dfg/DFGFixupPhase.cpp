@@ -334,6 +334,10 @@ private:
         case ArithAbs: {
             if (m_graph.unaryArithShouldSpeculateInt32(node, FixupPass)) {
                 fixIntOrBooleanEdge(node->child1());
+                if (bytecodeCanTruncateInteger(node->arithNodeFlags()))
+                    node->setArithMode(Arith::Unchecked);
+                else
+                    node->setArithMode(Arith::CheckOverflow);
                 break;
             }
             fixDoubleOrBooleanEdge(node->child1());
@@ -602,11 +606,10 @@ private:
         }
 
         case StringFromCharCode:
-            if (node->child1()->shouldSpeculateUntypedForArithmetic()) {
+            if (node->child1()->shouldSpeculateInt32())
+                fixEdge<Int32Use>(node->child1());
+            else
                 fixEdge<UntypedUse>(node->child1());
-                break;
-            }
-            fixEdge<Int32Use>(node->child1());
             break;
 
         case StringCharAt:

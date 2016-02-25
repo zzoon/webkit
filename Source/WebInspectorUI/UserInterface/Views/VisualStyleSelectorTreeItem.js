@@ -164,6 +164,8 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
             return;
 
         if (WebInspector.CSSStyleManager.ForceablePseudoClasses.every((className) => !this.representedObject.selectorText.includes(":" + className))) {
+            contextMenu.appendSeparator();
+
             for (let pseudoClass of WebInspector.CSSStyleManager.ForceablePseudoClasses) {
                 if (pseudoClass === "visited" && this.representedObject.node.nodeName() !== "A")
                     continue;
@@ -177,6 +179,8 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
                 });
             }
         }
+
+        contextMenu.appendSeparator();
 
         for (let pseudoElement of WebInspector.CSSStyleManager.PseudoElementNames) {
             let pseudoElementSelector = "::" + pseudoElement;
@@ -261,8 +265,8 @@ WebInspector.VisualStyleSelectorTreeItem = class VisualStyleSelectorTreeItem ext
         this._hasInvalidSelector = event && event.data && !event.data.valid;
         this._listItemNode.classList.toggle("selector-invalid", !!this._hasInvalidSelector);
         if (this._hasInvalidSelector) {
-            this._iconElement.title = WebInspector.UIString("The selector '%s' is invalid.\nClick to revert to the previous selector.").format(this.selectorText);
-            this.mainTitleElement.title = WebInspector.UIString("Using the previous selector '%s'.").format(this.representedObject.ownerRule.selectorText);
+            this._iconElement.title = WebInspector.UIString("The selector “%s” is invalid.\nClick to revert to the previous selector.").format(this.selectorText);
+            this.mainTitleElement.title = WebInspector.UIString("Using the previous selector “%s”.").format(this.representedObject.ownerRule.selectorText);
             return;
         }
 

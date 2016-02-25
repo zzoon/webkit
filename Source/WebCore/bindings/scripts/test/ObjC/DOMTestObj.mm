@@ -239,6 +239,12 @@
     IMPL->setLenientTestObjAttr(core(newLenientTestObjAttr));
 }
 
+- (NSString *)unforgeableAttr
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->unforgeableAttr();
+}
+
 - (DOMTestObj *)XMLObjAttr
 {
     WebCore::JSMainThreadNullState state;
@@ -864,6 +870,18 @@
     IMPL->setNullableLongSettableAttribute(newNullableLongSettableAttribute);
 }
 
+- (NSString *)nullableStringSettableAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableStringSettableAttribute();
+}
+
+- (void)setNullableStringSettableAttribute:(NSString *)newNullableStringSettableAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->setNullableStringSettableAttribute(newNullableStringSettableAttribute);
+}
+
 - (int)nullableStringValue
 {
     WebCore::JSMainThreadNullState state;
@@ -955,6 +973,30 @@
 {
     WebCore::JSMainThreadNullState state;
     return kit(WTF::getPtr(IMPL->objMethodWithArgs(longArg, strArg, core(objArg))));
+}
+
+- (int)unforgeableMethod
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->unforgeableMethod();
+}
+
+- (NSString *)nullableStringMethod
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableStringMethod();
+}
+
+- (NSString *)nullableStringStaticMethod
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableStringStaticMethod();
+}
+
+- (NSString *)nullableStringSpecialMethod:(unsigned)index
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableStringSpecialMethod(index);
 }
 
 - (void)methodWithEnumArg:(DOMTestEnumType *)enumArg
@@ -1241,12 +1283,6 @@
 {
     WebCore::JSMainThreadNullState state;
     IMPL->convert1(core(value));
-}
-
-- (void)convert2:(DOMTestNode *)value
-{
-    WebCore::JSMainThreadNullState state;
-    IMPL->convert2(core(value));
 }
 
 - (void)convert4:(DOMTestNode *)value

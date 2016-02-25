@@ -57,9 +57,6 @@ public:
 
     void add32(TrustedImm32 imm, AbsoluteAddress address)
     {
-        if (!imm.m_value)
-            return;
-
         move(TrustedImmPtr(address.m_ptr), scratchRegister());
         add32(imm, Address(scratchRegister()));
     }
@@ -276,33 +273,29 @@ public:
 
     void add64(TrustedImm32 imm, RegisterID srcDest)
     {
-        if (!imm.m_value)
-            return;
-        add64AndSetFlags(imm, srcDest);
+        if (imm.m_value == 1)
+            m_assembler.incq_r(srcDest);
+        else
+            m_assembler.addq_ir(imm.m_value, srcDest);
     }
 
-    void add64(TrustedImm64 imm, RegisterID srcDest)
+    void add64(TrustedImm64 imm, RegisterID dest)
     {
-        if (!imm.m_value)
-            return;
-        add64AndSetFlags(imm, srcDest);
+        if (imm.m_value == 1)
+            m_assembler.incq_r(dest);
+        else {
+            move(imm, scratchRegister());
+            add64(scratchRegister(), dest);
+        }
     }
 
     void add64(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
-        if (!imm.m_value) {
-            move(src, dest);
-            return;
-        }
-
         m_assembler.leaq_mr(imm.m_value, src, dest);
     }
 
     void add64(TrustedImm32 imm, Address address)
     {
-        if (!imm.m_value)
-            return;
-
         if (imm.m_value == 1)
             m_assembler.incq_m(address.offset, address.base);
         else
@@ -311,9 +304,6 @@ public:
 
     void add64(TrustedImm32 imm, AbsoluteAddress address)
     {
-        if (!imm.m_value)
-            return;
-
         move(TrustedImmPtr(address.m_ptr), scratchRegister());
         add64(imm, Address(scratchRegister()));
     }
@@ -359,6 +349,18 @@ public:
         and64(scratchRegister(), srcDest);
     }
 
+    void and64(RegisterID op1, RegisterID op2, RegisterID dest)
+    {
+        if (op1 == op2 && op1 != dest && op2 != dest)
+            move(op1, dest);
+        else if (op1 == dest)
+            and64(op2, dest);
+        else {
+            move(op2, dest);
+            and64(op1, dest);
+        }
+    }
+
     void countLeadingZeros64(RegisterID src, RegisterID dst)
     {
         if (supportsLZCNT()) {
@@ -386,11 +388,11 @@ public:
     
     void lshift64(RegisterID src, RegisterID dest)
     {
-        ASSERT(src != dest);
-        
         if (src == X86Registers::ecx)
             m_assembler.shlq_CLr(dest);
         else {
+            ASSERT(src != dest);
+            
             // Can only shift by ecx, so we do some swapping if we see anything else.
             swap(src, X86Registers::ecx);
             m_assembler.shlq_CLr(dest);
@@ -405,11 +407,11 @@ public:
 
     void rshift64(RegisterID src, RegisterID dest)
     {
-        ASSERT(src != dest);
-
         if (src == X86Registers::ecx)
             m_assembler.sarq_CLr(dest);
         else {
+            ASSERT(src != dest);
+            
             // Can only shift by ecx, so we do some swapping if we see anything else.
             swap(src, X86Registers::ecx);
             m_assembler.sarq_CLr(dest);
@@ -424,11 +426,11 @@ public:
 
     void urshift64(RegisterID src, RegisterID dest)
     {
-        ASSERT(src != dest);
-
         if (src == X86Registers::ecx)
             m_assembler.shrq_CLr(dest);
         else {
+            ASSERT(src != dest);
+            
             // Can only shift by ecx, so we do some swapping if we see anything else.
             swap(src, X86Registers::ecx);
             m_assembler.shrq_CLr(dest);
@@ -439,6 +441,16 @@ public:
     void mul64(RegisterID src, RegisterID dest)
     {
         m_assembler.imulq_rr(src, dest);
+    }
+
+    void mul64(RegisterID src1, RegisterID src2, RegisterID dest)
+    {
+        if (src2 == dest) {
+            m_assembler.imulq_rr(src1, dest);
+            return;
+        }
+        move(src1, dest);
+        m_assembler.imulq_rr(src2, dest);
     }
     
     void x86ConvertToQuadWord64()
@@ -550,6 +562,18 @@ public:
     void xor64(RegisterID src, RegisterID dest)
     {
         m_assembler.xorq_rr(src, dest);
+    }
+
+    void xor64(RegisterID op1, RegisterID op2, RegisterID dest)
+    {
+        if (op1 == op2)
+            move(TrustedImm32(0), dest);
+        else if (op1 == dest)
+            xor64(op2, dest);
+        else {
+            move(op2, dest);
+            xor64(op1, dest);
+        }
     }
     
     void xor64(RegisterID src, Address dest)
@@ -873,11 +897,37 @@ public:
 
     Jump branchAdd64(ResultCondition cond, TrustedImm32 imm, RegisterID dest)
     {
-        add64AndSetFlags(imm, dest);
+        add64(imm, dest);
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 
+    Jump branchAdd64(ResultCondition cond, RegisterID src1, RegisterID src2, RegisterID dest)
+    {
+        if (src1 == dest)
+            return branchAdd64(cond, src2, dest);
+        move(src2, dest);
+        return branchAdd64(cond, src1, dest);
+    }
+
+    Jump branchAdd64(ResultCondition cond, Address src1, RegisterID src2, RegisterID dest)
+    {
+        move(src2, dest);
+        return branchAdd64(cond, src1, dest);
+    }
+
+    Jump branchAdd64(ResultCondition cond, RegisterID src1, Address src2, RegisterID dest)
+    {
+        move(src1, dest);
+        return branchAdd64(cond, src2, dest);
+    }
+
     Jump branchAdd64(ResultCondition cond, RegisterID src, RegisterID dest)
+    {
+        add64(src, dest);
+        return Jump(m_assembler.jCC(x86Condition(cond)));
+    }
+
+    Jump branchAdd64(ResultCondition cond, Address src, RegisterID dest)
     {
         add64(src, dest);
         return Jump(m_assembler.jCC(x86Condition(cond)));
@@ -929,10 +979,43 @@ public:
         cmov(x86Condition(cond), src, dest);
     }
 
+    void moveConditionally64(RelationalCondition cond, RegisterID left, RegisterID right, RegisterID thenCase, RegisterID elseCase, RegisterID dest)
+    {
+        m_assembler.cmpq_rr(right, left);
+
+        if (thenCase != dest && elseCase != dest) {
+            move(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest)
+            cmov(x86Condition(cond), thenCase, dest);
+        else
+            cmov(x86Condition(invert(cond)), elseCase, dest);
+    }
+
     void moveConditionallyTest64(ResultCondition cond, RegisterID testReg, RegisterID mask, RegisterID src, RegisterID dest)
     {
         m_assembler.testq_rr(testReg, mask);
         cmov(x86Condition(cond), src, dest);
+    }
+
+    void moveConditionallyTest64(ResultCondition cond, RegisterID left, RegisterID right, RegisterID thenCase, RegisterID elseCase, RegisterID dest)
+    {
+        ASSERT(isInvertible(cond));
+        ASSERT_WITH_MESSAGE(cond != Overflow, "TEST does not set the Overflow Flag.");
+
+        m_assembler.testq_rr(right, left);
+
+        if (thenCase != dest && elseCase != dest) {
+            move(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest)
+            cmov(x86Condition(cond), thenCase, dest);
+        else
+            cmov(x86Condition(invert(cond)), elseCase, dest);
     }
     
     void moveConditionallyTest64(ResultCondition cond, RegisterID testReg, TrustedImm32 mask, RegisterID src, RegisterID dest)
@@ -945,6 +1028,29 @@ public:
         else
             m_assembler.testq_i32r(mask.m_value, testReg);
         cmov(x86Condition(cond), src, dest);
+    }
+
+    void moveConditionallyTest64(ResultCondition cond, RegisterID testReg, TrustedImm32 mask, RegisterID thenCase, RegisterID elseCase, RegisterID dest)
+    {
+        ASSERT(isInvertible(cond));
+        ASSERT_WITH_MESSAGE(cond != Overflow, "TEST does not set the Overflow Flag.");
+
+        if (mask.m_value == -1)
+            m_assembler.testq_rr(testReg, testReg);
+        else if (!(mask.m_value & ~0x7f))
+            m_assembler.testb_i8r(mask.m_value, testReg);
+        else
+            m_assembler.testq_i32r(mask.m_value, testReg);
+
+        if (thenCase != dest && elseCase != dest) {
+            move(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest)
+            cmov(x86Condition(cond), thenCase, dest);
+        else
+            cmov(x86Condition(invert(cond)), elseCase, dest);
     }
     
     void abortWithReason(AbortReason reason)
@@ -1115,24 +1221,6 @@ public:
     }
 
 private:
-    void add64AndSetFlags(TrustedImm32 imm, RegisterID srcDest)
-    {
-        if (imm.m_value == 1)
-            m_assembler.incq_r(srcDest);
-        else
-            m_assembler.addq_ir(imm.m_value, srcDest);
-    }
-
-    void add64AndSetFlags(TrustedImm64 imm, RegisterID dest)
-    {
-        if (imm.m_value == 1)
-            m_assembler.incq_r(dest);
-        else {
-            move(imm, scratchRegister());
-            add64(scratchRegister(), dest);
-        }
-    }
-
     // If lzcnt is not available, use this after BSR
     // to count the leading zeros.
     void clz64AfterBsr(RegisterID dst)

@@ -110,7 +110,6 @@ typedef const struct OpaqueWKHitTestResult* WKHitTestResultRef;
 typedef const struct OpaqueWKIconDatabase* WKIconDatabaseRef;
 typedef const struct OpaqueWKInspector* WKInspectorRef;
 typedef const struct OpaqueWKKeyValueStorageManager* WKKeyValueStorageManagerRef;
-typedef const struct OpaqueWKMediaCacheManager* WKMediaCacheManagerRef;
 typedef const struct OpaqueWKMediaSessionFocusManager* WKMediaSessionFocusManagerRef;
 typedef const struct OpaqueWKMediaSessionMetadata* WKMediaSessionMetadataRef;
 typedef const struct OpaqueWKNavigationAction* WKNavigationActionRef;
@@ -126,9 +125,9 @@ typedef const struct OpaqueWKOpenPanelResultListener* WKOpenPanelResultListenerR
 typedef const struct OpaqueWKPage* WKPageRef;
 typedef const struct OpaqueWKPageConfiguration* WKPageConfigurationRef;
 typedef const struct OpaqueWKPageGroup* WKPageGroupRef;
-typedef const struct OpaqueWKPluginSiteDataManager* WKPluginSiteDataManagerRef;
 typedef const struct OpaqueWKPreferences* WKPreferencesRef;
 typedef const struct OpaqueWKProtectionSpace* WKProtectionSpaceRef;
+typedef const struct OpaqueWKPageRunBeforeUnloadConfirmPanelResultListener* WKPageRunBeforeUnloadConfirmPanelResultListenerRef;
 typedef const struct OpaqueWKPageRunJavaScriptAlertResultListener* WKPageRunJavaScriptAlertResultListenerRef;
 typedef const struct OpaqueWKPageRunJavaScriptConfirmResultListener* WKPageRunJavaScriptConfirmResultListenerRef;
 typedef const struct OpaqueWKPageRunJavaScriptPromptResultListener* WKPageRunJavaScriptPromptResultListenerRef;

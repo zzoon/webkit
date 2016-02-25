@@ -1,3 +1,381 @@
+2016-02-24  Nikos Andronikos  <nikos.andronikos-webkit@cisra.canon.com.au>
+
+        [web-animations] Add AnimationTimeline, DocumentTimeline and add extensions to Document interface
+        https://bugs.webkit.org/show_bug.cgi?id=151688
+
+        Reviewed by Dean Jackson.
+
+        Enables the WEB_ANIMATIONS compiler switch.
+
+        * wtf/FeatureDefines.h:
+
+2016-02-24  Konstantin Tokarev  <annulen@yandex.ru>
+
+        [cmake] Moved PRE/POST_BUILD_COMMAND to WEBKIT_FRAMEWORK.
+        https://bugs.webkit.org/show_bug.cgi?id=154651
+
+        Reviewed by Alex Christensen.
+
+        * CMakeLists.txt: Moved shared code to WEBKIT_FRAMEWORK macro.
+
+2016-02-23  Dan Bernstein  <mitz@apple.com>
+
+        [Xcode] Linker errors display mangled names, but no longer should
+        https://bugs.webkit.org/show_bug.cgi?id=154632
+
+        Reviewed by Sam Weinig.
+
+        * Configurations/Base.xcconfig: Stop setting LINKER_DISPLAYS_MANGLED_NAMES to YES.
+
+2016-02-23  Gavin Barraclough  <barraclough@apple.com>
+
+        Remove HIDDEN_PAGE_DOM_TIMER_THROTTLING feature define
+        https://bugs.webkit.org/show_bug.cgi?id=112323
+
+        Reviewed by Chris Dumez.
+
+        This feature is controlled by a runtime switch, and defaults off.
+
+        * wtf/FeatureDefines.h:
+
+2016-02-22  Konstantin Tokarev  <annulen@yandex.ru>
+
+        [cmake] Moved library setup code to WEBKIT_FRAMEWORK macro.
+        https://bugs.webkit.org/show_bug.cgi?id=154450
+
+        Reviewed by Alex Christensen.
+
+        * wtf/CMakeLists.txt:
+
+2016-02-20  Mark Lam  <mark.lam@apple.com>
+
+        Use of inlined asm statements causes problems for -std=c99 builds.
+        https://bugs.webkit.org/show_bug.cgi?id=154507
+
+        Reviewed by Dan Bernstein.
+
+        WTF's Assertions.h may inadvertantly get included by other projects that are built
+        with -std=c99.  The use of the inlined asm statements with the keyword "asm" is
+        not recognized when the -std compiler flag is used.
+
+        https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html says "When writing code that
+        can be compiled with -ansi and the various -std options, use __asm__ instead of
+        asm (see Alternate Keywords)."
+
+        So, to be a good citizen, we can change the use of "asm" in CRASH() to "__asm__"
+        so that we don't break the build of such other projects.
+
+        * wtf/Assertions.h:
+
+2016-02-18  Brent Fulgham  <bfulgham@apple.com>
+
+        Extend HashCountedSet with a method to efficiently set the count of an entry
+        https://bugs.webkit.org/show_bug.cgi?id=154352
+
+        Reviewed by Geoffrey Garen.
+
+        Tested by new TestWebKitAPI tests.
+
+        Update the HashCountedSet class with a new 'add' method to support efficient initialization of
+        the count of a given key. Also provide move and pointer template specializations to expand the
+        types of data that can be used as 'keys' in the HashCountedSet to match the underlying HashMap
+        implementation.
+
+        * wtf/HashCountedSet.h:
+        (WTF::Traits>::add): Added new overload supporting a supplied count.
+
+2016-02-18  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r196791.
+        https://bugs.webkit.org/show_bug.cgi?id=154438
+
+        broke windows build (Requested by alexchristensen on #webkit).
+
+        Reverted changeset:
+
+        "Extend HashCountedSet with a method to efficiently set the
+        count of an entry"
+        https://bugs.webkit.org/show_bug.cgi?id=154352
+        http://trac.webkit.org/changeset/196791
+
+2016-02-18  Brent Fulgham  <bfulgham@apple.com>
+
+        Extend HashCountedSet with a method to efficiently set the count of an entry
+        https://bugs.webkit.org/show_bug.cgi?id=154352
+
+        Reviewed by Geoffrey Garen.
+
+        Tested by new TestWebKitAPI tests.
+
+        Update the HashCountedSet class with a new 'add' method to support efficient initialization of
+        the count of a given key. Also provide move and pointer template specializations to expand the
+        types of data that can be used as 'keys' in the HashCountedSet to match the underlying HashMap
+        implementation.
+
+        * wtf/HashCountedSet.h:
+        (WTF::Traits>::add): Added new overload supporting a supplied count.
+
+2016-02-17  Filip Pizlo  <fpizlo@apple.com>
+
+        Remove LLVM dependencies from WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=154323
+
+        Reviewed by Antti Koivisto and Benjamin Poulain.
+
+        * wtf/Platform.h:
+
+2016-02-16  Sam Weinig  <sam@webkit.org>
+
+        Add an ensure function on HashMap that takes a key and a function to make the lazy value initialization idiom easier
+        https://bugs.webkit.org/show_bug.cgi?id=134857
+
+        Reviewed by Geoffrey Garen.
+
+        The current idiom for adding a value to a HashMap if the key is not already present, to allow for not
+        unnecessarily constructing the new value if it won't be used, is:
+        
+        {
+            auto result = map.add(key, Value());
+            if (!result.isNewEntry)
+                return result.iterator->value;
+
+            result.iterator->value = createNewValue();
+            return result.iterator->value;
+        }
+
+        or sometimes
+
+        {
+            auto& value = map.add(key, Value()).iterator->value;
+            if (!value)
+                value = createNewValue();
+            return value;
+        }
+
+        With this patch, you can now use the new function HashMap::ensure(key, functor). This will allow us to 
+        change to using the following idiom:
+
+        {
+            return map.ensure(key, [] { return createNewValue(); });
+        }
+
+        The passed in functor will only be called if the key is not already present in the HashMap.
+
+        * wtf/HashMap.h:
+        (WTF::HashMapTranslator::translate):
+        (WTF::HashMapEnsureTranslator::hash):
+        (WTF::HashMapEnsureTranslator::equal):
+        (WTF::HashMapEnsureTranslator::translate):
+        (WTF::HashMapTranslatorAdapter::hash):
+
+2016-02-16  Filip Pizlo  <fpizlo@apple.com>
+
+        FTL_USES_B3 should be unconditionally true
+        https://bugs.webkit.org/show_bug.cgi?id=154324
+
+        Reviewed by Benjamin Poulain.
+
+        * wtf/Platform.h:
+
+2016-02-13  Mark Lam  <mark.lam@apple.com>
+
+        Eliminate the need for WTFCrashImpl().
+        https://bugs.webkit.org/show_bug.cgi?id=154202
+
+        Reviewed by Alexey Proskuryakov.
+
+        * wtf/Assertions.cpp:
+        * wtf/Assertions.h:
+
+2016-02-12  Sukolsak Sakshuwong  <sukolsak@gmail.com>
+
+        Update ICU header files to version 52
+        https://bugs.webkit.org/show_bug.cgi?id=154160
+
+        Reviewed by Alex Christensen.
+
+        Update ICU header files to version 52 to allow the use of newer APIs.
+
+        * icu/unicode/bytestream.h:
+        * icu/unicode/localpointer.h:
+        * icu/unicode/platform.h:
+        * icu/unicode/ptypes.h:
+        * icu/unicode/putil.h:
+        * icu/unicode/rep.h:
+        (Replaceable::Replaceable):
+        * icu/unicode/std_string.h:
+        * icu/unicode/strenum.h:
+        * icu/unicode/stringpiece.h:
+        * icu/unicode/uchar.h:
+        * icu/unicode/ucnv.h:
+        * icu/unicode/ucol.h:
+        * icu/unicode/uconfig.h:
+        * icu/unicode/uenum.h:
+        * icu/unicode/uiter.h:
+        * icu/unicode/uloc.h:
+        * icu/unicode/umachine.h:
+        * icu/unicode/unistr.h:
+        (UnicodeString::UnicodeString):
+        (UnicodeString::operator== ):
+        (UnicodeString::startsWith):
+        (UnicodeString::setTo):
+        (UnicodeString::remove):
+        (UnicodeString::replace): Deleted.
+        (UnicodeString::extract): Deleted.
+        (UnicodeString::char32At): Deleted.
+        (UnicodeString::getChar32Start): Deleted.
+        (UnicodeString::getChar32Limit): Deleted.
+        (UnicodeString::getTerminatedBuffer): Deleted.
+        (UnicodeString::append): Deleted.
+        (UnicodeString::truncate): Deleted.
+        * icu/unicode/unorm2.h:
+        * icu/unicode/uobject.h:
+        * icu/unicode/urename.h:
+        * icu/unicode/uscript.h:
+        * icu/unicode/uset.h:
+        * icu/unicode/ustring.h:
+        * icu/unicode/utf.h:
+        * icu/unicode/utf16.h:
+        * icu/unicode/utf8.h:
+        * icu/unicode/utf_old.h:
+        * icu/unicode/utypes.h:
+        * icu/unicode/uvernum.h:
+        * icu/unicode/uversion.h:
+
+2016-02-11  Mark Lam  <mark.lam@apple.com>
+
+        Need WTFCrash workaround for shipping SafariForWebKitDevelopment binaries.
+        https://bugs.webkit.org/show_bug.cgi?id=154125
+
+        Reviewed by Joseph Pecoraro.
+
+        Presently shipping SafariForWebKitDevelopment binaries still expect to link to a
+        WTFCrash function.  We need to provide this function as a workaround until we can
+        update SafariForWebKitDevelopment to use the new inlined version.
+
+        We do this by doing:
+        1. Make WTFCrashImpl() the sole function for implementing a crash.
+           The CRASH() macro is now defined to be WTFCrashImpl() instead of WTFCrash().
+        2. Renamed the legacy WTFCrash() to WTFCrashImpl() for debug or non-Darwin builds.
+           For (non-debug && OS(DARWIN)) builds, WTFCrashImpl() will be an inlined
+           function with an asm statement that issues a breakpoint trap.
+        3. Implement WTFCrash() as a function that calls CRASH().
+           This satisfies the need of shipping SafariForWebKitDevelopment binaries.
+        4. Change WTFCrashWithSecurityImplication() to call CRASH().
+           This ensures that we have a consistent implementation of how we crash.
+        5. Changed WTFLogAlwaysAndCrash() to call CRASH() instead of WTFCrash().
+           This is just to have consistency in that all code in the WebKit project
+           now crashes by calling CRASH(), not WTFCrash().
+
+        * wtf/Assertions.cpp:
+        * wtf/Assertions.h:
+
+2016-02-09  Mark Lam  <mark.lam@apple.com>
+
+        Changed WTFCrash to not trash the crash site register state.
+        https://bugs.webkit.org/show_bug.cgi?id=153996
+
+        Reviewed by Geoffrey Garen.
+
+        When doing post-mortem crash site analysis using data from crash reports, it is
+        immensely valuable to be able to infer the crashing program's state from the
+        register values at crash time.  However, for RELEASE_ASSERT failures, we crash
+        using WTFCrash(), and WTFCrash() is currently implemented as a function call
+        that, in turn, calls a lot of other functions to do crash handling before
+        actually crashing.  As a result, the register values captured in the crash
+        reports are not likely to still contain the values used by the caller function
+        that failed the RELEASE_ASSERT.
+
+        This patch aims to remedy this issue for non-debug builds on OS(DARWIN) ports.
+        It does so by changing WTFCrash() into an inlined function that has an inlined
+        asm statement to issues the CPU specific breakpoint trap instruction.  As a
+        result, for non-debug OS(DARWIN) builds, crashes due to failed RELEASE_ASSERTs
+        will now show up in crash reports as crashing due to EXC_BREAKPOINT (SIGTRAP)
+        instead of a EXC_BAD_ACCESS (SIGSEGV) on address 0xbbadbeef.
+
+        For debug and non-DARWIN builds, WTFCrash() behavior currently remains unchanged.
+
+        * wtf/Assertions.cpp:
+        * wtf/Assertions.h:
+
+2016-02-09  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [GTK][EFL] Fix several build configuration related to SamplingProfiler after r196245
+        https://bugs.webkit.org/show_bug.cgi?id=154033
+
+        Reviewed by Michael Catanzaro.
+
+        * wtf/Platform.h:
+
+2016-02-08  Filip Pizlo  <fpizlo@apple.com>
+
+        Make sure that locking code that relies on module boundaries for compiler fences uses NEVER_INLINE
+        https://bugs.webkit.org/show_bug.cgi?id=153972
+
+        Reviewed by Andreas Kling.
+
+        When this code was written, we assumed that module boundaries were compiler fences. That might
+        not be the case if we ever do LTO.
+
+        * wtf/Lock.cpp:
+        (WTF::LockBase::lockSlow):
+        (WTF::LockBase::unlockSlow):
+        * wtf/ParkingLot.cpp:
+        (WTF::ParkingLot::parkConditionally):
+        (WTF::ParkingLot::unparkOne):
+        (WTF::ParkingLot::unparkAll):
+        (WTF::ParkingLot::forEach):
+        * wtf/WordLock.cpp:
+        (WTF::WordLock::lockSlow):
+        (WTF::WordLock::unlockSlow):
+
+2016-02-07  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        [GTK][EFL] Enable SamplingProfiler
+        https://bugs.webkit.org/show_bug.cgi?id=153638
+
+        Reviewed by Michael Catanzaro.
+
+        * wtf/Platform.h:
+
+2016-02-07  Dan Bernstein  <mitz@apple.com>
+
+        [Cocoa] Replace __has_include guards around inclusion of Apple-internal-SDK headers with USE(APPLE_INTERNAL_SDK)
+        https://bugs.webkit.org/show_bug.cgi?id=153963
+
+        Reviewed by Sam Weinig.
+
+        * wtf/SystemTracing.h:
+        * wtf/WTFThreadData.h:
+        * wtf/spi/darwin/CommonCryptoSPI.h:
+
+2016-02-06  Darin Adler  <darin@apple.com>
+
+        Finish auditing call sites of upper() and lower(), eliminate many, and rename the functions
+        https://bugs.webkit.org/show_bug.cgi?id=153905
+
+        Reviewed by Sam Weinig.
+
+        * wtf/text/AtomicString.cpp:
+        (WTF::AtomicString::lower): Deleted.
+        * wtf/text/AtomicString.h: Deleted the lower function.
+
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::convertToLowercaseWithoutLocale): Renamed from lower.
+        (WTF::StringImpl::convertToUppercaseWithoutLocale): Renamed from upper.
+        (WTF::StringImpl::convertToLowercaseWithLocale): Renamed from lower.
+        (WTF::StringImpl::convertToUppercaseWithLocale): Renamed from upper.
+        (WTF::StringImpl::foldCase): Added fast cases for ASCII since this is
+        now used in some more-performance-critical code.
+        * wtf/text/StringImpl.h: Renamed lower and upper.
+
+        * wtf/text/WTFString.cpp:
+        (WTF::String::convertToLowercaseWithoutLocale): Renamed from lower.
+        (WTF::String::convertToUppercaseWithoutLocale): Renamed from upper.
+        (WTF::String::convertToLowercaseWithLocale): Renamed from lower.
+        (WTF::String::convertToUppercaseWithLocale): Renamed from upper.
+        * wtf/text/WTFString.h: Renamed lower and upper. Removed unneeded comment.
+
 2016-02-03  Darin Adler  <darin@apple.com>
 
         Convert another batch of String::lower callsites to something better, typically convertToASCIILowercase

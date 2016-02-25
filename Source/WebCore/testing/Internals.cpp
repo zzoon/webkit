@@ -39,6 +39,7 @@
 #include "ChromeClient.h"
 #include "ClientRect.h"
 #include "ClientRectList.h"
+#include "ComposedTreeIterator.h"
 #include "Cursor.h"
 #include "DOMPath.h"
 #include "DOMStringList.h"
@@ -102,6 +103,7 @@
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
 #include "RenderedDocumentMarker.h"
+#include "ResourceLoadObserver.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
 #include "ScriptedAnimationController.h"
@@ -374,10 +376,11 @@ void Internals::resetToConsistentState(Page* page)
 
     WebCore::overrideUserPreferredLanguages(Vector<String>());
     WebCore::Settings::setUsesOverlayScrollbars(false);
-    page->inspectorController().setProfilerEnabled(false);
+    WebCore::Settings::setUsesMockScrollAnimator(false);
+    page->inspectorController().setLegacyProfilerEnabled(false);
 #if ENABLE(VIDEO_TRACK)
-    page->group().captionPreferences()->setCaptionsStyleSheetOverride(emptyString());
-    page->group().captionPreferences()->setTestingMode(false);
+    page->group().captionPreferences().setCaptionsStyleSheetOverride(emptyString());
+    page->group().captionPreferences().setTestingMode(false);
 #endif
     if (!page->mainFrame().editor().isContinuousSpellCheckingEnabled())
         page->mainFrame().editor().toggleContinuousSpellChecking();
@@ -408,7 +411,7 @@ Internals::Internals(Document* document)
 {
 #if ENABLE(VIDEO_TRACK)
     if (document && document->page())
-        document->page()->group().captionPreferences()->setTestingMode(true);
+        document->page()->group().captionPreferences().setTestingMode(true);
 #endif
 
 #if ENABLE(MEDIA_STREAM)
@@ -464,6 +467,34 @@ bool Internals::nodeNeedsStyleRecalc(Node* node, ExceptionCode& exception)
     }
 
     return node->needsStyleRecalc();
+}
+
+static String styleChangeTypeToString(StyleChangeType type)
+{
+    switch (type) {
+    case NoStyleChange:
+        return "NoStyleChange";
+    case InlineStyleChange:
+        return "InlineStyleChange";
+    case FullStyleChange:
+        return "FullStyleChange";
+    case SyntheticStyleChange:
+        return "SyntheticStyleChange";
+    case ReconstructRenderTree:
+        return "ReconstructRenderTree";
+    }
+    ASSERT_NOT_REACHED();
+    return "";
+}
+
+String Internals::styleChangeType(Node* node, ExceptionCode& exception)
+{
+    if (!node) {
+        exception = INVALID_ACCESS_ERR;
+        return { };
+    }
+
+    return styleChangeTypeToString(node->styleChangeType());
 }
 
 String Internals::description(Deprecated::ScriptValue value)
@@ -550,6 +581,16 @@ static ResourceRequestCachePolicy stringToResourceRequestCachePolicy(const Strin
 void Internals::setOverrideCachePolicy(const String& policy)
 {
     frame()->loader().setOverrideCachePolicyForTesting(stringToResourceRequestCachePolicy(policy));
+}
+
+void Internals::setCanShowModalDialogOverride(bool allow, ExceptionCode& ec)
+{
+    if (!contextDocument() || !contextDocument()->domWindow()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    contextDocument()->domWindow()->setCanShowModalDialogOverride(allow);
 }
 
 static ResourceLoadPriority stringToResourceLoadPriority(const String& policy)
@@ -1475,7 +1516,7 @@ Vector<String> Internals::userPreferredAudioCharacteristics() const
     if (!document || !document->page())
         return Vector<String>();
 #if ENABLE(VIDEO_TRACK)
-    return document->page()->group().captionPreferences()->preferredAudioCharacteristics();
+    return document->page()->group().captionPreferences().preferredAudioCharacteristics();
 #else
     return Vector<String>();
 #endif
@@ -1487,7 +1528,7 @@ void Internals::setUserPreferredAudioCharacteristic(const String& characteristic
     if (!document || !document->page())
         return;
 #if ENABLE(VIDEO_TRACK)
-    document->page()->group().captionPreferences()->setPreferredAudioCharacteristic(characteristic);
+    document->page()->group().captionPreferences().setPreferredAudioCharacteristic(characteristic);
 #else
     UNUSED_PARAM(characteristic);
 #endif
@@ -1870,7 +1911,7 @@ void Internals::closeDummyInspectorFrontend()
     m_inspectorFrontend = nullptr;
 }
 
-void Internals::setJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)
+void Internals::setLegacyJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)
 {
     Page* page = contextDocument()->frame()->page();
     if (!page) {
@@ -1878,7 +1919,7 @@ void Internals::setJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)
         return;
     }
 
-    page->inspectorController().setProfilerEnabled(enabled);
+    page->inspectorController().setLegacyProfilerEnabled(enabled);
 }
 
 void Internals::setInspectorIsUnderTest(bool isUnderTest, ExceptionCode& ec)
@@ -2653,6 +2694,11 @@ void Internals::setUsesOverlayScrollbars(bool enabled)
     WebCore::Settings::setUsesOverlayScrollbars(enabled);
 }
 
+void Internals::setUsesMockScrollAnimator(bool enabled)
+{
+    WebCore::Settings::setUsesMockScrollAnimator(enabled);
+}
+
 void Internals::forceReload(bool endToEnd)
 {
     frame()->loader().reload(endToEnd);
@@ -2762,7 +2808,7 @@ String Internals::captionsStyleSheetOverride(ExceptionCode& ec)
     }
 
 #if ENABLE(VIDEO_TRACK)
-    return document->page()->group().captionPreferences()->captionsStyleSheetOverride();
+    return document->page()->group().captionPreferences().captionsStyleSheetOverride();
 #else
     return emptyString();
 #endif
@@ -2777,7 +2823,7 @@ void Internals::setCaptionsStyleSheetOverride(const String& override, ExceptionC
     }
 
 #if ENABLE(VIDEO_TRACK)
-    document->page()->group().captionPreferences()->setCaptionsStyleSheetOverride(override);
+    document->page()->group().captionPreferences().setCaptionsStyleSheetOverride(override);
 #else
     UNUSED_PARAM(override);
 #endif
@@ -2792,7 +2838,7 @@ void Internals::setPrimaryAudioTrackLanguageOverride(const String& language, Exc
     }
 
 #if ENABLE(VIDEO_TRACK)
-    document->page()->group().captionPreferences()->setPrimaryAudioTrackLanguageOverride(language);
+    document->page()->group().captionPreferences().setPrimaryAudioTrackLanguageOverride(language);
 #else
     UNUSED_PARAM(language);
 #endif
@@ -2807,16 +2853,16 @@ void Internals::setCaptionDisplayMode(const String& mode, ExceptionCode& ec)
     }
     
 #if ENABLE(VIDEO_TRACK)
-    CaptionUserPreferences* captionPreferences = document->page()->group().captionPreferences();
+    auto& captionPreferences = document->page()->group().captionPreferences();
     
     if (equalLettersIgnoringASCIICase(mode, "automatic"))
-        captionPreferences->setCaptionDisplayMode(CaptionUserPreferences::Automatic);
+        captionPreferences.setCaptionDisplayMode(CaptionUserPreferences::Automatic);
     else if (equalLettersIgnoringASCIICase(mode, "forcedonly"))
-        captionPreferences->setCaptionDisplayMode(CaptionUserPreferences::ForcedOnly);
+        captionPreferences.setCaptionDisplayMode(CaptionUserPreferences::ForcedOnly);
     else if (equalLettersIgnoringASCIICase(mode, "alwayson"))
-        captionPreferences->setCaptionDisplayMode(CaptionUserPreferences::AlwaysOn);
+        captionPreferences.setCaptionDisplayMode(CaptionUserPreferences::AlwaysOn);
     else if (equalLettersIgnoringASCIICase(mode, "manual"))
-        captionPreferences->setCaptionDisplayMode(CaptionUserPreferences::Manual);
+        captionPreferences.setCaptionDisplayMode(CaptionUserPreferences::Manual);
     else
         ec = SYNTAX_ERR;
 #else
@@ -3421,8 +3467,8 @@ bool Internals::isReadableStreamDisturbed(ScriptState& state, JSValue stream)
     JSVMClientData* clientData = static_cast<JSVMClientData*>(state.vm().clientData);
     const Identifier& privateName = clientData->builtinFunctions().readableStreamInternalsBuiltins().isReadableStreamDisturbedPrivateName();
     JSValue value;
-    PropertySlot propertySlot(value);
-    globalObject->fastGetOwnPropertySlot(&state, state.vm(), *globalObject->structure(), privateName, propertySlot);
+    PropertySlot propertySlot(value, PropertySlot::InternalMethodType::Get);
+    globalObject->methodTable()->getOwnPropertySlot(globalObject, &state, privateName, propertySlot);
     value = propertySlot.getValue(&state, privateName);
     ASSERT(value.isFunction());
 
@@ -3438,5 +3484,22 @@ bool Internals::isReadableStreamDisturbed(ScriptState& state, JSValue stream)
     return returnedValue.asBoolean();
 }
 #endif
+
+String Internals::resourceLoadStatisticsForOrigin(String origin)
+{
+    return ResourceLoadObserver::sharedObserver().statisticsForOrigin(origin);
+}
+
+void Internals::setResourceLoadStatisticsEnabled(bool enable)
+{
+    Settings::setResourceLoadStatisticsEnabled(enable);
+}
+
+String Internals::composedTreeAsText(Node* node)
+{
+    if (!is<ContainerNode>(node))
+        return "";
+    return WebCore::composedTreeAsText(downcast<ContainerNode>(*node));
+}
 
 }

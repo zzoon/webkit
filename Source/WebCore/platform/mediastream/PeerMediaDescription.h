@@ -147,23 +147,18 @@ public:
     }
 
 private:
-    PeerMediaDescription()
-        : m_port(0)
-        , m_rtcpMux(false)
-        , m_rtcpPort(0)
-        , m_source(nullptr)
-    { }
+    PeerMediaDescription() { }
 
     String m_type;
-    unsigned short m_port;
+    unsigned short m_port { 0 };
     String m_address;
     String m_mode;
 
     Vector<RefPtr<MediaPayload>> m_payloads;
 
-    bool m_rtcpMux;
+    bool m_rtcpMux { false };
     String m_rtcpAddress;
-    unsigned short m_rtcpPort;
+    unsigned short m_rtcpPort { 0 };
 
     String m_mediaStreamId;
     String m_mediaStreamTrackId;
@@ -179,7 +174,7 @@ private:
     String m_icePassword;
     Vector<RefPtr<IceCandidate>> m_iceCandidates;
 
-    RefPtr<RealtimeMediaSource> m_source;
+    RefPtr<RealtimeMediaSource> m_source { nullptr };
 };
 
 } // namespace WebCore

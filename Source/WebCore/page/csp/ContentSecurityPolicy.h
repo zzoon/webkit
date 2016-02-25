@@ -38,14 +38,14 @@ class OrdinalNumber;
 
 namespace WebCore {
 
-class CSPDirectiveList;
-class CSPSource;
+class ContentSecurityPolicyDirectiveList;
+class ContentSecurityPolicySource;
 class DOMStringList;
 class ScriptExecutionContext;
 class SecurityOrigin;
 class URL;
 
-typedef Vector<std::unique_ptr<CSPDirectiveList>> CSPDirectiveListVector;
+typedef Vector<std::unique_ptr<ContentSecurityPolicyDirectiveList>> CSPDirectiveListVector;
 typedef int SandboxFlags;
 
 class ContentSecurityPolicy {
@@ -67,9 +67,14 @@ public:
     };
     ReflectedXSSDisposition reflectedXSSDisposition() const;
 
+    enum class PolicyFrom {
+        HTTPEquivMeta,
+        HTTPHeader,
+        Inherited,
+    };
     ContentSecurityPolicyResponseHeaders responseHeaders() const;
     void didReceiveHeaders(const ContentSecurityPolicyResponseHeaders&);
-    void didReceiveHeader(const String&, ContentSecurityPolicyHeaderType);
+    void processHTTPEquiv(const String& content, ContentSecurityPolicyHeaderType type) { didReceiveHeader(content, type, ContentSecurityPolicy::PolicyFrom::HTTPEquivMeta); }
 
     enum class ReportingStatus {
         SendReport,
@@ -84,6 +89,7 @@ public:
     bool allowScriptFromSource(const URL&, bool overrideContentSecurityPolicy = false, ContentSecurityPolicy::ReportingStatus = ContentSecurityPolicy::ReportingStatus::SendReport) const;
     bool allowObjectFromSource(const URL&, bool overrideContentSecurityPolicy = false, ContentSecurityPolicy::ReportingStatus = ContentSecurityPolicy::ReportingStatus::SendReport) const;
     bool allowChildFrameFromSource(const URL&, bool overrideContentSecurityPolicy = false, ContentSecurityPolicy::ReportingStatus = ContentSecurityPolicy::ReportingStatus::SendReport) const;
+    bool allowChildContextFromSource(const URL&, bool overrideContentSecurityPolicy = false, ContentSecurityPolicy::ReportingStatus = ContentSecurityPolicy::ReportingStatus::SendReport) const;
     bool allowImageFromSource(const URL&, bool overrideContentSecurityPolicy = false, ContentSecurityPolicy::ReportingStatus = ContentSecurityPolicy::ReportingStatus::SendReport) const;
     bool allowStyleFromSource(const URL&, bool overrideContentSecurityPolicy = false, ContentSecurityPolicy::ReportingStatus = ContentSecurityPolicy::ReportingStatus::SendReport) const;
     bool allowFontFromSource(const URL&, bool overrideContentSecurityPolicy = false, ContentSecurityPolicy::ReportingStatus = ContentSecurityPolicy::ReportingStatus::SendReport) const;
@@ -102,42 +108,44 @@ public:
 
     bool experimentalFeaturesEnabled() const;
 
-    static bool shouldBypassMainWorldContentSecurityPolicy(ScriptExecutionContext&);
-
     // The following functions are used by internal data structures to call back into this object when parsing, validating,
     // and applying a Content Security Policy.
     // FIXME: We should make the various directives serve only as state stores for the parsed policy and remove these functions.
     // This class should traverse the directives, validating the policy, and applying it to the script execution context.
 
-    // Used by MediaListDirective
+    // Used by ContentSecurityPolicyMediaListDirective
     void reportInvalidPluginTypes(const String&) const;
 
-    // Used by CSPSourceList
+    // Used by ContentSecurityPolicySourceList
     void reportDirectiveAsSourceExpression(const String& directiveName, const String& sourceExpression) const;
     void reportInvalidPathCharacter(const String& directiveName, const String& value, const char) const;
     void reportInvalidSourceExpression(const String& directiveName, const String& source) const;
     bool urlMatchesSelf(const URL&) const;
 
-    // Used by CSPDirectiveList
+    // Used by ContentSecurityPolicyDirectiveList
     void reportDuplicateDirective(const String&) const;
     void reportInvalidDirectiveValueCharacter(const String& directiveName, const String& value) const;
     void reportInvalidSandboxFlags(const String&) const;
     void reportInvalidReflectedXSS(const String&) const;
+    void reportInvalidDirectiveInReportOnlyMode(const String&) const;
+    void reportInvalidDirectiveInHTTPEquivMeta(const String&) const;
     void reportMissingReportURI(const String&) const;
     void reportUnsupportedDirective(const String&) const;
     void reportViolation(const String& directiveText, const String& effectiveDirective, const String& consoleMessage, const URL& blockedURL, const Vector<String>& reportURIs, const String& header, const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), JSC::ExecState* = nullptr) const;
     void reportBlockedScriptExecutionToInspector(const String& directiveText) const;
     void enforceSandboxFlags(SandboxFlags sandboxFlags) { m_sandboxFlags |= sandboxFlags; }
 
-    // Used by CSPSource
+    // Used by ContentSecurityPolicySource
     bool protocolMatchesSelf(const URL&) const;
 
 private:
     void logToConsole(const String& message, const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), JSC::ExecState* = nullptr) const;
     void applyPolicyToScriptExecutionContext();
 
+    void didReceiveHeader(const String&, ContentSecurityPolicyHeaderType, ContentSecurityPolicy::PolicyFrom);
+
     ScriptExecutionContext* m_scriptExecutionContext { nullptr };
-    std::unique_ptr<CSPSource> m_selfSource;
+    std::unique_ptr<ContentSecurityPolicySource> m_selfSource;
     String m_selfSourceProtocol;
     CSPDirectiveListVector m_policies;
     String m_lastPolicyEvalDisabledErrorMessage;

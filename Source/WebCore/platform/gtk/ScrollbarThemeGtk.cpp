@@ -220,6 +220,7 @@ static GRefPtr<GtkStyleContext> createChildStyleContext(GtkStyleContext* parent,
 #if GTK_CHECK_VERSION(3, 19, 2)
     gtk_widget_path_iter_set_object_name(path.get(), -1, name);
 #else
+    gtk_widget_path_iter_add_class(path.get(), -1, GTK_STYLE_CLASS_SCROLLBAR);
     gtk_widget_path_iter_add_class(path.get(), -1, name);
 #endif
 
@@ -229,17 +230,26 @@ static GRefPtr<GtkStyleContext> createChildStyleContext(GtkStyleContext* parent,
     return styleContext;
 }
 
+static void themeChangedCallback()
+{
+    ScrollbarTheme::theme().themeChanged();
+}
+
 ScrollbarThemeGtk::ScrollbarThemeGtk()
 {
 #if GTK_CHECK_VERSION(3, 19, 2)
 #if USE(COORDINATED_GRAPHICS_THREADED)
     m_usesOverlayScrollbars = true;
 #else
-    // FIXME: Disable overlay scrollbars by default for now due to bug #153404.
-    // Invert the logic here once bug #153404 is fixed.
-    m_usesOverlayScrollbars = !g_strcmp0(g_getenv("GTK_OVERLAY_SCROLLING"), "1");
+    m_usesOverlayScrollbars = g_strcmp0(g_getenv("GTK_OVERLAY_SCROLLING"), "0");
 #endif
 #endif
+    static bool themeMonitorInitialized = false;
+    if (!themeMonitorInitialized) {
+        g_signal_connect_swapped(gtk_settings_get_default(), "notify::gtk-theme-name", G_CALLBACK(themeChangedCallback), nullptr);
+        themeMonitorInitialized = true;
+    }
+
     updateThemeProperties();
 }
 
@@ -481,9 +491,25 @@ bool ScrollbarThemeGtk::paint(Scrollbar& scrollbar, GraphicsContext& graphicsCon
     return true;
 }
 
-bool ScrollbarThemeGtk::shouldCenterOnThumb(Scrollbar&, const PlatformMouseEvent& event)
+ScrollbarButtonPressAction ScrollbarThemeGtk::handleMousePressEvent(Scrollbar&, const PlatformMouseEvent& event, ScrollbarPart pressedPart)
 {
-    return (event.shiftKey() && event.button() == LeftButton) || (event.button() == MiddleButton);
+    switch (pressedPart) {
+    case BackTrackPart:
+    case ForwardTrackPart:
+        if (event.button() == LeftButton)
+            return ScrollbarButtonPressAction::CenterOnThumb;
+        if (event.button() == RightButton)
+            return ScrollbarButtonPressAction::Scroll;
+        break;
+    case ThumbPart:
+        if (event.button() != RightButton)
+            return ScrollbarButtonPressAction::StartDrag;
+        break;
+    default:
+        break;
+    }
+
+    return ScrollbarButtonPressAction::None;
 }
 
 int ScrollbarThemeGtk::scrollbarThickness(ScrollbarControlSize)

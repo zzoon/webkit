@@ -85,7 +85,7 @@ void JSPromiseConstructor::finishCreation(VM& vm, JSPromisePrototype* promisePro
     Base::finishCreation(vm, ASCIILiteral("Promise"));
     putDirectWithoutTransition(vm, vm.propertyNames->prototype, promisePrototype, DontEnum | DontDelete | ReadOnly);
     putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
-    putDirectNonIndexAccessor(vm, vm.propertyNames->speciesSymbol, speciesSymbol, Accessor | ReadOnly | DontEnum | DontDelete);
+    putDirectNonIndexAccessor(vm, vm.propertyNames->speciesSymbol, speciesSymbol, Accessor | ReadOnly | DontEnum);
 }
 
 void JSPromiseConstructor::addOwnInternalSlots(VM& vm, JSGlobalObject* globalObject)
@@ -104,6 +104,8 @@ static EncodedJSValue JSC_HOST_CALL constructPromise(ExecState* exec)
         return throwVMTypeError(exec);
 
     Structure* promiseStructure = InternalFunction::createSubclassStructure(exec, exec->newTarget(), globalObject->promiseStructure());
+    if (exec->hadException())
+        return JSValue::encode(JSValue());
     JSPromise* promise = JSPromise::create(vm, promiseStructure);
     promise->initialize(exec, globalObject, exec->argument(0));
 
@@ -112,7 +114,7 @@ static EncodedJSValue JSC_HOST_CALL constructPromise(ExecState* exec)
 
 static EncodedJSValue JSC_HOST_CALL callPromise(ExecState* exec)
 {
-    return throwVMTypeError(exec);
+    return JSValue::encode(throwConstructorCannotBeCalledAsFunctionTypeError(exec, "Promise"));
 }
 
 ConstructType JSPromiseConstructor::getConstructData(JSCell*, ConstructData& constructData)

@@ -30,6 +30,7 @@ set(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/webdatabase"
     "${WEBCORE_DIR}/Modules/websockets"
     "${WEBCORE_DIR}/accessibility"
+    "${WEBCORE_DIR}/animation"
     "${WEBCORE_DIR}/bindings"
     "${WEBCORE_DIR}/bindings/generic"
     "${WEBCORE_DIR}/bindings/js"
@@ -74,19 +75,10 @@ set(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/cpu/arm/filters"
     "${WEBCORE_DIR}/platform/graphics/displaylists"
     "${WEBCORE_DIR}/platform/graphics/filters"
-    "${WEBCORE_DIR}/platform/graphics/filters/texmap"
     "${WEBCORE_DIR}/platform/graphics/harfbuzz"
     "${WEBCORE_DIR}/platform/graphics/harfbuzz/ng"
     "${WEBCORE_DIR}/platform/graphics/opentype"
-    "${WEBCORE_DIR}/platform/graphics/texmap"
     "${WEBCORE_DIR}/platform/graphics/transforms"
-    "${WEBCORE_DIR}/platform/image-decoders"
-    "${WEBCORE_DIR}/platform/image-decoders/bmp"
-    "${WEBCORE_DIR}/platform/image-decoders/gif"
-    "${WEBCORE_DIR}/platform/image-decoders/ico"
-    "${WEBCORE_DIR}/platform/image-decoders/jpeg"
-    "${WEBCORE_DIR}/platform/image-decoders/png"
-    "${WEBCORE_DIR}/platform/image-decoders/webp"
     "${WEBCORE_DIR}/platform/mediastream"
     "${WEBCORE_DIR}/platform/mock"
     "${WEBCORE_DIR}/platform/mock/mediasource"
@@ -125,6 +117,7 @@ set(WebCore_SYSTEM_INCLUDE_DIRECTORIES
 )
 
 set(WebCore_IDL_INCLUDES
+    animation
     css
     dom
     fileapi
@@ -175,6 +168,7 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/fetch/FetchBody.idl
     Modules/fetch/FetchHeaders.idl
     Modules/fetch/FetchRequest.idl
+    Modules/fetch/FetchResponse.idl
 
     Modules/geolocation/Coordinates.idl
     Modules/geolocation/Geolocation.idl
@@ -338,7 +332,8 @@ set(WebCore_NON_SVG_IDL_FILES
     css/CSSValueList.idl
     css/Counter.idl
     css/DOMWindowCSS.idl
-    css/FontLoader.idl
+    css/FontFace.idl
+    css/FontFaceSet.idl
     css/MediaList.idl
     css/MediaQueryList.idl
     css/MediaQueryListListener.idl
@@ -435,7 +430,6 @@ set(WebCore_NON_SVG_IDL_FILES
     fileapi/FileReaderSync.idl
 
     html/DOMFormData.idl
-    html/DOMSettableTokenList.idl
     html/DOMTokenList.idl
     html/DOMURL.idl
     html/HTMLAllCollection.idl
@@ -469,6 +463,7 @@ set(WebCore_NON_SVG_IDL_FILES
     html/HTMLHeadElement.idl
     html/HTMLHeadingElement.idl
     html/HTMLHtmlElement.idl
+    html/HTMLHyperlinkElementUtils.idl
     html/HTMLIFrameElement.idl
     html/HTMLImageElement.idl
     html/HTMLInputElement.idl
@@ -641,6 +636,7 @@ set(WebCore_NON_SVG_IDL_FILES
 
     xml/DOMParser.idl
     xml/XMLHttpRequest.idl
+    xml/XMLHttpRequestEventTarget.idl
     xml/XMLHttpRequestProgressEvent.idl
     xml/XMLHttpRequestUpload.idl
     xml/XMLSerializer.idl
@@ -819,6 +815,7 @@ set(WebCore_SOURCES
     Modules/fetch/FetchBody.cpp
     Modules/fetch/FetchHeaders.cpp
     Modules/fetch/FetchRequest.cpp
+    Modules/fetch/FetchResponse.cpp
 
     Modules/geolocation/Coordinates.cpp
     Modules/geolocation/GeoNotifier.cpp
@@ -846,6 +843,7 @@ set(WebCore_SOURCES
     Modules/indexeddb/IDBObjectStore.cpp
     Modules/indexeddb/IDBOpenDBRequest.cpp
     Modules/indexeddb/IDBRequest.cpp
+    Modules/indexeddb/IDBRequestCompletionEvent.cpp
     Modules/indexeddb/IDBTransaction.cpp
     Modules/indexeddb/IDBVersionChangeEvent.cpp
     Modules/indexeddb/WorkerGlobalScopeIndexedDatabase.cpp
@@ -1105,6 +1103,7 @@ set(WebCore_SOURCES
     bindings/js/Dictionary.cpp
     bindings/js/GCController.cpp
     bindings/js/IDBBindingUtilities.cpp
+    bindings/js/JSAnimationTimelineCustom.cpp
     bindings/js/JSAttrCustom.cpp
     bindings/js/JSAudioBufferSourceNodeCustom.cpp
     bindings/js/JSAudioContextCustom.cpp
@@ -1115,6 +1114,8 @@ set(WebCore_SOURCES
     bindings/js/JSCSSRuleCustom.cpp
     bindings/js/JSCSSRuleListCustom.cpp
     bindings/js/JSCSSStyleDeclarationCustom.cpp
+    bindings/js/JSFontFaceCustom.cpp
+    bindings/js/JSFontFaceSetCustom.cpp
     bindings/js/JSCSSValueCustom.cpp
     bindings/js/JSCallbackData.cpp
     bindings/js/JSCanvasRenderingContext2DCustom.cpp
@@ -1163,7 +1164,6 @@ set(WebCore_SOURCES
     bindings/js/JSEventListener.cpp
     bindings/js/JSEventTargetCustom.cpp
     bindings/js/JSExceptionBase.cpp
-    bindings/js/JSFetchHeadersCustom.cpp
     bindings/js/JSFileReaderCustom.cpp
     bindings/js/JSGeolocationCustom.cpp
     bindings/js/JSHTMLAllCollectionCustom.cpp
@@ -1188,6 +1188,7 @@ set(WebCore_SOURCES
     bindings/js/JSIDBCursorCustom.cpp
     bindings/js/JSIDBCursorWithValueCustom.cpp
     bindings/js/JSIDBDatabaseCustom.cpp
+    bindings/js/JSIDBIndexCustom.cpp
     bindings/js/JSIDBObjectStoreCustom.cpp
     bindings/js/JSImageConstructor.cpp
     bindings/js/JSImageDataCustom.cpp
@@ -1306,7 +1307,10 @@ set(WebCore_SOURCES
     css/CSSCursorImageValue.cpp
     css/CSSDefaultStyleSheets.cpp
     css/CSSFilterImageValue.cpp
+    css/FontFaceSet.cpp
+    css/FontFace.cpp
     css/CSSFontFace.cpp
+    css/CSSFontFaceSet.cpp
     css/CSSFontFaceLoadEvent.cpp
     css/CSSFontFaceRule.cpp
     css/CSSFontFaceSource.cpp
@@ -1361,7 +1365,7 @@ set(WebCore_SOURCES
     css/DOMWindowCSS.cpp
     css/DocumentRuleSets.cpp
     css/ElementRuleCollector.cpp
-    css/FontLoader.cpp
+    css/FontVariantBuilder.cpp
     css/InspectorCSSOMWrappers.cpp
     css/LengthFunctions.cpp
     css/MediaFeatureNames.cpp
@@ -1515,6 +1519,7 @@ set(WebCore_SOURCES
     dom/SecurityOriginPolicy.cpp
     dom/SelectorQuery.cpp
     dom/ShadowRoot.cpp
+    dom/SimulatedClick.cpp
     dom/SlotAssignment.cpp
     dom/SpaceSplitString.cpp
     dom/StaticNodeList.cpp
@@ -1636,7 +1641,6 @@ set(WebCore_SOURCES
     html/CheckboxInputType.cpp
     html/ColorInputType.cpp
     html/DOMFormData.cpp
-    html/DOMSettableTokenList.cpp
     html/DOMTokenList.cpp
     html/DOMURL.cpp
     html/DateInputType.cpp
@@ -1727,6 +1731,7 @@ set(WebCore_SOURCES
     html/HTMLTableCellElement.cpp
     html/HTMLTableColElement.cpp
     html/HTMLTableElement.cpp
+    html/HTMLTableHeaderCellElement.cpp
     html/HTMLTablePartElement.cpp
     html/HTMLTableRowElement.cpp
     html/HTMLTableRowsCollection.cpp
@@ -1938,6 +1943,8 @@ set(WebCore_SOURCES
     loader/PolicyChecker.cpp
     loader/ProgressTracker.cpp
     loader/ResourceLoadNotifier.cpp
+    loader/ResourceLoadObserver.cpp
+    loader/ResourceLoadStatistics.cpp
     loader/ResourceLoader.cpp
     loader/SinkDocument.cpp
     loader/SubframeLoader.cpp
@@ -2073,7 +2080,12 @@ set(WebCore_SOURCES
     page/animation/KeyframeAnimation.cpp
 
     page/csp/ContentSecurityPolicy.cpp
+    page/csp/ContentSecurityPolicyDirectiveList.cpp
+    page/csp/ContentSecurityPolicyMediaListDirective.cpp
     page/csp/ContentSecurityPolicyResponseHeaders.cpp
+    page/csp/ContentSecurityPolicySource.cpp
+    page/csp/ContentSecurityPolicySourceList.cpp
+    page/csp/ContentSecurityPolicySourceListDirective.cpp
 
     page/scrolling/AxisScrollSnapOffsets.cpp
     page/scrolling/ScrollLatchingState.cpp
@@ -2276,15 +2288,6 @@ set(WebCore_SOURCES
 
     platform/graphics/opentype/OpenTypeMathData.cpp
 
-    platform/graphics/texmap/TextureMapper.cpp
-    platform/graphics/texmap/TextureMapperAnimation.cpp
-    platform/graphics/texmap/TextureMapperBackingStore.cpp
-    platform/graphics/texmap/TextureMapperFPSCounter.cpp
-    platform/graphics/texmap/TextureMapperLayer.cpp
-    platform/graphics/texmap/TextureMapperSurfaceBackingStore.cpp
-    platform/graphics/texmap/TextureMapperTile.cpp
-    platform/graphics/texmap/TextureMapperTiledBackingStore.cpp
-
     platform/graphics/transforms/AffineTransform.cpp
     platform/graphics/transforms/Matrix3DTransformOperation.cpp
     platform/graphics/transforms/MatrixTransformOperation.cpp
@@ -2320,6 +2323,7 @@ set(WebCore_SOURCES
     platform/mock/RTCDataChannelHandlerMock.cpp
     platform/mock/RTCNotifiersMock.cpp
     platform/mock/RTCPeerConnectionHandlerMock.cpp
+    platform/mock/ScrollAnimatorMock.cpp
     platform/mock/ScrollbarThemeMock.cpp
 
     platform/network/AuthenticationChallengeBase.cpp
@@ -2636,6 +2640,9 @@ set(WebCore_SOURCES
     storage/StorageMap.cpp
     storage/StorageNamespaceProvider.cpp
 
+    style/AttributeChangeInvalidation.cpp
+    style/ClassChangeInvalidation.cpp
+    style/IdChangeInvalidation.cpp
     style/InlineTextBoxStyle.cpp
     style/RenderTreePosition.cpp
     style/StyleChange.cpp
@@ -2784,6 +2791,7 @@ set(WebCore_SOURCES
     svg/SVGTextPathElement.cpp
     svg/SVGTextPositioningElement.cpp
     svg/SVGTitleElement.cpp
+    svg/SVGToOTFFontConversion.cpp
     svg/SVGTransform.cpp
     svg/SVGTransformDistance.cpp
     svg/SVGTransformList.cpp
@@ -2817,6 +2825,7 @@ set(WebCore_SOURCES
     workers/DedicatedWorkerGlobalScope.cpp
     workers/DedicatedWorkerThread.cpp
     workers/Worker.cpp
+    workers/WorkerConsoleClient.cpp
     workers/WorkerEventQueue.cpp
     workers/WorkerGlobalScope.cpp
     workers/WorkerLocation.cpp
@@ -3010,6 +3019,20 @@ endif ()
 list(APPEND WebCore_CSS_VALUE_KEYWORDS
     ${WEBCORE_DIR}/css/SVGCSSValueKeywords.in
 )
+
+if (ENABLE_WEB_ANIMATIONS)
+    list(APPEND WebCore_IDL_FILES
+        "animation/AnimationTimeline.idl"
+        "animation/DocumentAnimation.idl"
+        "animation/DocumentTimeline.idl"
+    )
+
+    list(APPEND WebCore_SOURCES
+        "animation/AnimationTimeline.cpp"
+        "animation/DocumentAnimation.cpp"
+        "animation/DocumentTimeline.cpp"
+    )
+endif ()
 
 if (ENABLE_WEBGL)
     list(APPEND WebCore_SOURCES
@@ -3678,6 +3701,7 @@ GENERATE_BINDINGS(WebCoreTestSupport_SOURCES
 
 set(WebCore_BUILTINS_SOURCES
     ${WEBCORE_DIR}/Modules/fetch/FetchHeaders.js
+    ${WEBCORE_DIR}/Modules/fetch/FetchResponse.js
     ${WEBCORE_DIR}/Modules/mediastream/MediaDevices.js
     ${WEBCORE_DIR}/Modules/mediastream/NavigatorUserMedia.js
     ${WEBCORE_DIR}/Modules/mediastream/RTCPeerConnection.js
@@ -3782,16 +3806,11 @@ list(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/XMLNames.cpp)
 WEBKIT_WRAP_SOURCELIST(${WebCore_IDL_FILES} ${WebCore_SOURCES})
 WEBKIT_WRAP_SOURCELIST(${WebCoreTestSupport_IDL_FILES} ${WebCoreTestSupport_SOURCES})
 
-include_directories(${WebCore_INCLUDE_DIRECTORIES} ${WebCoreTestSupport_INCLUDE_DIRECTORIES})
-include_directories(SYSTEM ${WebCore_SYSTEM_INCLUDE_DIRECTORIES})
-
 if (MSVC)
     ADD_PRECOMPILED_HEADER("WebCorePrefix.h" "WebCorePrefix.cpp" WebCore_SOURCES)
 endif ()
 
-add_library(WebCore ${WebCore_LIBRARY_TYPE} ${WebCore_SOURCES})
-set_target_properties(WebCore PROPERTIES COMPILE_DEFINITIONS "BUILDING_WebCore")
-set_target_properties(WebCore PROPERTIES FOLDER "WebCore")
+WEBKIT_FRAMEWORK(WebCore)
 
 # The -ftree-sra optimization (implicit with -O2) causes crashes when
 # allocating large chunks of memory using bmalloc on Intel 32bit.
@@ -3801,23 +3820,11 @@ if (CMAKE_COMPILER_IS_GNUCXX AND "${LOWERCASE_CMAKE_HOST_SYSTEM_PROCESSOR}" MATC
     ADD_TARGET_PROPERTIES(WebCore COMPILE_FLAGS "-fno-tree-sra")
 endif ()
 
-if (WebCore_PRE_BUILD_COMMAND)
-    add_custom_target(WebCorePreBuild COMMAND ${WebCore_PRE_BUILD_COMMAND} VERBATIM)
-    add_dependencies(WebCore WebCorePreBuild)
-endif ()
-
-if (WebCore_POST_BUILD_COMMAND)
-    add_custom_command(TARGET WebCore POST_BUILD COMMAND ${WebCore_POST_BUILD_COMMAND} VERBATIM)
-endif ()
-
-if (WebCore_OUTPUT_NAME)
-    set_target_properties(WebCore PROPERTIES OUTPUT_NAME ${WebCore_OUTPUT_NAME})
-endif ()
-
 if (MSVC)
     ADD_PRECOMPILED_HEADER("WebCoreTestSupportPrefix.h" "testing/js/WebCoreTestSupportPrefix.cpp" WebCoreTestSupport_SOURCES)
 endif ()
 
+include_directories(${WebCoreTestSupport_INCLUDE_DIRECTORIES})
 add_library(WebCoreTestSupport ${WebCoreTestSupport_LIBRARY_TYPE} ${WebCoreTestSupport_SOURCES})
 add_dependencies(WebCoreTestSupport WebCore)
 target_link_libraries(WebCoreTestSupport ${WebCoreTestSupport_LIBRARIES})
@@ -3859,5 +3866,3 @@ endif ()
 if ((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND WTF_CPU_ARM AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "4.9") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.9.3"))
     set_source_files_properties(svg/SVGPathElement.cpp PROPERTIES COMPILE_FLAGS "-O2")
 endif ()
-
-WEBKIT_FRAMEWORK(WebCore)

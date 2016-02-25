@@ -43,6 +43,7 @@
 #include "StatisticsData.h"
 #include "TextChecker.h"
 #include "WKContextPrivate.h"
+#include "WebAutomationSession.h"
 #include "WebCertificateInfo.h"
 #include "WebContextSupplement.h"
 #include "WebCookieManagerProxy.h"
@@ -50,7 +51,6 @@
 #include "WebGeolocationManagerProxy.h"
 #include "WebIconDatabase.h"
 #include "WebKit2Initialize.h"
-#include "WebMediaCacheManagerProxy.h"
 #include "WebMemorySampler.h"
 #include "WebNotificationManagerProxy.h"
 #include "WebPageGroup.h"
@@ -178,7 +178,6 @@ WebProcessPool::WebProcessPool(API::ProcessPoolConfiguration& configuration)
 
     addSupplement<WebCookieManagerProxy>();
     addSupplement<WebGeolocationManagerProxy>();
-    addSupplement<WebMediaCacheManagerProxy>();
     addSupplement<WebNotificationManagerProxy>();
 #if USE(SOUP)
     addSupplement<WebSoupCustomProtocolRequestManager>();
@@ -452,6 +451,7 @@ void WebProcessPool::databaseProcessCrashed(DatabaseProcessProxy* databaseProces
     for (auto& supplement : m_supplements)
         supplement.value->processDidClose(databaseProcessProxy);
 
+    m_client.databaseProcessDidCrash(this);
     m_databaseProcess = nullptr;
 }
 #endif
@@ -683,11 +683,6 @@ bool WebProcessPool::shouldTerminate(WebProcessProxy* process)
     if (!m_processTerminationEnabled)
         return false;
 
-    for (const auto& supplement : m_supplements.values()) {
-        if (!supplement->shouldTerminate(process))
-            return false;
-    }
-
     return true;
 }
 
@@ -836,12 +831,24 @@ void WebProcessPool::setAdditionalPluginsDirectory(const String& directory)
 }
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 
-PlatformProcessIdentifier WebProcessPool::networkProcessIdentifier()
+pid_t WebProcessPool::networkProcessIdentifier()
 {
     if (!m_networkProcess)
         return 0;
 
     return m_networkProcess->processIdentifier();
+}
+
+pid_t WebProcessPool::databaseProcessIdentifier()
+{
+#if ENABLE(DATABASE_PROCESS)
+    if (!m_databaseProcess)
+        return 0;
+
+    return m_databaseProcess->processIdentifier();
+#else
+    return 0;
+#endif
 }
 
 void WebProcessPool::setAlwaysUsesComplexTextCodePath(bool alwaysUseComplexText)
@@ -913,9 +920,9 @@ void WebProcessPool::registerURLSchemeAsCORSEnabled(const String& urlScheme)
     sendToAllProcesses(Messages::WebProcess::RegisterURLSchemeAsCORSEnabled(urlScheme));
 }
 
-HashSet<String>& WebProcessPool::globalURLSchemesWithCustomProtocolHandlers()
+HashSet<String, ASCIICaseInsensitiveHash>& WebProcessPool::globalURLSchemesWithCustomProtocolHandlers()
 {
-    static NeverDestroyed<HashSet<String>> set;
+    static NeverDestroyed<HashSet<String, ASCIICaseInsensitiveHash>> set;
     return set;
 }
 
@@ -924,10 +931,9 @@ void WebProcessPool::registerGlobalURLSchemeAsHavingCustomProtocolHandlers(const
     if (!urlScheme)
         return;
 
-    String schemeLower = urlScheme.lower();
-    globalURLSchemesWithCustomProtocolHandlers().add(schemeLower);
+    globalURLSchemesWithCustomProtocolHandlers().add(urlScheme);
     for (auto* processPool : allProcessPools())
-        processPool->registerSchemeForCustomProtocol(schemeLower);
+        processPool->registerSchemeForCustomProtocol(urlScheme);
 }
 
 void WebProcessPool::unregisterGlobalURLSchemeAsHavingCustomProtocolHandlers(const String& urlScheme)
@@ -935,10 +941,9 @@ void WebProcessPool::unregisterGlobalURLSchemeAsHavingCustomProtocolHandlers(con
     if (!urlScheme)
         return;
 
-    String schemeLower = urlScheme.lower();
-    globalURLSchemesWithCustomProtocolHandlers().remove(schemeLower);
+    globalURLSchemesWithCustomProtocolHandlers().remove(urlScheme);
     for (auto* processPool : allProcessPools())
-        processPool->unregisterSchemeForCustomProtocol(schemeLower);
+        processPool->unregisterSchemeForCustomProtocol(urlScheme);
 }
 
 #if ENABLE(CACHE_PARTITIONING)
@@ -1090,6 +1095,16 @@ void WebProcessPool::updateAutomationCapabilities() const
 {
 #if ENABLE(REMOTE_INSPECTOR)
     Inspector::RemoteInspector::singleton().clientCapabilitiesDidChange();
+#endif
+}
+
+void WebProcessPool::setAutomationSession(RefPtr<WebAutomationSession>&& automationSession)
+{
+    m_automationSession = WTFMove(automationSession);
+
+#if ENABLE(REMOTE_INSPECTOR)
+    if (m_automationSession)
+        m_automationSession->init();
 #endif
 }
 

@@ -688,12 +688,20 @@ extern NSString *NSTextInputReplacementRangeAttributeName;
 @end
 
 #if !PLATFORM(IOS)
-static IMP oldSetNeedsDisplayInRectIMP;
 
-static void setNeedsDisplayInRect(NSView *self, SEL cmd, NSRect invalidRect)
+@interface NSView (WebSetNeedsDisplayInRect)
+- (void)_web_setNeedsDisplayInRect:(NSRect)invalidRect;
+@end
+
+@implementation NSView (WebSetNeedsDisplayInRect)
+
+- (void)_web_setNeedsDisplayInRect:(NSRect)invalidRect
 {
+    // Note that we call method_exchangeImplementations below, so any calls
+    // to _web_setNeedsDisplayInRect: will actually call -[NSView setNeedsDisplayInRect:].
+
     if (![NSThread isMainThread] || ![self _drawnByAncestor]) {
-        wtfCallIMP<id>(oldSetNeedsDisplayInRectIMP, self, cmd, invalidRect);
+        [self _web_setNeedsDisplayInRect:invalidRect];
         return;
     }
 
@@ -703,14 +711,14 @@ static void setNeedsDisplayInRect(NSView *self, SEL cmd, NSRect invalidRect)
         enclosingWebFrameView = (WebFrameView *)[enclosingWebFrameView superview];
 
     if (!enclosingWebFrameView) {
-        wtfCallIMP<id>(oldSetNeedsDisplayInRectIMP, self, cmd, invalidRect);
+        [self _web_setNeedsDisplayInRect:invalidRect];
         return;
     }
 
     Frame* coreFrame = core([enclosingWebFrameView webFrame]);
     FrameView* frameView = coreFrame ? coreFrame->view() : 0;
     if (!frameView || !frameView->isEnclosedInCompositingLayer()) {
-        wtfCallIMP<id>(oldSetNeedsDisplayInRectIMP, self, cmd, invalidRect);
+        [self _web_setNeedsDisplayInRect:invalidRect];
         return;
     }
 
@@ -721,6 +729,8 @@ static void setNeedsDisplayInRect(NSView *self, SEL cmd, NSRect invalidRect)
 
     frameView->invalidateRect(invalidRectInFrameViewCoordinates);
 }
+
+@end
 
 @interface NSApplication (WebNSApplicationDetails)
 - (void)speakString:(NSString *)string;
@@ -1026,15 +1036,8 @@ static NSCellStateValue kit(TriState state)
         ASSERT(oldSetCursorForMouseLocationIMP);
     }
 
-    if (!oldSetNeedsDisplayInRectIMP) {
-        Method setNeedsDisplayInRectMethod = class_getInstanceMethod([NSView class], @selector(setNeedsDisplayInRect:));
-        ASSERT(setNeedsDisplayInRectMethod);
-        oldSetNeedsDisplayInRectIMP = method_setImplementation(setNeedsDisplayInRectMethod, (IMP)setNeedsDisplayInRect);
-        ASSERT(oldSetNeedsDisplayInRectIMP);
-    }
-
+    method_exchangeImplementations(class_getInstanceMethod([NSView class], @selector(setNeedsDisplayInRect:)), class_getInstanceMethod([NSView class], @selector(_web_setNeedsDisplayInRect:)));
 #endif
-
 }
 
 - (void)dealloc
@@ -6094,6 +6097,10 @@ static BOOL writingDirectionKeyBindingsEnabled()
     [self _updateSelectionForInputManager];
 #if !PLATFORM(IOS)
     [self _updateFontPanel];
+    if (Frame* coreFrame = core([self _frame])) {
+        if (!coreFrame->editor().isHandlingAcceptedCandidate())
+            _private->softSpaceRange = NSMakeRange(NSNotFound, 0);
+    }
 #endif
 }
 
@@ -7095,16 +7102,23 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
     if (!coreFrame || !coreFrame->editor().canEdit())
         return;
 
+    BOOL needToRemoveSoftSpace = NO;
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-    if (_private->softSpaceRange.location != NSNotFound && (replacementRange.location == NSMaxRange(_private->softSpaceRange) || replacementRange.location == NSNotFound) && replacementRange.length == 0 && [[NSSpellChecker sharedSpellChecker] deletesAutospaceBeforeString:text language:nil])
+    if (_private->softSpaceRange.location != NSNotFound && (replacementRange.location == NSMaxRange(_private->softSpaceRange) || replacementRange.location == NSNotFound) && !replacementRange.length && [[NSSpellChecker sharedSpellChecker] deletesAutospaceBeforeString:text language:nil]) {
         replacementRange = _private->softSpaceRange;
+        needToRemoveSoftSpace = YES;
+    }
 #endif
 #if !PLATFORM(IOS)
     _private->softSpaceRange = NSMakeRange(NSNotFound, 0);
 #endif
 
-    if (replacementRange.location != NSNotFound)
-        [[self _frame] _selectNSRange:replacementRange];
+    if (replacementRange.location != NSNotFound) {
+        WebRangeIsRelativeTo rangeIsRelativeTo = needToRemoveSoftSpace ? WebRangeIsRelativeTo::Paragraph : WebRangeIsRelativeTo::EditableRoot;
+        RefPtr<Range> domRange = [[self _frame] _convertToDOMRange:replacementRange rangeIsRelativeTo:rangeIsRelativeTo];
+        if (domRange)
+            coreFrame->selection().setSelection(VisibleSelection(*domRange, SEL_DEFAULT_AFFINITY));
+    }
 
     bool eventHandled = false;
     String eventText = text;

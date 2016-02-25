@@ -24,7 +24,7 @@
 
 #include "ChildNodeList.h"
 #include "ClassCollection.h"
-#include "DOMSettableTokenList.h"
+#include "DOMTokenList.h"
 #include "HTMLCollection.h"
 #include "HTMLNames.h"
 #include "LiveNodeList.h"
@@ -43,6 +43,7 @@
 namespace WebCore {
 
 class LabelsNodeList;
+class NameNodeList;
 class RadioNodeList;
 class TreeScope;
 

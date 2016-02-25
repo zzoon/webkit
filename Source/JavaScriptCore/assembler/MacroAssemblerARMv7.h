@@ -168,11 +168,6 @@ public:
 
     void add32(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
-        if (!imm.m_value) {
-            move(src, dest);
-            return;
-        }
-
         ARMThumbImmediate armImm = ARMThumbImmediate::makeUInt12OrEncodedImm(imm.m_value);
 
         // For adds with stack pointer destination, moving the src first to sp is
@@ -192,9 +187,6 @@ public:
 
     void add32(TrustedImm32 imm, Address address)
     {
-        if (!imm.m_value)
-            return;
-
         load32(address, dataTempRegister);
 
         ARMThumbImmediate armImm = ARMThumbImmediate::makeUInt12OrEncodedImm(imm.m_value);
@@ -218,9 +210,6 @@ public:
 
     void add32(TrustedImm32 imm, AbsoluteAddress address)
     {
-        if (!imm.m_value)
-            return;
-
         load32(address.m_ptr, dataTempRegister);
 
         ARMThumbImmediate armImm = ARMThumbImmediate::makeUInt12OrEncodedImm(imm.m_value);
@@ -411,7 +400,10 @@ public:
 
     void rshift32(RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
-        m_assembler.asr(dest, src, imm.m_value & 0x1f);
+        if (!imm.m_value)
+            move(src, dest);
+        else
+            m_assembler.asr(dest, src, imm.m_value & 0x1f);
     }
 
     void rshift32(RegisterID shiftAmount, RegisterID dest)
@@ -436,7 +428,10 @@ public:
     
     void urshift32(RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
-        m_assembler.lsr(dest, src, imm.m_value & 0x1f);
+        if (!imm.m_value)
+            move(src, dest);
+        else
+            m_assembler.lsr(dest, src, imm.m_value & 0x1f);
     }
 
     void urshift32(RegisterID shiftAmount, RegisterID dest)

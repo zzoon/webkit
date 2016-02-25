@@ -59,30 +59,38 @@ inline unsigned attributesForStructure(unsigned attributes)
 }
 
 class PropertySlot {
-    enum PropertyType {
+    enum PropertyType : uint8_t {
         TypeUnset,
         TypeValue,
         TypeGetter,
         TypeCustom
     };
 
-    enum CacheabilityType {
+    enum CacheabilityType : uint8_t {
         CachingDisallowed,
         CachingAllowed
     };
 
 public:
-    explicit PropertySlot(const JSValue thisValue)
-        : m_propertyType(TypeUnset)
-        , m_offset(invalidOffset)
+    enum class InternalMethodType : uint8_t {
+        Get, // [[Get]] internal method in the spec.
+        HasProperty, // [[HasProperty]] internal method in the spec.
+        GetOwnProperty, // [[GetOwnProperty]] internal method in the spec.
+        VMInquiry, // Our VM is just poking around. When this is the InternalMethodType, getOwnPropertySlot is not allowed to do user observable actions.
+    };
+
+    explicit PropertySlot(const JSValue thisValue, InternalMethodType internalMethodType)
+        : m_offset(invalidOffset)
         , m_thisValue(thisValue)
         , m_slotBase(nullptr)
         , m_watchpointSet(nullptr)
         , m_cacheability(CachingAllowed)
+        , m_propertyType(TypeUnset)
+        , m_internalMethodType(internalMethodType)
     {
     }
 
-    typedef EncodedJSValue (*GetValueFunc)(ExecState*, JSObject* slotBase, EncodedJSValue thisValue, PropertyName);
+    typedef EncodedJSValue (*GetValueFunc)(ExecState*, EncodedJSValue thisValue, PropertyName);
 
     JSValue getValue(ExecState*, PropertyName) const;
     JSValue getValue(ExecState*, unsigned propertyName) const;
@@ -95,6 +103,8 @@ public:
     bool isCacheableValue() const { return isCacheable() && isValue(); }
     bool isCacheableGetter() const { return isCacheable() && isAccessor(); }
     bool isCacheableCustom() const { return isCacheable() && isCustom(); }
+
+    InternalMethodType internalMethodType() const { return m_internalMethodType; }
 
     void disableCaching()
     {
@@ -249,6 +259,7 @@ public:
 
 private:
     JS_EXPORT_PRIVATE JSValue functionGetter(ExecState*) const;
+    JS_EXPORT_PRIVATE JSValue customGetter(ExecState*, PropertyName) const;
 
     unsigned m_attributes;
     union {
@@ -261,12 +272,13 @@ private:
         } custom;
     } m_data;
 
-    PropertyType m_propertyType;
     PropertyOffset m_offset;
     JSValue m_thisValue;
     JSObject* m_slotBase;
     WatchpointSet* m_watchpointSet;
     CacheabilityType m_cacheability;
+    PropertyType m_propertyType;
+    InternalMethodType m_internalMethodType;
 };
 
 ALWAYS_INLINE JSValue PropertySlot::getValue(ExecState* exec, PropertyName propertyName) const
@@ -275,7 +287,7 @@ ALWAYS_INLINE JSValue PropertySlot::getValue(ExecState* exec, PropertyName prope
         return JSValue::decode(m_data.value);
     if (m_propertyType == TypeGetter)
         return functionGetter(exec);
-    return JSValue::decode(m_data.custom.getValue(exec, slotBase(), JSValue::encode(m_thisValue), propertyName));
+    return customGetter(exec, propertyName);
 }
 
 ALWAYS_INLINE JSValue PropertySlot::getValue(ExecState* exec, unsigned propertyName) const
@@ -284,7 +296,7 @@ ALWAYS_INLINE JSValue PropertySlot::getValue(ExecState* exec, unsigned propertyN
         return JSValue::decode(m_data.value);
     if (m_propertyType == TypeGetter)
         return functionGetter(exec);
-    return JSValue::decode(m_data.custom.getValue(exec, slotBase(), JSValue::encode(m_thisValue), Identifier::from(exec, propertyName)));
+    return customGetter(exec, Identifier::from(exec, propertyName));
 }
 
 } // namespace JSC

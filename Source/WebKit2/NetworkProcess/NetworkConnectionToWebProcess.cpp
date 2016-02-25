@@ -204,8 +204,8 @@ void NetworkConnectionToWebProcess::convertMainResourceLoadToDownload(SessionID 
     // Unblock the URL connection operation queue.
     loader->networkLoad()->handle()->continueDidReceiveResponse();
     
-    loader->didConvertToDownload();
 #endif
+    loader->didConvertToDownload();
 }
 
 void NetworkConnectionToWebProcess::cookiesForDOM(SessionID sessionID, const URL& firstParty, const URL& url, String& result)
@@ -242,7 +242,7 @@ void NetworkConnectionToWebProcess::registerFileBlobURL(const URL& url, const St
 {
     RefPtr<SandboxExtension> extension = SandboxExtension::create(extensionHandle);
 
-    NetworkBlobRegistry::singleton().registerFileBlobURL(this, url, path, extension.release(), contentType);
+    NetworkBlobRegistry::singleton().registerFileBlobURL(this, url, path, WTFMove(extension), contentType);
 }
 
 void NetworkConnectionToWebProcess::registerBlobURL(const URL& url, Vector<BlobPart> blobParts, const String& contentType)

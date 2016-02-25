@@ -40,6 +40,7 @@ class Identifier;
 
 #define JSC_COMMON_BYTECODE_INTRINSIC_FUNCTIONS_EACH_NAME(macro) \
     macro(assert) \
+    macro(isObject) \
     macro(putByValDirect) \
     macro(toString)
 
@@ -51,7 +52,9 @@ class Identifier;
     macro(promiseStatePending) \
     macro(promiseStateFulfilled) \
     macro(promiseStateRejected) \
-    macro(symbolIterator)
+    macro(symbolIterator) \
+    macro(symbolSearch) \
+    macro(symbolSpecies)
 
 class BytecodeIntrinsicRegistry {
     WTF_MAKE_NONCOPYABLE(BytecodeIntrinsicRegistry);

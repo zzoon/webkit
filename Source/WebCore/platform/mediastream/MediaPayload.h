@@ -93,26 +93,19 @@ public:
     }
 
 private:
-    MediaPayload()
-        : m_type(0)
-        , m_clockRate(0)
-        , m_channels(0)
-        , m_ccmfir(false)
-        , m_nackpli(false)
-        , m_nack(false)
-    { }
+    MediaPayload() { }
 
-    unsigned m_type;
+    unsigned m_type { 0 };
     String m_encodingName;
-    unsigned m_clockRate;
+    unsigned m_clockRate { 0 };
 
     // audio
-    unsigned m_channels;
+    unsigned m_channels { 0 };
 
     // video
-    bool m_ccmfir;
-    bool m_nackpli;
-    bool m_nack;
+    bool m_ccmfir { false };
+    bool m_nackpli { false };
+    bool m_nack { false };
 
     HashMap<String, unsigned> m_parameters;
 };
