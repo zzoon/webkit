@@ -33,7 +33,6 @@
 #if ENABLE(MEDIA_STREAM)
 #include "MediaEndpointPeerConnection.h"
 
-#include "CryptoDigest.h"
 #include "DOMError.h"
 #include "JSDOMError.h"
 #include "JSRTCSessionDescription.h"

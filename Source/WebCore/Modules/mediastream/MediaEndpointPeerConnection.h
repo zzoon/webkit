@@ -122,7 +122,6 @@ private:
     String m_dtlsFingerprint;
     String m_dtlsFingerprintFunction;
     unsigned m_sdpSessionVersion { 0 };
-    Vector<bool> iceGatheringStatus;
 
     RefPtr<SessionDescription> m_currentLocalDescription;
     RefPtr<SessionDescription> m_pendingLocalDescription;
