@@ -121,7 +121,7 @@ private:
     String m_icePassword;
     String m_dtlsFingerprint;
     String m_dtlsFingerprintFunction;
-    unsigned m_sdpSessionVersion;
+    unsigned m_sdpSessionVersion { 0 };
     Vector<bool> iceGatheringStatus;
 
     RefPtr<SessionDescription> m_currentLocalDescription;
@@ -132,7 +132,7 @@ private:
 
     RefPtr<RTCConfiguration> m_configuration;
 
-    bool m_negotiationNeeded;
+    bool m_negotiationNeeded { false };
 };
 
 } // namespace WebCore

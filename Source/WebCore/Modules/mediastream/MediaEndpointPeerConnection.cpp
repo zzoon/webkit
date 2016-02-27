@@ -123,8 +123,6 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     , m_cname(randomString(16))
     , m_iceUfrag(randomString(4))
     , m_icePassword(randomString(22))
-    , m_sdpSessionVersion(0)
-    , m_negotiationNeeded(false)
 {
     m_mediaEndpoint = MediaEndpoint::create(this);
     ASSERT(m_mediaEndpoint);
