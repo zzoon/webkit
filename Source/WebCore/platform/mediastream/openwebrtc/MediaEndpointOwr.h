@@ -44,7 +44,7 @@ class RTCConfigurationPrivate;
 
 class MediaEndpointOwr : public MediaEndpoint {
 public:
-    MediaEndpointOwr(MediaEndpointClient*);
+    MediaEndpointOwr(MediaEndpointClient&);
     ~MediaEndpointOwr();
 
     virtual void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override;
@@ -88,7 +88,7 @@ private:
     OwrTransportAgent* m_transportAgent;
     Vector<OwrSession*> m_sessions;
 
-    MediaEndpointClient* m_client;
+    MediaEndpointClient& m_client;
 
     unsigned m_numberOfReceivePreparedSessions;
     unsigned m_numberOfSendPreparedSessions;

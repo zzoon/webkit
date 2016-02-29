@@ -41,12 +41,12 @@ namespace WebCore {
 static const char* fingerprint = "8B:87:09:8A:5D:C2:F3:33:EF:C5:B1:F6:84:3A:3D:D6:A3:E2:9C:17:4C:E7:46:3B:1B:CE:84:98:DD:8E:AF:7B";
 static const char* fingerprintFunction = "sha-256";
 
-std::unique_ptr<MediaEndpoint> MockMediaEndpoint::create(MediaEndpointClient* client)
+std::unique_ptr<MediaEndpoint> MockMediaEndpoint::create(MediaEndpointClient& client)
 {
     return std::unique_ptr<MediaEndpoint>(new MockMediaEndpoint(client));
 }
 
-MockMediaEndpoint::MockMediaEndpoint(MediaEndpointClient* client)
+MockMediaEndpoint::MockMediaEndpoint(MediaEndpointClient& client)
     : m_client(client)
 {
 }
@@ -64,7 +64,7 @@ void MockMediaEndpoint::setConfiguration(RefPtr<MediaEndpointConfiguration>&& co
 void MockMediaEndpoint::generateDtlsInfo()
 {
     callOnMainThread([this]() {
-        m_client->gotDtlsFingerprint(String(fingerprint), String(fingerprintFunction));
+        m_client.gotDtlsFingerprint(String(fingerprint), String(fingerprintFunction));
     });
 }
 

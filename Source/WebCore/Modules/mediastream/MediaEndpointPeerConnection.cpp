@@ -123,7 +123,7 @@ MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendCl
     , m_iceUfrag(randomString(4))
     , m_icePassword(randomString(22))
 {
-    m_mediaEndpoint = MediaEndpoint::create(this);
+    m_mediaEndpoint = MediaEndpoint::create(*this);
     ASSERT(m_mediaEndpoint);
 
     m_defaultAudioPayloads = m_mediaEndpoint->getDefaultAudioPayloads();

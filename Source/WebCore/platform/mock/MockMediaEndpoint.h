@@ -39,9 +39,9 @@ namespace WebCore {
 
 class MockMediaEndpoint : public MediaEndpoint {
 public:
-    WEBCORE_EXPORT static std::unique_ptr<MediaEndpoint> create(MediaEndpointClient*);
+    WEBCORE_EXPORT static std::unique_ptr<MediaEndpoint> create(MediaEndpointClient&);
 
-    MockMediaEndpoint(MediaEndpointClient*);
+    MockMediaEndpoint(MediaEndpointClient&);
     ~MockMediaEndpoint();
 
     virtual void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override;
@@ -60,7 +60,7 @@ public:
     virtual void stop() override;
 
 private:
-    MediaEndpointClient* m_client;
+    MediaEndpointClient& m_client;
 };
 
 } // namespace WebCore

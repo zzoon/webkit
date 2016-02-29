@@ -53,14 +53,14 @@ static const Vector<String> candidateTypes = { "host", "srflx", "prflx", "relay"
 static const Vector<String> candidateTcpTypes = { "", "active", "passive", "so" };
 static const Vector<String> codecTypes = { "NONE", "PCMU", "PCMA", "OPUS", "H264", "VP8" };
 
-static std::unique_ptr<MediaEndpoint> createMediaEndpointOwr(MediaEndpointClient* client)
+static std::unique_ptr<MediaEndpoint> createMediaEndpointOwr(MediaEndpointClient& client)
 {
     return std::unique_ptr<MediaEndpoint>(new MediaEndpointOwr(client));
 }
 
 CreateMediaEndpoint MediaEndpoint::create = createMediaEndpointOwr;
 
-MediaEndpointOwr::MediaEndpointOwr(MediaEndpointClient* client)
+MediaEndpointOwr::MediaEndpointOwr(MediaEndpointClient& client)
     : m_transportAgent(nullptr)
     , m_client(client)
     , m_numberOfReceivePreparedSessions(0)
@@ -292,12 +292,12 @@ unsigned MediaEndpointOwr::sessionIndex(OwrSession* session) const
 
 void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate)
 {
-    m_client->gotIceCandidate(sessionIndex, WTFMove(iceCandidate));
+    m_client.gotIceCandidate(sessionIndex, WTFMove(iceCandidate));
 }
 
 void MediaEndpointOwr::dispatchGatheringDone(unsigned sessionIndex)
 {
-    m_client->doneGatheringCandidates(sessionIndex);
+    m_client.doneGatheringCandidates(sessionIndex);
 }
 
 void MediaEndpointOwr::dispatchDtlsFingerprint(gchar* privateKey, gchar* certificate, const String& fingerprint, const String& fingerprintFunction)
@@ -305,12 +305,12 @@ void MediaEndpointOwr::dispatchDtlsFingerprint(gchar* privateKey, gchar* certifi
     m_dtlsPrivateKey = privateKey;
     m_dtlsCertificate = certificate;
 
-    m_client->gotDtlsFingerprint(fingerprint, fingerprintFunction);
+    m_client.gotDtlsFingerprint(fingerprint, fingerprintFunction);
 }
 
 void MediaEndpointOwr::dispatchRemoteSource(unsigned sessionIndex, RefPtr<RealtimeMediaSource>&& source)
 {
-    m_client->gotRemoteSource(sessionIndex, WTFMove(source));
+    m_client.gotRemoteSource(sessionIndex, WTFMove(source));
 }
 
 void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription* mediaDescription)
