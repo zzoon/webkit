@@ -127,16 +127,16 @@ Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultVideoPayloads()
 {
     Vector<RefPtr<MediaPayload>> payloads;
 
-    // RefPtr<MediaPayload> payload = MediaPayload::create();
-    // payload->setType(103);
-    // payload->setEncodingName("H264");
-    // payload->setClockRate(90000);
-    // payload->setCcmfir(true);
-    // payload->setNackpli(true);
-    // payload->addParameter("packetizationMode", 1);
-    // payloads.append(payload);
-
     RefPtr<MediaPayload> payload = MediaPayload::create();
+    payload->setType(103);
+    payload->setEncodingName("H264");
+    payload->setClockRate(90000);
+    payload->setCcmfir(true);
+    payload->setNackpli(true);
+    payload->addParameter("packetizationMode", 1);
+    payloads.append(payload);
+
+    payload = MediaPayload::create();
     payload->setType(100);
     payload->setEncodingName("VP8");
     payload->setClockRate(90000);
