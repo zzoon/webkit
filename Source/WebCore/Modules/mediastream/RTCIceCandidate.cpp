@@ -44,31 +44,30 @@ namespace WebCore {
 RefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary, ExceptionCode& ec)
 {
     String candidate;
-    bool ok = dictionary.get("candidate", candidate);
-    if (ok && candidate.isEmpty()) {
-        ec = TYPE_MISMATCH_ERR;
+    if (!dictionary.get("candidate", candidate)) {
+        ec = TypeError;
         return nullptr;
     }
 
     String sdpMid;
-    ok = dictionary.get("sdpMid", sdpMid);
-    if (ok && sdpMid.isEmpty()) {
-        ec = TYPE_MISMATCH_ERR;
-        return nullptr;
-    }
+    dictionary.get("sdpMid", sdpMid);
 
-    String tempLineIndex;
     unsigned short sdpMLineIndex = 0;
-    // First we check if the property exists in the Dictionary.
-    ok = dictionary.get("sdpMLineIndex", tempLineIndex);
-    // Then we try to convert it to a number and check if it was successful.
-    if (ok) {
+    String sdpMLineIndexString;
+    bool hasSdpMLineIndex = dictionary.get("sdpMLineIndex", sdpMLineIndexString);
+
+    if (hasSdpMLineIndex) {
         bool intConversionOk;
-        sdpMLineIndex = tempLineIndex.toUIntStrict(&intConversionOk);
+        sdpMLineIndex = sdpMLineIndexString.toUIntStrict(&intConversionOk);
         if (!intConversionOk) {
-            ec = TYPE_MISMATCH_ERR;
+            ec = TypeError;
             return nullptr;
         }
+    }
+
+    if (sdpMid.isNull() && !hasSdpMLineIndex) {
+        ec = TypeError;
+        return nullptr;
     }
 
     return adoptRef(new RTCIceCandidate(candidate, sdpMid, sdpMLineIndex));
