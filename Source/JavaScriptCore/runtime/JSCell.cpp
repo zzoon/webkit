@@ -51,6 +51,16 @@ void JSCell::dumpToStream(const JSCell* cell, PrintStream& out)
     out.printf("<%p, %s>", cell, cell->className());
 }
 
+size_t JSCell::estimatedSizeInBytes() const
+{
+    return methodTable()->estimatedSize(const_cast<JSCell*>(this));
+}
+
+size_t JSCell::estimatedSize(JSCell* cell)
+{
+    return MarkedBlock::blockFor(cell)->cellSize();
+}
+
 void JSCell::copyBackingStore(JSCell*, CopyVisitor&, CopyToken)
 {
 }
@@ -83,7 +93,7 @@ CallType JSCell::getCallData(JSCell*, CallData& callData)
     callData.js.functionExecutable = 0;
     callData.js.scope = 0;
     callData.native.function = 0;
-    return CallTypeNone;
+    return CallType::None;
 }
 
 ConstructType JSCell::getConstructData(JSCell*, ConstructData& constructData)
@@ -91,7 +101,7 @@ ConstructType JSCell::getConstructData(JSCell*, ConstructData& constructData)
     constructData.js.functionExecutable = 0;
     constructData.js.scope = 0;
     constructData.native.function = 0;
-    return ConstructTypeNone;
+    return ConstructType::None;
 }
 
 void JSCell::put(JSCell* cell, ExecState* exec, PropertyName identifier, JSValue value, PutPropertySlot& slot)
@@ -256,6 +266,26 @@ void JSCell::getStructurePropertyNames(JSObject*, ExecState*, PropertyNameArray&
 }
 
 void JSCell::getGenericPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode)
+{
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+bool JSCell::preventExtensions(JSObject*, ExecState*)
+{
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+bool JSCell::isExtensible(JSObject*, ExecState*)
+{
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+bool JSCell::setPrototype(JSObject*, ExecState*, JSValue, bool)
+{
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+JSValue JSCell::getPrototype(JSObject*, ExecState*)
 {
     RELEASE_ASSERT_NOT_REACHED();
 }

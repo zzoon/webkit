@@ -96,7 +96,9 @@ static EncodedJSValue JSC_HOST_CALL constructIntlNumberFormat(ExecState* state)
     IntlNumberFormat* numberFormat = IntlNumberFormat::create(vm, jsCast<IntlNumberFormatConstructor*>(state->callee()));
     if (numberFormat && !jsDynamicCast<IntlNumberFormatConstructor*>(newTarget)) {
         JSValue proto = asObject(newTarget)->getDirect(vm, vm.propertyNames->prototype);
-        asObject(numberFormat)->setPrototypeWithCycleCheck(state, proto);
+        asObject(numberFormat)->setPrototype(vm, state, proto);
+        if (vm.exception())
+            return JSValue::encode(JSValue());
     }
 
     // 3. ReturnIfAbrupt(numberFormat).
@@ -132,13 +134,13 @@ static EncodedJSValue JSC_HOST_CALL callIntlNumberFormat(ExecState* state)
 ConstructType IntlNumberFormatConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructIntlNumberFormat;
-    return ConstructTypeHost;
+    return ConstructType::Host;
 }
 
 CallType IntlNumberFormatConstructor::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callIntlNumberFormat;
-    return CallTypeHost;
+    return CallType::Host;
 }
 
 bool IntlNumberFormatConstructor::getOwnPropertySlot(JSObject* object, ExecState* state, PropertyName propertyName, PropertySlot& slot)

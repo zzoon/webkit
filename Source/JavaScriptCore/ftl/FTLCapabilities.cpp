@@ -97,6 +97,8 @@ inline CapabilityLevel canCompile(Node* node)
     case ArithPow:
     case ArithRandom:
     case ArithRound:
+    case ArithFloor:
+    case ArithCeil:
     case ArithSqrt:
     case ArithLog:
     case ArithFRound:
@@ -109,6 +111,7 @@ inline CapabilityLevel canCompile(Node* node)
     case ExtractOSREntryLocal:
     case LoopHint:
     case SkipScope:
+    case GetGlobalObject:
     case CreateActivation:
     case NewArrowFunction:
     case NewFunction:
@@ -218,6 +221,12 @@ inline CapabilityLevel canCompile(Node* node)
     case PutSetterByVal:
     case CopyRest:
     case GetRestLength:
+    case RegExpExec:
+    case RegExpTest:
+    case NewRegexp:
+    case StringReplace:
+    case GetRegExpObjectLastIndex:
+    case SetRegExpObjectLastIndex:
         // These are OK.
         break;
 
@@ -454,12 +463,14 @@ CapabilityLevel canCompile(Graph& graph)
                 case FunctionUse:
                 case ObjectOrOtherUse:
                 case StringUse:
+                case StringOrOtherUse:
                 case KnownStringUse:
                 case KnownPrimitiveUse:
                 case StringObjectUse:
                 case StringOrStringObjectUse:
                 case SymbolUse:
                 case FinalObjectUse:
+                case RegExpObjectUse:
                 case NotCellUse:
                 case OtherUse:
                 case MiscUse:

@@ -34,14 +34,16 @@
 #include "SDPProcessorScriptResource.h"
 
 #include "SDPProcessorScripts.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
 namespace SDPProcessorScriptResource {
 
-String scriptString()
+const String& scriptString()
 {
-    return String(sdpJavaScript);
+    static NeverDestroyed<const String> script = String(sdpJavaScript);
+    return script;
 }
 
 } // namespace SDPProcessorScriptResource

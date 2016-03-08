@@ -27,7 +27,6 @@
 #define DatabaseToWebProcessConnection_h
 
 #include "Connection.h"
-#include "DatabaseProcessIDBConnection.h"
 #include "MessageSender.h"
 
 #include <wtf/HashMap.h>
@@ -49,28 +48,22 @@ private:
     DatabaseToWebProcessConnection(IPC::Connection::Identifier);
 
     // IPC::Connection::Client
-    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
-    virtual void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
-    virtual void didClose(IPC::Connection&) override;
-    virtual void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
-    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::Database; }
-    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Web; }
+    void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    void didReceiveSyncMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
+    void didClose(IPC::Connection&) override;
+    void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
+    IPC::ProcessType localProcessType() override { return IPC::ProcessType::Database; }
+    IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Web; }
     void didReceiveDatabaseToWebProcessConnectionMessage(IPC::Connection&, IPC::MessageDecoder&);
+    void didReceiveSyncDatabaseToWebProcessConnectionMessage(IPC::Connection&, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
 
     // IPC::MessageSender
-    virtual IPC::Connection* messageSenderConnection() override { return m_connection.get(); }
-    virtual uint64_t messageSenderDestinationID() override { return 0; }
+    IPC::Connection* messageSenderConnection() override { return m_connection.get(); }
+    uint64_t messageSenderDestinationID() override { return 0; }
 
 #if ENABLE(INDEXED_DATABASE)
-    // Messages handlers (Legacy IDB)
-    void establishIDBConnection(uint64_t serverConnectionIdentifier);
-    void removeDatabaseProcessIDBConnection(uint64_t serverConnectionIdentifier);
-
-    typedef HashMap<uint64_t, RefPtr<DatabaseProcessIDBConnection>> IDBConnectionMap;
-    IDBConnectionMap m_idbConnections;
-
     // Messages handlers (Modern IDB)
-    void establishIDBConnectionToServer(uint64_t serverConnectionIdentifier);
+    void establishIDBConnectionToServer(uint64_t& serverConnectionIdentifier);
     void removeIDBConnectionToServer(uint64_t serverConnectionIdentifier);
 
     HashMap<uint64_t, RefPtr<WebIDBConnectionToClient>> m_webIDBConnections;

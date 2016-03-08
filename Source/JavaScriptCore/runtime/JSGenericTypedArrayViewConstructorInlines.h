@@ -77,7 +77,7 @@ Structure* JSGenericTypedArrayViewConstructor<ViewClass>::createStructure(
 }
 
 template<typename ViewClass>
-static JSObject* constructGenericTypedArrayViewFromIterator(ExecState* exec, Structure* structure, JSValue iterator)
+inline JSObject* constructGenericTypedArrayViewFromIterator(ExecState* exec, Structure* structure, JSValue iterator)
 {
     if (!iterator.isObject())
         return throwTypeError(exec, "Symbol.Iterator for the first argument did not return an object.");
@@ -115,7 +115,7 @@ static JSObject* constructGenericTypedArrayViewFromIterator(ExecState* exec, Str
 }
 
 template<typename ViewClass>
-static JSObject* constructGenericTypedArrayViewWithArguments(ExecState* exec, Structure* structure, EncodedJSValue firstArgument, unsigned offset, Optional<unsigned> lengthOpt)
+inline JSObject* constructGenericTypedArrayViewWithArguments(ExecState* exec, Structure* structure, EncodedJSValue firstArgument, unsigned offset, Optional<unsigned> lengthOpt)
 {
     JSValue firstValue = JSValue::decode(firstArgument);
     VM& vm = exec->vm();
@@ -170,7 +170,7 @@ static JSObject* constructGenericTypedArrayViewWithArguments(ExecState* exec, St
 
                     CallData callData;
                     CallType callType = getCallData(iteratorFunc, callData);
-                    if (callType == CallTypeNone)
+                    if (callType == CallType::None)
                         return throwTypeError(exec, "Symbol.Iterator for the first argument cannot be called.");
 
                     ArgList arguments;
@@ -193,7 +193,7 @@ static JSObject* constructGenericTypedArrayViewWithArguments(ExecState* exec, St
             return nullptr;
         }
         
-        if (!result->set(exec, object, 0, length))
+        if (!result->set(exec, 0, object, 0, length))
             return nullptr;
         
         return result;
@@ -216,7 +216,10 @@ static JSObject* constructGenericTypedArrayViewWithArguments(ExecState* exec, St
 }
 
 template<typename ViewClass>
-static EncodedJSValue JSC_HOST_CALL constructGenericTypedArrayView(ExecState* exec)
+EncodedJSValue JSC_HOST_CALL constructGenericTypedArrayView(ExecState*);
+
+template<typename ViewClass>
+EncodedJSValue JSC_HOST_CALL constructGenericTypedArrayView(ExecState* exec)
 {
     Structure* structure = InternalFunction::createSubclassStructure(exec, exec->newTarget(), asInternalFunction(exec->callee())->globalObject()->typedArrayStructure(ViewClass::TypedArrayStorageType));
     if (exec->hadException())
@@ -254,7 +257,7 @@ template<typename ViewClass>
 ConstructType JSGenericTypedArrayViewConstructor<ViewClass>::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructGenericTypedArrayView<ViewClass>;
-    return ConstructTypeHost;
+    return ConstructType::Host;
 }
 
 template<typename ViewClass>
@@ -267,7 +270,7 @@ template<typename ViewClass>
 CallType JSGenericTypedArrayViewConstructor<ViewClass>::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callGenericTypedArrayView<ViewClass>;
-    return CallTypeHost;
+    return CallType::Host;
 }
 
 } // namespace JSC

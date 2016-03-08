@@ -553,9 +553,6 @@
 
 #define HAVE_NETWORK_EXTENSION 1
 #define HAVE_READLINE 1
-#if USE(APPLE_INTERNAL_SDK)
-#define USE_CFNETWORK 1
-#endif
 #define USE_UIKIT_EDITING 1
 #define USE_WEB_THREAD 1
 
@@ -663,6 +660,10 @@
 
 #if OS(WINDOWS)
 #define HAVE_VIRTUALALLOC 1
+#endif
+
+#if (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200) || (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000)
+#define HAVE_CFNETWORK_STORAGE_PARTITIONING 1
 #endif
 
 /* ENABLE macro defaults */
@@ -1131,6 +1132,10 @@
 /* While 10.10 has support for fences, it is missing some API important for our integration of them. */
 #if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
 #define HAVE_COREANIMATION_FENCES 1
+#endif
+
+#if (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200) || (PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000)
+#define USE_OS_LOG 1
 #endif
 
 #endif /* WTF_Platform_h */

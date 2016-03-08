@@ -84,6 +84,8 @@ list(APPEND WebCore_SOURCES
 
     platform/audio/glib/AudioBusGLib.cpp
 
+    platform/crypto/gnutls/CryptoDigestGnuTLS.cpp
+
     platform/geoclue/GeolocationProviderGeoclue1.cpp
     platform/geoclue/GeolocationProviderGeoclue2.cpp
 
@@ -264,6 +266,7 @@ list(APPEND WebCore_LIBRARIES
     ${GLIB_GMODULE_LIBRARIES}
     ${GLIB_GOBJECT_LIBRARIES}
     ${GLIB_LIBRARIES}
+    ${GNUTLS_LIBRARIES}
     ${GUDEV_LIBRARIES}
     ${HARFBUZZ_LIBRARIES}
     ${LIBSECRET_LIBRARIES}
@@ -288,6 +291,7 @@ list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
     ${GEOCLUE_INCLUDE_DIRS}
     ${GIO_UNIX_INCLUDE_DIRS}
     ${GLIB_INCLUDE_DIRS}
+    ${GNUTLS_INCLUDE_DIRS}
     ${GUDEV_INCLUDE_DIRS}
     ${HARFBUZZ_INCLUDE_DIRS}
     ${LIBSECRET_INCLUDE_DIRS}
@@ -564,7 +568,6 @@ list(APPEND GObjectDOMBindingsUnstable_IDL_FILES
     loader/appcache/DOMApplicationCache.idl
 
     page/BarProp.idl
-    page/DOMSecurityPolicy.idl
     page/DOMSelection.idl
     page/History.idl
     page/Location.idl
@@ -815,7 +818,6 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/gnutls/CryptoAlgorithmRSASSA_PKCS1_v1_5GnuTLS.cpp
         crypto/gnutls/CryptoAlgorithmRSA_OAEPGnuTLS.cpp
         crypto/gnutls/CryptoAlgorithmRegistryGnuTLS.cpp
-        crypto/gnutls/CryptoDigestGnuTLS.cpp
         crypto/gnutls/CryptoKeyRSAGnuTLS.cpp
         crypto/gnutls/SerializedCryptoKeyWrapGnuTLS.cpp
 
@@ -824,12 +826,5 @@ if (ENABLE_SUBTLE_CRYPTO)
         crypto/keys/CryptoKeyDataRSAComponents.cpp
         crypto/keys/CryptoKeyHMAC.cpp
         crypto/keys/CryptoKeySerializationRaw.cpp
-    )
-
-    list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
-        ${GNUTLS_INCLUDE_DIRS}
-    )
-    list(APPEND WebCore_LIBRARIES
-        ${GNUTLS_LIBRARIES}
     )
 endif ()

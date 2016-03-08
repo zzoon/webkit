@@ -113,7 +113,7 @@
 #endif
 
 #if PLATFORM(IOS)
-#include "RuntimeApplicationChecksIOS.h"
+#include "RuntimeApplicationChecks.h"
 #include "WebVideoFullscreenInterfaceAVKit.h"
 #endif
 
@@ -148,6 +148,10 @@
 #include "MediaControlsHost.h"
 #include "ScriptGlobalObject.h"
 #include <bindings/ScriptObject.h>
+#endif
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/HTMLMediaElementAdditions.cpp>
 #endif
 
 namespace WebCore {
@@ -2344,25 +2348,6 @@ void HTMLMediaElement::keyAdded()
 }
 #endif
 
-#if ENABLE(MEDIA_STREAM)
-String HTMLMediaElement::mediaPlayerMediaDeviceIdentifierStorageDirectory() const
-{
-    Settings* settings = document().settings();
-    if (!settings)
-        return emptyString();
-
-    String storageDirectory = settings->mediaDeviceIdentifierStorageDirectory();
-    if (storageDirectory.isEmpty())
-        return emptyString();
-
-    SecurityOrigin* origin = document().securityOrigin();
-    if (!origin)
-        return emptyString();
-
-    return pathByAppendingComponent(storageDirectory, origin->databaseIdentifier());
-}
-#endif
-
 void HTMLMediaElement::progressEventTimerFired()
 {
     ASSERT(m_player);
@@ -2972,6 +2957,14 @@ void HTMLMediaElement::playInternal()
     if (!m_mediaSession->clientWillBeginPlayback()) {
         LOG(Media, "  returning because of interruption");
         return;
+    }
+
+    // FIXME: rdar://problem/23833752 We need to be more strategic about when we set up the video controls manager.
+    // It's really something that should be handled by the PlatformMediaSessionManager since we only want a controls
+    // manager for the currentSession.
+    if (document().page() && is<HTMLVideoElement>(*this)) {
+        HTMLVideoElement& asVideo = downcast<HTMLVideoElement>(*this);
+        document().page()->chrome().client().setUpVideoControlsManager(asVideo);
     }
 
     // 4.8.10.9. Playing the media resource
@@ -3927,7 +3920,7 @@ void HTMLMediaElement::updateCaptionContainer()
 
     JSC::CallData callData;
     JSC::CallType callType = methodObject->methodTable()->getCallData(methodObject, callData);
-    if (callType == JSC::CallTypeNone)
+    if (callType == JSC::CallType::None)
         return;
 
     JSC::MarkedArgumentBuffer noArguments;
@@ -5180,7 +5173,7 @@ bool HTMLMediaElement::removeEventListener(const AtomicString& eventType, EventL
 
 void HTMLMediaElement::enqueuePlaybackTargetAvailabilityChangedEvent()
 {
-    bool hasTargets = m_mediaSession->hasWirelessPlaybackTargets(*this);
+    bool hasTargets = m_mediaSession->hasWirelessPlaybackTargets(*this) || !playbackTargetPickerCustomActionName().isEmpty();
     LOG(Media, "HTMLMediaElement::enqueuePlaybackTargetAvailabilityChangedEvent(%p) - hasTargets = %s", this, boolString(hasTargets));
     RefPtr<Event> event = WebKitPlaybackTargetAvailabilityEvent::create(eventNames().webkitplaybacktargetavailabilitychangedEvent, hasTargets);
     event->setTarget(this);
@@ -5220,6 +5213,19 @@ void HTMLMediaElement::setShouldPlayToPlaybackTarget(bool shouldPlay)
     if (m_player)
         m_player->setShouldPlayToPlaybackTarget(shouldPlay);
 }
+
+#if !USE(APPLE_INTERNAL_SDK)
+void HTMLMediaElement::customPlaybackActionSelected()
+{
+    LOG(Media, "HTMLMediaElement::customPlaybackActionSelected(%p)", this);
+}
+
+String HTMLMediaElement::playbackTargetPickerCustomActionName() const
+{
+    return { };
+}
+#endif
+
 #else // ENABLE(WIRELESS_PLAYBACK_TARGET)
 
 bool HTMLMediaElement::webkitCurrentPlaybackTargetIsWireless() const
@@ -5271,9 +5277,19 @@ void HTMLMediaElement::enterFullscreen(VideoFullscreenMode mode)
         return;
 
 #if ENABLE(FULLSCREEN_API)
-    if (mode == VideoFullscreenModeStandard && document().settings() && document().settings()->fullScreenEnabled()) {
-        document().requestFullScreenForElement(this, 0, Document::ExemptIFrameAllowFullScreenRequirement);
-        return;
+    if (document().settings()->fullScreenEnabled()) {
+        if (mode == VideoFullscreenModeStandard) {
+            document().requestFullScreenForElement(this, 0, Document::ExemptIFrameAllowFullScreenRequirement);
+            return;
+        }
+
+        // If this media element is not going to standard fullscreen mode but there's
+        // an element that's currently in full screen in the document, exit full screen
+        // if it contains this media element.
+        if (Element* fullscreenElement = document().webkitCurrentFullScreenElement()) {
+            if (fullscreenElement->contains(this))
+                document().webkitCancelFullScreen();
+        }
     }
 #endif
 
@@ -5322,6 +5338,31 @@ void HTMLMediaElement::exitFullscreen()
     }
 }
 
+void HTMLMediaElement::willBecomeFullscreenElement()
+{
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+    HTMLMediaElementEnums::VideoFullscreenMode oldVideoFullscreenMode = m_videoFullscreenMode;
+#endif
+
+    fullscreenModeChanged(VideoFullscreenModeStandard);
+
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+    switch (oldVideoFullscreenMode) {
+    case VideoFullscreenModeNone:
+    case VideoFullscreenModeStandard:
+        // Don't need to do anything if we are not in any special fullscreen mode or it's already
+        // in standard fullscreen mode.
+        break;
+    case VideoFullscreenModePictureInPicture:
+        if (is<HTMLVideoElement>(*this))
+            downcast<HTMLVideoElement>(this)->exitToFullscreenModeWithoutAnimationIfPossible(oldVideoFullscreenMode, VideoFullscreenModeStandard);
+        break;
+    }
+#endif
+
+    Element::willBecomeFullscreenElement();
+}
+
 void HTMLMediaElement::didBecomeFullscreenElement()
 {
     if (hasMediaControls())
@@ -5332,6 +5373,9 @@ void HTMLMediaElement::willStopBeingFullscreenElement()
 {
     if (hasMediaControls())
         mediaControls()->exitedFullscreen();
+
+    if (fullscreenMode() == VideoFullscreenModeStandard)
+        fullscreenModeChanged(VideoFullscreenModeNone);
 }
 
 PlatformMedia HTMLMediaElement::platformMedia() const
@@ -5807,7 +5851,7 @@ void HTMLMediaElement::setMediaGroup(const String& group)
     setController(0);
 
     // 3. If m's mediagroup attribute is being removed, then abort these steps.
-    if (group.isNull() || group.isEmpty())
+    if (group.isEmpty())
         return;
 
     // 4. If there is another media element whose Document is the same as m's Document (even if one or both
@@ -6309,7 +6353,7 @@ void HTMLMediaElement::didAddUserAgentShadowRoot(ShadowRoot* root)
     JSC::JSObject* function = functionValue.toObject(exec);
     JSC::CallData callData;
     JSC::CallType callType = function->methodTable()->getCallData(function, callData);
-    if (callType == JSC::CallTypeNone)
+    if (callType == JSC::CallType::None)
         return;
 
     JSC::JSValue controllerValue = JSC::call(exec, function, callType, callData, globalObject, argList);
@@ -6404,7 +6448,7 @@ String HTMLMediaElement::getCurrentMediaControlsStatus()
     JSC::CallData callData;
     JSC::CallType callType = function->methodTable()->getCallData(function, callData);
     JSC::MarkedArgumentBuffer argList;
-    if (callType == JSC::CallTypeNone)
+    if (callType == JSC::CallType::None)
         return "";
 
     JSC::JSValue outputValue = JSC::call(exec, function, callType, callData, controllerObject, argList);

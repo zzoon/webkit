@@ -197,6 +197,13 @@ ALWAYS_INLINE void JSObject::visitButterfly(SlotVisitor& visitor, Butterfly* but
     }
 }
 
+size_t JSObject::estimatedSize(JSCell* cell)
+{
+    JSObject* thisObject = jsCast<JSObject*>(cell);
+    size_t butterflyOutOfLineSize = thisObject->m_butterfly ? thisObject->structure()->outOfLineSize() : 0;
+    return Base::estimatedSize(cell) + butterflyOutOfLineSize;
+}
+
 void JSObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSObject* thisObject = jsCast<JSObject*>(cell);
@@ -265,7 +272,7 @@ String JSObject::calculatedClassName(JSObject* object)
 {
     String prototypeFunctionName;
     ExecState* exec = object->globalObject()->globalExec();
-    PropertySlot slot(object->structure()->storedPrototype(), PropertySlot::InternalMethodType::VMInquiry);
+    PropertySlot slot(object->getPrototypeDirect(), PropertySlot::InternalMethodType::VMInquiry);
     PropertyName constructor(exec->propertyNames().constructor);
     if (object->getPropertySlot(exec, constructor, slot)) {
         if (slot.isValue()) {
@@ -422,7 +429,15 @@ void JSObject::putInlineSlow(ExecState* exec, PropertyName propertyName, JSValue
                 }
             }
         }
-        JSValue prototype = obj->prototype();
+        if (obj->type() == ProxyObjectType && propertyName != vm.propertyNames->underscoreProto) {
+            // FIXME: We shouldn't unconditionally perform [[Set]] here.
+            // We need to do more because this is observable behavior.
+            // https://bugs.webkit.org/show_bug.cgi?id=155012
+            ProxyObject* proxy = jsCast<ProxyObject*>(obj);
+            proxy->ProxyObject::put(proxy, exec, propertyName, value, slot);
+            return;
+        }
+        JSValue prototype = obj->getPrototypeDirect();
         if (prototype.isNull())
             break;
         obj = asObject(prototype);
@@ -1159,7 +1174,7 @@ void JSObject::switchToSlowPutArrayStorage(VM& vm)
     }
 }
 
-void JSObject::setPrototype(VM& vm, JSValue prototype)
+void JSObject::setPrototypeDirect(VM& vm, JSValue prototype)
 {
     ASSERT(prototype);
     if (prototype.isObject())
@@ -1185,17 +1200,52 @@ void JSObject::setPrototype(VM& vm, JSValue prototype)
     switchToSlowPutArrayStorage(vm);
 }
 
-bool JSObject::setPrototypeWithCycleCheck(ExecState* exec, JSValue prototype)
+bool JSObject::setPrototypeWithCycleCheck(VM& vm, ExecState* exec, JSValue prototype, bool shouldThrowIfCantSet)
 {
-    ASSERT(methodTable(exec->vm())->toThis(this, exec, NotStrictMode) == this);
-    JSValue nextPrototype = prototype;
-    while (nextPrototype && nextPrototype.isObject()) {
-        if (nextPrototype == this)
-            return false;
-        nextPrototype = asObject(nextPrototype)->prototype();
+    ASSERT(methodTable(vm)->toThis(this, exec, NotStrictMode) == this);
+
+    if (this->getPrototypeDirect() == prototype)
+        return true;
+
+    bool isExtensible = this->isExtensible(exec);
+    if (vm.exception())
+        return false;
+
+    if (!isExtensible) {
+        if (shouldThrowIfCantSet)
+            throwVMError(exec, createTypeError(exec, StrictModeReadonlyPropertyWriteError));
+        return false;
     }
-    setPrototype(exec->vm(), prototype);
+
+    JSValue nextPrototype = prototype;
+    MethodTable::GetPrototypeFunctionPtr defaultGetPrototype = JSObject::getPrototype;
+    while (nextPrototype && nextPrototype.isObject()) {
+        if (nextPrototype == this) {
+            if (shouldThrowIfCantSet)
+                vm.throwException(exec, createError(exec, ASCIILiteral("cyclic __proto__ value")));
+            return false;
+        }
+        if (UNLIKELY(asObject(nextPrototype)->methodTable(vm)->getPrototype != defaultGetPrototype))
+            break; // We're done. Set the prototype.
+        nextPrototype = asObject(nextPrototype)->getPrototypeDirect();
+    }
+    setPrototypeDirect(vm, prototype);
     return true;
+}
+
+bool JSObject::setPrototype(JSObject* object, ExecState* exec, JSValue prototype, bool shouldThrowIfCantSet)
+{
+    return object->setPrototypeWithCycleCheck(exec->vm(), exec, prototype, shouldThrowIfCantSet);
+}
+
+JSValue JSObject::getPrototype(JSObject* object, ExecState*)
+{
+    return object->getPrototypeDirect();
+}
+
+bool JSObject::setPrototype(VM& vm, ExecState* exec, JSValue prototype, bool shouldThrowIfCantSet)
+{
+    return methodTable(vm)->setPrototype(this, exec, prototype, shouldThrowIfCantSet);
 }
 
 bool JSObject::allowsAccessFrom(ExecState* exec)
@@ -1275,13 +1325,23 @@ void JSObject::putDirectNonIndexAccessor(VM& vm, PropertyName propertyName, JSVa
 // http://www.ecma-international.org/ecma-262/6.0/index.html#sec-hasproperty
 bool JSObject::hasProperty(ExecState* exec, PropertyName propertyName) const
 {
-    PropertySlot slot(this, PropertySlot::InternalMethodType::HasProperty);
-    return const_cast<JSObject*>(this)->getPropertySlot(exec, propertyName, slot);
+    return hasPropertyGeneric(exec, propertyName, PropertySlot::InternalMethodType::HasProperty);
 }
 
 bool JSObject::hasProperty(ExecState* exec, unsigned propertyName) const
 {
-    PropertySlot slot(this, PropertySlot::InternalMethodType::HasProperty);
+    return hasPropertyGeneric(exec, propertyName, PropertySlot::InternalMethodType::HasProperty);
+}
+
+bool JSObject::hasPropertyGeneric(ExecState* exec, PropertyName propertyName, PropertySlot::InternalMethodType internalMethodType) const
+{
+    PropertySlot slot(this, internalMethodType);
+    return const_cast<JSObject*>(this)->getPropertySlot(exec, propertyName, slot);
+}
+
+bool JSObject::hasPropertyGeneric(ExecState* exec, unsigned propertyName, PropertySlot::InternalMethodType internalMethodType) const
+{
+    PropertySlot slot(this, internalMethodType);
     return const_cast<JSObject*>(this)->getPropertySlot(exec, propertyName, slot);
 }
 
@@ -1377,55 +1437,67 @@ bool JSObject::deletePropertyByIndex(JSCell* cell, ExecState* exec, unsigned i)
     }
 }
 
-static ALWAYS_INLINE JSValue callDefaultValueFunction(ExecState* exec, const JSObject* object, PropertyName propertyName)
+enum class TypeHintMode { TakesHint, DoesNotTakeHint };
+
+template<TypeHintMode mode = TypeHintMode::DoesNotTakeHint>
+static ALWAYS_INLINE JSValue callToPrimitiveFunction(ExecState* exec, const JSObject* object, PropertyName propertyName, PreferredPrimitiveType hint)
 {
     JSValue function = object->get(exec, propertyName);
-    CallData callData;
-    CallType callType = getCallData(function, callData);
-    if (callType == CallTypeNone)
-        return exec->exception();
-
-    // Prevent "toString" and "valueOf" from observing execution if an exception
-    // is pending.
     if (exec->hadException())
         return exec->exception();
+    if (function.isUndefined() && mode == TypeHintMode::TakesHint)
+        return JSValue();
+    CallData callData;
+    CallType callType = getCallData(function, callData);
+    if (callType == CallType::None)
+        return exec->exception();
 
-    JSValue result = call(exec, function, callType, callData, const_cast<JSObject*>(object), exec->emptyList());
+    MarkedArgumentBuffer callArgs;
+    if (mode == TypeHintMode::TakesHint) {
+        JSString* hintString;
+        switch (hint) {
+        case NoPreference:
+            hintString = exec->vm().smallStrings.defaultString();
+            break;
+        case PreferNumber:
+            hintString = exec->vm().smallStrings.numberString();
+            break;
+        case PreferString:
+            hintString = exec->vm().smallStrings.stringString();
+            break;
+        }
+        callArgs.append(hintString);
+    }
+
+    JSValue result = call(exec, function, callType, callData, const_cast<JSObject*>(object), callArgs);
     ASSERT(!result.isGetterSetter());
     if (exec->hadException())
         return exec->exception();
     if (result.isObject())
-        return JSValue();
+        return mode == TypeHintMode::DoesNotTakeHint ? JSValue() : throwTypeError(exec, "Symbol.toPrimitive returned an object");
     return result;
 }
 
-bool JSObject::getPrimitiveNumber(ExecState* exec, double& number, JSValue& result) const
-{
-    result = methodTable(exec->vm())->defaultValue(this, exec, PreferNumber);
-    number = result.toNumber(exec);
-    return !result.isString();
-}
-
-// ECMA 8.6.2.6
-JSValue JSObject::defaultValue(const JSObject* object, ExecState* exec, PreferredPrimitiveType hint)
+// ECMA 7.1.1
+JSValue JSObject::ordinaryToPrimitive(ExecState* exec, PreferredPrimitiveType hint) const
 {
     // Make sure that whatever default value methods there are on object's prototype chain are
     // being watched.
-    object->structure()->startWatchingInternalPropertiesIfNecessaryForEntireChain(exec->vm());
-    
-    // Must call toString first for Date objects.
-    if ((hint == PreferString) || (hint != PreferNumber && object->prototype() == exec->lexicalGlobalObject()->datePrototype())) {
-        JSValue value = callDefaultValueFunction(exec, object, exec->propertyNames().toString);
+    this->structure()->startWatchingInternalPropertiesIfNecessaryForEntireChain(exec->vm());
+
+    JSValue value;
+    if (hint == PreferString) {
+        value = callToPrimitiveFunction(exec, this, exec->propertyNames().toString, hint);
         if (value)
             return value;
-        value = callDefaultValueFunction(exec, object, exec->propertyNames().valueOf);
+        value = callToPrimitiveFunction(exec, this, exec->propertyNames().valueOf, hint);
         if (value)
             return value;
     } else {
-        JSValue value = callDefaultValueFunction(exec, object, exec->propertyNames().valueOf);
+        value = callToPrimitiveFunction(exec, this, exec->propertyNames().valueOf, hint);
         if (value)
             return value;
-        value = callDefaultValueFunction(exec, object, exec->propertyNames().toString);
+        value = callToPrimitiveFunction(exec, this, exec->propertyNames().toString, hint);
         if (value)
             return value;
     }
@@ -1433,6 +1505,27 @@ JSValue JSObject::defaultValue(const JSObject* object, ExecState* exec, Preferre
     ASSERT(!exec->hadException());
 
     return exec->vm().throwException(exec, createTypeError(exec, ASCIILiteral("No default value")));
+}
+
+JSValue JSObject::defaultValue(const JSObject* object, ExecState* exec, PreferredPrimitiveType hint)
+{
+    return object->ordinaryToPrimitive(exec, hint);
+}
+
+JSValue JSObject::toPrimitive(ExecState* exec, PreferredPrimitiveType preferredType) const
+{
+    JSValue value = callToPrimitiveFunction<TypeHintMode::TakesHint>(exec, this, exec->propertyNames().toPrimitiveSymbol, preferredType);
+    if (value)
+        return value;
+
+    return this->methodTable(exec->vm())->defaultValue(this, exec, preferredType);
+}
+
+bool JSObject::getPrimitiveNumber(ExecState* exec, double& number, JSValue& result) const
+{
+    result = toPrimitive(exec, PreferNumber);
+    number = result.toNumber(exec);
+    return !result.isString();
 }
 
 const HashTableValue* JSObject::findPropertyHashEntry(PropertyName propertyName) const
@@ -1453,7 +1546,7 @@ bool JSObject::hasInstance(ExecState* exec, JSValue value, JSValue hasInstanceVa
     if (!hasInstanceValue.isUndefinedOrNull() && hasInstanceValue != exec->lexicalGlobalObject()->functionProtoHasInstanceSymbolFunction()) {
         CallData callData;
         CallType callType = JSC::getCallData(hasInstanceValue, callData);
-        if (callType == CallTypeNone) {
+        if (callType == CallType::None) {
             vm.throwException(exec, createInvalidInstanceofParameterErrorhasInstanceValueNotFunction(exec, this));
             return false;
         }
@@ -1490,12 +1583,19 @@ bool JSObject::defaultHasInstance(ExecState* exec, JSValue value, JSValue proto)
         return false;
     }
 
+    VM& vm = exec->vm();
     JSObject* object = asObject(value);
-    while ((object = object->prototype().getObject())) {
+    while (true) {
+        JSValue objectValue = object->getPrototype(vm, exec);
+        if (UNLIKELY(vm.exception()))
+            return false;
+        if (!objectValue.isObject())
+            return false;
+        object = asObject(objectValue);
         if (proto == object)
             return true;
     }
-    return false;
+    ASSERT_NOT_REACHED();
 }
 
 EncodedJSValue JSC_HOST_CALL objectPrivateFuncInstanceOf(ExecState* exec)
@@ -1508,20 +1608,29 @@ EncodedJSValue JSC_HOST_CALL objectPrivateFuncInstanceOf(ExecState* exec)
 
 void JSObject::getPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    object->methodTable(exec->vm())->getOwnPropertyNames(object, exec, propertyNames, mode);
-
-    if (object->prototype().isNull())
+    VM& vm = exec->vm();
+    object->methodTable(vm)->getOwnPropertyNames(object, exec, propertyNames, mode);
+    if (UNLIKELY(vm.exception()))
         return;
 
-    VM& vm = exec->vm();
-    JSObject* prototype = asObject(object->prototype());
+    JSValue nextProto = object->getPrototype(vm, exec);
+    if (UNLIKELY(vm.exception()))
+        return;
+    if (nextProto.isNull())
+        return;
+
+    JSObject* prototype = asObject(nextProto);
     while(1) {
         if (prototype->structure(vm)->typeInfo().overridesGetPropertyNames()) {
             prototype->methodTable(vm)->getPropertyNames(prototype, exec, propertyNames, mode);
             break;
         }
         prototype->methodTable(vm)->getOwnPropertyNames(prototype, exec, propertyNames, mode);
-        JSValue nextProto = prototype->prototype();
+        if (UNLIKELY(vm.exception()))
+            return;
+        nextProto = prototype->getPrototype(vm, exec);
+        if (UNLIKELY(vm.exception()))
+            return;
         if (nextProto.isNull())
             break;
         prototype = asObject(nextProto);
@@ -1653,12 +1762,30 @@ void JSObject::freeze(VM& vm)
     setStructure(vm, Structure::freezeTransition(vm, structure(vm)));
 }
 
-void JSObject::preventExtensions(VM& vm)
+bool JSObject::preventExtensions(JSObject* object, ExecState* exec)
 {
-    if (!isExtensible())
-        return;
-    enterDictionaryIndexingMode(vm);
-    setStructure(vm, Structure::preventExtensionsTransition(vm, structure(vm)));
+    if (!object->isStructureExtensible()) {
+        // We've already set the internal [[PreventExtensions]] field to false.
+        // We don't call the methodTable isExtensible here because it's not defined
+        // that way in the specification. We are just doing an optimization here.
+        return true;
+    }
+
+    VM& vm = exec->vm();
+    object->enterDictionaryIndexingMode(vm);
+    object->setStructure(vm, Structure::preventExtensionsTransition(vm, object->structure(vm)));
+    return true;
+}
+
+bool JSObject::isExtensible(JSObject* obj, ExecState*)
+{
+    return obj->isExtensibleImpl();
+}
+
+bool JSObject::isExtensible(ExecState* exec)
+{ 
+    VM& vm = exec->vm();
+    return methodTable(vm)->isExtensible(this, exec);
 }
 
 void JSObject::reifyAllStaticProperties(ExecState* exec)
@@ -1796,7 +1923,7 @@ bool JSObject::defineOwnIndexedProperty(ExecState* exec, unsigned index, const P
     // 3. If current is undefined and extensible is false, then Reject.
     // 4. If current is undefined and extensible is true, then
     if (result.isNewEntry) {
-        if (!isExtensible()) {
+        if (!isStructureExtensible()) {
             map->remove(result.iterator);
             return reject(exec, throwException, "Attempting to define property on object that is not extensible.");
         }
@@ -1916,8 +2043,14 @@ bool JSObject::attemptToInterceptPutByIndexOnHoleForPrototype(ExecState* exec, J
                 return true;
             }
         }
+
+        if (current->type() == ProxyObjectType) {
+            ProxyObject* proxy = jsCast<ProxyObject*>(current);
+            proxy->putByIndexCommon(exec, thisValue, i, value, shouldThrow);
+            return true;
+        }
         
-        JSValue prototypeValue = current->prototype();
+        JSValue prototypeValue = current->getPrototypeDirect();
         if (prototypeValue.isNull())
             return false;
         
@@ -1927,7 +2060,7 @@ bool JSObject::attemptToInterceptPutByIndexOnHoleForPrototype(ExecState* exec, J
 
 bool JSObject::attemptToInterceptPutByIndexOnHole(ExecState* exec, unsigned i, JSValue value, bool shouldThrow)
 {
-    JSValue prototypeValue = prototype();
+    JSValue prototypeValue = getPrototypeDirect();
     if (prototypeValue.isNull())
         return false;
     
@@ -2006,7 +2139,7 @@ void JSObject::putByIndexBeyondVectorLengthWithArrayStorage(ExecState* exec, uns
     // First, handle cases where we don't currently have a sparse map.
     if (LIKELY(!map)) {
         // If the array is not extensible, we should have entered dictionary mode, and created the sparse map.
-        ASSERT(isExtensible());
+        ASSERT(isStructureExtensible());
     
         // Update m_length if necessary.
         if (i >= storage->length())
@@ -2032,7 +2165,7 @@ void JSObject::putByIndexBeyondVectorLengthWithArrayStorage(ExecState* exec, uns
     unsigned length = storage->length();
     if (i >= length) {
         // Prohibit growing the array if length is not writable.
-        if (map->lengthIsReadOnly() || !isExtensible()) {
+        if (map->lengthIsReadOnly() || !isStructureExtensible()) {
             if (shouldThrow)
                 throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
             return;
@@ -2152,7 +2285,7 @@ bool JSObject::putDirectIndexBeyondVectorLengthWithArrayStorage(ExecState* exec,
     // First, handle cases where we don't currently have a sparse map.
     if (LIKELY(!map)) {
         // If the array is not extensible, we should have entered dictionary mode, and created the spare map.
-        ASSERT(isExtensible());
+        ASSERT(isStructureExtensible());
     
         // Update m_length if necessary.
         if (i >= storage->length())
@@ -2182,7 +2315,7 @@ bool JSObject::putDirectIndexBeyondVectorLengthWithArrayStorage(ExecState* exec,
             // Prohibit growing the array if length is not writable.
             if (map->lengthIsReadOnly())
                 return reject(exec, mode == PutDirectIndexShouldThrow, StrictModeReadonlyPropertyWriteError);
-            if (!isExtensible())
+            if (!isStructureExtensible())
                 return reject(exec, mode == PutDirectIndexShouldThrow, "Attempting to define property on object that is not extensible.");
         }
         length = i + 1;
@@ -2817,7 +2950,10 @@ bool JSObject::defineOwnNonIndexProperty(ExecState* exec, PropertyName propertyN
     DefineOwnPropertyScope scope(exec);
     PropertyDescriptor current;
     bool isCurrentDefined = getOwnPropertyDescriptor(exec, propertyName, current);
-    return validateAndApplyPropertyDescriptor(exec, this, propertyName, isExtensible(), descriptor, isCurrentDefined, current, throwException);
+    bool isExtensible = this->isExtensible(exec);
+    if (UNLIKELY(exec->hadException()))
+        return false;
+    return validateAndApplyPropertyDescriptor(exec, this, propertyName, isExtensible, descriptor, isCurrentDefined, current, throwException);
 }
 
 bool JSObject::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, const PropertyDescriptor& descriptor, bool throwException)
@@ -2834,11 +2970,6 @@ bool JSObject::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName
     }
     
     return object->defineOwnNonIndexProperty(exec, propertyName, descriptor, throwException);
-}
-
-JSObject* throwTypeError(ExecState* exec, const String& message)
-{
-    return exec->vm().throwException(exec, createTypeError(exec, message));
 }
 
 void JSObject::convertToDictionary(VM& vm)
@@ -2921,18 +3052,27 @@ void JSObject::getGenericPropertyNames(JSObject* object, ExecState* exec, Proper
 {
     VM& vm = exec->vm();
     object->methodTable(vm)->getOwnPropertyNames(object, exec, propertyNames, EnumerationMode(mode, JSObjectPropertiesMode::Exclude));
-
-    if (object->prototype().isNull())
+    if (UNLIKELY(vm.exception()))
         return;
 
-    JSObject* prototype = asObject(object->prototype());
+    JSValue nextProto = object->getPrototype(vm, exec);
+    if (UNLIKELY(vm.exception()))
+        return;
+    if (nextProto.isNull())
+        return;
+
+    JSObject* prototype = asObject(nextProto);
     while (true) {
         if (prototype->structure(vm)->typeInfo().overridesGetPropertyNames()) {
             prototype->methodTable(vm)->getPropertyNames(prototype, exec, propertyNames, mode);
             break;
         }
         prototype->methodTable(vm)->getOwnPropertyNames(prototype, exec, propertyNames, mode);
-        JSValue nextProto = prototype->prototype();
+        if (UNLIKELY(exec->hadException()))
+            return;
+        nextProto = prototype->getPrototype(vm, exec);
+        if (UNLIKELY(vm.exception()))
+            return;
         if (nextProto.isNull())
             break;
         prototype = asObject(nextProto);
@@ -2956,7 +3096,7 @@ JSValue JSObject::getMethod(ExecState* exec, CallData& callData, CallType& callT
     }
 
     callType = method.asCell()->methodTable()->getCallData(method.asCell(), callData);
-    if (callType == CallTypeNone) {
+    if (callType == CallType::None) {
         throwVMTypeError(exec, errorMessage);
         return jsUndefined();
     }

@@ -2886,6 +2886,16 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyColumnWidth: // auto | <length>
         parsedValue = parseColumnWidth();
         break;
+    case CSSPropertyObjectPosition: {
+        RefPtr<CSSPrimitiveValue> val1;
+        RefPtr<CSSPrimitiveValue> val2;
+        parseFillPosition(*m_valueList, val1, val2);
+        if (val1) {
+            addProperty(CSSPropertyObjectPosition, createPrimitiveValuePair(val1.release(), val2.release()), important);
+            return true;
+        }
+        return false;
+        }
     // End of CSS3 properties
 
     case CSSPropertyWillChange: // auto | [scroll-position | contents | <custom-ident>]#
@@ -3405,18 +3415,18 @@ bool CSSParser::parseLegacyPosition(CSSPropertyID propId, bool important)
 
 RefPtr<CSSValue> CSSParser::parseContentDistributionOverflowPosition()
 {
-    // auto | <baseline-position> | <content-distribution> || [ <overflow-position>? && <content-position> ]
+    // normal | <baseline-position> | <content-distribution> || [ <overflow-position>? && <content-position> ]
     // <baseline-position> = baseline | last-baseline;
     // <content-distribution> = space-between | space-around | space-evenly | stretch;
     // <content-position> = center | start | end | flex-start | flex-end | left | right;
-    // <overflow-position> = true | safe
+    // <overflow-position> = unsafe | safe
 
     CSSParserValue* value = m_valueList->current();
     if (!value)
         return nullptr;
 
     // auto | <baseline-position>
-    if (value->id == CSSValueAuto || isBaselinePositionKeyword(value->id)) {
+    if (value->id == CSSValueNormal || isBaselinePositionKeyword(value->id)) {
         m_valueList->next();
         return CSSContentDistributionValue::create(CSSValueInvalid, value->id, CSSValueInvalid);
     }
@@ -6245,18 +6255,18 @@ bool CSSParser::parseGridTemplateAreasRow(NamedGridAreaMap& gridAreaMap, const u
 
             // The following checks test that the grid area is a single filled-in rectangle.
             // 1. The new row is adjacent to the previously parsed row.
-            if (rowCount != gridCoordinate.rows.resolvedFinalPosition().toInt())
+            if (rowCount != gridCoordinate.rows.resolvedFinalPosition())
                 return false;
 
             // 2. The new area starts at the same position as the previously parsed area.
-            if (currentColumn != gridCoordinate.columns.resolvedInitialPosition().toInt())
+            if (currentColumn != gridCoordinate.columns.resolvedInitialPosition())
                 return false;
 
             // 3. The new area ends at the same position as the previously parsed area.
-            if (lookAheadColumn != gridCoordinate.columns.resolvedFinalPosition().toInt())
+            if (lookAheadColumn != gridCoordinate.columns.resolvedFinalPosition())
                 return false;
 
-            gridCoordinate.rows = GridSpan::definiteGridSpan(gridCoordinate.rows.resolvedInitialPosition(), gridCoordinate.rows.resolvedFinalPosition().next());
+            gridCoordinate.rows = GridSpan::definiteGridSpan(gridCoordinate.rows.resolvedInitialPosition(), gridCoordinate.rows.resolvedFinalPosition() + 1);
         }
         currentColumn = lookAheadColumn - 1;
     }
@@ -11894,6 +11904,12 @@ inline bool CSSParser::detectFunctionTypeToken(int length)
             m_token = MATCHESFUNCTION;
             return true;
         }
+#if ENABLE(SHADOW_DOM)
+        if (isEqualToCSSIdentifier(name, "slotted")) {
+            m_token = SLOTTEDFUNCTION;
+            return true;
+        }
+#endif
         return false;
 
     case 9:

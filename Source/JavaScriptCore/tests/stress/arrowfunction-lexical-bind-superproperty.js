@@ -123,6 +123,28 @@ var G = class G extends A {
      getParentValue() {
          return super.getValue();
      }
+
+     getValueBlockScope() {
+         if (true) {
+             var someValue ='';
+             if (true) {
+                 return () => {
+                    if (true) {
+                        let internalValue = '';
+                        return super.getValue();
+                    }
+                 }
+             }
+         }
+     }
+     *genGetParentValue() {
+         let arr = () => super.getValue();
+         yield arr();
+     }
+     *genGetParentValueDeepArrow() {
+         let arr = () => () => () => super.getValue();
+         yield arr()()();
+     }
  };
 
  var g = new G();
@@ -141,6 +163,10 @@ for (var i = 0; i < 10000; i++) {
     let setValue = g1.setValueCB();
     setValue('new-value');
     testCase(getValue(), 'new-value', 'Error: Some problem with using arrow and "super" inside of the method that retun arrow function');
+    getValue = g1.getValueBlockScope();
+    testCase(getValue(), 'new-value',  'Error: Some problem with using arrow and "super" with deep nesting inside of the method that retun arrow function');
+    testCase(g1.genGetParentValue().next().value, 'new-value',  'Error: Some problem with using arrow and "super" with deep nesting inside of the generator method that retun arrow function');
+    testCase(g1.genGetParentValueDeepArrow().next().value, 'new-value',  'Error: Some problem with using arrow and "super" with deep nesting inside of the generator method that retun arrow function');
 }
 
 var H = class H extends A {

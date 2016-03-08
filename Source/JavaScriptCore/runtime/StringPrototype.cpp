@@ -135,7 +135,7 @@ void StringPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject, JSStr
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION("lastIndexOf", stringProtoFuncLastIndexOf, DontEnum, 1);
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION("match", stringProtoFuncMatch, DontEnum, 1);
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION("repeat", stringProtoFuncRepeat, DontEnum, 1);
-    JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION("replace", stringProtoFuncReplace, DontEnum, 2);
+    JSC_NATIVE_INTRINSIC_FUNCTION_WITHOUT_TRANSITION("replace", stringProtoFuncReplace, DontEnum, 2, StringPrototypeReplaceIntrinsic);
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION("slice", stringProtoFuncSlice, DontEnum, 2);
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION("split", stringProtoFuncSplit, DontEnum, 2);
     JSC_NATIVE_FUNCTION_WITHOUT_TRANSITION("substr", stringProtoFuncSubstr, DontEnum, 2);
@@ -446,7 +446,7 @@ static ALWAYS_INLINE JSValue jsSpliceSubstringsWithSeparators(ExecState* exec, J
     return jsString(exec, impl.release());
 }
 
-static NEVER_INLINE EncodedJSValue removeUsingRegExpSearch(ExecState* exec, JSString* string, const String& source, RegExp* regExp)
+static ALWAYS_INLINE EncodedJSValue removeUsingRegExpSearch(ExecState* exec, JSString* string, const String& source, RegExp* regExp)
 {
     size_t lastIndex = 0;
     unsigned startPosition = 0;
@@ -484,18 +484,10 @@ static NEVER_INLINE EncodedJSValue removeUsingRegExpSearch(ExecState* exec, JSSt
     return JSValue::encode(jsSpliceSubstrings(exec, string, source, sourceRanges.data(), sourceRanges.size()));
 }
 
-static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSString* string, JSValue searchValue)
+static ALWAYS_INLINE EncodedJSValue replaceUsingRegExpSearch(
+    ExecState* exec, JSString* string, JSValue searchValue, CallData& callData, CallType callType,
+    String& replacementString, JSValue replaceValue)
 {
-    JSValue replaceValue = exec->argument(1);
-    String replacementString;
-    CallData callData;
-    CallType callType = getCallData(replaceValue, callData);
-    if (callType == CallTypeNone) {
-        replacementString = replaceValue.toString(exec)->value(exec);
-        if (exec->hadException())
-            return JSValue::encode(jsUndefined());
-    }
-
     const String& source = string->value(exec);
     unsigned sourceLen = source.length();
     if (exec->hadException())
@@ -510,10 +502,12 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
         if (exec->hadException())
             return JSValue::encode(jsUndefined());
 
-        if (callType == CallTypeNone && !replacementString.length())
+        if (callType == CallType::None && !replacementString.length())
             return removeUsingRegExpSearch(exec, string, source, regExp);
     }
 
+    // FIXME: This is wrong because we may be called directly from the FTL.
+    // https://bugs.webkit.org/show_bug.cgi?id=154874
     RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
 
     size_t lastIndex = 0;
@@ -523,7 +517,7 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
     Vector<String, 16> replacements;
 
     // This is either a loop (if global is set) or a one-way (if not).
-    if (global && callType == CallTypeJS) {
+    if (global && callType == CallType::JS) {
         // regExp->numSubpatterns() + 1 for pattern args, + 2 for match start and string
         int argCount = regExp->numSubpatterns() + 1 + 2;
         JSFunction* func = jsCast<JSFunction*>(replaceValue);
@@ -618,7 +612,7 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
             if (!result)
                 break;
 
-            if (callType != CallTypeNone) {
+            if (callType != CallType::None) {
                 sourceRanges.append(StringRange(lastIndex, result.start - lastIndex));
 
                 MarkedArgumentBuffer args;
@@ -672,7 +666,49 @@ static NEVER_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSS
     return JSValue::encode(jsSpliceSubstringsWithSeparators(exec, string, source, sourceRanges.data(), sourceRanges.size(), replacements.data(), replacements.size()));
 }
 
-static inline EncodedJSValue replaceUsingStringSearch(ExecState* exec, JSString* jsString, JSValue searchValue)
+EncodedJSValue JIT_OPERATION operationStringProtoFuncReplaceRegExpEmptyStr(
+    ExecState* exec, JSString* thisValue, RegExpObject* searchValue)
+{
+    RegExp* regExp = searchValue->regExp();
+    if (regExp->global()) {
+        // ES5.1 15.5.4.10 step 8.a.
+        searchValue->setLastIndex(exec, 0);
+        if (exec->hadException())
+            return JSValue::encode(jsUndefined());
+        return removeUsingRegExpSearch(exec, thisValue, thisValue->value(exec), regExp);
+    }
+
+    CallData callData;
+    String replacementString = emptyString();
+    return replaceUsingRegExpSearch(
+        exec, thisValue, searchValue, callData, CallType::None, replacementString, JSValue());
+}
+
+EncodedJSValue JIT_OPERATION operationStringProtoFuncReplaceRegExpString(
+    ExecState* exec, JSString* thisValue, RegExpObject* searchValue, JSString* replaceString)
+{
+    CallData callData;
+    String replacementString = replaceString->value(exec);
+    return replaceUsingRegExpSearch(
+        exec, thisValue, searchValue, callData, CallType::None, replacementString, replaceString);
+}
+
+static ALWAYS_INLINE EncodedJSValue replaceUsingRegExpSearch(ExecState* exec, JSString* string, JSValue searchValue, JSValue replaceValue)
+{
+    String replacementString;
+    CallData callData;
+    CallType callType = getCallData(replaceValue, callData);
+    if (callType == CallType::None) {
+        replacementString = replaceValue.toString(exec)->value(exec);
+        if (exec->hadException())
+            return JSValue::encode(jsUndefined());
+    }
+
+    return replaceUsingRegExpSearch(
+        exec, string, searchValue, callData, callType, replacementString, replaceValue);
+}
+
+static ALWAYS_INLINE EncodedJSValue replaceUsingStringSearch(ExecState* exec, JSString* jsString, JSValue searchValue, JSValue replaceValue)
 {
     const String& string = jsString->value(exec);
     String searchString = searchValue.toString(exec)->value(exec);
@@ -684,10 +720,9 @@ static inline EncodedJSValue replaceUsingStringSearch(ExecState* exec, JSString*
     if (matchStart == notFound)
         return JSValue::encode(jsString);
 
-    JSValue replaceValue = exec->argument(1);
     CallData callData;
     CallType callType = getCallData(replaceValue, callData);
-    if (callType != CallTypeNone) {
+    if (callType != CallType::None) {
         MarkedArgumentBuffer args;
         args.append(jsSubstring(exec, string, matchStart, searchString.impl()->length()));
         args.append(jsNumber(matchStart));
@@ -787,17 +822,37 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncRepeat(ExecState* exec)
     return JSValue::encode(ropeBuilder.release());
 }
 
-EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
+ALWAYS_INLINE EncodedJSValue replace(
+    ExecState* exec, JSString* string, JSValue searchValue, JSValue replaceValue)
 {
-    JSValue thisValue = exec->thisValue();
+    if (searchValue.inherits(RegExpObject::info()))
+        return replaceUsingRegExpSearch(exec, string, searchValue, replaceValue);
+    return replaceUsingStringSearch(exec, string, searchValue, replaceValue);
+}
+
+ALWAYS_INLINE EncodedJSValue replace(
+    ExecState* exec, JSValue thisValue, JSValue searchValue, JSValue replaceValue)
+{
     if (!checkObjectCoercible(thisValue))
         return throwVMTypeError(exec);
     JSString* string = thisValue.toString(exec);
-    JSValue searchValue = exec->argument(0);
+    if (exec->hadException())
+        return JSValue::encode(jsUndefined());
+    return replace(exec, string, searchValue, replaceValue);
+}
 
-    if (searchValue.inherits(RegExpObject::info()))
-        return replaceUsingRegExpSearch(exec, string, searchValue);
-    return replaceUsingStringSearch(exec, string, searchValue);
+EncodedJSValue JSC_HOST_CALL stringProtoFuncReplace(ExecState* exec)
+{
+    return replace(exec, exec->thisValue(), exec->argument(0), exec->argument(1));
+}
+
+EncodedJSValue JIT_OPERATION operationStringProtoFuncReplaceGeneric(
+    ExecState* exec, EncodedJSValue thisValue, EncodedJSValue searchValue,
+    EncodedJSValue replaceValue)
+{
+    return replace(
+        exec, JSValue::decode(thisValue), JSValue::decode(searchValue),
+        JSValue::decode(replaceValue));
 }
 
 EncodedJSValue JSC_HOST_CALL stringProtoFuncToString(ExecState* exec)
@@ -980,7 +1035,8 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncMatch(ExecState* exec)
         return throwVMTypeError(exec);
     JSString* string = thisValue.toString(exec);
     String s = string->value(exec);
-    VM* vm = &exec->vm();
+    JSGlobalObject* globalObject = exec->lexicalGlobalObject();
+    VM* vm = &globalObject->vm();
 
     JSValue a0 = exec->argument(0);
 
@@ -1012,11 +1068,11 @@ EncodedJSValue JSC_HOST_CALL stringProtoFuncMatch(ExecState* exec)
         if (!regExp->isValid())
             return throwVMError(exec, createSyntaxError(exec, regExp->errorMessage()));
     }
-    RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
+    RegExpConstructor* regExpConstructor = globalObject->regExpConstructor();
     MatchResult result = regExpConstructor->performMatch(*vm, regExp, string, s, 0);
     // case without 'g' flag is handled like RegExp.prototype.exec
     if (!global)
-        return JSValue::encode(result ? createRegExpMatchesArray(exec, string, regExp, result) : jsNull());
+        return JSValue::encode(result ? createRegExpMatchesArray(exec, globalObject, string, regExp, result) : jsNull());
 
     // return array of matches
     MarkedArgumentBuffer list;
@@ -1500,7 +1556,7 @@ static EncodedJSValue toLocaleCase(ExecState* state, int32_t (*convertCase)(UCha
     // a. Let requestedLocale be the first element of requestedLocales.
     // 8. Else
     // a. Let requestedLocale be DefaultLocale().
-    String requestedLocale = len > 0 ? requestedLocales.first() : defaultLocale();
+    String requestedLocale = len > 0 ? requestedLocales.first() : defaultLocale(*state);
 
     // 9. Let noExtensionsLocale be the String value that is requestedLocale with all Unicode locale extension sequences (6.2.1) removed.
     String noExtensionsLocale = removeUnicodeLocaleExtension(requestedLocale);

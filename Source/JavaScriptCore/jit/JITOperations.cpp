@@ -29,6 +29,7 @@
 #if ENABLE(JIT)
 
 #include "ArrayConstructor.h"
+#include "CommonSlowPaths.h"
 #include "DFGCompilationMode.h"
 #include "DFGDriver.h"
 #include "DFGOSREntry.h"
@@ -42,6 +43,7 @@
 #include "GetterSetter.h"
 #include "HostCallReturnValue.h"
 #include "JIT.h"
+#include "JITExceptions.h"
 #include "JITToDFGDeferredCompilationCallback.h"
 #include "JSCInlines.h"
 #include "JSGeneratorFunction.h"
@@ -698,9 +700,9 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, JSValue callee, 
         CallData callData;
         CallType callType = getCallData(callee, callData);
     
-        ASSERT(callType != CallTypeJS);
+        ASSERT(callType != CallType::JS);
     
-        if (callType == CallTypeHost) {
+        if (callType == CallType::Host) {
             NativeCallFrameTracer tracer(vm, execCallee);
             execCallee->setCallee(asObject(callee));
             vm->hostCallReturnValue = JSValue::decode(callData.native.function(execCallee));
@@ -715,7 +717,7 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, JSValue callee, 
                 reinterpret_cast<void*>(callLinkInfo->callMode() == CallMode::Tail ? ReuseTheFrame : KeepTheFrame));
         }
     
-        ASSERT(callType == CallTypeNone);
+        ASSERT(callType == CallType::None);
         exec->vm().throwException(exec, createNotAFunctionError(exec, callee));
         return encodeResult(
             vm->getCTIStub(throwExceptionFromCallSlowPathGenerator).code().executableAddress(),
@@ -727,9 +729,9 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, JSValue callee, 
     ConstructData constructData;
     ConstructType constructType = getConstructData(callee, constructData);
     
-    ASSERT(constructType != ConstructTypeJS);
+    ASSERT(constructType != ConstructType::JS);
     
-    if (constructType == ConstructTypeHost) {
+    if (constructType == ConstructType::Host) {
         NativeCallFrameTracer tracer(vm, execCallee);
         execCallee->setCallee(asObject(callee));
         vm->hostCallReturnValue = JSValue::decode(constructData.native.function(execCallee));
@@ -742,7 +744,7 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, JSValue callee, 
         return encodeResult(bitwise_cast<void*>(getHostCallReturnValue), reinterpret_cast<void*>(KeepTheFrame));
     }
     
-    ASSERT(constructType == ConstructTypeNone);
+    ASSERT(constructType == ConstructType::None);
     exec->vm().throwException(exec, createNotAConstructorError(exec, callee));
     return encodeResult(
         vm->getCTIStub(throwExceptionFromCallSlowPathGenerator).code().executableAddress(),
@@ -957,13 +959,6 @@ size_t JIT_OPERATION operationCompareStringEq(ExecState* exec, JSCell* left, JSC
     return result;
 #endif
 }
-
-size_t JIT_OPERATION operationHasProperty(ExecState* exec, JSObject* base, JSString* property)
-{
-    int result = base->hasProperty(exec, property->toIdentifier(exec));
-    return result;
-}
-    
 
 EncodedJSValue JIT_OPERATION operationNewArrayWithProfile(ExecState* exec, ArrayAllocationProfile* profile, const JSValue* values, int size)
 {
@@ -1705,7 +1700,7 @@ EncodedJSValue JIT_OPERATION operationHasIndexedPropertyDefault(ExecState* exec,
         // https://bugs.webkit.org/show_bug.cgi?id=149886
         byValInfo->arrayProfile->setOutOfBounds();
     }
-    return JSValue::encode(jsBoolean(object->hasProperty(exec, index)));
+    return JSValue::encode(jsBoolean(object->hasPropertyGeneric(exec, index, PropertySlot::InternalMethodType::GetOwnProperty)));
 }
     
 EncodedJSValue JIT_OPERATION operationHasIndexedPropertyGeneric(ExecState* exec, EncodedJSValue encodedBase, EncodedJSValue encodedSubscript, ByValInfo* byValInfo)
@@ -1729,7 +1724,7 @@ EncodedJSValue JIT_OPERATION operationHasIndexedPropertyGeneric(ExecState* exec,
         // https://bugs.webkit.org/show_bug.cgi?id=149886
         byValInfo->arrayProfile->setOutOfBounds();
     }
-    return JSValue::encode(jsBoolean(object->hasProperty(exec, subscript.asUInt32())));
+    return JSValue::encode(jsBoolean(object->hasPropertyGeneric(exec, subscript.asUInt32(), PropertySlot::InternalMethodType::GetOwnProperty)));
 }
     
 EncodedJSValue JIT_OPERATION operationGetByValString(ExecState* exec, EncodedJSValue encodedBase, EncodedJSValue encodedSubscript, ByValInfo* byValInfo)
@@ -1784,8 +1779,6 @@ EncodedJSValue JIT_OPERATION operationInstanceOf(ExecState* exec, EncodedJSValue
     JSValue value = JSValue::decode(encodedValue);
     JSValue proto = JSValue::decode(encodedProto);
     
-    ASSERT(!value.isObject() || !proto.isObject());
-
     bool result = JSObject::defaultHasInstance(exec, value, proto);
     return JSValue::encode(jsBoolean(result));
 }
@@ -2049,7 +2042,7 @@ EncodedJSValue JIT_OPERATION operationHasGenericProperty(ExecState* exec, Encode
         return JSValue::encode(jsBoolean(false));
 
     JSObject* base = baseValue.toObject(exec);
-    return JSValue::encode(jsBoolean(base->hasProperty(exec, asString(propertyName)->toIdentifier(exec))));
+    return JSValue::encode(jsBoolean(base->hasPropertyGeneric(exec, asString(propertyName)->toIdentifier(exec), PropertySlot::InternalMethodType::GetOwnProperty)));
 }
 
 EncodedJSValue JIT_OPERATION operationHasIndexedProperty(ExecState* exec, JSCell* baseCell, int32_t subscript)
@@ -2057,7 +2050,7 @@ EncodedJSValue JIT_OPERATION operationHasIndexedProperty(ExecState* exec, JSCell
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
     JSObject* object = baseCell->toObject(exec, exec->lexicalGlobalObject());
-    return JSValue::encode(jsBoolean(object->hasProperty(exec, subscript)));
+    return JSValue::encode(jsBoolean(object->hasPropertyGeneric(exec, subscript, PropertySlot::InternalMethodType::GetOwnProperty)));
 }
     
 JSCell* JIT_OPERATION operationGetPropertyEnumerator(ExecState* exec, JSCell* cell)

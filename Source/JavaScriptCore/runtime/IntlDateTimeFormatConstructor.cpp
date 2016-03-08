@@ -96,7 +96,9 @@ static EncodedJSValue JSC_HOST_CALL constructIntlDateTimeFormat(ExecState* state
     IntlDateTimeFormat* dateTimeFormat = IntlDateTimeFormat::create(vm, jsCast<IntlDateTimeFormatConstructor*>(state->callee()));
     if (dateTimeFormat && !jsDynamicCast<IntlDateTimeFormatConstructor*>(newTarget)) {
         JSValue proto = asObject(newTarget)->getDirect(vm, vm.propertyNames->prototype);
-        asObject(dateTimeFormat)->setPrototypeWithCycleCheck(state, proto);
+        asObject(dateTimeFormat)->setPrototype(vm, state, proto);
+        if (vm.exception())
+            return JSValue::encode(JSValue());
     }
 
     // 3. ReturnIfAbrupt(dateTimeFormat).
@@ -132,13 +134,13 @@ static EncodedJSValue JSC_HOST_CALL callIntlDateTimeFormat(ExecState* state)
 ConstructType IntlDateTimeFormatConstructor::getConstructData(JSCell*, ConstructData& constructData)
 {
     constructData.native.function = constructIntlDateTimeFormat;
-    return ConstructTypeHost;
+    return ConstructType::Host;
 }
 
 CallType IntlDateTimeFormatConstructor::getCallData(JSCell*, CallData& callData)
 {
     callData.native.function = callIntlDateTimeFormat;
-    return CallTypeHost;
+    return CallType::Host;
 }
 
 bool IntlDateTimeFormatConstructor::getOwnPropertySlot(JSObject* object, ExecState* state, PropertyName propertyName, PropertySlot& slot)

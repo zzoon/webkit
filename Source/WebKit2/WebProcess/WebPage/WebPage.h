@@ -289,6 +289,11 @@ public:
 
     void setActivePopupMenu(WebPopupMenu*);
 
+    void setHiddenPageTimerThrottlingIncreaseLimit(std::chrono::milliseconds limit)
+    {
+        m_page->setTimerAlignmentIntervalIncreaseLimit(limit);
+    }
+
 #if ENABLE(INPUT_TYPE_COLOR)
     WebColorChooser* activeColorChooser() const { return m_activeColorChooser; }
     void setActiveColorChooser(WebColorChooser*);
@@ -924,12 +929,17 @@ public:
 
     void didRestoreScrollPosition();
 
+    bool isControlledByAutomation() const;
+    void setControlledByAutomation(bool);
+
+    void insertNewlineInQuotedContent();
+
 private:
     WebPage(uint64_t pageID, const WebPageCreationParameters&);
 
     // IPC::MessageSender
-    virtual IPC::Connection* messageSenderConnection() override;
-    virtual uint64_t messageSenderDestinationID() override;
+    IPC::Connection* messageSenderConnection() override;
+    uint64_t messageSenderDestinationID() override;
 
     void platformInitialize();
     void platformDetach();
@@ -1015,6 +1025,8 @@ private:
 
     void loadURLInFrame(const String&, uint64_t frameID);
 
+    enum class WasRestoredByAPIRequest { No, Yes };
+    void restoreSessionInternal(const Vector<BackForwardListItemState>&, WasRestoredByAPIRequest);
     void restoreSession(const Vector<BackForwardListItemState>&);
     void didRemoveBackForwardItem(uint64_t);
 
@@ -1111,7 +1123,7 @@ private:
 
 #if ENABLE(MEDIA_STREAM)
     void didReceiveUserMediaPermissionDecision(uint64_t userMediaID, bool allowed, const String& audioDeviceUID, const String& videoDeviceUID);
-    void didCompleteUserMediaPermissionCheck(uint64_t userMediaID, bool allowed);
+    void didCompleteUserMediaPermissionCheck(uint64_t userMediaID, const String&, bool allowed);
 #endif
 
     void advanceToNextMisspelling(bool startBeforeSelection);
@@ -1161,6 +1173,7 @@ private:
     void playbackTargetSelected(uint64_t, const WebCore::MediaPlaybackTargetContext& outputDevice) const;
     void playbackTargetAvailabilityDidChange(uint64_t, bool);
     void setShouldPlayToPlaybackTarget(uint64_t, bool);
+    void customPlaybackActionSelected(uint64_t);
 #endif
 
     void clearWheelEventTestTrigger();
@@ -1304,7 +1317,7 @@ private:
     RefPtr<WebOpenPanelResultListener> m_activeOpenPanelResultListener;
     RefPtr<NotificationPermissionRequestManager> m_notificationPermissionRequestManager;
 
-    RefPtr<WebUserContentController> m_userContentController;
+    Ref<WebUserContentController> m_userContentController;
 
 #if ENABLE(GEOLOCATION)
     GeolocationPermissionRequestManager m_geolocationPermissionRequestManager;

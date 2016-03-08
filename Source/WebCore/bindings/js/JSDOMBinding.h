@@ -84,6 +84,8 @@ DOMWindow& firstDOMWindow(JSC::ExecState*);
 WEBCORE_EXPORT JSC::EncodedJSValue reportDeprecatedGetterError(JSC::ExecState&, const char* interfaceName, const char* attributeName);
 WEBCORE_EXPORT void reportDeprecatedSetterError(JSC::ExecState&, const char* interfaceName, const char* attributeName);
 
+void throwNotSupportedError(JSC::ExecState&, const char* message);
+void throwInvalidStateError(JSC::ExecState&, const char* message);
 void throwArrayElementTypeError(JSC::ExecState&);
 void throwAttributeTypeError(JSC::ExecState&, const char* interfaceName, const char* attributeName, const char* expectedType);
 WEBCORE_EXPORT void throwSequenceTypeError(JSC::ExecState&);
@@ -316,7 +318,10 @@ String propertyNameToString(JSC::PropertyName);
 
 AtomicString propertyNameToAtomicString(JSC::PropertyName);
 
+// FIXME: This is only used by legacy code and should go away. Use valueToStringTreatingNullAsEmptyString() instead.
 String valueToStringWithNullCheck(JSC::ExecState*, JSC::JSValue); // null if the value is null
+
+String valueToStringTreatingNullAsEmptyString(JSC::ExecState*, JSC::JSValue);
 String valueToStringWithUndefinedOrNullCheck(JSC::ExecState*, JSC::JSValue); // null if the value is null or undefined
 
 template<typename T> JSC::JSValue toNullableJSNumber(Optional<T>); // null if the optional is null
@@ -406,9 +411,9 @@ inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, 
         return JSC::jsNull();
     if (JSC::JSValue result = getExistingWrapper<JSC::JSArrayBuffer>(globalObject, buffer))
         return result;
-    buffer->ref();
+
+    // The JSArrayBuffer::create function will register the wrapper in finishCreation.
     JSC::JSArrayBuffer* wrapper = JSC::JSArrayBuffer::create(exec->vm(), globalObject->arrayBufferStructure(), buffer);
-    cacheWrapper(globalObject->world(), buffer, wrapper);
     return wrapper;
 }
 

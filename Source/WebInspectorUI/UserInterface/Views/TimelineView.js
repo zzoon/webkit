@@ -52,6 +52,11 @@ WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
 
     // Public
 
+    get navigationItems()
+    {
+        return this._scopeBar ? [this._scopeBar] : [];
+    }
+
     get navigationSidebarTreeOutline()
     {
         return this._contentTreeOutline;
@@ -166,7 +171,6 @@ WebInspector.TimelineView = class TimelineView extends WebInspector.ContentView
         this._contentTreeOutline.removeChildren();
         this._timelineSidebarPanel.hideEmptyContentPlaceholder();
     }
-
 
     filterDidChange()
     {

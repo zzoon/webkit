@@ -443,6 +443,9 @@ set(JavaScriptCore_SOURCES
     heap/HandleStack.cpp
     heap/Heap.cpp
     heap/HeapHelperPool.cpp
+    heap/HeapProfiler.cpp
+    heap/HeapSnapshot.cpp
+    heap/HeapSnapshotBuilder.cpp
     heap/HeapStatistics.cpp
     heap/HeapTimer.cpp
     heap/HeapVerifier.cpp
@@ -827,7 +830,7 @@ set(JavaScriptCore_SOURCES
     wasm/WASMReader.cpp
 
     yarr/RegularExpression.cpp
-    yarr/YarrCanonicalizeUCS2.cpp
+    yarr/YarrCanonicalizeUnicode.cpp
     yarr/YarrInterpreter.cpp
     yarr/YarrJIT.cpp
     yarr/YarrPattern.cpp

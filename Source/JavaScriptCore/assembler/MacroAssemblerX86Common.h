@@ -30,6 +30,7 @@
 
 #include "X86Assembler.h"
 #include "AbstractMacroAssembler.h"
+#include <wtf/Optional.h>
 
 namespace JSC {
 
@@ -198,7 +199,7 @@ public:
     void add32(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
         if (!imm.m_value) {
-            move(src, dest);
+            zeroExtend32ToPtr(src, dest);
             return;
         }
 
@@ -262,26 +263,26 @@ public:
         else if (op1 == dest)
             and32(op2, dest);
         else {
-            move(op2, dest);
+            move32IfNeeded(op2, dest);
             and32(op1, dest);
         }
     }
 
     void and32(Address op1, RegisterID op2, RegisterID dest)
     {
-        move(op2, dest);
+        move32IfNeeded(op2, dest);
         and32(op1, dest);
     }
 
     void and32(RegisterID op1, Address op2, RegisterID dest)
     {
-        move(op1, dest);
+        move32IfNeeded(op1, dest);
         and32(op2, dest);
     }
 
     void and32(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
-        move(src, dest);
+        move32IfNeeded(src, dest);
         and32(imm, dest);
     }
 
@@ -324,8 +325,7 @@ public:
     {
         ASSERT(shift_amount != dest);
 
-        if (src != dest)
-            move(src, dest);
+        move32IfNeeded(src, dest);
         lshift32(shift_amount, dest);
     }
 
@@ -336,8 +336,7 @@ public:
     
     void lshift32(RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
-        if (src != dest)
-            move(src, dest);
+        move32IfNeeded(src, dest);
         lshift32(imm, dest);
     }
     
@@ -352,7 +351,7 @@ public:
             m_assembler.imull_rr(src1, dest);
             return;
         }
-        move(src1, dest);
+        move32IfNeeded(src1, dest);
         m_assembler.imull_rr(src2, dest);
     }
 
@@ -363,13 +362,13 @@ public:
 
     void mul32(Address src1, RegisterID src2, RegisterID dest)
     {
-        move(src2, dest);
+        move32IfNeeded(src2, dest);
         mul32(src1, dest);
     }
 
     void mul32(RegisterID src1, Address src2, RegisterID dest)
     {
-        move(src1, dest);
+        move32IfNeeded(src1, dest);
         mul32(src2, dest);
     }
     
@@ -444,26 +443,26 @@ public:
         else if (op1 == dest)
             or32(op2, dest);
         else {
-            move(op2, dest);
+            move32IfNeeded(op2, dest);
             or32(op1, dest);
         }
     }
 
     void or32(Address op1, RegisterID op2, RegisterID dest)
     {
-        move(op2, dest);
+        move32IfNeeded(op2, dest);
         or32(op1, dest);
     }
 
     void or32(RegisterID op1, Address op2, RegisterID dest)
     {
-        move(op1, dest);
+        move32IfNeeded(op1, dest);
         or32(op2, dest);
     }
 
     void or32(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
-        move(src, dest);
+        move32IfNeeded(src, dest);
         or32(imm, dest);
     }
 
@@ -487,8 +486,7 @@ public:
     {
         ASSERT(shift_amount != dest);
 
-        if (src != dest)
-            move(src, dest);
+        move32IfNeeded(src, dest);
         rshift32(shift_amount, dest);
     }
 
@@ -499,8 +497,7 @@ public:
     
     void rshift32(RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
-        if (src != dest)
-            move(src, dest);
+        move32IfNeeded(src, dest);
         rshift32(imm, dest);
     }
     
@@ -524,8 +521,7 @@ public:
     {
         ASSERT(shift_amount != dest);
 
-        if (src != dest)
-            move(src, dest);
+        move32IfNeeded(src, dest);
         urshift32(shift_amount, dest);
     }
 
@@ -536,8 +532,7 @@ public:
     
     void urshift32(RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
-        if (src != dest)
-            move(src, dest);
+        move32IfNeeded(src, dest);
         urshift32(imm, dest);
     }
     
@@ -607,26 +602,26 @@ public:
         else if (op1 == dest)
             xor32(op2, dest);
         else {
-            move(op2, dest);
+            move32IfNeeded(op2, dest);
             xor32(op1, dest);
         }
     }
 
     void xor32(Address op1, RegisterID op2, RegisterID dest)
     {
-        move(op2, dest);
+        move32IfNeeded(op2, dest);
         xor32(op1, dest);
     }
 
     void xor32(RegisterID op1, Address op2, RegisterID dest)
     {
-        move(op1, dest);
+        move32IfNeeded(op1, dest);
         xor32(op2, dest);
     }
 
     void xor32(TrustedImm32 imm, RegisterID src, RegisterID dest)
     {
-        move(src, dest);
+        move32IfNeeded(src, dest);
         xor32(imm, dest);
     }
 
@@ -694,6 +689,26 @@ public:
     void ceilFloat(Address src, FPRegisterID dst)
     {
         m_assembler.roundss_mr(src.offset, src.base, dst, X86Assembler::RoundingType::TowardInfiniti);
+    }
+
+    void floorDouble(FPRegisterID src, FPRegisterID dst)
+    {
+        m_assembler.roundsd_rr(src, dst, X86Assembler::RoundingType::TowardNegativeInfiniti);
+    }
+
+    void floorDouble(Address src, FPRegisterID dst)
+    {
+        m_assembler.roundsd_mr(src.offset, src.base, dst, X86Assembler::RoundingType::TowardNegativeInfiniti);
+    }
+
+    void floorFloat(FPRegisterID src, FPRegisterID dst)
+    {
+        m_assembler.roundss_rr(src, dst, X86Assembler::RoundingType::TowardNegativeInfiniti);
+    }
+
+    void floorFloat(Address src, FPRegisterID dst)
+    {
+        m_assembler.roundss_mr(src.offset, src.base, dst, X86Assembler::RoundingType::TowardNegativeInfiniti);
     }
 
     // Memory access operations:
@@ -1763,6 +1778,28 @@ public:
             cmov(x86Condition(invert(cond)), elseCase, dest);
     }
 
+    void moveConditionally32(RelationalCondition cond, RegisterID left, TrustedImm32 right, RegisterID thenCase, RegisterID elseCase, RegisterID dest)
+    {
+        if (!right.m_value) {
+            if (auto resultCondition = commuteCompareToZeroIntoTest(cond)) {
+                moveConditionallyTest32(*resultCondition, left, left, thenCase, elseCase, dest);
+                return;
+            }
+        }
+
+        m_assembler.cmpl_ir(right.m_value, left);
+
+        if (thenCase != dest && elseCase != dest) {
+            move(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest)
+            cmov(x86Condition(cond), thenCase, dest);
+        else
+            cmov(x86Condition(invert(cond)), elseCase, dest);
+    }
+
     void moveConditionallyTest32(ResultCondition cond, RegisterID testReg, RegisterID mask, RegisterID src, RegisterID dest)
     {
         m_assembler.testl_rr(testReg, mask);
@@ -1789,7 +1826,7 @@ public:
 
     void moveConditionallyTest32(ResultCondition cond, RegisterID testReg, TrustedImm32 mask, RegisterID src, RegisterID dest)
     {
-        test32(cond, testReg, mask);
+        test32(testReg, mask);
         cmov(x86Condition(cond), src, dest);
     }
 
@@ -1798,7 +1835,7 @@ public:
         ASSERT(isInvertible(cond));
         ASSERT_WITH_MESSAGE(cond != Overflow, "TEST does not set the Overflow Flag.");
 
-        test32(cond, testReg, mask);
+        test32(testReg, mask);
 
         if (thenCase != dest && elseCase != dest) {
             move(elseCase, dest);
@@ -1809,6 +1846,90 @@ public:
             cmov(x86Condition(cond), thenCase, dest);
         else
             cmov(x86Condition(invert(cond)), elseCase, dest);
+    }
+
+    template<typename LeftType, typename RightType>
+    void moveDoubleConditionally32(RelationalCondition cond, LeftType left, RightType right, FPRegisterID thenCase, FPRegisterID elseCase, FPRegisterID dest)
+    {
+        static_assert(!std::is_same<LeftType, FPRegisterID>::value && !std::is_same<RightType, FPRegisterID>::value, "One of the tested argument could be aliased on dest. Use moveDoubleConditionallyDouble().");
+
+        if (thenCase != dest && elseCase != dest) {
+            moveDouble(elseCase, dest);
+            elseCase = dest;
+        }
+
+        if (elseCase == dest) {
+            Jump falseCase = branch32(invert(cond), left, right);
+            moveDouble(thenCase, dest);
+            falseCase.link(this);
+        } else {
+            Jump trueCase = branch32(cond, left, right);
+            moveDouble(elseCase, dest);
+            trueCase.link(this);
+        }
+    }
+
+    template<typename TestType, typename MaskType>
+    void moveDoubleConditionallyTest32(ResultCondition cond, TestType test, MaskType mask, FPRegisterID thenCase, FPRegisterID elseCase, FPRegisterID dest)
+    {
+        static_assert(!std::is_same<TestType, FPRegisterID>::value && !std::is_same<MaskType, FPRegisterID>::value, "One of the tested argument could be aliased on dest. Use moveDoubleConditionallyDouble().");
+
+        if (elseCase == dest && isInvertible(cond)) {
+            Jump falseCase = branchTest32(invert(cond), test, mask);
+            moveDouble(thenCase, dest);
+            falseCase.link(this);
+        } else if (thenCase == dest) {
+            Jump trueCase = branchTest32(cond, test, mask);
+            moveDouble(elseCase, dest);
+            trueCase.link(this);
+        }
+
+        Jump trueCase = branchTest32(cond, test, mask);
+        moveDouble(elseCase, dest);
+        Jump falseCase = jump();
+        trueCase.link(this);
+        moveDouble(thenCase, dest);
+        falseCase.link(this);
+    }
+
+    void moveDoubleConditionallyDouble(DoubleCondition cond, FPRegisterID left, FPRegisterID right, FPRegisterID thenCase, FPRegisterID elseCase, FPRegisterID dest)
+    {
+        if (elseCase == dest) {
+            Jump falseCase = branchDouble(invert(cond), left, right);
+            moveDouble(thenCase, dest);
+            falseCase.link(this);
+        } else if (thenCase == dest) {
+            Jump trueCase = branchDouble(cond, left, right);
+            moveDouble(elseCase, dest);
+            trueCase.link(this);
+        } else {
+            Jump trueCase = branchDouble(cond, left, right);
+            moveDouble(elseCase, dest);
+            Jump falseCase = jump();
+            trueCase.link(this);
+            moveDouble(thenCase, dest);
+            falseCase.link(this);
+        }
+    }
+
+    void moveDoubleConditionallyFloat(DoubleCondition cond, FPRegisterID left, FPRegisterID right, FPRegisterID thenCase, FPRegisterID elseCase, FPRegisterID dest)
+    {
+        if (elseCase == dest) {
+            Jump falseCase = branchFloat(invert(cond), left, right);
+            moveDouble(thenCase, dest);
+            falseCase.link(this);
+        } else if (thenCase == dest) {
+            Jump trueCase = branchFloat(cond, left, right);
+            moveDouble(elseCase, dest);
+            trueCase.link(this);
+        } else {
+            Jump trueCase = branchFloat(cond, left, right);
+            moveDouble(elseCase, dest);
+            Jump falseCase = jump();
+            trueCase.link(this);
+            moveDouble(thenCase, dest);
+            falseCase.link(this);
+        }
     }
 
     // Forwards / external control flow operations:
@@ -1844,10 +1965,12 @@ public:
 
     Jump branch32(RelationalCondition cond, RegisterID left, TrustedImm32 right)
     {
-        if (((cond == Equal) || (cond == NotEqual)) && !right.m_value)
-            m_assembler.testl_rr(left, left);
-        else
-            m_assembler.cmpl_ir(right.m_value, left);
+        if (!right.m_value) {
+            if (auto resultCondition = commuteCompareToZeroIntoTest(cond))
+                return branchTest32(*resultCondition, left, left);
+        }
+
+        m_assembler.cmpl_ir(right.m_value, left);
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
     
@@ -1886,7 +2009,7 @@ public:
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 
-    void test32(ResultCondition, RegisterID reg, TrustedImm32 mask = TrustedImm32(-1))
+    void test32(RegisterID reg, TrustedImm32 mask = TrustedImm32(-1))
     {
         if (mask.m_value == -1)
             m_assembler.testl_rr(reg, reg);
@@ -1906,7 +2029,7 @@ public:
 
     Jump branchTest32(ResultCondition cond, RegisterID reg, TrustedImm32 mask = TrustedImm32(-1))
     {
-        test32(cond, reg, mask);
+        test32(reg, mask);
         return branch(cond);
     }
 
@@ -2016,25 +2139,25 @@ public:
     {
         if (src1 == dest)
             return branchAdd32(cond, src2, dest);
-        move(src2, dest);
+        move32IfNeeded(src2, dest);
         return branchAdd32(cond, src1, dest);
     }
 
     Jump branchAdd32(ResultCondition cond, Address src1, RegisterID src2, RegisterID dest)
     {
-        move(src2, dest);
+        move32IfNeeded(src2, dest);
         return branchAdd32(cond, src1, dest);
     }
 
     Jump branchAdd32(ResultCondition cond, RegisterID src1, Address src2, RegisterID dest)
     {
-        move(src1, dest);
+        move32IfNeeded(src1, dest);
         return branchAdd32(cond, src2, dest);
     }
 
     Jump branchAdd32(ResultCondition cond, RegisterID src, TrustedImm32 imm, RegisterID dest)
     {
-        move(src, dest);
+        move32IfNeeded(src, dest);
         return branchAdd32(cond, imm, dest);
     }
 
@@ -2066,7 +2189,7 @@ public:
     {
         if (src1 == dest)
             return branchMul32(cond, src2, dest);
-        move(src2, dest);
+        move32IfNeeded(src2, dest);
         return branchMul32(cond, src1, dest);
     }
 
@@ -2105,13 +2228,13 @@ public:
         // B := A - B is invalid.
         ASSERT(src1 == dest || src2 != dest);
 
-        move(src1, dest);
+        move32IfNeeded(src1, dest);
         return branchSub32(cond, src2, dest);
     }
 
     Jump branchSub32(ResultCondition cond, RegisterID src1, TrustedImm32 src2, RegisterID dest)
     {
-        move(src1, dest);
+        move32IfNeeded(src1, dest);
         return branchSub32(cond, src2, dest);
     }
 
@@ -2174,10 +2297,14 @@ public:
 
     void compare32(RelationalCondition cond, RegisterID left, TrustedImm32 right, RegisterID dest)
     {
-        if (((cond == Equal) || (cond == NotEqual)) && !right.m_value)
-            m_assembler.testl_rr(left, left);
-        else
-            m_assembler.cmpl_ir(right.m_value, left);
+        if (!right.m_value) {
+            if (auto resultCondition = commuteCompareToZeroIntoTest(cond)) {
+                test32(*resultCondition, left, left, dest);
+                return;
+            }
+        }
+
+        m_assembler.cmpl_ir(right.m_value, left);
         set32(x86Condition(cond), dest);
     }
 
@@ -2204,6 +2331,12 @@ public:
     void test32(ResultCondition cond, RegisterID reg, RegisterID mask, RegisterID dest)
     {
         m_assembler.testl_rr(reg, mask);
+        set32(x86Condition(cond), dest);
+    }
+
+    void test32(ResultCondition cond, RegisterID reg, TrustedImm32 mask, RegisterID dest)
+    {
+        test32(reg, mask);
         set32(x86Condition(cond), dest);
     }
 
@@ -2280,6 +2413,23 @@ public:
         }
     }
 
+    static Optional<ResultCondition> commuteCompareToZeroIntoTest(RelationalCondition cond)
+    {
+        switch (cond) {
+        case Equal:
+            return Zero;
+        case NotEqual:
+            return NonZero;
+        case LessThan:
+            return Signed;
+        case GreaterThanOrEqual:
+            return PositiveOrZero;
+            break;
+        default:
+            return Nullopt;
+        }
+    }
+
     void nop()
     {
         m_assembler.nop();
@@ -2300,7 +2450,7 @@ public:
         return X86Assembler::maxJumpReplacementSize();
     }
 
-    static bool supportsFloatingPointCeil()
+    static bool supportsFloatingPointRounding()
     {
         if (s_sse4_1CheckState == CPUIDCheckState::NotChecked) {
             int flags = 0;
@@ -2470,6 +2620,15 @@ private:
 
         ASSERT(!(cond & DoubleConditionBitSpecial));
         return Jump(m_assembler.jCC(static_cast<X86Assembler::Condition>(cond & ~DoubleConditionBits)));
+    }
+
+    // The 32bit Move does not need the REX byte for low registers, making it shorter.
+    // Use this if the top bits are irrelevant because they will be reset by the next instruction.
+    void move32IfNeeded(RegisterID src, RegisterID dest)
+    {
+        if (src == dest)
+            return;
+        m_assembler.movl_rr(src, dest);
     }
 
 #if CPU(X86_64)

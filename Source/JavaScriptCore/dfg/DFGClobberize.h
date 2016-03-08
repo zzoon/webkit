@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -134,6 +134,7 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case ArithLog:
     case GetScope:
     case SkipScope:
+    case GetGlobalObject:
     case StringCharCodeAt:
     case CompareStrictEq:
     case IsUndefined:
@@ -297,6 +298,8 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         }
 
     case ArithRound:
+    case ArithFloor:
+    case ArithCeil:
         def(PureValue(node, static_cast<uintptr_t>(node->arithRoundingMode())));
         return;
 
@@ -906,6 +909,16 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         write(AbstractHeap(ScopeProperties, node->scopeOffset().offset()));
         def(HeapLocation(ClosureVariableLoc, AbstractHeap(ScopeProperties, node->scopeOffset().offset()), node->child1()), LazyNode(node->child2().node()));
         return;
+
+    case GetRegExpObjectLastIndex:
+        read(RegExpObject_lastIndex);
+        def(HeapLocation(RegExpObjectLastIndexLoc, RegExpObject_lastIndex, node->child1()), LazyNode(node));
+        return;
+
+    case SetRegExpObjectLastIndex:
+        write(RegExpObject_lastIndex);
+        def(HeapLocation(RegExpObjectLastIndexLoc, RegExpObject_lastIndex, node->child1()), LazyNode(node->child2().node()));
+        return;
         
     case GetFromArguments: {
         AbstractHeap heap(DirectArgumentsProperties, node->capturedArgumentsOffset().offset());
@@ -1066,8 +1079,26 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
 
     case RegExpExec:
     case RegExpTest:
-        read(RegExpState);
-        write(RegExpState);
+        if (node->child2().useKind() == RegExpObjectUse
+            && node->child3().useKind() == StringUse) {
+            read(RegExpState);
+            write(RegExpState);
+            return;
+        }
+        read(World);
+        write(Heap);
+        return;
+
+    case StringReplace:
+        if (node->child1().useKind() == StringUse
+            && node->child2().useKind() == RegExpObjectUse
+            && node->child3().useKind() == StringUse) {
+            read(RegExpState);
+            write(RegExpState);
+            return;
+        }
+        read(World);
+        write(Heap);
         return;
 
     case StringCharAt:

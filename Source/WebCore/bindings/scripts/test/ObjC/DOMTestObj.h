@@ -75,6 +75,7 @@ WEBCORE_EXPORT @interface DOMTestObj : DOMObject
 @property (strong) DOMTestObj *testObjAttr;
 @property (strong) DOMTestObj *lenientTestObjAttr;
 @property (readonly, copy) NSString *unforgeableAttr;
+@property (copy) NSString *stringAttrTreatingNullAsEmptyString;
 @property (strong) DOMTestObj *XMLObjAttr;
 @property BOOL create;
 @property (copy) NSString *reflectedStringAttr;
@@ -143,6 +144,7 @@ WEBCORE_EXPORT @interface DOMTestObj : DOMObject
 - (DOMTestObj *)objMethod;
 - (DOMTestObj *)objMethodWithArgs:(int)longArg strArg:(NSString *)strArg objArg:(DOMTestObj *)objArg;
 - (int)unforgeableMethod;
+- (void)methodWithArgTreatingNullAsEmptyString:(NSString *)arg;
 - (NSString *)nullableStringMethod;
 - (NSString *)nullableStringStaticMethod;
 - (NSString *)nullableStringSpecialMethod:(unsigned)index;
@@ -179,8 +181,9 @@ WEBCORE_EXPORT @interface DOMTestObj : DOMObject
 - (void)classMethod2:(int)arg;
 - (DOMSVGDocument *)getSVGDocument;
 - (void)convert1:(DOMTestNode *)value;
-- (void)convert4:(DOMTestNode *)value;
-- (void)convert5:(DOMTestNode *)value;
+- (void)convert2:(DOMTestNode *)value;
+- (void)convert3:(NSString *)value;
+- (void)convert4:(NSString *)value;
 - (DOMSVGPoint *)mutablePointFunction;
 - (DOMSVGPoint *)immutablePointFunction;
 - (void)orange;

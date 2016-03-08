@@ -39,7 +39,7 @@ namespace WebCore {
 
 namespace SDPProcessorScriptResource {
 
-String scriptString();
+const String& scriptString();
 
 } // namespace SDPProcessorScriptResource
 

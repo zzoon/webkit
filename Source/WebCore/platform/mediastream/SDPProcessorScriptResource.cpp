@@ -37,7 +37,7 @@ namespace WebCore {
 
 namespace SDPProcessorScriptResource {
 
-String scriptString()
+const String& scriptString()
 {
     return emptyString();
 }
@@ -47,5 +47,3 @@ String scriptString()
 } // namespace WebCore
 
 #endif // ENABLE(MEDIA_STREAM)
-
-#endif // SDPProcessorScriptResource_h

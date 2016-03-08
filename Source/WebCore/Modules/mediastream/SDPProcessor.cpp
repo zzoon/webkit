@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Ericsson AB. All rights reserved.
+ * Copyright (C) 2015, 2016 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,10 +41,61 @@
 #include "ScriptSourceCode.h"
 #include "inspector/InspectorValues.h"
 #include <bindings/ScriptObject.h>
+#include <wtf/NeverDestroyed.h>
 
 using namespace Inspector;
 
 namespace WebCore {
+
+#define STRING_FUNCTION(name) \
+    static const String& name##String() \
+    { \
+        static NeverDestroyed<const String> name { ASCIILiteral(#name) }; \
+        return name; \
+    }
+
+STRING_FUNCTION(address)
+STRING_FUNCTION(apt)
+STRING_FUNCTION(candidates)
+STRING_FUNCTION(ccmfir)
+STRING_FUNCTION(channels)
+STRING_FUNCTION(clockRate)
+STRING_FUNCTION(cname)
+STRING_FUNCTION(componentId)
+STRING_FUNCTION(dtls)
+STRING_FUNCTION(encodingName)
+STRING_FUNCTION(fingerprint)
+STRING_FUNCTION(fingerprintHashFunction)
+STRING_FUNCTION(foundation)
+STRING_FUNCTION(ice)
+STRING_FUNCTION(mediaDescriptions)
+STRING_FUNCTION(mediaStreamId)
+STRING_FUNCTION(mediaStreamTrackId)
+STRING_FUNCTION(mode)
+STRING_FUNCTION(mux)
+STRING_FUNCTION(nack)
+STRING_FUNCTION(nackpli)
+STRING_FUNCTION(originator)
+STRING_FUNCTION(packetizationMode)
+STRING_FUNCTION(parameters)
+STRING_FUNCTION(password)
+STRING_FUNCTION(payloads)
+STRING_FUNCTION(port)
+STRING_FUNCTION(priority)
+STRING_FUNCTION(relatedAddress)
+STRING_FUNCTION(relatedPort)
+STRING_FUNCTION(rtcp)
+STRING_FUNCTION(rtcpAddress)
+STRING_FUNCTION(rtcpPort)
+STRING_FUNCTION(rtxTime)
+STRING_FUNCTION(sessionId)
+STRING_FUNCTION(sessionVersion)
+STRING_FUNCTION(setup)
+STRING_FUNCTION(ssrcs)
+STRING_FUNCTION(tcpType)
+STRING_FUNCTION(transport)
+STRING_FUNCTION(type)
+STRING_FUNCTION(ufrag)
 
 SDPProcessor::SDPProcessor(ScriptExecutionContext* context)
     : ContextDestructionObserver(context)
@@ -59,18 +110,18 @@ static RefPtr<InspectorObject> createCandidateObject(const IceCandidate& candida
 {
     RefPtr<InspectorObject> candidateObject = InspectorObject::create();
 
-    candidateObject->setString(ASCIILiteral("type"), candidate.type());
-    candidateObject->setString(ASCIILiteral("foundation"), candidate.foundation());
-    candidateObject->setInteger(ASCIILiteral("componentId"), candidate.componentId());
-    candidateObject->setString(ASCIILiteral("transport"), candidate.transport());
-    candidateObject->setInteger(ASCIILiteral("priority"), candidate.priority());
-    candidateObject->setString(ASCIILiteral("address"), candidate.address());
-    candidateObject->setInteger(ASCIILiteral("port"), candidate.port());
+    candidateObject->setString(typeString(), candidate.type());
+    candidateObject->setString(foundationString(), candidate.foundation());
+    candidateObject->setInteger(componentIdString(), candidate.componentId());
+    candidateObject->setString(transportString(), candidate.transport());
+    candidateObject->setInteger(priorityString(), candidate.priority());
+    candidateObject->setString(addressString(), candidate.address());
+    candidateObject->setInteger(portString(), candidate.port());
     if (!candidate.tcpType().isEmpty())
-        candidateObject->setString(ASCIILiteral("tcpType"), candidate.tcpType());
+        candidateObject->setString(tcpTypeString(), candidate.tcpType());
     if (candidate.type().convertToASCIIUppercase() != "HOST") {
-        candidateObject->setString(ASCIILiteral("relatedAddress"), candidate.relatedAddress());
-        candidateObject->setInteger(ASCIILiteral("relatedPort"), candidate.relatedPort());
+        candidateObject->setString(relatedAddressString(), candidate.relatedAddress());
+        candidateObject->setInteger(relatedPortString(), candidate.relatedPort());
     }
 
     return candidateObject;
@@ -82,34 +133,34 @@ static RefPtr<IceCandidate> createCandidate(const InspectorObject& candidateObje
     String stringValue;
     unsigned intValue;
 
-    if (candidateObject.getString(ASCIILiteral("type"), stringValue))
+    if (candidateObject.getString(typeString(), stringValue))
         candidate->setType(stringValue);
 
-    if (candidateObject.getString(ASCIILiteral("foundation"), stringValue))
+    if (candidateObject.getString(foundationString(), stringValue))
         candidate->setFoundation(stringValue);
 
-    if (candidateObject.getInteger(ASCIILiteral("componentId"), intValue))
+    if (candidateObject.getInteger(componentIdString(), intValue))
         candidate->setComponentId(intValue);
 
-    if (candidateObject.getString(ASCIILiteral("transport"), stringValue))
+    if (candidateObject.getString(transportString(), stringValue))
         candidate->setTransport(stringValue);
 
-    if (candidateObject.getInteger(ASCIILiteral("priority"), intValue))
+    if (candidateObject.getInteger(priorityString(), intValue))
         candidate->setPriority(intValue);
 
-    if (candidateObject.getString(ASCIILiteral("address"), stringValue))
+    if (candidateObject.getString(addressString(), stringValue))
         candidate->setAddress(stringValue);
 
-    if (candidateObject.getInteger(ASCIILiteral("port"), intValue))
+    if (candidateObject.getInteger(portString(), intValue))
         candidate->setPort(intValue);
 
-    if (candidateObject.getString(ASCIILiteral("tcpType"), stringValue))
+    if (candidateObject.getString(tcpTypeString(), stringValue))
         candidate->setTcpType(stringValue);
 
-    if (candidateObject.getString(ASCIILiteral("relatedAddress"), stringValue))
+    if (candidateObject.getString(relatedAddressString(), stringValue))
         candidate->setRelatedAddress(stringValue);
 
-    if (candidateObject.getInteger(ASCIILiteral("relatedPort"), intValue))
+    if (candidateObject.getInteger(relatedPortString(), intValue))
         candidate->setRelatedPort(intValue);
 
     return candidate;
@@ -133,36 +184,36 @@ static RefPtr<MediaEndpointSessionConfiguration> configurationFromJSON(const Str
     bool boolValue;
 
     RefPtr<InspectorObject> originatorObject = InspectorObject::create();
-    if (object->getObject(ASCIILiteral("originator"), originatorObject)) {
-        if (originatorObject->getInteger(ASCIILiteral("sessionId"), longValue))
+    if (object->getObject(originatorString(), originatorObject)) {
+        if (originatorObject->getInteger(sessionIdString(), longValue))
             configuration->setSessionId(longValue);
-        if (originatorObject->getInteger(ASCIILiteral("sessionVersion"), intValue))
+        if (originatorObject->getInteger(sessionVersionString(), intValue))
             configuration->setSessionVersion(intValue);
     }
 
     RefPtr<InspectorArray> mediaDescriptionsArray = InspectorArray::create();
-    object->getArray(ASCIILiteral("mediaDescriptions"), mediaDescriptionsArray);
+    object->getArray(mediaDescriptionsString(), mediaDescriptionsArray);
 
     for (unsigned i = 0; i < mediaDescriptionsArray->length(); ++i) {
-        RefPtr<InspectorObject> mdescObject = InspectorObject::create();
-        mediaDescriptionsArray->get(i)->asObject(mdescObject);
+        RefPtr<InspectorObject> mediaDescriptionObject = InspectorObject::create();
+        mediaDescriptionsArray->get(i)->asObject(mediaDescriptionObject);
 
-        RefPtr<PeerMediaDescription> mdesc = PeerMediaDescription::create();
+        RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
 
-        if (mdescObject->getString(ASCIILiteral("type"), stringValue))
-            mdesc->setType(stringValue);
+        if (mediaDescriptionObject->getString(typeString(), stringValue))
+            mediaDescription->setType(stringValue);
 
-        if (mdescObject->getInteger(ASCIILiteral("port"), intValue))
-            mdesc->setPort(intValue);
+        if (mediaDescriptionObject->getInteger(portString(), intValue))
+            mediaDescription->setPort(intValue);
 
-        if (mdescObject->getString(ASCIILiteral("address"), stringValue))
-            mdesc->setAddress(stringValue);
+        if (mediaDescriptionObject->getString(addressString(), stringValue))
+            mediaDescription->setAddress(stringValue);
 
-        if (mdescObject->getString(ASCIILiteral("mode"), stringValue))
-            mdesc->setMode(stringValue);
+        if (mediaDescriptionObject->getString(modeString(), stringValue))
+            mediaDescription->setMode(stringValue);
 
         RefPtr<InspectorArray> payloadsArray = InspectorArray::create();
-        mdescObject->getArray(ASCIILiteral("payloads"), payloadsArray);
+        mediaDescriptionObject->getArray(payloadsString(), payloadsArray);
 
         for (unsigned j = 0; j < payloadsArray->length(); ++j) {
             RefPtr<InspectorObject> payloadsObject = InspectorObject::create();
@@ -170,103 +221,103 @@ static RefPtr<MediaEndpointSessionConfiguration> configurationFromJSON(const Str
 
             RefPtr<MediaPayload> payload = MediaPayload::create();
 
-            if (payloadsObject->getInteger(ASCIILiteral("type"), intValue))
+            if (payloadsObject->getInteger(typeString(), intValue))
                 payload->setType(intValue);
 
-            if (payloadsObject->getString(ASCIILiteral("encodingName"), stringValue))
+            if (payloadsObject->getString(encodingNameString(), stringValue))
                 payload->setEncodingName(stringValue);
 
-            if (payloadsObject->getInteger(ASCIILiteral("clockRate"), intValue))
+            if (payloadsObject->getInteger(clockRateString(), intValue))
                 payload->setClockRate(intValue);
 
-            if (payloadsObject->getInteger(ASCIILiteral("channels"), intValue))
+            if (payloadsObject->getInteger(channelsString(), intValue))
                 payload->setChannels(intValue);
 
-            if (payloadsObject->getBoolean(ASCIILiteral("ccmfir"), boolValue))
+            if (payloadsObject->getBoolean(ccmfirString(), boolValue))
                 payload->setCcmfir(boolValue);
 
-            if (payloadsObject->getBoolean(ASCIILiteral("nackpli"), boolValue))
+            if (payloadsObject->getBoolean(nackpliString(), boolValue))
                 payload->setNackpli(boolValue);
 
-            if (payloadsObject->getBoolean(ASCIILiteral("nack"), boolValue))
+            if (payloadsObject->getBoolean(nackString(), boolValue))
                 payload->setNack(boolValue);
 
             RefPtr<InspectorObject> parametersObject = InspectorObject::create();
-            if (payloadsObject->getObject(ASCIILiteral("parameters"), parametersObject)) {
-                if (parametersObject->getInteger(ASCIILiteral("packetizationMode"), intValue))
+            if (payloadsObject->getObject(parametersString(), parametersObject)) {
+                if (parametersObject->getInteger(packetizationModeString(), intValue))
                     payload->addParameter("packetizationMode", intValue);
 
-                if (parametersObject->getInteger(ASCIILiteral("apt"), intValue))
+                if (parametersObject->getInteger(aptString(), intValue))
                     payload->addParameter("apt", intValue);
 
-                if (parametersObject->getInteger(ASCIILiteral("rtxTime"), intValue))
+                if (parametersObject->getInteger(rtxTimeString(), intValue))
                     payload->addParameter("rtxTime", intValue);
             }
 
-            mdesc->addPayload(WTFMove(payload));
+            mediaDescription->addPayload(WTFMove(payload));
         }
 
         RefPtr<InspectorObject> rtcpObject = InspectorObject::create();
-        if (mdescObject->getObject(ASCIILiteral("rtcp"), rtcpObject)) {
-            if (rtcpObject->getBoolean(ASCIILiteral("mux"), boolValue))
-                mdesc->setRtcpMux(boolValue);
+        if (mediaDescriptionObject->getObject(rtcpString(), rtcpObject)) {
+            if (rtcpObject->getBoolean(muxString(), boolValue))
+                mediaDescription->setRtcpMux(boolValue);
 
-            if (rtcpObject->getString(ASCIILiteral("rtcpAddress"), stringValue))
-                mdesc->setRtcpAddress(stringValue);
+            if (rtcpObject->getString(rtcpAddressString(), stringValue))
+                mediaDescription->setRtcpAddress(stringValue);
 
-            if (rtcpObject->getInteger(ASCIILiteral("rtcpPort"), intValue))
-                mdesc->setRtcpPort(intValue);
+            if (rtcpObject->getInteger(rtcpPortString(), intValue))
+                mediaDescription->setRtcpPort(intValue);
         }
 
-        if (mdescObject->getString(ASCIILiteral("mediaStreamId"), stringValue))
-            mdesc->setMediaStreamId(stringValue);
+        if (mediaDescriptionObject->getString(mediaStreamIdString(), stringValue))
+            mediaDescription->setMediaStreamId(stringValue);
 
-        if (mdescObject->getString(ASCIILiteral("mediaStreamTrackId"), stringValue))
-            mdesc->setMediaStreamTrackId(stringValue);
+        if (mediaDescriptionObject->getString(mediaStreamTrackIdString(), stringValue))
+            mediaDescription->setMediaStreamTrackId(stringValue);
 
         RefPtr<InspectorObject> dtlsObject = InspectorObject::create();
-        if (mdescObject->getObject(ASCIILiteral("dtls"), dtlsObject)) {
-            if (dtlsObject->getString(ASCIILiteral("setup"), stringValue))
-                mdesc->setDtlsSetup(stringValue);
+        if (mediaDescriptionObject->getObject(dtlsString(), dtlsObject)) {
+            if (dtlsObject->getString(setupString(), stringValue))
+                mediaDescription->setDtlsSetup(stringValue);
 
-            if (dtlsObject->getString(ASCIILiteral("fingerprintHashFunction"), stringValue))
-                mdesc->setDtlsFingerprintHashFunction(stringValue);
+            if (dtlsObject->getString(fingerprintHashFunctionString(), stringValue))
+                mediaDescription->setDtlsFingerprintHashFunction(stringValue);
 
-            if (dtlsObject->getString(ASCIILiteral("fingerprint"), stringValue))
-                mdesc->setDtlsFingerprint(stringValue);
+            if (dtlsObject->getString(fingerprintString(), stringValue))
+                mediaDescription->setDtlsFingerprint(stringValue);
         }
 
         RefPtr<InspectorArray> ssrcsArray = InspectorArray::create();
-        mdescObject->getArray(ASCIILiteral("ssrcs"), ssrcsArray);
+        mediaDescriptionObject->getArray(ssrcsString(), ssrcsArray);
 
         for (unsigned j = 0; j < ssrcsArray->length(); ++j) {
             ssrcsArray->get(j)->asInteger(intValue);
-            mdesc->addSsrc(intValue);
+            mediaDescription->addSsrc(intValue);
         }
 
-        if (mdescObject->getString(ASCIILiteral("cname"), stringValue))
-            mdesc->setCname(stringValue);
+        if (mediaDescriptionObject->getString(cnameString(), stringValue))
+            mediaDescription->setCname(stringValue);
 
         RefPtr<InspectorObject> iceObject = InspectorObject::create();
-        if (mdescObject->getObject(ASCIILiteral("ice"), iceObject)) {
-            if (iceObject->getString(ASCIILiteral("ufrag"), stringValue))
-                mdesc->setIceUfrag(stringValue);
+        if (mediaDescriptionObject->getObject(iceString(), iceObject)) {
+            if (iceObject->getString(ufragString(), stringValue))
+                mediaDescription->setIceUfrag(stringValue);
 
-            if (iceObject->getString(ASCIILiteral("password"), stringValue))
-                mdesc->setIcePassword(stringValue);
+            if (iceObject->getString(passwordString(), stringValue))
+                mediaDescription->setIcePassword(stringValue);
 
             RefPtr<InspectorArray> candidatesArray = InspectorArray::create();
-            iceObject->getArray(ASCIILiteral("candidates"), candidatesArray);
+            iceObject->getArray(candidatesString(), candidatesArray);
 
             for (unsigned j = 0; j < candidatesArray->length(); ++j) {
                 RefPtr<InspectorObject> candidateObject = InspectorObject::create();
                 candidatesArray->get(j)->asObject(candidateObject);
 
-                mdesc->addIceCandidate(createCandidate(*candidateObject));
+                mediaDescription->addIceCandidate(createCandidate(*candidateObject));
             }
         }
 
-        configuration->addMediaDescription(WTFMove(mdesc));
+        configuration->addMediaDescription(WTFMove(mediaDescription));
     }
 
     return configuration;
@@ -290,32 +341,32 @@ static String configurationToJSON(const MediaEndpointSessionConfiguration& confi
     RefPtr<InspectorObject> object = InspectorObject::create();
 
     RefPtr<InspectorObject> originatorObject = InspectorObject::create();
-    originatorObject->setDouble(ASCIILiteral("sessionId"), configuration.sessionId());
-    originatorObject->setInteger(ASCIILiteral("sessionVersion"), configuration.sessionVersion());
-    object->setObject(ASCIILiteral("originator"), originatorObject);
+    originatorObject->setDouble(sessionIdString(), configuration.sessionId());
+    originatorObject->setInteger(sessionVersionString(), configuration.sessionVersion());
+    object->setObject(originatorString(), originatorObject);
 
     RefPtr<InspectorArray> mediaDescriptionsArray = InspectorArray::create();
 
-    for (const RefPtr<PeerMediaDescription>& mdesc : configuration.mediaDescriptions()) {
-        RefPtr<InspectorObject> mdescObject = InspectorObject::create();
+    for (const RefPtr<PeerMediaDescription>& mediaDescription : configuration.mediaDescriptions()) {
+        RefPtr<InspectorObject> mediaDescriptionObject = InspectorObject::create();
 
-        mdescObject->setString(ASCIILiteral("type"), mdesc->type());
-        mdescObject->setInteger(ASCIILiteral("port"), mdesc->port());
-        mdescObject->setString(ASCIILiteral("address"), mdesc->address());
-        mdescObject->setString(ASCIILiteral("mode"), mdesc->mode());
+        mediaDescriptionObject->setString(typeString(), mediaDescription->type());
+        mediaDescriptionObject->setInteger(portString(), mediaDescription->port());
+        mediaDescriptionObject->setString(addressString(), mediaDescription->address());
+        mediaDescriptionObject->setString(modeString(), mediaDescription->mode());
 
         RefPtr<InspectorArray> payloadsArray = InspectorArray::create();
 
-        for (RefPtr<MediaPayload> payload : mdesc->payloads()) {
+        for (RefPtr<MediaPayload> payload : mediaDescription->payloads()) {
             RefPtr<InspectorObject> payloadObject = InspectorObject::create();
 
-            payloadObject->setInteger(ASCIILiteral("type"), payload->type());
-            payloadObject->setString(ASCIILiteral("encodingName"), payload->encodingName());
-            payloadObject->setInteger(ASCIILiteral("clockRate"), payload->clockRate());
-            payloadObject->setInteger(ASCIILiteral("channels"), payload->channels());
-            payloadObject->setBoolean(ASCIILiteral("ccmfir"), payload->ccmfir());
-            payloadObject->setBoolean(ASCIILiteral("nackpli"), payload->nackpli());
-            payloadObject->setBoolean(ASCIILiteral("nack"), payload->nack());
+            payloadObject->setInteger(typeString(), payload->type());
+            payloadObject->setString(encodingNameString(), payload->encodingName());
+            payloadObject->setInteger(clockRateString(), payload->clockRate());
+            payloadObject->setInteger(channelsString(), payload->channels());
+            payloadObject->setBoolean(ccmfirString(), payload->ccmfir());
+            payloadObject->setBoolean(nackpliString(), payload->nackpli());
+            payloadObject->setBoolean(nackString(), payload->nack());
 
             if (!payload->parameters().isEmpty()) {
                 RefPtr<InspectorObject> parametersObject = InspectorObject::create();
@@ -323,51 +374,51 @@ static String configurationToJSON(const MediaEndpointSessionConfiguration& confi
                 for (auto& name : payload->parameters().keys())
                     parametersObject->setInteger(name, payload->parameters().get(name));
 
-                payloadObject->setObject(ASCIILiteral("parameters"), parametersObject);
+                payloadObject->setObject(parametersString(), parametersObject);
             }
 
             payloadsArray->pushObject(payloadObject);
         }
-        mdescObject->setArray(ASCIILiteral("payloads"), payloadsArray);
+        mediaDescriptionObject->setArray(payloadsString(), payloadsArray);
 
         RefPtr<InspectorObject> rtcpObject = InspectorObject::create();
-        rtcpObject->setBoolean(ASCIILiteral("mux"), mdesc->rtcpMux());
-        rtcpObject->setString(ASCIILiteral("address"), mdesc->rtcpAddress());
-        rtcpObject->setInteger(ASCIILiteral("port"), mdesc->rtcpPort());
-        mdescObject->setObject(ASCIILiteral("rtcp"), rtcpObject);
+        rtcpObject->setBoolean(muxString(), mediaDescription->rtcpMux());
+        rtcpObject->setString(addressString(), mediaDescription->rtcpAddress());
+        rtcpObject->setInteger(portString(), mediaDescription->rtcpPort());
+        mediaDescriptionObject->setObject(rtcpString(), rtcpObject);
 
-        mdescObject->setString(ASCIILiteral("mediaStreamId"), mdesc->mediaStreamId());
-        mdescObject->setString(ASCIILiteral("mediaStreamTrackId"), mdesc->mediaStreamTrackId());
+        mediaDescriptionObject->setString(mediaStreamIdString(), mediaDescription->mediaStreamId());
+        mediaDescriptionObject->setString(mediaStreamTrackIdString(), mediaDescription->mediaStreamTrackId());
 
         RefPtr<InspectorObject> dtlsObject = InspectorObject::create();
-        dtlsObject->setString(ASCIILiteral("setup"), mdesc->dtlsSetup());
-        dtlsObject->setString(ASCIILiteral("fingerprintHashFunction"), mdesc->dtlsFingerprintHashFunction());
-        dtlsObject->setString(ASCIILiteral("fingerprint"), mdesc->dtlsFingerprint());
-        mdescObject->setObject(ASCIILiteral("dtls"), dtlsObject);
+        dtlsObject->setString(setupString(), mediaDescription->dtlsSetup());
+        dtlsObject->setString(fingerprintHashFunctionString(), mediaDescription->dtlsFingerprintHashFunction());
+        dtlsObject->setString(fingerprintString(), mediaDescription->dtlsFingerprint());
+        mediaDescriptionObject->setObject(dtlsString(), dtlsObject);
 
         RefPtr<InspectorArray> ssrcsArray = InspectorArray::create();
 
-        for (auto ssrc : mdesc->ssrcs())
+        for (auto ssrc : mediaDescription->ssrcs())
             ssrcsArray->pushDouble(ssrc);
-        mdescObject->setArray(ASCIILiteral("ssrcs"), ssrcsArray);
+        mediaDescriptionObject->setArray(ssrcsString(), ssrcsArray);
 
-        mdescObject->setString(ASCIILiteral("cname"), mdesc->cname());
+        mediaDescriptionObject->setString(cnameString(), mediaDescription->cname());
 
         RefPtr<InspectorObject> iceObject = InspectorObject::create();
-        iceObject->setString(ASCIILiteral("ufrag"), mdesc->iceUfrag());
-        iceObject->setString(ASCIILiteral("password"), mdesc->icePassword());
+        iceObject->setString(ufragString(), mediaDescription->iceUfrag());
+        iceObject->setString(passwordString(), mediaDescription->icePassword());
 
         RefPtr<InspectorArray> candidatesArray = InspectorArray::create();
 
-        for (RefPtr<IceCandidate> candidate : mdesc->iceCandidates())
+        for (RefPtr<IceCandidate> candidate : mediaDescription->iceCandidates())
             candidatesArray->pushObject(createCandidateObject(*candidate));
 
-        iceObject->setArray(ASCIILiteral("candidates"), candidatesArray);
-        mdescObject->setObject(ASCIILiteral("ice"), iceObject);
+        iceObject->setArray(candidatesString(), candidatesArray);
+        mediaDescriptionObject->setObject(iceString(), iceObject);
 
-        mediaDescriptionsArray->pushObject(mdescObject);
+        mediaDescriptionsArray->pushObject(mediaDescriptionObject);
     }
-    object->setArray(ASCIILiteral("mediaDescriptions"), mediaDescriptionsArray);
+    object->setArray(mediaDescriptionsString(), mediaDescriptionsArray);
 
     return object->toJSONString();
 }
@@ -465,7 +516,7 @@ bool SDPProcessor::callScript(const String& functionName, const String& argument
     JSC::JSObject* function = functionValue.toObject(exec);
     JSC::CallData callData;
     JSC::CallType callType = function->methodTable()->getCallData(function, callData);
-    if (callType == JSC::CallTypeNone)
+    if (callType == JSC::CallType::None)
         return false;
 
     JSC::MarkedArgumentBuffer argList;
@@ -473,7 +524,7 @@ bool SDPProcessor::callScript(const String& functionName, const String& argument
 
     JSC::JSValue result = JSC::call(exec, function, callType, callData, globalObject, argList);
     if (exec->hadException()) {
-        printf("SDPProcessor::callScript(): %s() threw\n", functionName.ascii().data());
+        LOG_ERROR("SDPProcessor script threw in function %s", functionName.ascii().data());
         exec->clearException();
         return false;
     }

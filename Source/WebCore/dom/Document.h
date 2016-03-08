@@ -198,10 +198,6 @@ class ScriptedAnimationController;
 class TextAutosizer;
 #endif
 
-#if ENABLE(CSP_NEXT)
-class DOMSecurityPolicy;
-#endif
-
 class FontFaceSet;
 
 typedef int ExceptionCode;
@@ -345,7 +341,7 @@ public:
     using ContainerNode::ref;
     using ContainerNode::deref;
 
-    virtual bool canContainRangeEndPoint() const override final { return true; }
+    bool canContainRangeEndPoint() const final { return true; }
 
     Element* getElementByAccessKey(const String& key);
     void invalidateAccessKeyMap();
@@ -461,10 +457,6 @@ public:
 
     void setTimerThrottlingEnabled(bool);
     bool isTimerThrottlingEnabled() const { return m_isTimerThrottlingEnabled; }
-
-#if ENABLE(CSP_NEXT)
-    DOMSecurityPolicy& securityPolicy();
-#endif
 
     RefPtr<Node> adoptNode(Node* source, ExceptionCode&);
 
@@ -603,10 +595,10 @@ public:
     void prepareForDestruction();
 
     // Override ScriptExecutionContext methods to do additional work
-    bool shouldBypassMainWorldContentSecurityPolicy() const override final;
-    virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) override final;
-    virtual void resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) override final;
-    virtual void stopActiveDOMObjects() override final;
+    bool shouldBypassMainWorldContentSecurityPolicy() const final;
+    void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) final;
+    void resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) final;
+    void stopActiveDOMObjects() final;
 
     void suspendDeviceMotionAndOrientationUpdates();
     void resumeDeviceMotionAndOrientationUpdates();
@@ -648,7 +640,7 @@ public:
 
     bool wellFormed() const { return m_wellFormed; }
 
-    virtual const URL& url() const override final { return m_url; }
+    const URL& url() const final { return m_url; }
     void setURL(const URL&);
     const URL& urlForBindings() const { return m_url.isEmpty() ? blankURL() : m_url; }
 
@@ -661,12 +653,12 @@ public:
     const String& baseTarget() const { return m_baseTarget; }
     void processBaseElement();
 
-    WEBCORE_EXPORT virtual URL completeURL(const String&) const override final;
+    WEBCORE_EXPORT URL completeURL(const String&) const final;
     URL completeURL(const String&, const URL& baseURLOverride) const;
 
-    virtual String userAgent(const URL&) const override final;
+    String userAgent(const URL&) const final;
 
-    virtual void disableEval(const String& errorMessage) override final;
+    void disableEval(const String& errorMessage) final;
 
     bool canNavigate(Frame* targetFrame);
     Frame* findUnsafeParentScrollPropagationBoundary();
@@ -986,7 +978,7 @@ public:
     bool isDNSPrefetchEnabled() const { return m_isDNSPrefetchEnabled; }
     void parseDNSPrefetchControlHeader(const String&);
 
-    virtual void postTask(Task) override final; // Executes the task on context's thread asynchronously.
+    void postTask(Task) final; // Executes the task on context's thread asynchronously.
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     ScriptedAnimationController* scriptedAnimationController() { return m_scriptedAnimationController.get(); }
@@ -1075,7 +1067,7 @@ public:
     void setAnnotatedRegions(const Vector<AnnotatedRegionValue>&);
 #endif
 
-    virtual void removeAllEventListeners() override final;
+    void removeAllEventListeners() final;
 
     WEBCORE_EXPORT const SVGDocumentExtensions* svgExtensions();
     WEBCORE_EXPORT SVGDocumentExtensions& accessSVGExtensions();
@@ -1089,8 +1081,8 @@ public:
     bool processingLoadEvent() const { return m_processingLoadEvent; }
     bool loadEventFinished() const { return m_loadEventFinished; }
 
-    virtual bool isContextThread() const override final;
-    virtual bool isJSExecutionForbidden() const override final { return false; }
+    bool isContextThread() const final;
+    bool isJSExecutionForbidden() const final { return false; }
 
     void enqueueWindowEvent(Ref<Event>&&);
     void enqueueDocumentEvent(Ref<Event>&&);
@@ -1098,7 +1090,7 @@ public:
     void enqueuePageshowEvent(PageshowEventPersistence);
     void enqueueHashchangeEvent(const String& oldURL, const String& newURL);
     void enqueuePopstateEvent(RefPtr<SerializedScriptValue>&& stateObject);
-    virtual DocumentEventQueue& eventQueue() const override final { return m_eventQueue; }
+    DocumentEventQueue& eventQueue() const final { return m_eventQueue; }
 
     WEBCORE_EXPORT void addMediaCanStartListener(MediaCanStartListener*);
     WEBCORE_EXPORT void removeMediaCanStartListener(MediaCanStartListener*);
@@ -1172,8 +1164,8 @@ public:
 
     void sendWillRevealEdgeEventsIfNeeded(const IntPoint& oldPosition, const IntPoint& newPosition, const IntRect& visibleRect, const IntSize& contentsSize, Element* target = nullptr);
 
-    virtual EventTarget* errorEventTarget() override final;
-    virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, RefPtr<Inspector::ScriptCallStack>&&) override final;
+    EventTarget* errorEventTarget() final;
+    void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, RefPtr<Inspector::ScriptCallStack>&&) final;
 
     void initDNSPrefetch();
 
@@ -1220,7 +1212,7 @@ public:
     typedef std::pair<Region, bool> RegionFixedPair;
     RegionFixedPair absoluteRegionForEventTargets(const EventTargetSet*);
 
-    LayoutRect absoluteEventHandlerBounds(bool&) override final;
+    LayoutRect absoluteEventHandlerBounds(bool&) final;
 
     bool visualUpdatesAllowed() const { return m_visualUpdatesAllowed; }
 
@@ -1267,9 +1259,9 @@ public:
     void addDisabledFieldsetElement() { m_disabledFieldsetElementsCount++; }
     void removeDisabledFieldsetElement() { ASSERT(m_disabledFieldsetElementsCount); m_disabledFieldsetElementsCount--; }
 
-    WEBCORE_EXPORT virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0) override final;
+    WEBCORE_EXPORT void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0) final;
 
-    WEBCORE_EXPORT virtual SecurityOrigin* topOrigin() const override final;
+    WEBCORE_EXPORT SecurityOrigin* topOrigin() const final;
 
     Ref<FontFaceSet> fonts();
 
@@ -1278,8 +1270,8 @@ public:
     void setVisualUpdatesAllowedByClient(bool);
 
 #if ENABLE(SUBTLE_CRYPTO)
-    virtual bool wrapCryptoKey(const Vector<uint8_t>& key, Vector<uint8_t>& wrappedKey) override final;
-    virtual bool unwrapCryptoKey(const Vector<uint8_t>& wrappedKey, Vector<uint8_t>& key) override final;
+    bool wrapCryptoKey(const Vector<uint8_t>& key, Vector<uint8_t>& wrappedKey) final;
+    bool unwrapCryptoKey(const Vector<uint8_t>& wrappedKey, Vector<uint8_t>& key) final;
 #endif
 
     void setHasStyleWithViewportUnits() { m_hasStyleWithViewportUnits = true; }
@@ -1296,12 +1288,15 @@ public:
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     void addPlaybackTargetPickerClient(MediaPlaybackTargetClient&);
     void removePlaybackTargetPickerClient(MediaPlaybackTargetClient&);
-    void showPlaybackTargetPicker(MediaPlaybackTargetClient&, bool);
+
+    void showPlaybackTargetPicker(MediaPlaybackTargetClient&, bool, const String&);
+
     void playbackTargetPickerClientStateDidChange(MediaPlaybackTargetClient&, MediaProducer::MediaStateFlags);
 
     void setPlaybackTarget(uint64_t, Ref<MediaPlaybackTarget>&&);
     void playbackTargetAvailabilityDidChange(uint64_t, bool);
     void setShouldPlayToPlaybackTarget(uint64_t, bool);
+    void customPlaybackActionSelected(uint64_t);
 #endif
 
     ShouldOpenExternalURLsPolicy shouldOpenExternalURLsPolicyToPropagate() const;
@@ -1343,26 +1338,26 @@ private:
     void detachParser();
 
     // FontSelectorClient
-    virtual void fontsNeedUpdate(FontSelector&) override final;
+    void fontsNeedUpdate(FontSelector&) final;
 
-    virtual bool isDocument() const override final { return true; }
+    bool isDocument() const final { return true; }
 
-    virtual void childrenChanged(const ChildChange&) override final;
+    void childrenChanged(const ChildChange&) final;
 
-    virtual String nodeName() const override final;
-    virtual NodeType nodeType() const override final;
-    virtual bool childTypeAllowed(NodeType) const override final;
-    virtual Ref<Node> cloneNodeInternal(Document&, CloningOperation) override final;
+    String nodeName() const final;
+    NodeType nodeType() const final;
+    bool childTypeAllowed(NodeType) const final;
+    Ref<Node> cloneNodeInternal(Document&, CloningOperation) final;
     void cloneDataFromDocument(const Document&);
 
-    virtual void refScriptExecutionContext() override final { ref(); }
-    virtual void derefScriptExecutionContext() override final { deref(); }
+    void refScriptExecutionContext() final { ref(); }
+    void derefScriptExecutionContext() final { deref(); }
 
-    virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, RefPtr<Inspector::ScriptCallStack>&&, JSC::ExecState* = nullptr, unsigned long requestIdentifier = 0) override final;
+    void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, RefPtr<Inspector::ScriptCallStack>&&, JSC::ExecState* = nullptr, unsigned long requestIdentifier = 0) final;
 
-    virtual double minimumTimerInterval() const override final;
+    std::chrono::milliseconds minimumTimerInterval() const final;
 
-    virtual double timerAlignmentInterval(bool hasReachedMaxNestingLevel) const override final;
+    std::chrono::milliseconds timerAlignmentInterval(bool hasReachedMaxNestingLevel) const final;
 
     void updateTitleFromTitleElement();
     void updateTitle(const StringWithDirection&);
@@ -1412,7 +1407,7 @@ private:
     void setCachedDOMCookies(const String&);
     bool isDOMCookieCacheValid() const { return m_cookieCacheExpiryTimer.isActive(); }
     void invalidateDOMCookieCache();
-    virtual void didLoadResourceSynchronously(const ResourceRequest&) override final;
+    void didLoadResourceSynchronously(const ResourceRequest&) final;
 
     void checkViewportDependentPictures();
 
@@ -1726,11 +1721,7 @@ private:
 
     RefPtr<NamedFlowCollection> m_namedFlows;
 
-#if ENABLE(CSP_NEXT)
-    RefPtr<DOMSecurityPolicy> m_domSecurityPolicy;
-#endif
-
-    void sharedObjectPoolClearTimerFired();
+    void clearSharedObjectPool();
     Timer m_sharedObjectPoolClearTimer;
 
     std::unique_ptr<DocumentSharedObjectPool> m_sharedObjectPool;
@@ -1807,11 +1798,7 @@ inline TextEncoding Document::textEncoding() const
 #if ENABLE(TEMPLATE_ELEMENT)
 inline const Document* Document::templateDocument() const
 {
-    // If DOCUMENT does not have a browsing context, Let TEMPLATE CONTENTS OWNER be DOCUMENT and abort these steps.
-    if (!m_frame)
-        return this;
-
-    return m_templateDocument.get();
+    return m_templateDocumentHost ? this : m_templateDocument.get();
 }
 #endif
 

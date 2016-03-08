@@ -71,19 +71,16 @@
 
                 var mdescIndex = -1;
                 sdp.split("\r\n").forEach(function (line) {
-                    var mline;
-
-                    if (mline = match(line, regexp.mline)) {
+                    if (match(line, regexp.mline)) {
                         // Media block ("header" line)
                         mdescIndex++;
                     } else if (mdescIndex < 0) {
                         // Session block
                         var oline;
-                        var msidsemantic;
 
                         if (oline = match(line, regexp.oline))
                             line = line.replace(oline[2], verified("session-id"));
-                        else if (msidsemantic = match(line, regexp.msidsemantic)) {
+                        else if (match(line, regexp.msidsemantic)) {
                             mdescVariables.forEach(function (variables) {
                                 line = line.replace(variables.streamId, verified("media-stream-id"));
                             });

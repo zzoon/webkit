@@ -35,6 +35,7 @@
 #include "Frame.h"
 #include "FrameView.h"
 #include "HTMLMediaElement.h"
+#include "HTMLMediaElementEnums.h"
 #include "HTMLNames.h"
 #include "HTMLVideoElement.h"
 #include "Logging.h"
@@ -45,7 +46,7 @@
 
 #if PLATFORM(IOS)
 #include "AudioSession.h"
-#include "RuntimeApplicationChecksIOS.h"
+#include "RuntimeApplicationChecks.h"
 #endif
 
 namespace WebCore {
@@ -207,7 +208,8 @@ void MediaElementSession::showPlaybackTargetPicker(const HTMLMediaElement& eleme
     }
 #endif
 
-    element.document().showPlaybackTargetPicker(*this, is<HTMLVideoElement>(element));
+    String customMenuItemTitle = element.playbackTargetPickerCustomActionName();
+    element.document().showPlaybackTargetPicker(*this, is<HTMLVideoElement>(element), customMenuItemTitle);
 }
 
 bool MediaElementSession::hasWirelessPlaybackTargets(const HTMLMediaElement&) const
@@ -329,6 +331,11 @@ void MediaElementSession::setShouldPlayToPlaybackTarget(bool shouldPlay)
     LOG(Media, "MediaElementSession::setShouldPlayToPlaybackTarget - shouldPlay %s", shouldPlay ? "TRUE" : "FALSE");
     m_shouldPlayToPlaybackTarget = shouldPlay;
     client().setShouldPlayToPlaybackTarget(shouldPlay);
+}
+
+void MediaElementSession::customPlaybackActionSelected()
+{
+    client().customPlaybackActionSelected();
 }
 
 void MediaElementSession::mediaStateDidChange(const HTMLMediaElement& element, MediaProducer::MediaStateFlags state)

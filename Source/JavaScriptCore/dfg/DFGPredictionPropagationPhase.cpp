@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -177,6 +177,7 @@ private:
         case ArrayPush:
         case RegExpExec:
         case RegExpTest:
+        case StringReplace:
         case GetById:
         case GetByIdFlush:
         case GetByOffset:
@@ -386,7 +387,9 @@ private:
             break;
         }
 
-        case ArithRound: {
+        case ArithRound:
+        case ArithFloor:
+        case ArithCeil: {
             if (isInt32OrBooleanSpeculation(node->getHeapPrediction()) && m_graph.roundShouldSpeculateInt32(node, m_pass))
                 changed |= setPrediction(SpecInt32);
             else
@@ -547,7 +550,8 @@ private:
             break;
         }
             
-        case SkipScope: {
+        case SkipScope:
+        case GetGlobalObject: {
             changed |= setPrediction(SpecObjectOther);
             break;
         }
@@ -570,7 +574,11 @@ private:
             break;
         }
             
-        case NewRegexp:
+        case NewRegexp: {
+            changed |= setPrediction(SpecRegExpObject);
+            break;
+        }
+            
         case CreateActivation: {
             changed |= setPrediction(SpecObjectOther);
             break;
@@ -658,7 +666,9 @@ private:
         case PutStack:
         case KillStack:
         case StoreBarrier:
-        case GetStack: {
+        case GetStack:
+        case GetRegExpObjectLastIndex:
+        case SetRegExpObjectLastIndex: {
             // This node should never be visible at this stage of compilation. It is
             // inserted by fixup(), which follows this phase.
             DFG_CRASH(m_graph, node, "Unexpected node during prediction propagation");

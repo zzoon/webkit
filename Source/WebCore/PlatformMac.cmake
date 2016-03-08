@@ -103,6 +103,7 @@ list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/ca/cocoa"
     "${WEBCORE_DIR}/platform/graphics/cocoa"
     "${WEBCORE_DIR}/platform/graphics/cg"
+    "${WEBCORE_DIR}/platform/graphics/cv"
     "${WEBCORE_DIR}/platform/graphics/opentype"
     "${WEBCORE_DIR}/platform/graphics/opengl"
     "${WEBCORE_DIR}/platform/graphics/mac"
@@ -217,7 +218,6 @@ list(APPEND WebCore_SOURCES
     crypto/mac/CryptoAlgorithmRSASSA_PKCS1_v1_5Mac.cpp
     crypto/mac/CryptoAlgorithmRSA_OAEPMac.cpp
     crypto/mac/CryptoAlgorithmRegistryMac.cpp
-    crypto/mac/CryptoDigestMac.cpp
     crypto/mac/CryptoKeyMac.cpp
     crypto/mac/CryptoKeyRSAMac.cpp
     crypto/mac/SerializedCryptoKeyWrapMac.mm
@@ -322,6 +322,7 @@ list(APPEND WebCore_SOURCES
     platform/cf/URLCF.cpp
 
     platform/cocoa/ContentFilterUnblockHandlerCocoa.mm
+    platform/cocoa/CoreVideoSoftLink.cpp
     platform/cocoa/DisplaySleepDisablerCocoa.cpp
     platform/cocoa/KeyEventCocoa.mm
     platform/cocoa/LocalizedStringsCocoa.mm
@@ -337,6 +338,8 @@ list(APPEND WebCore_SOURCES
     platform/cocoa/ThemeCocoa.cpp
     platform/cocoa/VNodeTrackerCocoa.cpp
     platform/cocoa/WebCoreNSErrorExtras.mm
+
+    platform/crypto/mac/CryptoDigestMac.cpp
 
     platform/graphics/DisplayRefreshMonitor.cpp
     platform/graphics/DisplayRefreshMonitorManager.cpp
@@ -416,6 +419,10 @@ list(APPEND WebCore_SOURCES
     platform/graphics/cocoa/IOSurfacePoolCocoa.mm
     platform/graphics/cocoa/WebActionDisablingCALayerDelegate.mm
     platform/graphics/cocoa/WebCoreCALayerExtras.mm
+
+    platform/graphics/cv/PixelBufferConformerCV.cpp
+    platform/graphics/cv/TextureCacheCV.mm
+    platform/graphics/cv/VideoTextureCopierCV.cpp
 
     platform/graphics/mac/ColorMac.mm
     platform/graphics/mac/ComplexTextController.cpp
@@ -856,7 +863,6 @@ set(ObjC_Bindings_IDL_FILES
     html/ValidityState.idl
 
     page/AbstractView.idl
-    page/DOMSecurityPolicy.idl
 
     xml/XPathExpression.idl
     xml/XPathNSResolver.idl

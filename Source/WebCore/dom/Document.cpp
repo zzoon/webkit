@@ -103,6 +103,7 @@
 #include "JSModuleLoader.h"
 #include "KeyboardEvent.h"
 #include "Language.h"
+#include "LifecycleCallbackQueue.h"
 #include "LoaderStrategy.h"
 #include "Logging.h"
 #include "MainFrame.h"
@@ -188,10 +189,6 @@
 #include <wtf/TemporaryChange.h>
 #include <wtf/text/StringBuffer.h>
 #include <yarr/RegularExpression.h>
-
-#if ENABLE(CSP_NEXT)
-#include "DOMSecurityPolicy.h"
-#endif
 
 #if ENABLE(DEVICE_ORIENTATION)
 #include "DeviceMotionEvent.h"
@@ -536,7 +533,7 @@ Document::Document(Frame* frame, const URL& url, unsigned documentClasses, unsig
     , m_scheduledTasksAreSuspended(false)
     , m_visualUpdatesAllowed(true)
     , m_visualUpdatesSuppressionTimer(*this, &Document::visualUpdatesSuppressionTimerFired)
-    , m_sharedObjectPoolClearTimer(*this, &Document::sharedObjectPoolClearTimerFired)
+    , m_sharedObjectPoolClearTimer(*this, &Document::clearSharedObjectPool)
 #ifndef NDEBUG
     , m_didDispatchViewportPropertiesChanged(false)
 #endif
@@ -883,35 +880,35 @@ void Document::childrenChanged(const ChildChange& change)
     clearStyleResolver();
 }
 
-static RefPtr<Element> createHTMLElementWithNameValidation(Document& document, const QualifiedName qualifiedName, ExceptionCode& ec)
+static RefPtr<Element> createHTMLElementWithNameValidation(Document& document, const AtomicString& localName, ExceptionCode& ec)
 {
-    RefPtr<HTMLElement> element = HTMLElementFactory::createKnownElement(qualifiedName, document);
+    RefPtr<HTMLElement> element = HTMLElementFactory::createKnownElement(localName, document);
     if (LIKELY(element))
         return element;
 
 #if ENABLE(CUSTOM_ELEMENTS)
     auto* definitions = document.customElementDefinitions();
     if (UNLIKELY(definitions)) {
-        if (auto* interface = definitions->findInterface(qualifiedName))
-            return interface->constructElement(qualifiedName.localName());
+        if (auto* interface = definitions->findInterface(localName))
+            return interface->constructElement(localName, JSCustomElementInterface::ShouldClearException::DoNotClear);
     }
 #endif
 
-    if (UNLIKELY(!Document::isValidName(qualifiedName.localName()))) {
+    if (UNLIKELY(!Document::isValidName(localName))) {
         ec = INVALID_CHARACTER_ERR;
         return nullptr;
     }
 
-    return HTMLUnknownElement::create(qualifiedName, document);
+    return HTMLUnknownElement::create(QualifiedName(nullAtom, localName, xhtmlNamespaceURI), document);
 }
 
 RefPtr<Element> Document::createElementForBindings(const AtomicString& name, ExceptionCode& ec)
 {
     if (isHTMLDocument())
-        return createHTMLElementWithNameValidation(*this, QualifiedName(nullAtom, name.convertToASCIILowercase(), xhtmlNamespaceURI), ec);
+        return createHTMLElementWithNameValidation(*this, name.convertToASCIILowercase(), ec);
 
     if (isXHTMLDocument())
-        return createHTMLElementWithNameValidation(*this, QualifiedName(nullAtom, name, xhtmlNamespaceURI), ec);
+        return createHTMLElementWithNameValidation(*this, name, ec);
 
     if (!isValidName(name)) {
         ec = INVALID_CHARACTER_ERR;
@@ -1076,15 +1073,33 @@ bool Document::hasValidNamespaceForAttributes(const QualifiedName& qName)
     return hasValidNamespaceForElements(qName);
 }
 
+static Ref<HTMLElement> createFallbackHTMLElement(Document& document, const QualifiedName& name)
+{
+#if ENABLE(CUSTOM_ELEMENTS)
+    auto* definitions = document.customElementDefinitions();
+    if (UNLIKELY(definitions)) {
+        if (auto* interface = definitions->findInterface(name)) {
+            Ref<HTMLElement> element = HTMLElement::create(name, document);
+            element->setIsCustomElement(); // Pre-upgrade element is still considered a custom element.
+            LifecycleCallbackQueue::enqueueElementUpgrade(element.get(), *interface);
+            return element;
+        }
+    }
+#endif
+    return HTMLUnknownElement::create(name, document);
+}
+
 // FIXME: This should really be in a possible ElementFactory class.
 Ref<Element> Document::createElement(const QualifiedName& name, bool createdByParser)
 {
     RefPtr<Element> element;
 
     // FIXME: Use registered namespaces and look up in a hash to find the right factory.
-    if (name.namespaceURI() == xhtmlNamespaceURI)
-        element = HTMLElementFactory::createElement(name, *this, nullptr, createdByParser);
-    else if (name.namespaceURI() == SVGNames::svgNamespaceURI)
+    if (name.namespaceURI() == xhtmlNamespaceURI) {
+        element = HTMLElementFactory::createKnownElement(name, *this, nullptr, createdByParser);
+        if (UNLIKELY(!element))
+            element = createFallbackHTMLElement(*this, name);
+    } else if (name.namespaceURI() == SVGNames::svgNamespaceURI)
         element = SVGElementFactory::createElement(name, *this, createdByParser);
 #if ENABLE(MATHML)
     else if (name.namespaceURI() == MathMLNames::mathmlNamespaceURI)
@@ -1294,7 +1309,7 @@ String Document::defaultCharset() const
 {
     if (Settings* settings = this->settings())
         return settings->defaultTextEncodingName();
-    return String();
+    return UTF8Encoding().domName();
 }
 
 void Document::setCharset(const String& charset)
@@ -1684,15 +1699,6 @@ void Document::allowsMediaDocumentInlinePlaybackChanged()
 {
     for (auto* element : m_allowsMediaDocumentInlinePlaybackElements)
         element->allowsMediaDocumentInlinePlaybackChanged();
-}
-#endif
-
-#if ENABLE(CSP_NEXT)
-DOMSecurityPolicy& Document::securityPolicy()
-{
-    if (!m_domSecurityPolicy)
-        m_domSecurityPolicy = DOMSecurityPolicy::create(this);
-    return *m_domSecurityPolicy;
 }
 #endif
 
@@ -2909,7 +2915,7 @@ void Document::writeln(const String& text, Document* ownerDocument)
     write("\n", ownerDocument);
 }
 
-double Document::minimumTimerInterval() const
+std::chrono::milliseconds Document::minimumTimerInterval() const
 {
     auto* page = this->page();
     if (!page)
@@ -2926,9 +2932,9 @@ void Document::setTimerThrottlingEnabled(bool shouldThrottle)
     didChangeTimerAlignmentInterval();
 }
 
-double Document::timerAlignmentInterval(bool hasReachedMaxNestingLevel) const
+std::chrono::milliseconds Document::timerAlignmentInterval(bool hasReachedMaxNestingLevel) const
 {
-    double alignmentInterval = ScriptExecutionContext::timerAlignmentInterval(hasReachedMaxNestingLevel);
+    auto alignmentInterval = ScriptExecutionContext::timerAlignmentInterval(hasReachedMaxNestingLevel);
 
     // Apply Document-level DOMTimer throttling only if timers have reached their maximum nesting level as the Page may still be visible.
     if (m_isTimerThrottlingEnabled && hasReachedMaxNestingLevel)
@@ -4612,6 +4618,7 @@ void Document::setInPageCache(bool flag)
 
         clearStyleResolver();
         clearSelectorQueryCache();
+        clearSharedObjectPool();
     } else {
         if (childNeedsStyleRecalc())
             scheduleStyleRecalc();
@@ -5058,9 +5065,10 @@ void Document::finishedParsing()
     m_cachedResourceLoader->clearPreloads();
 }
 
-void Document::sharedObjectPoolClearTimerFired()
+void Document::clearSharedObjectPool()
 {
     m_sharedObjectPool = nullptr;
+    m_sharedObjectPoolClearTimer.stop();
 }
 
 #if ENABLE(TELEPHONE_NUMBER_DETECTION)
@@ -5815,6 +5823,9 @@ void Document::webkitWillEnterFullScreenForElement(Element* element)
 
     unwrapFullScreenRenderer(m_fullScreenRenderer, m_fullScreenElement.get());
 
+    if (element)
+        element->willBecomeFullscreenElement();
+    
     m_fullScreenElement = element;
 
 #if USE(NATIVE_FULLSCREEN_VIDEO)
@@ -6841,7 +6852,7 @@ void Document::removePlaybackTargetPickerClient(MediaPlaybackTargetClient& clien
     page->removePlaybackTargetPickerClient(clientId);
 }
 
-void Document::showPlaybackTargetPicker(MediaPlaybackTargetClient& client, bool isVideo)
+void Document::showPlaybackTargetPicker(MediaPlaybackTargetClient& client, bool isVideo, const String& customMenuItemTitle)
 {
     Page* page = this->page();
     if (!page)
@@ -6851,7 +6862,7 @@ void Document::showPlaybackTargetPicker(MediaPlaybackTargetClient& client, bool 
     if (it == m_clientToIDMap.end())
         return;
 
-    page->showPlaybackTargetPicker(it->value, view()->lastKnownMousePosition(), isVideo);
+    page->showPlaybackTargetPicker(it->value, view()->lastKnownMousePosition(), isVideo, customMenuItemTitle);
 }
 
 void Document::playbackTargetPickerClientStateDidChange(MediaPlaybackTargetClient& client, MediaProducer::MediaStateFlags state)
@@ -6892,6 +6903,12 @@ void Document::setShouldPlayToPlaybackTarget(uint64_t clientId, bool shouldPlay)
         return;
 
     it->value->setShouldPlayToPlaybackTarget(shouldPlay);
+}
+
+void Document::customPlaybackActionSelected(uint64_t clientId)
+{
+    if (auto* client = m_idToClientMap.get(clientId))
+        client->customPlaybackActionSelected();
 }
 #endif // ENABLE(WIRELESS_PLAYBACK_TARGET)
 

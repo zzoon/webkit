@@ -95,11 +95,11 @@ class CodeBlock : public JSCell {
     friend class LLIntOffsetsExtractor;
 
     class UnconditionalFinalizer : public JSC::UnconditionalFinalizer { 
-        virtual void finalizeUnconditionally() override;
+        void finalizeUnconditionally() override;
     };
 
     class WeakReferenceHarvester : public JSC::WeakReferenceHarvester {
-        virtual void visitWeakReferences(SlotVisitor&) override;
+        void visitWeakReferences(SlotVisitor&) override;
     };
 
 public:
@@ -179,6 +179,7 @@ public:
     // https://bugs.webkit.org/show_bug.cgi?id=123677
     CodeBlock* baselineVersion();
 
+    static size_t estimatedSize(JSCell*);
     static void visitChildren(JSCell*, SlotVisitor&);
     void visitChildren(SlotVisitor&);
     void visitWeakly(SlotVisitor&);

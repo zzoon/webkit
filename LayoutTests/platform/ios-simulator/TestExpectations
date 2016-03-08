@@ -77,6 +77,16 @@ compositing/plugins
 http/tests/plugins
 fast/frames/sandboxed-iframe-plugins.html
 fast/loader/reload-zero-byte-plugin.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-affects-child.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-invalid.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-mismatched-data.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-mismatched-url.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-notype-data.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-notype-url.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-nourl-allowed.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-nourl-blocked.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-url-01.html
+http/tests/security/contentSecurityPolicy/1.1/plugintypes-url-02.html
 
 # Pointer-lock not supported on iOS
 pointer-lock
@@ -225,10 +235,20 @@ webkit.org/b/149440 fast/shadow-dom/css-scoping-shadow-host-functional-rule.html
 webkit.org/b/149441 fast/shadow-dom/css-scoping-shadow-slotted-rule.html [ ImageOnlyFailure ]
 webkit.org/b/149441 fast/shadow-dom/css-scoping-shadow-slot-display-override.html [ ImageOnlyFailure ]
 
+# No tab navigation support on iOS
+fast/shadow-dom/negative-tabindex-on-shadow-host.html [ Failure ]
+
 webkit.org/b/150225 fast/custom-elements [ Pass ]
 
 # This test needs to be rewritten to use runUIScript to work on iOS
 webkit.org/b/152993 http/tests/contentdispositionattachmentsandbox/form-submission-disabled.html [ Skip ]
+
+# iOS does not have the required font for these tests
+fast/text/complex-small-caps-non-bmp-capitalize.html [ Skip ]
+fast/text/all-small-caps-whitespace.html [ Skip ]
+
+# <attachment> support is currently half-baked
+fast/attachment [ Skip ]
 
 ###
 # Known failures
@@ -2468,7 +2488,6 @@ editing/style/style-text-node-without-editable-parent.html
 editing/selection/minimal-user-select-crash.html
 
 # Editing tests that fail:
-editing/deleting/delete-emoji.html [ Failure ]
 editing/inserting/typing-at-end-of-line.html [ Failure ]
 editing/undo/undo-combined-delete-boundary.html [ Failure ]
 editing/undo/undo-combined-delete.html [ Failure ]
@@ -2522,6 +2541,11 @@ platform/ios-simulator/ios/scrolling/textarea-scroll-touch.html [ Failure ]
 platform/ios-simulator/ios/scrolling/touch-stacking.html [ Failure ]
 platform/ios-simulator/ios/touch [ Skip ]
 fast/events/ios/focused-input-should-assist-on-touch.html [ Skip ]
+
+# image inputs get rounded corners on iOS
+fast/css/object-position/object-position-input-image.html [ ImageOnlyFailure ]
+# iOS snapshot is retina, results differ.
+fast/css/object-position/object-position-img.html [ ImageOnlyFailure ]
 
 webkit.org/b/152276 platform/ios-simulator/ios/scrolling/scroll-events-back-forward-after-pageshow.html [ Failure ]
 webkit.org/b/152276 platform/ios-simulator/ios/scrolling/scroll-events-back-forward.html [ Failure ]
@@ -2933,3 +2957,28 @@ webkit.org/b/153029 fast/css-generated-content/details-summary-before-after.html
 webkit.org/b/76121 imported/blink/fast/events/event-trusted.html [ Skip ]
 
 webkit.org/b/154253 animations/animation-delay-changed.html [ Pass Failure ]
+
+webkit.org/b/155095 fast/table/border-collapsing/table-rtl-row-mixed-direction.html [ ImageOnlyFailure Pass ]
+webkit.org/b/155095 fast/table/border-collapsing/table-ltr-rows-mixed-direction.html [ ImageOnlyFailure Pass ]
+
+# Redundant and invalid. fast/table/hidpi-collapsed-border-with-odd-pixel-width.html covers it.
+fast/table/collapsed-border-with-odd-pixel-width.html [ ImageOnlyFailure ]
+
+# Uncategorized reftest failures, uncovered once we made reftests work. Needs triage.
+css3/font-variant-petite-caps-synthesis-coverage.html [ ImageOnlyFailure ]
+css3/font-variant-small-caps-synthesis-coverage.html [ ImageOnlyFailure ]
+fast/backgrounds/background-image-large-float-intrinsic-ratio.html [ ImageOnlyFailure ]
+fast/block/positioning/fixed-container-with-relative-parent.html [ ImageOnlyFailure ]
+fast/borders/border-image-fill-inline-no-border.html [ ImageOnlyFailure ]
+fast/borders/border-image-space.html [ ImageOnlyFailure ]
+fast/css-generated-content/initial-letter-first-line-wrapping.html [ ImageOnlyFailure ]
+fast/css/pseudo-visited-background-color-on-input.html [ ImageOnlyFailure ]
+fast/css3-text/css3-text-decoration/text-decoration-line-through-mispositioned.html [ ImageOnlyFailure ]
+fast/forms/select-size.html [ ImageOnlyFailure ]
+fast/inline/inline-with-outline-offset.html [ ImageOnlyFailure ]
+fast/inline/outline-corners-with-offset.html [ ImageOnlyFailure ]
+fast/overflow/overflow-hidden-scroll-into-view.html [ ImageOnlyFailure ]
+fast/regions/layers/region-removed-during-animation.html [ ImageOnlyFailure ]
+fast/sub-pixel/table-with-subpixel-cell-size.html [ ImageOnlyFailure ]
+svg/filters/feCompositeOpaque.html [ ImageOnlyFailure ]
+svg/text/tspan-multiple-outline.svg [ ImageOnlyFailure ]

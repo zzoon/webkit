@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -833,10 +833,20 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
     }
 
-    case ArithRound: {
+    case ArithRound:
+    case ArithFloor:
+    case ArithCeil: {
         JSValue operand = forNode(node->child1()).value();
         if (operand && operand.isNumber()) {
-            double roundedValue = jsRound(operand.asNumber());
+            double roundedValue = 0;
+            if (node->op() == ArithRound)
+                roundedValue = jsRound(operand.asNumber());
+            else if (node->op() == ArithFloor)
+                roundedValue = floor(operand.asNumber());
+            else {
+                ASSERT(node->op() == ArithCeil);
+                roundedValue = ceil(operand.asNumber());
+            }
 
             if (producesInteger(node->arithRoundingMode())) {
                 int32_t roundedValueAsInt32 = static_cast<int32_t>(roundedValue);
@@ -1544,13 +1554,45 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     }
             
     case RegExpExec:
-        forNode(node).makeHeapTop();
+        if (node->child2().useKind() == RegExpObjectUse
+            && node->child3().useKind() == StringUse) {
+            // This doesn't clobber the world since there are no conversions to perform.
+        } else
+            clobberWorld(node->origin.semantic, clobberLimit);
+        if (JSValue globalObjectValue = forNode(node->child1()).m_value) {
+            if (JSGlobalObject* globalObject = jsDynamicCast<JSGlobalObject*>(globalObjectValue)) {
+                if (!globalObject->isHavingABadTime()) {
+                    m_graph.watchpoints().addLazily(globalObject->havingABadTimeWatchpoint());
+                    Structure* structure = globalObject->regExpMatchesArrayStructure();
+                    m_graph.registerStructure(structure);
+                    forNode(node).set(m_graph, structure);
+                    forNode(node).merge(SpecOther);
+                    break;
+                }
+            }
+        }
+        forNode(node).setType(m_graph, SpecOther | SpecArray);
         break;
 
     case RegExpTest:
+        if (node->child2().useKind() == RegExpObjectUse
+            && node->child3().useKind() == StringUse) {
+            // This doesn't clobber the world since there are no conversions to perform.
+        } else
+            clobberWorld(node->origin.semantic, clobberLimit);
         forNode(node).setType(SpecBoolean);
         break;
             
+    case StringReplace:
+        if (node->child1().useKind() == StringUse
+            && node->child2().useKind() == RegExpObjectUse
+            && node->child3().useKind() == StringUse) {
+            // This doesn't clobber the world. It just reads and writes regexp state.
+        } else
+            clobberWorld(node->origin.semantic, clobberLimit);
+        forNode(node).set(m_graph, m_graph.m_vm.stringStructure.get());
+        break;
+
     case Jump:
         break;
             
@@ -1683,7 +1725,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             m_graph.globalObjectFor(node->origin.semantic)->typedArrayStructure(
                 node->typedArrayType()));
         break;
-            
+        
     case NewRegexp:
         forNode(node).set(m_graph, m_graph.globalObjectFor(node->origin.semantic)->regExpStructure());
         break;
@@ -1852,6 +1894,33 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
     }
 
+    case GetGlobalObject: {
+        JSValue child = forNode(node->child1()).value();
+        if (child) {
+            setConstant(node, *m_graph.freeze(JSValue(asObject(child)->globalObject())));
+            break;
+        }
+
+        if (forNode(node->child1()).m_structure.isFinite()) {
+            JSGlobalObject* globalObject = nullptr;
+            bool ok = true;
+            forNode(node->child1()).m_structure.forEach(
+                [&] (Structure* structure) {
+                    if (!globalObject)
+                        globalObject = structure->globalObject();
+                    else if (globalObject != structure->globalObject())
+                        ok = false;
+                });
+            if (globalObject && ok) {
+                setConstant(node, *m_graph.freeze(JSValue(globalObject)));
+                break;
+            }
+        }
+
+        forNode(node).setType(m_graph, SpecObjectOther);
+        break;
+    }
+
     case GetClosureVar:
         if (JSValue value = m_graph.tryGetConstantClosureVar(forNode(node->child1()), node->scopeOffset())) {
             setConstant(node, *m_graph.freeze(value));
@@ -1861,6 +1930,13 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         break;
             
     case PutClosureVar:
+        break;
+
+    case GetRegExpObjectLastIndex:
+        forNode(node).makeHeapTop();
+        break;
+
+    case SetRegExpObjectLastIndex:
         break;
         
     case GetFromArguments:

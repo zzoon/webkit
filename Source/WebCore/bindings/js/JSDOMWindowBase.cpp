@@ -34,6 +34,7 @@
 #include "JSMainThreadExecState.h"
 #include "JSModuleLoader.h"
 #include "JSNode.h"
+#include "Language.h"
 #include "Logging.h"
 #include "Page.h"
 #include "RuntimeApplicationChecks.h"
@@ -63,7 +64,7 @@ static bool shouldAllowAccessFrom(const JSGlobalObject* thisObject, ExecState* e
 
 const ClassInfo JSDOMWindowBase::s_info = { "Window", &JSDOMGlobalObject::s_info, 0, CREATE_METHOD_TABLE(JSDOMWindowBase) };
 
-const GlobalObjectMethodTable JSDOMWindowBase::s_globalObjectMethodTable = { &shouldAllowAccessFrom, &supportsLegacyProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptRuntimeFlags, &queueTaskToEventLoop, &shouldInterruptScriptBeforeTimeout, &moduleLoaderResolve, &moduleLoaderFetch, nullptr, nullptr, &moduleLoaderEvaluate };
+const GlobalObjectMethodTable JSDOMWindowBase::s_globalObjectMethodTable = { &shouldAllowAccessFrom, &supportsLegacyProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptRuntimeFlags, &queueTaskToEventLoop, &shouldInterruptScriptBeforeTimeout, &moduleLoaderResolve, &moduleLoaderFetch, nullptr, nullptr, &moduleLoaderEvaluate, &defaultLanguage };
 
 JSDOMWindowBase::JSDOMWindowBase(VM& vm, Structure* structure, PassRefPtr<DOMWindow> window, JSDOMWindowShell* shell)
     : JSDOMGlobalObject(vm, structure, &shell->world(), &s_globalObjectMethodTable)
@@ -263,7 +264,7 @@ VM& JSDOMWindowBase::commonVM()
 #endif
 
 #if PLATFORM(MAC)
-        if (applicationIsITunes() || applicationIsIBooks() || Settings::shouldRewriteConstAsVar())
+        if (MacApplication::isITunes() || MacApplication::isIBooks() || Settings::shouldRewriteConstAsVar())
             vm->setShouldRewriteConstAsVar(true);
 #endif
 
@@ -308,7 +309,7 @@ JSDOMWindow* toJSDOMWindow(JSValue value)
             return jsCast<JSDOMWindow*>(object);
         if (classInfo == JSDOMWindowShell::info())
             return jsCast<JSDOMWindowShell*>(object)->window();
-        value = object->prototype();
+        value = object->getPrototypeDirect();
     }
     return 0;
 }

@@ -29,8 +29,6 @@
 #if ENABLE(DATABASE_PROCESS)
 
 #include "ChildProcess.h"
-#include "LegacyUniqueIDBDatabase.h"
-#include "LegacyUniqueIDBDatabaseIdentifier.h"
 #include <WebCore/IDBServer.h>
 #include <WebCore/UniqueIDBDatabase.h>
 #include <wtf/NeverDestroyed.h>
@@ -44,7 +42,7 @@ struct SecurityOriginData;
 namespace WebKit {
 
 class DatabaseToWebProcessConnection;
-
+enum class WebsiteDataType;
 struct DatabaseProcessCreationParameters;
 
 class DatabaseProcess : public ChildProcess {
@@ -56,9 +54,6 @@ public:
 
 #if ENABLE(INDEXED_DATABASE)
     const String& indexedDatabaseDirectory() const { return m_indexedDatabaseDirectory; }
-
-    RefPtr<LegacyUniqueIDBDatabase> getOrCreateLegacyUniqueIDBDatabase(const LegacyUniqueIDBDatabaseIdentifier&);
-    void removeLegacyUniqueIDBDatabase(const LegacyUniqueIDBDatabase&);
 
     void ensureIndexedDatabaseRelativePathExists(const String&);
     String absoluteIndexedDatabasePathFromDatabaseRelativePath(const String&);
@@ -74,27 +69,27 @@ private:
     DatabaseProcess();
 
     // ChildProcess
-    virtual void initializeProcess(const ChildProcessInitializationParameters&) override;
-    virtual void initializeProcessName(const ChildProcessInitializationParameters&) override;
-    virtual void initializeSandbox(const ChildProcessInitializationParameters&, SandboxInitializationParameters&) override;
-    virtual void initializeConnection(IPC::Connection*) override;
-    virtual bool shouldTerminate() override;
+    void initializeProcess(const ChildProcessInitializationParameters&) override;
+    void initializeProcessName(const ChildProcessInitializationParameters&) override;
+    void initializeSandbox(const ChildProcessInitializationParameters&, SandboxInitializationParameters&) override;
+    void initializeConnection(IPC::Connection*) override;
+    bool shouldTerminate() override;
 
     // IPC::Connection::Client
-    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
-    virtual void didClose(IPC::Connection&) override;
-    virtual void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
-    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::Database; }
-    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::UI; }
+    void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    void didClose(IPC::Connection&) override;
+    void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
+    IPC::ProcessType localProcessType() override { return IPC::ProcessType::Database; }
+    IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::UI; }
     void didReceiveDatabaseProcessMessage(IPC::Connection&, IPC::MessageDecoder&);
 
     // Message Handlers
     void initializeDatabaseProcess(const DatabaseProcessCreationParameters&);
     void createDatabaseToWebProcessConnection();
 
-    void fetchWebsiteData(WebCore::SessionID, uint64_t websiteDataTypes, uint64_t callbackID);
-    void deleteWebsiteData(WebCore::SessionID, uint64_t websiteDataTypes, std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID);
-    void deleteWebsiteDataForOrigins(WebCore::SessionID, uint64_t websiteDataTypes, const Vector<WebCore::SecurityOriginData>& origins, uint64_t callbackID);
+    void fetchWebsiteData(WebCore::SessionID, OptionSet<WebsiteDataType> websiteDataTypes, uint64_t callbackID);
+    void deleteWebsiteData(WebCore::SessionID, OptionSet<WebsiteDataType> websiteDataTypes, std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID);
+    void deleteWebsiteDataForOrigins(WebCore::SessionID, OptionSet<WebsiteDataType> websiteDataTypes, const Vector<WebCore::SecurityOriginData>& origins, uint64_t callbackID);
 
 #if ENABLE(INDEXED_DATABASE)
     Vector<RefPtr<WebCore::SecurityOrigin>> indexedDatabaseOrigins();
@@ -112,8 +107,6 @@ private:
 
 #if ENABLE(INDEXED_DATABASE)
     String m_indexedDatabaseDirectory;
-
-    HashMap<LegacyUniqueIDBDatabaseIdentifier, RefPtr<LegacyUniqueIDBDatabase>> m_idbDatabases;
 
     RefPtr<WebCore::IDBServer::IDBServer> m_idbServer;
 #endif

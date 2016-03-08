@@ -101,15 +101,6 @@ typedef NS_ENUM(NSInteger, AVPlayerViewControllerExitFullScreenReason) {
 @end
 
 #endif // USE(APPLE_INTERNAL_SDK)
-
-@interface AVValueTiming : NSObject <NSCoding, NSCopying, NSMutableCopying>
-@end
-
-@interface AVValueTiming ()
-+ (AVValueTiming *)valueTimingWithAnchorValue:(double)anchorValue anchorTimeStamp:(NSTimeInterval)timeStamp rate:(double)rate;
-@property (NS_NONATOMIC_IOSONLY, readonly) double currentValue;
-@end
-
 #endif // PLATFORM(IOS)
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET) && !PLATFORM(IOS)
@@ -134,9 +125,24 @@ NS_CLASS_AVAILABLE_MAC(10_11)
 - (void)showMenuForRect:(NSRect)screenRect appearanceName:(NSString *)appearanceName;
 - (BOOL)showMenuForRect:(NSRect)screenRect appearanceName:(NSString *)appearanceName allowReselectionOfSelectedOutputDevice:(BOOL)allowReselectionOfSelectedOutputDevice;
 
+typedef NS_ENUM(NSInteger, AVOutputDeviceMenuControllerSelection) {
+    AVOutputDeviceMenuControllerSelectionOutputDevice,
+    AVOutputDeviceMenuControllerSelectionCustomMenuItem,
+    AVOutputDeviceMenuControllerSelectionNone
+};
+
+- (AVOutputDeviceMenuControllerSelection)showMenuForRect:(NSRect)screenRect appearanceName:(NSString *)appearanceName allowReselectionOfSelectedOutputDevice:(BOOL)allowReselectionOfSelectedOutputDevice customMenuItemTitle:(NSString *)customMenuItemTitle customMenuItemEnabled:(BOOL)customMenuItemEnabled;
 @end
 
 
-#endif
+#endif // USE(APPLE_INTERNAL_SDK)
 
-#endif
+#endif // ENABLE(WIRELESS_PLAYBACK_TARGET) && !PLATFORM(IOS)
+
+@interface AVValueTiming : NSObject <NSCoding, NSCopying, NSMutableCopying> 
+@end
+
+@interface AVValueTiming ()
++ (AVValueTiming *)valueTimingWithAnchorValue:(double)anchorValue anchorTimeStamp:(NSTimeInterval)timeStamp rate:(double)rate;
+@property (NS_NONATOMIC_IOSONLY, readonly) double currentValue;
+@end

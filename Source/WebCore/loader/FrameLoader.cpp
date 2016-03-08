@@ -135,7 +135,7 @@
 #include "DocumentType.h"
 #include "MemoryPressureHandler.h"
 #include "ResourceLoader.h"
-#include "RuntimeApplicationChecksIOS.h"
+#include "RuntimeApplicationChecks.h"
 #include "SystemMemory.h"
 #include "WKContentObservation.h"
 #endif
@@ -1475,7 +1475,7 @@ bool FrameLoader::willLoadMediaElementURL(URL& url)
 #if PLATFORM(IOS)
     // MobileStore depends on the iOS 4.0 era client delegate method because webView:resource:willSendRequest:redirectResponse:fromDataSource
     // doesn't let them tell when a load request is coming from a media element. See <rdar://problem/8266916> for more details.
-    if (applicationIsMobileStore())
+    if (IOSApplication::isMobileStore())
         return m_client.shouldLoadMediaElementURL(url);
 #endif
 
@@ -1766,6 +1766,13 @@ void FrameLoader::commitProvisionalLoad()
         // For top-level navigations, have JSC throw away linked code. The immediate memory savings far
         // outweigh the cost of recompiling in the case of a future backwards navigation.
         GCController::singleton().deleteAllLinkedCode();
+
+        // Same thing with RegExp bytecode and JIT code.
+        GCController::singleton().deleteAllRegExpCode();
+
+        // Throw out decoded data for CachedImages when we are switching pages. The majority of it
+        // will not be used by the next page.
+        MemoryCache::singleton().destroyDecodedDataForAllImages();
 #endif
     }
 
@@ -3336,9 +3343,17 @@ void FrameLoader::loadDifferentDocumentItem(HistoryItem& item, FrameLoadType loa
             break;
         case FrameLoadType::Back:
         case FrameLoadType::Forward:
-        case FrameLoadType::IndexedBackForward:
-            request.setCachePolicy(ReturnCacheDataElseLoad);
+        case FrameLoadType::IndexedBackForward: {
+#if PLATFORM(IOS)
+            bool allowStaleData = true;
+#else
+            bool allowStaleData = !item.wasRestoredFromSession();
+#endif
+            if (allowStaleData)
+                request.setCachePolicy(ReturnCacheDataElseLoad);
+            item.setWasRestoredFromSession(false);
             break;
+        }
         case FrameLoadType::Standard:
         case FrameLoadType::RedirectWithLockedBackForwardList:
             break;

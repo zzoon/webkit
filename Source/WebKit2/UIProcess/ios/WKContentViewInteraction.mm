@@ -66,7 +66,7 @@
 #import <WebCore/Pasteboard.h>
 #import <WebCore/Path.h>
 #import <WebCore/PathUtilities.h>
-#import <WebCore/RuntimeApplicationChecksIOS.h>
+#import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/Scrollbar.h>
 #import <WebCore/SoftLinking.h>
 #import <WebCore/TextIndicator.h>
@@ -1083,6 +1083,14 @@ static inline bool isSamePair(UIGestureRecognizer *a, UIGestureRecognizer *b, UI
     [_actionSheetAssistant showImageSheet];
 }
 
+- (void)_showAttachmentSheet
+{
+    id <WKUIDelegatePrivate> uiDelegate = static_cast<id <WKUIDelegatePrivate>>([_webView UIDelegate]);
+    
+    if ([uiDelegate respondsToSelector:@selector(_webView:showCustomSheetForElement:)])
+        [uiDelegate _webView:_webView showCustomSheetForElement:[[_WKActivatedElementInfo alloc] _initWithType:_WKActivatedElementTypeAttachment URL:[NSURL _web_URLWithWTFString:_positionInformation.url] location:_positionInformation.point title:_positionInformation.title rect:_positionInformation.bounds image:nil]];
+}
+
 - (void)_showLinkSheet
 {
     [_actionSheetAssistant showLinkSheet];
@@ -1107,6 +1115,9 @@ static inline bool isSamePair(UIGestureRecognizer *a, UIGestureRecognizer *b, UI
             return @selector(_showDataDetectorsSheet);
         return @selector(_showLinkSheet);
     }
+    
+    if (_positionInformation.isAttachment)
+        return @selector(_showAttachmentSheet);
 
     return nil;
 }
@@ -3545,6 +3556,21 @@ static bool isAssistableInputType(InputType type)
 }
 #endif
 
+- (BOOL)actionSheetAssistant:(WKActionSheetAssistant *)assistant showCustomSheetForElement:(_WKActivatedElementInfo *)element
+{
+    id <WKUIDelegatePrivate> uiDelegate = static_cast<id <WKUIDelegatePrivate>>([_webView UIDelegate]);
+    
+    if ([uiDelegate respondsToSelector:@selector(_webView:showCustomSheetForElement:)]) {
+        if ([uiDelegate _webView:_webView showCustomSheetForElement:element]) {
+            // Prevent tap-and-hold and drag.
+            [UIApp _cancelAllTouches];
+            return YES;
+        }
+    }
+
+    return NO;
+}
+
 - (RetainPtr<NSArray>)actionSheetAssistant:(WKActionSheetAssistant *)assistant decideActionsForElement:(_WKActivatedElementInfo *)element defaultActions:(RetainPtr<NSArray>)defaultActions
 {
     return _page->uiClient().actionsForElement(element, WTFMove(defaultActions));
@@ -3606,7 +3632,7 @@ static bool isAssistableInputType(InputType type)
         return NO;
 
     [self ensurePositionInformationIsUpToDate:position];
-    if (!_positionInformation.isLink && !_positionInformation.isImage)
+    if (!_positionInformation.isLink && !_positionInformation.isImage && !_positionInformation.isAttachment)
         return NO;
     
     String absoluteLinkURL = _positionInformation.url;
@@ -3637,6 +3663,8 @@ static bool isAssistableInputType(InputType type)
     BOOL canShowImagePreview = _positionInformation.isImage && supportsImagePreview;
     BOOL canShowLinkPreview = _positionInformation.isLink || canShowImagePreview;
     BOOL useImageURLForLink = NO;
+    BOOL supportsAttachmentPreview = [uiDelegate respondsToSelector:@selector(_attachmentListForWebView:)] && [uiDelegate respondsToSelector:@selector(_webView:indexIntoAttachmentListForElement:)];
+    BOOL canShowAttachmentPreview = _positionInformation.isAttachment && supportsAttachmentPreview;
 
     if (canShowImagePreview && _positionInformation.isAnimatedImage) {
         canShowImagePreview = NO;
@@ -3644,7 +3672,7 @@ static bool isAssistableInputType(InputType type)
         useImageURLForLink = YES;
     }
 
-    if (!canShowLinkPreview && !canShowImagePreview)
+    if (!canShowLinkPreview && !canShowImagePreview && !canShowAttachmentPreview)
         return nil;
 
     String absoluteLinkURL = _positionInformation.url;
@@ -3663,7 +3691,6 @@ static bool isAssistableInputType(InputType type)
             dataForPreview[UIPreviewDataLink] = [NSURL _web_URLWithWTFString:_positionInformation.url];
         if (_positionInformation.isDataDetectorLink) {
             NSDictionary *context = nil;
-            id <WKUIDelegatePrivate> uiDelegate = static_cast<id <WKUIDelegatePrivate>>([_webView UIDelegate]);
             if ([uiDelegate respondsToSelector:@selector(_dataDetectionContextForWebView:)])
                 context = [uiDelegate _dataDetectionContextForWebView:_webView];
 
@@ -3680,6 +3707,13 @@ static bool isAssistableInputType(InputType type)
     } else if (canShowImagePreview) {
         *type = UIPreviewItemTypeImage;
         dataForPreview[UIPreviewDataLink] = [NSURL _web_URLWithWTFString:_positionInformation.imageURL];
+    } else if (canShowAttachmentPreview) {
+        // FIXME: Should use UIKit constants.
+        enum { WKUIPreviewItemTypeAttachment = 5 };
+        *type = static_cast<UIPreviewItemType>(WKUIPreviewItemTypeAttachment);
+        const auto& element = [[_WKActivatedElementInfo alloc] _initWithType:_WKActivatedElementTypeAttachment URL:[NSURL _web_URLWithWTFString:_positionInformation.url] location:_positionInformation.point title:_positionInformation.title rect:_positionInformation.bounds image:nil];
+        dataForPreview[@"UIPreviewDataAttachmentList"] = [uiDelegate _attachmentListForWebView:_webView];
+        dataForPreview[@"UIPreviewDataAttachmentIndex"] = [NSNumber numberWithUnsignedInteger:[uiDelegate _webView:_webView indexIntoAttachmentListForElement:element]];
     }
     
     return dataForPreview;

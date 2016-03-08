@@ -30,6 +30,7 @@
 #include "Connection.h"
 #include "MessageSender.h"
 #include "WebIDBConnectionToServer.h"
+#include <WebCore/SessionID.h>
 #include <wtf/RefCounted.h>
 
 #if ENABLE(DATABASE_PROCESS)
@@ -39,9 +40,6 @@ class SessionID;
 }
 
 namespace WebKit {
-
-class WebIDBServerConnection;
-class WebProcessIDBDatabaseBackend;
 
 class WebToDatabaseProcessConnection : public RefCounted<WebToDatabaseProcessConnection>, public IPC::Connection::Client, public IPC::MessageSender {
 public:
@@ -54,9 +52,6 @@ public:
     IPC::Connection* connection() const { return m_connection.get(); }
 
 #if ENABLE(INDEXED_DATABASE)
-    void registerWebIDBServerConnection(WebIDBServerConnection&);
-    void removeWebIDBServerConnection(WebIDBServerConnection&);
-
     WebIDBConnectionToServer& idbConnectionToServerForSession(const WebCore::SessionID&);
 #endif
 
@@ -64,22 +59,21 @@ private:
     WebToDatabaseProcessConnection(IPC::Connection::Identifier);
 
     // IPC::Connection::Client
-    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
-    virtual void didClose(IPC::Connection&) override;
-    virtual void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
-    virtual IPC::ProcessType localProcessType() override { return IPC::ProcessType::Web; }
-    virtual IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Database; }
+    void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
+    void didClose(IPC::Connection&) override;
+    void didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference messageReceiverName, IPC::StringReference messageName) override;
+    IPC::ProcessType localProcessType() override { return IPC::ProcessType::Web; }
+    IPC::ProcessType remoteProcessType() override { return IPC::ProcessType::Database; }
 
     // IPC::MessageSender
-    virtual IPC::Connection* messageSenderConnection() override { return m_connection.get(); }
-    virtual uint64_t messageSenderDestinationID() override { return 0; }
+    IPC::Connection* messageSenderConnection() override { return m_connection.get(); }
+    uint64_t messageSenderDestinationID() override { return 0; }
 
     RefPtr<IPC::Connection> m_connection;
 
 #if ENABLE(INDEXED_DATABASE)
-    HashMap<uint64_t, WebIDBServerConnection*> m_webIDBServerConnections;
-
-    HashMap<uint64_t, RefPtr<WebIDBConnectionToServer>> m_webIDBConnections;
+    HashMap<WebCore::SessionID, RefPtr<WebIDBConnectionToServer>> m_webIDBConnectionsBySession;
+    HashMap<uint64_t, RefPtr<WebIDBConnectionToServer>> m_webIDBConnectionsByIdentifier;
 #endif
 };
 

@@ -163,6 +163,8 @@ public:
     void notifyIsSafeToCollect() { m_isSafeToCollect = true; }
     bool isSafeToCollect() const { return m_isSafeToCollect; }
 
+    JS_EXPORT_PRIVATE bool isHeapSnapshotting() const;
+
     JS_EXPORT_PRIVATE void collectAllGarbageIfNotDoneRecently();
     void collectAllGarbage() { collectAndSweep(FullCollection); }
     JS_EXPORT_PRIVATE void collectAndSweep(HeapOperation collectionType = AnyCollection);
@@ -285,7 +287,7 @@ private:
     static const size_t minExtraMemory = 256;
     
     class FinalizerOwner : public WeakHandleOwner {
-        virtual void finalize(Handle<Unknown>, void* context) override;
+        void finalize(Handle<Unknown>, void* context) override;
     };
 
     JS_EXPORT_PRIVATE bool isValidAllocation(size_t);
@@ -327,6 +329,7 @@ private:
     void sweepArrayBuffers();
     void snapshotMarkedSpace();
     void deleteSourceProviderCaches();
+    void removeDeadHeapSnapshotNodes();
     void notifyIncrementalSweeper();
     void writeBarrierCurrentlyExecutingCodeBlocks();
     void resetAllocators();

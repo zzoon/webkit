@@ -1724,7 +1724,7 @@ public:
     {
     }
     
-    virtual void dump(PrintStream& out) const override
+    void dump(PrintStream& out) const override
     {
         out.print("Linking put_to_scope in ", FunctionExecutableDump(jsCast<FunctionExecutable*>(m_codeBlock->ownerExecutable())), " for ", m_ident);
     }
@@ -2460,6 +2460,15 @@ void CodeBlock::visitWeakly(SlotVisitor& visitor)
     m_jitCode->dfgCommon()->livenessHasBeenProved = false;
     determineLiveness(visitor);
 #endif // ENABLE(DFG_JIT)
+}
+
+size_t CodeBlock::estimatedSize(JSCell* cell)
+{
+    CodeBlock* thisObject = jsCast<CodeBlock*>(cell);
+    size_t extraMemoryAllocated = thisObject->m_instructions.size() * sizeof(Instruction);
+    if (thisObject->m_jitCode)
+        extraMemoryAllocated += thisObject->m_jitCode->size();
+    return Base::estimatedSize(cell) + extraMemoryAllocated;
 }
 
 void CodeBlock::visitChildren(JSCell* cell, SlotVisitor& visitor)
@@ -4201,6 +4210,8 @@ DFG::CapabilityLevel CodeBlock::capabilityLevel()
 
 void CodeBlock::insertBasicBlockBoundariesForControlFlowProfiler(RefCountedArray<Instruction>& instructions)
 {
+    if (!unlinkedCodeBlock()->hasOpProfileControlFlowBytecodeOffsets())
+        return;
     const Vector<size_t>& bytecodeOffsets = unlinkedCodeBlock()->opProfileControlFlowBytecodeOffsets();
     for (size_t i = 0, offsetsLength = bytecodeOffsets.size(); i < offsetsLength; i++) {
         // Because op_profile_control_flow is emitted at the beginning of every basic block, finding 

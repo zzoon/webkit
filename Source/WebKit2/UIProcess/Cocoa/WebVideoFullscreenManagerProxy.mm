@@ -374,6 +374,24 @@ void WebVideoFullscreenManagerProxy::setupFullscreenWithID(uint64_t contextId, u
 #endif
 }
 
+void WebVideoFullscreenManagerProxy::setUpVideoControlsManagerWithID(uint64_t contextId)
+{
+#if PLATFORM(MAC)
+    // If there is an existing controls manager, clean it up.
+    if (m_controlsManagerContextId)
+        m_contextMap.remove(m_controlsManagerContextId);
+
+    RefPtr<WebVideoFullscreenModelContext> model;
+    RefPtr<PlatformWebVideoFullscreenInterface> interface;
+
+    std::tie(model, interface) = ensureModelAndInterface(contextId);
+    m_controlsManagerContextId = contextId;
+    interface->ensureControlsManager();
+#else
+    UNUSED_PARAM(contextId);
+#endif
+}
+
 void WebVideoFullscreenManagerProxy::resetMediaState(uint64_t contextId)
 {
     ensureInterface(contextId).resetMediaState();
@@ -472,6 +490,13 @@ void WebVideoFullscreenManagerProxy::exitFullscreen(uint64_t contextId, WebCore:
     ensureInterface(contextId).exitFullscreen(finalWindowRect, m_page->platformWindow());
 #endif
 }
+
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+void WebVideoFullscreenManagerProxy::exitFullscreenWithoutAnimationToMode(uint64_t contextId, WebCore::HTMLMediaElementEnums::VideoFullscreenMode targetMode)
+{
+    ensureInterface(contextId).exitFullscreenWithoutAnimationToMode(targetMode);
+}
+#endif
 
 void WebVideoFullscreenManagerProxy::cleanupFullscreen(uint64_t contextId)
 {
@@ -613,6 +638,15 @@ void WebVideoFullscreenManagerProxy::fullscreenModeChanged(uint64_t contextId, W
 bool WebVideoFullscreenManagerProxy::isVisible() const
 {
     return m_page->isViewVisible() && m_page->isInWindow();
+}
+
+PlatformWebVideoFullscreenInterface* WebVideoFullscreenManagerProxy::controlsManagerInterface()
+{
+    if (!m_controlsManagerContextId)
+        return nullptr;
+
+    auto& interface = ensureInterface(m_controlsManagerContextId);
+    return &interface;
 }
 
 void WebVideoFullscreenManagerProxy::fullscreenMayReturnToInline(uint64_t contextId)

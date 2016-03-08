@@ -132,9 +132,10 @@ public:
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     // MediaPlaybackTargetClient
-    virtual void setPlaybackTarget(Ref<MediaPlaybackTarget>&&) override { }
-    virtual void externalOutputDeviceAvailableDidChange(bool) override { }
-    virtual void setShouldPlayToPlaybackTarget(bool) override { }
+    void setPlaybackTarget(Ref<MediaPlaybackTarget>&&) override { }
+    void externalOutputDeviceAvailableDidChange(bool) override { }
+    void setShouldPlayToPlaybackTarget(bool) override { }
+    void customPlaybackActionSelected() override { }
 #endif
 
 #if PLATFORM(IOS)
@@ -197,6 +198,7 @@ public:
     virtual bool canPlayToWirelessPlaybackTarget() const { return false; }
     virtual bool isPlayingToWirelessPlaybackTarget() const { return false; }
     virtual void setShouldPlayToPlaybackTarget(bool) { }
+    virtual void customPlaybackActionSelected() { }
 
     virtual const Document* hostingDocument() const = 0;
 

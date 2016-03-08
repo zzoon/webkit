@@ -408,7 +408,7 @@ sub GenerateGetOwnPropertySlotBody
     # https://heycam.github.io/webidl/#dfn-named-property-visibility
     # https://heycam.github.io/webidl/#dfn-named-properties-object
     my $prototypeCheck = sub {
-        push(@getOwnPropertySlotImpl, "    ${namespaceMaybe}JSValue proto = thisObject->prototype();\n");
+        push(@getOwnPropertySlotImpl, "    ${namespaceMaybe}JSValue proto = thisObject->getPrototypeDirect();\n");
         push(@getOwnPropertySlotImpl, "    if (proto.isObject() && jsCast<${namespaceMaybe}JSObject*>(proto)->hasProperty(state, propertyName))\n");
         push(@getOwnPropertySlotImpl, "        return false;\n\n");
     };
@@ -981,7 +981,7 @@ sub GenerateHeader
     # Prototype
     unless (IsDOMGlobalObject($interface)) {
         push(@headerContent, "    static JSC::JSObject* createPrototype(JSC::VM&, JSC::JSGlobalObject*);\n");
-        push(@headerContent, "    static JSC::JSObject* getPrototype(JSC::VM&, JSC::JSGlobalObject*);\n");
+        push(@headerContent, "    static JSC::JSObject* prototype(JSC::VM&, JSC::JSGlobalObject*);\n");
     }
 
     # JSValue to implementation type
@@ -2195,14 +2195,14 @@ sub GenerateImplementation
         push(@implContent, "JSObject* ${className}::createPrototype(VM& vm, JSGlobalObject* globalObject)\n");
         push(@implContent, "{\n");
         if ($hasParent && $parentClassName ne "JSC::DOMNodeFilter") {
-            push(@implContent, "    return ${className}Prototype::create(vm, globalObject, ${className}Prototype::createStructure(vm, globalObject, ${parentClassName}::getPrototype(vm, globalObject)));\n");
+            push(@implContent, "    return ${className}Prototype::create(vm, globalObject, ${className}Prototype::createStructure(vm, globalObject, ${parentClassName}::prototype(vm, globalObject)));\n");
         } else {
             my $prototype = $interface->isException ? "errorPrototype" : "objectPrototype";
             push(@implContent, "    return ${className}Prototype::create(vm, globalObject, ${className}Prototype::createStructure(vm, globalObject, globalObject->${prototype}()));\n");
         }
         push(@implContent, "}\n\n");
 
-        push(@implContent, "JSObject* ${className}::getPrototype(VM& vm, JSGlobalObject* globalObject)\n");
+        push(@implContent, "JSObject* ${className}::prototype(VM& vm, JSGlobalObject* globalObject)\n");
         push(@implContent, "{\n");
         push(@implContent, "    return getDOMPrototype<${className}>(vm, globalObject);\n");
         push(@implContent, "}\n\n");
@@ -2333,7 +2333,7 @@ sub GenerateImplementation
                 } elsif (InterfaceRequiresAttributesOnInstanceForCompatibility($interface)) {
                     # Fallback to trying to searching the prototype chain for compatibility reasons.
                     push(@implContent, "        JSObject* thisObject = JSValue::decode(thisValue).getObject();\n");
-                    push(@implContent, "        for (thisObject = thisObject ? thisObject->prototype().getObject() : nullptr; thisObject; thisObject = thisObject->prototype().getObject()) {\n");
+                    push(@implContent, "        for (thisObject = thisObject ? thisObject->getPrototypeDirect().getObject() : nullptr; thisObject; thisObject = thisObject->getPrototypeDirect().getObject()) {\n");
                     push(@implContent, "            if ((castedThis = " . GetCastingHelperForThisObject($interface) . "(thisObject)))\n");
                     push(@implContent, "                break;\n");
                     push(@implContent, "        }\n");
@@ -2636,7 +2636,7 @@ sub GenerateImplementation
                 } elsif (InterfaceRequiresAttributesOnInstanceForCompatibility($interface)) {
                     # Fallback to trying to searching the prototype chain for compatibility reasons.
                     push(@implContent, "        JSObject* thisObject = JSValue::decode(thisValue).getObject();\n");
-                    push(@implContent, "        for (thisObject = thisObject ? thisObject->prototype().getObject() : nullptr; thisObject; thisObject = thisObject->prototype().getObject()) {\n");
+                    push(@implContent, "        for (thisObject = thisObject ? thisObject->getPrototypeDirect().getObject() : nullptr; thisObject; thisObject = thisObject->getPrototypeDirect().getObject()) {\n");
                     push(@implContent, "            if ((castedThis = " . GetCastingHelperForThisObject($interface) . "(thisObject)))\n");
                     push(@implContent, "                break;\n");
                     push(@implContent, "        }\n");
@@ -2912,6 +2912,13 @@ sub GenerateImplementation
             push(@implContent, "{\n");
 
             $implIncludes{"<runtime/Error.h>"} = 1;
+
+            if ($function->signature->extendedAttributes->{"InvokesCustomElementLifecycleCallbacks"}) {
+                push(@implContent, "#if ENABLE(CUSTOM_ELEMENTS)\n");
+                push(@implContent, "    CustomElementLifecycleProcessingStack customElementLifecycleProcessingStack;\n");
+                push(@implContent, "#endif\n");
+                $implIncludes{"LifecycleCallbackQueue.h"} = 1;
+            }
 
             if ($function->isStatic) {
                 if ($isCustom) {
@@ -4141,21 +4148,13 @@ sub JSValueToNative
     return "valueToDate(state, $value)" if $type eq "Date";
 
     if ($type eq "DOMString") {
-        # FIXME: This implements [TreatNullAs=NullString] and [TreatUndefinedAs=NullString],
-        # but the Web IDL spec requires [TreatNullAs=EmptyString] and [TreatUndefinedAs=EmptyString].
-        if (($signature->extendedAttributes->{"TreatNullAs"} and $signature->extendedAttributes->{"TreatNullAs"} eq "NullString") and ($signature->extendedAttributes->{"TreatUndefinedAs"} and $signature->extendedAttributes->{"TreatUndefinedAs"} eq "NullString")) {
-            return "valueToStringWithUndefinedOrNullCheck(state, $value)"
+        if ($signature->extendedAttributes->{"TreatNullAs"}) {
+            return "valueToStringTreatingNullAsEmptyString(state, $value)" if $signature->extendedAttributes->{"TreatNullAs"} eq "EmptyString";
+            return "valueToStringWithNullCheck(state, $value)" if $signature->extendedAttributes->{"TreatNullAs"} eq "LegacyNullString";
         }
-        if ($signature->extendedAttributes->{"TreatNullAs"} and $signature->extendedAttributes->{"TreatNullAs"} eq "NullString") {
-            return "valueToStringWithNullCheck(state, $value)"
-        }
-        if ($signature->isNullable) {
-            return "valueToStringWithUndefinedOrNullCheck(state, $value)";
-        }
-        if ($signature->extendedAttributes->{"AtomicString"}) {
-            return "$value.toString(state)->toAtomicString(state)";
-        }
-        # FIXME: Add the case for 'if ($signature->extendedAttributes->{"TreatUndefinedAs"} and $signature->extendedAttributes->{"TreatUndefinedAs"} eq "NullString"))'.
+        return "valueToStringWithUndefinedOrNullCheck(state, $value)" if $signature->isNullable;
+        return "$value.toString(state)->toAtomicString(state)" if $signature->extendedAttributes->{"AtomicString"};
+
         return "$value.toString(state)->value(state)";
     }
 
@@ -4260,12 +4259,6 @@ sub NativeToJSValue
 
     if ($codeGenerator->IsStringType($type)) {
         AddToImplIncludes("URL.h", $conditional);
-        my $conv = $signature->extendedAttributes->{"TreatReturnedNullStringAs"};
-        if (defined $conv) {
-            return "jsStringOrUndefined(state, $value)" if $conv eq "Undefined";
-
-            die "Unknown value for TreatReturnedNullStringAs extended attribute";
-        }
         return "jsStringOrNull(state, $value)" if $signature->isNullable;
         AddToImplIncludes("<runtime/JSString.h>", $conditional);
         return "jsStringWithCache(state, $value)";
@@ -4795,18 +4788,7 @@ sub GenerateConstructorDefinition
     my $generatingNamedConstructor = shift;
     my $function = shift;
 
-
     if (IsJSBuiltinConstructor($interface)) {
-        if ($interface->extendedAttributes->{"JSBuiltinConstructor"}) {
-            # FIXME: Add support for ConstructorCallWith
-            push(@$outputArray, <<END);
-template<> JSC::JSObject* ${className}Constructor::createJSObject()
-{
-    return ${className}::create(getDOMStructure<${className}>(globalObject()->vm(), *globalObject()), globalObject(), ${interfaceName}::create());
-}
-
-END
-        }
         return;
     }
 
@@ -5045,11 +5027,11 @@ sub GenerateConstructorHelperMethods
     # of whether the interface was declared with the [NoInterfaceObject] extended attribute.
     # https://heycam.github.io/webidl/#interface-prototype-object
     if (IsDOMGlobalObject($interface)) {
-        push(@$outputArray, "    putDirect(vm, vm.propertyNames->prototype, globalObject.prototype(), DontDelete | ReadOnly | DontEnum);\n");
+        push(@$outputArray, "    putDirect(vm, vm.propertyNames->prototype, globalObject.getPrototypeDirect(), DontDelete | ReadOnly | DontEnum);\n");
     } elsif ($interface->isCallback) {
         push(@$outputArray, "    UNUSED_PARAM(globalObject);\n");
     } else {
-        push(@$outputArray, "    putDirect(vm, vm.propertyNames->prototype, ${className}::getPrototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);\n");
+        push(@$outputArray, "    putDirect(vm, vm.propertyNames->prototype, ${className}::prototype(vm, &globalObject), DontDelete | ReadOnly | DontEnum);\n");
     }
 
     push(@$outputArray, "    putDirect(vm, vm.propertyNames->name, jsNontrivialString(&vm, String(ASCIILiteral(\"$visibleInterfaceName\"))), ReadOnly | DontEnum);\n");
@@ -5071,7 +5053,7 @@ sub GenerateConstructorHelperMethods
         push(@$outputArray, "#if $conditionalString\n");
         push(@$outputArray, "    UNUSED_PARAM(cell);\n");
         push(@$outputArray, "    constructData.native.function = construct;\n");
-        push(@$outputArray, "    return ConstructTypeHost;\n");
+        push(@$outputArray, "    return ConstructType::Host;\n");
         push(@$outputArray, "#else\n");
         push(@$outputArray, "    return Base::getConstructData(cell, constructData);\n");
         push(@$outputArray, "#endif\n");

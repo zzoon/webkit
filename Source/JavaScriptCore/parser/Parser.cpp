@@ -2061,14 +2061,14 @@ template <class TreeBuilder> bool Parser<LexerType>::parseFunctionInfo(TreeBuild
         if (functionScope->hasDirectSuper()) {
             ConstructorKind functionConstructorKind = functionBodyType == StandardFunctionBodyBlock
                 ? constructorKind
-                : closestParentNonArrowFunctionNonLexicalScope()->constructorKind();
+                : closestParentOrdinaryFunctionNonLexicalScope()->constructorKind();
             semanticFailIfTrue(functionConstructorKind == ConstructorKind::None, "Cannot call super() outside of a class constructor");
             semanticFailIfTrue(functionConstructorKind != ConstructorKind::Derived, "Cannot call super() in a base class constructor");
         }
         if (functionScope->needsSuperBinding()) {
             SuperBinding functionSuperBinding = functionBodyType == StandardFunctionBodyBlock
                 ? expectedSuperBinding
-                : closestParentNonArrowFunctionNonLexicalScope()->expectedSuperBinding();
+                : closestParentOrdinaryFunctionNonLexicalScope()->expectedSuperBinding();
             semanticFailIfTrue(functionSuperBinding == SuperBinding::NotNeeded, "super can only be used in a method of a derived class");
         }
     }
@@ -3207,6 +3207,8 @@ template <class TreeBuilder> TreeProperty Parser<LexerType>::parseProperty(TreeB
             JSTextPosition start = tokenStartPosition();
             JSTokenLocation location(tokenLocation());
             currentScope()->useVariable(ident, m_vm->propertyNames->eval == *ident);
+            if (currentScope()->isArrowFunction())
+                currentScope()->setInnerArrowFunctionUsesEval();
             TreeExpression node = context.createResolve(location, *ident, start, lastTokenEndPosition());
             return context.createProperty(ident, node, static_cast<PropertyNode::Type>(PropertyNode::Constant | PropertyNode::Shorthand), PropertyNode::KnownDirect, complete);
         }
@@ -3620,6 +3622,8 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parsePrimaryExpre
     case THISTOKEN: {
         JSTokenLocation location(tokenLocation());
         next();
+        if (currentScope()->isArrowFunction())
+            currentScope()->setInnerArrowFunctionUsesThis();
         return context.createThisExpr(location, m_thisTDZMode);
     }
     case IDENT: {
@@ -3680,7 +3684,7 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parsePrimaryExpre
         next();
         TreeExpression re = context.createRegExp(location, *pattern, *flags, start);
         if (!re) {
-            const char* yarrErrorMsg = Yarr::checkSyntax(pattern->string());
+            const char* yarrErrorMsg = Yarr::checkSyntax(pattern->string(), flags->string());
             regexFail(yarrErrorMsg);
         }
         return re;
@@ -3795,6 +3799,8 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseMemberExpres
             if (m_vm->propertyNames->target == *ident) {
                 semanticFailIfFalse(currentScope()->isFunction(), "new.target is only valid inside functions");
                 baseIsNewTarget = true;
+                if (currentScope()->isArrowFunction())
+                    currentScope()->setInnerArrowFunctionUsesNewTarget();
                 base = context.createNewTargetExpr(location);
                 newCount--;
                 next();
@@ -3825,6 +3831,10 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseMemberExpres
             TreeExpression property = parseExpression(context);
             failIfFalse(property, "Cannot parse subscript expression");
             base = context.createBracketAccess(location, base, property, initialAssignments != m_parserState.assignmentCount, expressionStart, expressionEnd, tokenEndPosition());
+            
+            if (baseIsSuper && currentScope()->isArrowFunction())
+                currentFunctionScope()->setInnerArrowFunctionUsesSuperProperty();
+            
             handleProductionOrFail(CLOSEBRACKET, "]", "end", "subscript expression");
             m_parserState.nonLHSCount = nonLHSCount;
             break;
@@ -3842,8 +3852,11 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseMemberExpres
                 JSTextPosition expressionEnd = lastTokenEndPosition();
                 TreeArguments arguments = parseArguments(context);
                 failIfFalse(arguments, "Cannot parse call arguments");
-                if (baseIsSuper)
+                if (baseIsSuper) {
                     currentFunctionScope()->setHasDirectSuper();
+                    if (currentScope()->isArrowFunction())
+                        currentFunctionScope()->setInnerArrowFunctionUsesSuperCall();
+                }
                 base = context.makeFunctionCallNode(startLocation, base, arguments, expressionStart, expressionEnd, lastTokenEndPosition());
             }
             m_parserState.nonLHSCount = nonLHSCount;
@@ -3855,6 +3868,8 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseMemberExpres
             nextExpectIdentifier(LexerFlagsIgnoreReservedWords | TreeBuilder::DontBuildKeywords);
             matchOrFail(IDENT, "Expected a property name after '.'");
             base = context.createDotAccess(location, base, m_token.m_data.ident, expressionStart, expressionEnd, tokenEndPosition());
+            if (baseIsSuper && currentScope()->isArrowFunction())
+                currentFunctionScope()->setInnerArrowFunctionUsesSuperProperty();
             next();
             break;
         }

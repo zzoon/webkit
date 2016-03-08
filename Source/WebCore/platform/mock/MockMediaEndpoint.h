@@ -44,20 +44,20 @@ public:
     MockMediaEndpoint(MediaEndpointClient&);
     ~MockMediaEndpoint();
 
-    virtual void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override;
+    void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override;
 
-    virtual void generateDtlsInfo() override;
-    virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;
-    virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() override;
+    void generateDtlsInfo() override;
+    Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;
+    Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() override;
 
-    virtual UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
-    virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
+    UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
+    UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
 
-    virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
+    void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
 
-    virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) override;
+    void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) override;
 
-    virtual void stop() override;
+    void stop() override;
 
 private:
     MediaEndpointClient& m_client;

@@ -61,6 +61,8 @@ static void setImageLoadingSettings(Page* page)
         return;
 
     for (Frame* frame = &page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
+        if (!frame->document())
+            continue;
         frame->document()->cachedResourceLoader().setImagesEnabled(page->settings().areImagesEnabled());
         frame->document()->cachedResourceLoader().setAutoLoadImages(page->settings().loadsImagesAutomatically());
     }
@@ -80,6 +82,7 @@ bool Settings::gAVFoundationNSURLSessionEnabled = false;
 
 #if PLATFORM(COCOA)
 bool Settings::gQTKitEnabled = false;
+bool Settings::gCookieStoragePartitioningEnabled = false;
 #endif
 
 bool Settings::gMockScrollbarsEnabled = false;
@@ -199,7 +202,6 @@ Settings::Settings(Page* page)
     , m_needsAdobeFrameReloadingQuirk(false)
     , m_usesPageCache(false)
     , m_fontRenderingMode(0)
-    , m_antialiasedFontDilationEnabled(false)
     , m_showTiledScrollingIndicator(false)
     , m_backgroundShouldExtendBeyondPage(false)
     , m_dnsPrefetchingEnabled(false)
@@ -360,12 +362,6 @@ void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
 
 #endif
 
-void Settings::setAntialiasedFontDilationEnabled(bool enabled)
-{
-    // FIXME: It's wrong for a setting to toggle a global, but this code is temporary.
-    FontCascade::setAntialiasedFontDilationEnabled(enabled);
-}
-
 void Settings::setMediaTypeOverride(const String& mediaTypeOverride)
 {
     if (m_mediaTypeOverride == mediaTypeOverride)
@@ -468,9 +464,9 @@ void Settings::setNeedsAdobeFrameReloadingQuirk(bool shouldNotReloadIFramesForUn
     m_needsAdobeFrameReloadingQuirk = shouldNotReloadIFramesForUnchangedSRC;
 }
 
-void Settings::setMinimumDOMTimerInterval(double interval)
+void Settings::setMinimumDOMTimerInterval(std::chrono::milliseconds interval)
 {
-    double oldTimerInterval = m_minimumDOMTimerInterval;
+    auto oldTimerInterval = m_minimumDOMTimerInterval;
     m_minimumDOMTimerInterval = interval;
 
     if (!m_page)
@@ -602,6 +598,11 @@ void Settings::setQTKitEnabled(bool enabled)
 
     gQTKitEnabled = enabled;
     HTMLMediaElement::resetMediaEngines();
+}
+    
+void Settings::setCookieStoragePartitioningEnabled(bool enabled)
+{
+    gCookieStoragePartitioningEnabled = enabled;
 }
 #endif
 

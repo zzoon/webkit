@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -363,7 +363,9 @@ private:
             break;
         }
 
-        case ArithRound: {
+        case ArithRound:
+        case ArithFloor:
+        case ArithCeil: {
             if (m_graph.unaryArithShouldSpeculateInt32(node, FixupPass)) {
                 fixIntOrBooleanEdge(node->child1());
                 insertCheck<Int32Use>(m_indexInBlock, node->child1().node());
@@ -416,6 +418,8 @@ private:
                 fixEdge<DoubleRepUse>(node->child1());
             else if (node->child1()->shouldSpeculateString())
                 fixEdge<StringUse>(node->child1());
+            else if (node->child1()->shouldSpeculateStringOrOther())
+                fixEdge<StringOrOtherUse>(node->child1());
             break;
         }
 
@@ -877,8 +881,26 @@ private:
             
         case RegExpExec:
         case RegExpTest: {
-            fixEdge<CellUse>(node->child1());
-            fixEdge<CellUse>(node->child2());
+            fixEdge<KnownCellUse>(node->child1());
+            
+            if (node->child2()->shouldSpeculateRegExpObject()) {
+                fixEdge<RegExpObjectUse>(node->child2());
+
+                if (node->child3()->shouldSpeculateString())
+                    fixEdge<StringUse>(node->child3());
+            }
+            break;
+        }
+
+        case StringReplace: {
+            if (node->child1()->shouldSpeculateString()
+                && node->child2()->shouldSpeculateRegExpObject()
+                && node->child3()->shouldSpeculateString()) {
+                fixEdge<StringUse>(node->child1());
+                fixEdge<RegExpObjectUse>(node->child2());
+                fixEdge<StringUse>(node->child3());
+                break;
+            }
             break;
         }
             
@@ -903,6 +925,8 @@ private:
                 fixEdge<DoubleRepUse>(node->child1());
             else if (node->child1()->shouldSpeculateString())
                 fixEdge<StringUse>(node->child1());
+            else if (node->child1()->shouldSpeculateStringOrOther())
+                fixEdge<StringOrOtherUse>(node->child1());
             break;
         }
             
@@ -1031,7 +1055,8 @@ private:
         case SkipScope:
         case GetScope:
         case GetGetter:
-        case GetSetter: {
+        case GetSetter:
+        case GetGlobalObject: {
             fixEdge<KnownCellUse>(node->child1());
             break;
         }
@@ -1044,27 +1069,56 @@ private:
 
         case GetById:
         case GetByIdFlush: {
-            if (!node->child1()->shouldSpeculateCell())
-                break;
-
-            // If we hadn't exited because of BadCache, BadIndexingType, or ExoticObjectMode, then
-            // leave this as a GetById.
-            if (!m_graph.hasExitSite(node->origin.semantic, BadCache)
+            // FIXME: This should be done in the ByteCodeParser based on reading the
+            // PolymorphicAccess, which will surely tell us that this is a AccessCase::ArrayLength.
+            // https://bugs.webkit.org/show_bug.cgi?id=154990
+            if (node->child1()->shouldSpeculateCellOrOther()
+                && !m_graph.hasExitSite(node->origin.semantic, BadType)
+                && !m_graph.hasExitSite(node->origin.semantic, BadCache)
                 && !m_graph.hasExitSite(node->origin.semantic, BadIndexingType)
                 && !m_graph.hasExitSite(node->origin.semantic, ExoticObjectMode)) {
+                
                 auto uid = m_graph.identifiers()[node->identifierNumber()];
+                
                 if (uid == vm().propertyNames->length.impl()) {
                     attemptToMakeGetArrayLength(node);
                     break;
                 }
+
+                if (uid == vm().propertyNames->lastIndex.impl()
+                    && node->child1()->shouldSpeculateRegExpObject()) {
+                    node->setOp(GetRegExpObjectLastIndex);
+                    node->clearFlags(NodeMustGenerate);
+                    fixEdge<RegExpObjectUse>(node->child1());
+                    break;
+                }
             }
-            fixEdge<CellUse>(node->child1());
+
+            if (node->child1()->shouldSpeculateCell())
+                fixEdge<CellUse>(node->child1());
             break;
         }
             
         case PutById:
         case PutByIdFlush:
         case PutByIdDirect: {
+            if (node->child1()->shouldSpeculateCellOrOther()
+                && !m_graph.hasExitSite(node->origin.semantic, BadType)
+                && !m_graph.hasExitSite(node->origin.semantic, BadCache)
+                && !m_graph.hasExitSite(node->origin.semantic, BadIndexingType)
+                && !m_graph.hasExitSite(node->origin.semantic, ExoticObjectMode)) {
+                
+                auto uid = m_graph.identifiers()[node->identifierNumber()];
+                
+                if (uid == vm().propertyNames->lastIndex.impl()
+                    && node->child1()->shouldSpeculateRegExpObject()) {
+                    node->setOp(SetRegExpObjectLastIndex);
+                    fixEdge<RegExpObjectUse>(node->child1());
+                    speculateForBarrier(node->child2());
+                    break;
+                }
+            }
+            
             fixEdge<CellUse>(node->child1());
             break;
         }
@@ -1093,26 +1147,7 @@ private:
             break;
         }
 
-        case OverridesHasInstance: {
-            if (node->child2().node()->isCellConstant()) {
-                if (node->child2().node()->asCell() != m_graph.globalObjectFor(node->origin.semantic)->functionProtoHasInstanceSymbolFunction()) {
-
-                    m_graph.convertToConstant(node, jsBoolean(true));
-                    break;
-                }
-
-                if (!m_graph.hasExitSite(node->origin.semantic, BadTypeInfoFlags)) {
-                    // Here we optimistically assume that we will not see an bound/C-API function here.
-                    m_insertionSet.insertNode(m_indexInBlock, SpecNone, CheckTypeInfoFlags, node->origin, OpInfo(ImplementsDefaultHasInstance), Edge(node->child1().node(), CellUse));
-                    m_graph.convertToConstant(node, jsBoolean(false));
-                    break;
-                }
-            }
-
-            fixEdge<CellUse>(node->child1());
-            break;
-        }
-            
+        case OverridesHasInstance:
         case CheckStructure:
         case CheckCell:
         case CreateThis:
@@ -1264,6 +1299,8 @@ private:
         case KillStack:
         case GetStack:
         case StoreBarrier:
+        case GetRegExpObjectLastIndex:
+        case SetRegExpObjectLastIndex:
             // These are just nodes that we don't currently expect to see during fixup.
             // If we ever wanted to insert them prior to fixup, then we just have to create
             // fixup rules for them.

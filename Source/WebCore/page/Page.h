@@ -219,7 +219,7 @@ public:
     ProgressTracker& progress() const { return *m_progress; }
     BackForwardController& backForward() const { return *m_backForwardController; }
 
-    double domTimerAlignmentInterval() const { return m_timerAlignmentInterval; }
+    std::chrono::milliseconds domTimerAlignmentInterval() const { return m_timerAlignmentInterval; }
 
 #if ENABLE(VIEW_MODE_CSS_MEDIA)
     enum ViewMode {
@@ -472,7 +472,9 @@ public:
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
     void addPlaybackTargetPickerClient(uint64_t);
     void removePlaybackTargetPickerClient(uint64_t);
-    void showPlaybackTargetPicker(uint64_t, const IntPoint&, bool);
+
+    void showPlaybackTargetPicker(uint64_t, const IntPoint&, bool, const String&);
+
     void playbackTargetPickerClientStateDidChange(uint64_t, MediaProducer::MediaStateFlags);
     WEBCORE_EXPORT void setMockMediaPlaybackTargetPickerEnabled(bool);
     WEBCORE_EXPORT void setMockMediaPlaybackTargetPickerState(const String&, MediaPlaybackTargetContext::State);
@@ -480,6 +482,7 @@ public:
     WEBCORE_EXPORT void setPlaybackTarget(uint64_t, Ref<MediaPlaybackTarget>&&);
     WEBCORE_EXPORT void playbackTargetAvailabilityDidChange(uint64_t, bool);
     WEBCORE_EXPORT void setShouldPlayToPlaybackTarget(uint64_t, bool);
+    WEBCORE_EXPORT void customPlaybackActionSelected(uint64_t);
 #endif
 
     RefPtr<WheelEventTestTrigger> testTrigger() const { return m_testTrigger; }
@@ -498,6 +501,11 @@ public:
 
     void setShowAllPlugins(bool showAll) { m_showAllPlugins = showAll; }
     bool showAllPlugins() const;
+
+    WEBCORE_EXPORT void setTimerAlignmentIntervalIncreaseLimit(std::chrono::milliseconds);
+
+    bool isControlledByAutomation() const { return m_controlledByAutomation; }
+    void setControlledByAutomation(bool controlled) { m_controlledByAutomation = controlled; }
 
 private:
     WEBCORE_EXPORT void initGroup();
@@ -521,9 +529,11 @@ private:
 
     Vector<Ref<PluginViewBase>> pluginViews();
 
+    enum class TimerThrottlingState { Disabled, Enabled, EnabledIncreasing };
     void hiddenPageDOMTimerThrottlingStateChanged();
-    void setTimerThrottlingEnabled(bool);
-    void setDOMTimerAlignmentInterval(double);
+    void setTimerThrottlingState(TimerThrottlingState);
+    void updateTimerThrottlingState();
+    void updateDOMTimerAlignmentInterval();
     void timerAlignmentIntervalIncreaseTimerFired();
 
     const std::unique_ptr<Chrome> m_chrome;
@@ -610,9 +620,11 @@ private:
     ViewMode m_viewMode;
 #endif // ENABLE(VIEW_MODE_CSS_MEDIA)
 
-    Optional<double> m_timerThrottlingEnabledTime;
-    double m_timerAlignmentInterval;
+    TimerThrottlingState m_timerThrottlingState { TimerThrottlingState::Disabled };
+    std::chrono::steady_clock::time_point m_timerThrottlingStateLastChangedTime { std::chrono::steady_clock::duration::zero() };
+    std::chrono::milliseconds m_timerAlignmentInterval;
     Timer m_timerAlignmentIntervalIncreaseTimer;
+    std::chrono::milliseconds m_timerAlignmentIntervalIncreaseLimit { 0 };
 
     bool m_isEditable;
     bool m_isPrerender;
@@ -673,6 +685,8 @@ private:
     
     bool m_allowsMediaDocumentInlinePlayback { false };
     bool m_showAllPlugins { false };
+
+    bool m_controlledByAutomation { false };
 };
 
 inline PageGroup& Page::group()

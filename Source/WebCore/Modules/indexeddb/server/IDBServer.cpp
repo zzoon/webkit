@@ -151,17 +151,15 @@ void IDBServer::deleteDatabase(const IDBRequestData& requestData)
     }
 
     auto* database = m_uniqueIDBDatabaseMap.get(requestData.databaseIdentifier());
-    if (!database) {
-        connection->didDeleteDatabase(IDBResultData::deleteDatabaseSuccess(requestData.requestIdentifier(), IDBDatabaseInfo(requestData.databaseIdentifier().databaseName(), 0)));
-        return;
-    }
+    if (!database)
+        database = &getOrCreateUniqueIDBDatabase(requestData.databaseIdentifier());
 
     database->handleDelete(*connection, requestData);
 }
 
-void IDBServer::deleteUniqueIDBDatabase(UniqueIDBDatabase& database)
+void IDBServer::closeUniqueIDBDatabase(UniqueIDBDatabase& database)
 {
-    LOG(IndexedDB, "IDBServer::deleteUniqueIDBDatabase");
+    LOG(IndexedDB, "IDBServer::closeUniqueIDBDatabase");
 
     auto deletedDatabase = m_uniqueIDBDatabaseMap.take(database.identifier());
     ASSERT_UNUSED(deletedDatabase, deletedDatabase.get() == &database);

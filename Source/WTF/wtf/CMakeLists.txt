@@ -60,6 +60,7 @@ set(WTF_HEADERS
     NumberOfCores.h
     OSAllocator.h
     OSRandomSource.h
+    OptionSet.h
     OrderMaker.h
     PageAllocation.h
     PageBlock.h
@@ -184,7 +185,6 @@ set(WTF_SOURCES
     RAMSize.cpp
     RandomNumber.cpp
     RefCountedLeakCounter.cpp
-    RefCounter.cpp
     RunLoop.cpp
     SHA1.cpp
     SixCharacterHash.cpp

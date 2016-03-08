@@ -10,7 +10,6 @@ set(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/geolocation"
     "${WEBCORE_DIR}/Modules/indexeddb"
     "${WEBCORE_DIR}/Modules/indexeddb/client"
-    "${WEBCORE_DIR}/Modules/indexeddb/legacy"
     "${WEBCORE_DIR}/Modules/indexeddb/server"
     "${WEBCORE_DIR}/Modules/indexeddb/shared"
     "${WEBCORE_DIR}/Modules/indieui"
@@ -70,6 +69,7 @@ set(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform"
     "${WEBCORE_DIR}/platform/animation"
     "${WEBCORE_DIR}/platform/audio"
+    "${WEBCORE_DIR}/platform/crypto"
     "${WEBCORE_DIR}/platform/graphics"
     "${WEBCORE_DIR}/platform/graphics/cpu/arm"
     "${WEBCORE_DIR}/platform/graphics/cpu/arm/filters"
@@ -595,7 +595,6 @@ set(WebCore_NON_SVG_IDL_FILES
     page/AbstractView.idl
     page/BarProp.idl
     page/Crypto.idl
-    page/DOMSecurityPolicy.idl
     page/DOMSelection.idl
     page/DOMWindow.idl
     page/EventSource.idl
@@ -830,7 +829,6 @@ set(WebCore_SOURCES
     Modules/indexeddb/IDBDatabase.cpp
     Modules/indexeddb/IDBDatabaseException.cpp
     Modules/indexeddb/IDBDatabaseIdentifier.cpp
-    Modules/indexeddb/IDBDatabaseMetadata.cpp
     Modules/indexeddb/IDBEventDispatcher.cpp
     Modules/indexeddb/IDBFactory.cpp
     Modules/indexeddb/IDBGetResult.cpp
@@ -861,26 +859,6 @@ set(WebCore_SOURCES
     Modules/indexeddb/client/IDBTransactionImpl.cpp
     Modules/indexeddb/client/IDBVersionChangeEventImpl.cpp
     Modules/indexeddb/client/TransactionOperation.cpp
-
-    Modules/indexeddb/legacy/IDBCursorBackend.cpp
-    Modules/indexeddb/legacy/IDBCursorBackendOperations.cpp
-    Modules/indexeddb/legacy/IDBDatabaseBackend.cpp
-    Modules/indexeddb/legacy/IDBDatabaseCallbacksImpl.cpp
-    Modules/indexeddb/legacy/IDBPendingTransactionMonitor.cpp
-    Modules/indexeddb/legacy/IDBTransactionBackend.cpp
-    Modules/indexeddb/legacy/IDBTransactionBackendOperations.cpp
-    Modules/indexeddb/legacy/IDBTransactionCoordinator.cpp
-    Modules/indexeddb/legacy/LegacyAny.cpp
-    Modules/indexeddb/legacy/LegacyCursor.cpp
-    Modules/indexeddb/legacy/LegacyCursorWithValue.cpp
-    Modules/indexeddb/legacy/LegacyDatabase.cpp
-    Modules/indexeddb/legacy/LegacyFactory.cpp
-    Modules/indexeddb/legacy/LegacyIndex.cpp
-    Modules/indexeddb/legacy/LegacyObjectStore.cpp
-    Modules/indexeddb/legacy/LegacyOpenDBRequest.cpp
-    Modules/indexeddb/legacy/LegacyRequest.cpp
-    Modules/indexeddb/legacy/LegacyTransaction.cpp
-    Modules/indexeddb/legacy/LegacyVersionChangeEvent.cpp
 
     Modules/indexeddb/server/IDBConnectionToClient.cpp
     Modules/indexeddb/server/IDBSerialization.cpp
@@ -1081,6 +1059,7 @@ set(WebCore_SOURCES
     accessibility/AccessibilityObject.cpp
     accessibility/AccessibilityProgressIndicator.cpp
     accessibility/AccessibilityRenderObject.cpp
+    accessibility/AccessibilitySVGElement.cpp
     accessibility/AccessibilitySVGRoot.cpp
     accessibility/AccessibilityScrollView.cpp
     accessibility/AccessibilityScrollbar.cpp
@@ -1474,6 +1453,7 @@ set(WebCore_SOURCES
     dom/IdTargetObserverRegistry.cpp
     dom/InlineStyleSheetOwner.cpp
     dom/KeyboardEvent.cpp
+    dom/LifecycleCallbackQueue.cpp
     dom/LiveNodeList.cpp
     dom/MessageChannel.cpp
     dom/MessageEvent.cpp
@@ -1631,6 +1611,7 @@ set(WebCore_SOURCES
     history/PageCache.cpp
 
     html/AttributeDOMTokenList.cpp
+    html/Autofill.cpp
     html/BaseButtonInputType.cpp
     html/BaseCheckableInputType.cpp
     html/BaseChooserOnlyDateAndTimeInputType.cpp
@@ -1945,6 +1926,7 @@ set(WebCore_SOURCES
     loader/ResourceLoadNotifier.cpp
     loader/ResourceLoadObserver.cpp
     loader/ResourceLoadStatistics.cpp
+    loader/ResourceLoadStatisticsStore.cpp
     loader/ResourceLoader.cpp
     loader/SinkDocument.cpp
     loader/SubframeLoader.cpp
@@ -2007,7 +1989,6 @@ set(WebCore_SOURCES
     page/ContextMenuContext.cpp
     page/ContextMenuController.cpp
     page/Crypto.cpp
-    page/DOMSecurityPolicy.cpp
     page/DOMSelection.cpp
     page/DOMTimer.cpp
     page/DOMWindow.cpp
@@ -2124,6 +2105,7 @@ set(WebCore_SOURCES
     platform/FileSystem.cpp
     platform/Language.cpp
     platform/Length.cpp
+    platform/LengthPoint.cpp
     platform/LengthSize.cpp
     platform/LinkHash.cpp
     platform/Logging.cpp
@@ -2137,7 +2119,6 @@ set(WebCore_SOURCES
     platform/PlatformSpeechSynthesizer.cpp
     platform/PlatformStrategies.cpp
     platform/RemoteCommandListener.cpp
-    platform/RuntimeApplicationChecks.cpp
     platform/SchemeRegistry.cpp
     platform/ScrollAnimator.cpp
     platform/ScrollView.cpp
