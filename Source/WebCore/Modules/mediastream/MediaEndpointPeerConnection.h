@@ -101,10 +101,10 @@ private:
     RefPtr<RTCSessionDescription> createRTCSessionDescription(SessionDescription*) const;
 
     // MediaEndpointClient
-    virtual void gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction) override;
-    virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) override;
-    virtual void doneGatheringCandidates(unsigned mdescIndex) override;
-    virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) override;
+    void gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction) override;
+    void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) override;
+    void doneGatheringCandidates(unsigned mdescIndex) override;
+    void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) override;
 
     PeerConnectionBackendClient* m_client;
     std::unique_ptr<MediaEndpoint> m_mediaEndpoint;

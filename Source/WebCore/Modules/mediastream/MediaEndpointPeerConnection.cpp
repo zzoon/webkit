@@ -250,12 +250,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         mediaDescription->setMediaStreamId(sender->mediaStreamIds()[0]);
         mediaDescription->setMediaStreamTrackId(track->id());
         mediaDescription->setType(track->kind());
-        mediaDescription->setPort(9);
-        mediaDescription->setAddress("0.0.0.0");
-        mediaDescription->setMode("sendrecv");
         mediaDescription->setPayloads(track->kind() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads);
-        mediaDescription->setRtcpMux(true);
-        mediaDescription->setDtlsSetup("actpass");
         mediaDescription->setDtlsFingerprintHashFunction(m_dtlsFingerprintFunction);
         mediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
         mediaDescription->setCname(m_cname);
