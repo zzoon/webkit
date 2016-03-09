@@ -34,12 +34,15 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "MediaEndpointSessionConfiguration.h"
+#include "RTCSessionDescription.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
 class MediaEndpointSessionConfiguration;
+class SDPProcessor;
+class DOMError;
 
 class SessionDescription : public RefCounted<SessionDescription> {
 public:
@@ -50,16 +53,17 @@ public:
         Rollback = 4
     };
 
-    static RefPtr<SessionDescription> create(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration)
-    {
-        return adoptRef(new SessionDescription(type, WTFMove(configuration)));
-    }
+    static Ref<SessionDescription> create(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration);
+    static RefPtr<SessionDescription> create(const RTCSessionDescription&, const SDPProcessor&, RefPtr<DOMError>&);
     virtual ~SessionDescription() { }
 
+    RefPtr<RTCSessionDescription> toRTCSessionDescription(const SDPProcessor&) const;
+
     Type type() const { return m_type; }
+    const String& typeString() const;
     MediaEndpointSessionConfiguration* configuration() const { return m_configuration.get(); }
 
-    bool isLaterThan(SessionDescription* other) { return !other || configuration()->sessionVersion() > other->configuration()->sessionVersion(); }
+    bool isLaterThan(SessionDescription* other) const;
 
 private:
     SessionDescription(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration)

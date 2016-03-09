@@ -261,14 +261,8 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         configurationSnapshot->addMediaDescription(WTFMove(mediaDescription));
     }
 
-    String sdpString;
-    SDPProcessor::Result result = m_sdpProcessor->generate(*configurationSnapshot, sdpString);
-    if (result != SDPProcessor::Result::Success) {
-        LOG_ERROR("SDPProcessor internal error");
-        return;
-    }
-
-    promise.resolve(RTCSessionDescription::create("offer", sdpString));
+    Ref<SessionDescription> description = SessionDescription::create(SessionDescription::Type::Offer, WTFMove(configurationSnapshot));
+    promise.resolve(description->toRTCSessionDescription(*m_sdpProcessor));
 }
 
 void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, SessionDescriptionPromise&& promise)
@@ -332,14 +326,8 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
     RtpSenderVector senders = m_client->getSenders();
     updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
 
-    String sdpString;
-    SDPProcessor::Result result = m_sdpProcessor->generate(*configurationSnapshot, sdpString);
-    if (result != SDPProcessor::Result::Success) {
-        LOG_ERROR("SDPProcessor internal error");
-        return;
-    }
-
-    promise.resolve(RTCSessionDescription::create("answer", sdpString));
+    Ref<SessionDescription> description = SessionDescription::create(SessionDescription::Type::Answer, WTFMove(configurationSnapshot));
+    promise.resolve(description->toRTCSessionDescription(*m_sdpProcessor));
 }
 
 void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& description, VoidPromise&& promise)
@@ -378,28 +366,24 @@ static bool allSendersRepresented(const RtpSenderVector& senders, const MediaDes
 
 void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription& description, VoidPromise& promise)
 {
-    SessionDescription::Type descriptionType = parseDescriptionType(description.type());
+    RefPtr<DOMError> error;
+    RefPtr<SessionDescription> newDescription = SessionDescription::create(description, *m_sdpProcessor, error);
+    if (!newDescription) {
+        promise.reject(error);
+        return;
+    }
 
-    if (!localDescriptionTypeValidForState(descriptionType)) {
-        // FIXME: Error type?
+    if (!localDescriptionTypeValidForState(newDescription->type())) {
         promise.reject(DOMError::create("InvalidSessionDescriptionError (bad description type for current state)"));
         return;
     }
 
-    RefPtr<MediaEndpointSessionConfiguration> parsedConfiguration;
-    SDPProcessor::Result result = m_sdpProcessor->parse(description.sdp(), parsedConfiguration);
-    if (result != SDPProcessor::Result::Success) {
-        if (result == SDPProcessor::Result::ParseError)
-            promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
-        else
-            LOG_ERROR("SDPProcessor internal error");
-        return;
-    }
+    RefPtr<MediaEndpointSessionConfiguration> parsedConfiguration = newDescription->configuration();
 
     unsigned previousNumberOfMediaDescriptions = internalLocalDescription() ? internalLocalDescription()->configuration()->mediaDescriptions().size() : 0;
     unsigned numberOfMediaDescriptions = parsedConfiguration->mediaDescriptions().size();
     bool hasNewMediaDescriptions = numberOfMediaDescriptions > previousNumberOfMediaDescriptions;
-    bool isInitiator = descriptionType == SessionDescription::Type::Offer;
+    bool isInitiator = newDescription->type() == SessionDescription::Type::Offer;
 
     if (hasNewMediaDescriptions) {
         MediaEndpoint::UpdateResult result = m_mediaEndpoint->updateReceiveConfiguration(parsedConfiguration.get(), isInitiator);
@@ -433,7 +417,6 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     if (allSendersRepresented(m_client->getSenders(), parsedConfiguration->mediaDescriptions()))
         clearNegotiationNeededState();
 
-    RefPtr<SessionDescription> newDescription = SessionDescription::create(descriptionType, WTFMove(parsedConfiguration));
     SignalingState newSignalingState;
 
     // Update state and local descriptions according to setLocal/RemoteDescription processing model
@@ -533,23 +516,19 @@ void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription& de
 
 void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription& description, VoidPromise& promise)
 {
-    SessionDescription::Type descriptionType = parseDescriptionType(description.type());
+    RefPtr<DOMError> error;
+    RefPtr<SessionDescription> newDescription = SessionDescription::create(description, *m_sdpProcessor, error);
+    if (!newDescription) {
+        promise.reject(error);
+        return;
+    }
 
-    if (!remoteDescriptionTypeValidForState(descriptionType)) {
-        // FIXME: Error type?
+    if (!remoteDescriptionTypeValidForState(newDescription->type())) {
         promise.reject(DOMError::create("InvalidSessionDescriptionError (bad description type for current state)"));
         return;
     }
 
-    RefPtr<MediaEndpointSessionConfiguration> parsedConfiguration;
-    SDPProcessor::Result result = m_sdpProcessor->parse(description.sdp(), parsedConfiguration);
-    if (result != SDPProcessor::Result::Success) {
-        if (result == SDPProcessor::Result::ParseError)
-            promise.reject(DOMError::create("InvalidSessionDescriptionError (unable to parse description)"));
-        else
-            LOG_ERROR("SDPProcessor internal error");
-        return;
-    }
+    RefPtr<MediaEndpointSessionConfiguration> parsedConfiguration = newDescription->configuration();
 
     RtpSenderVector senders = m_client->getSenders();
 
@@ -561,7 +540,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
             mediaDescription->type() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads));
     }
 
-    bool isInitiator = descriptionType == SessionDescription::Type::Answer;
+    bool isInitiator = newDescription->type() == SessionDescription::Type::Answer;
 
     if (internalLocalDescription())
         updateSendSources(internalLocalDescription()->configuration()->mediaDescriptions(), parsedConfiguration->mediaDescriptions(), senders);
@@ -572,7 +551,6 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
         return;
     }
 
-    RefPtr<SessionDescription> newDescription = SessionDescription::create(descriptionType, WTFMove(parsedConfiguration));
     SignalingState newSignalingState;
 
     // Update state and local descriptions according to setLocal/RemoteDescription processing model
@@ -769,34 +747,6 @@ bool MediaEndpointPeerConnection::remoteDescriptionTypeValidForState(SessionDesc
     return false;
 }
 
-SessionDescription::Type MediaEndpointPeerConnection::parseDescriptionType(const String& typeName) const
-{
-    if (typeName == "offer")
-        return SessionDescription::Type::Offer;
-    if (typeName == "pranswer")
-        return SessionDescription::Type::Pranswer;
-
-    ASSERT(typeName == "answer");
-    return SessionDescription::Type::Answer;
-}
-
-static String descriptionTypeToString(SessionDescription::Type type)
-{
-    switch (type) {
-    case SessionDescription::Type::Offer:
-        return ASCIILiteral("offer");
-    case SessionDescription::Type::Pranswer:
-        return ASCIILiteral("pranswer");
-    case SessionDescription::Type::Answer:
-        return ASCIILiteral("answer");
-    case SessionDescription::Type::Rollback:
-        return ASCIILiteral("rollback");
-    }
-
-    ASSERT_NOT_REACHED();
-    return emptyString();
-}
-
 SessionDescription* MediaEndpointPeerConnection::internalLocalDescription() const
 {
     return m_pendingLocalDescription ? m_pendingLocalDescription.get() : m_currentLocalDescription.get();
@@ -809,18 +759,7 @@ SessionDescription* MediaEndpointPeerConnection::internalRemoteDescription() con
 
 RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::createRTCSessionDescription(SessionDescription* description) const
 {
-    if (!description)
-        return nullptr;
-
-    String sdpString;
-    SDPProcessor::Result result = m_sdpProcessor->generate(*description->configuration(), sdpString);
-    if (result != SDPProcessor::Result::Success) {
-        LOG_ERROR("SDPProcessor internal error");
-        return nullptr;
-    }
-
-
-    return RTCSessionDescription::create(descriptionTypeToString(description->type()), sdpString);
+    return description ? description->toRTCSessionDescription(*m_sdpProcessor) : nullptr;
 }
 
 void MediaEndpointPeerConnection::gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction)

@@ -938,6 +938,7 @@ set(WebCore_SOURCES
     Modules/mediastream/RTCStatsReport.cpp
     Modules/mediastream/RTCStatsResponse.cpp
     Modules/mediastream/RTCTrackEvent.cpp
+    Modules/mediastream/SessionDescription.cpp
     Modules/mediastream/SDPProcessor.cpp
     Modules/mediastream/SourceInfo.cpp
     Modules/mediastream/UserMediaController.cpp
