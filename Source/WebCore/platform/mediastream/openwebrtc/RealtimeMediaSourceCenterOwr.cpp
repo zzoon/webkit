@@ -73,7 +73,8 @@ RealtimeMediaSourceCenterOwr::RealtimeMediaSourceCenterOwr()
 {
     initializeOpenWebRTC();
 
-    // Temporary solution to hint about preferred device names.
+    // Temporary solution to hint about preferred device names. Each call to getUserMedia() will
+    // prefer the device name at the first element of the list and then move that element last.
     char* envString = getenv("WEBKIT_AUDIO_SOURCE_NAMES");
     if (envString)
         String(envString).split(',', false, m_preferredAudioSourceNames);
