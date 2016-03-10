@@ -378,15 +378,14 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
         return;
     }
 
-    RefPtr<MediaEndpointSessionConfiguration> parsedConfiguration = newDescription->configuration();
-
-    unsigned previousNumberOfMediaDescriptions = internalLocalDescription() ? internalLocalDescription()->configuration()->mediaDescriptions().size() : 0;
-    unsigned numberOfMediaDescriptions = parsedConfiguration->mediaDescriptions().size();
-    bool hasNewMediaDescriptions = numberOfMediaDescriptions > previousNumberOfMediaDescriptions;
+    const MediaDescriptionVector& mediaDescriptions = newDescription->configuration()->mediaDescriptions();
+    unsigned previousNumberOfMediaDescriptions = internalLocalDescription() ?
+        internalLocalDescription()->configuration()->mediaDescriptions().size() : 0;
+    bool hasNewMediaDescriptions = mediaDescriptions.size() > previousNumberOfMediaDescriptions;
     bool isInitiator = newDescription->type() == SessionDescription::Type::Offer;
 
     if (hasNewMediaDescriptions) {
-        MediaEndpoint::UpdateResult result = m_mediaEndpoint->updateReceiveConfiguration(parsedConfiguration.get(), isInitiator);
+        MediaEndpoint::UpdateResult result = m_mediaEndpoint->updateReceiveConfiguration(newDescription->configuration(), isInitiator);
 
         if (result == MediaEndpoint::UpdateResult::SuccessWithIceRestart) {
             if (m_client->internalIceGatheringState() != IceGatheringState::Gathering)
@@ -405,7 +404,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     }
 
     if (internalRemoteDescription()) {
-        updateSendSources(parsedConfiguration->mediaDescriptions(), internalRemoteDescription()->configuration()->mediaDescriptions(), m_client->getSenders());
+        updateSendSources(mediaDescriptions, internalRemoteDescription()->configuration()->mediaDescriptions(), m_client->getSenders());
 
         if (m_mediaEndpoint->updateSendConfiguration(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
             // FIXME: Error type?
@@ -414,7 +413,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
         }
     }
 
-    if (allSendersRepresented(m_client->getSenders(), parsedConfiguration->mediaDescriptions()))
+    if (allSendersRepresented(m_client->getSenders(), mediaDescriptions))
         clearNegotiationNeededState();
 
     SignalingState newSignalingState;
@@ -455,7 +454,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     }
 
     // FIXME: do this even if an ice start was done?
-    if (m_client->internalIceGatheringState() == IceGatheringState::New && numberOfMediaDescriptions)
+    if (m_client->internalIceGatheringState() == IceGatheringState::New && mediaDescriptions.size())
         m_client->updateIceGatheringState(IceGatheringState::Gathering);
 
     if (m_client->internalSignalingState() == SignalingState::Stable && m_negotiationNeeded)
@@ -528,11 +527,10 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
         return;
     }
 
-    RefPtr<MediaEndpointSessionConfiguration> parsedConfiguration = newDescription->configuration();
-
+    const MediaDescriptionVector& mediaDescriptions = newDescription->configuration()->mediaDescriptions();
     RtpSenderVector senders = m_client->getSenders();
 
-    for (auto& mediaDescription : parsedConfiguration->mediaDescriptions()) {
+    for (auto& mediaDescription : mediaDescriptions) {
         if (mediaDescription->type() != "audio" && mediaDescription->type() != "video")
             continue;
 
@@ -543,9 +541,9 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
     bool isInitiator = newDescription->type() == SessionDescription::Type::Answer;
 
     if (internalLocalDescription())
-        updateSendSources(internalLocalDescription()->configuration()->mediaDescriptions(), parsedConfiguration->mediaDescriptions(), senders);
+        updateSendSources(internalLocalDescription()->configuration()->mediaDescriptions(), mediaDescriptions, senders);
 
-    if (m_mediaEndpoint->updateSendConfiguration(parsedConfiguration.get(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
+    if (m_mediaEndpoint->updateSendConfiguration(newDescription->configuration(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
         // FIXME: Error type?
         promise.reject(DOMError::create("IncompatibleSessionDescriptionError (send configuration)"));
         return;
