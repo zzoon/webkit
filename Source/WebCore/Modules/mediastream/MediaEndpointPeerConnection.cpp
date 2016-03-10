@@ -605,8 +605,6 @@ RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::pendingRemoteDescript
 
 void MediaEndpointPeerConnection::setConfiguration(RTCConfiguration& configuration)
 {
-    // FIXME: updateIce() might be renamed to setConfiguration(). It's also possible
-    // that its current behavior with update deltas will change.
     m_mediaEndpoint->setConfiguration(createMediaEndpointConfiguration(configuration));
 }
 
