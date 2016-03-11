@@ -140,6 +140,7 @@
 #import <WebCore/GCController.h>
 #import <WebCore/GeolocationController.h>
 #import <WebCore/GeolocationError.h>
+#import <WebCore/GraphicsLayer.h>
 #import <WebCore/HTMLNames.h>
 #import <WebCore/HTMLVideoElement.h>
 #import <WebCore/HistoryController.h>
@@ -759,15 +760,7 @@ static void WebKitInitializeApplicationStatisticsStoragePathIfNecessary()
     if (initialized)
         return;
     
-    NSString *appName = [[NSBundle mainBundle] bundleIdentifier];
-    if (!appName)
-        appName = [[NSProcessInfo processInfo] processName];
-    
-    ASSERT(appName);
-    
-    NSString *supportDirectory = [NSString _webkit_localStorageDirectoryWithBundleIdentifier:appName];
-
-    resourceLoadStatisticsStore = &WebCore::ResourceLoadStatisticsStore::create(supportDirectory).leakRef();
+    resourceLoadStatisticsStore = &WebCore::ResourceLoadStatisticsStore::create().leakRef();
     ResourceLoadObserver::sharedObserver().setStatisticsStore(*resourceLoadStatisticsStore);
     
     initialized = YES;
@@ -2339,8 +2332,10 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings.setInteractiveFormValidationEnabled([self interactiveFormValidationEnabled]);
     settings.setValidationMessageTimerMagnification([self validationMessageTimerMagnification]);
 
-    settings.setRequiresUserGestureForMediaPlayback([preferences mediaPlaybackRequiresUserGesture]);
-    settings.setAudioPlaybackRequiresUserGesture([preferences audioPlaybackRequiresUserGesture]);
+    BOOL mediaPlaybackRequiresUserGesture = [preferences mediaPlaybackRequiresUserGesture];
+    settings.setVideoPlaybackRequiresUserGesture(mediaPlaybackRequiresUserGesture || [preferences videoPlaybackRequiresUserGesture]);
+    settings.setAudioPlaybackRequiresUserGesture(mediaPlaybackRequiresUserGesture || [preferences audioPlaybackRequiresUserGesture]);
+    settings.setMainContentUserGestureOverrideEnabled([preferences overrideUserGestureRequirementForMainContent]);
     settings.setAllowsInlineMediaPlayback([preferences mediaPlaybackAllowsInline]);
     settings.setInlineMediaPlaybackRequiresPlaysInlineAttribute([preferences inlineMediaPlaybackRequiresPlaysInlineAttribute]);
     settings.setInvisibleAutoplayNotPermitted([preferences invisibleAutoplayNotPermitted]);
@@ -2480,8 +2475,6 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings.setHiddenPageCSSAnimationSuspensionEnabled([preferences hiddenPageCSSAnimationSuspensionEnabled]);
 
     settings.setResourceLoadStatisticsEnabled([preferences resourceLoadStatisticsEnabled]);
-    if (resourceLoadStatisticsStore)
-        resourceLoadStatisticsStore->readDataFromDiskIfNeeded();
 
 #if ENABLE(GAMEPAD)
     RuntimeEnabledFeatures::sharedFeatures().setGamepadsEnabled([preferences gamepadsEnabled]);
@@ -2490,6 +2483,14 @@ static bool needsSelfRetainWhileLoadingQuirk()
 #if ENABLE(INDEXED_DATABASE)
     RuntimeEnabledFeatures::sharedFeatures().setWebkitIndexedDBEnabled(true);
 #endif
+
+#if ENABLE(SHADOW_DOM)
+    RuntimeEnabledFeatures::sharedFeatures().setShadowDOMEnabled([preferences shadowDOMEnabled]);
+#endif
+#if ENABLE(CUSTOM_ELEMENTS)
+    RuntimeEnabledFeatures::sharedFeatures().setCustomElementsEnabled([preferences customElementsEnabled]);
+#endif
+
 
     NSTimeInterval timeout = [preferences incrementalRenderingSuppressionTimeoutInSeconds];
     if (timeout > 0)
@@ -3234,6 +3235,16 @@ static inline IMP getMethod(id o, SEL s)
 + (BOOL)_shouldUseFontSmoothing
 {
     return FontCascade::shouldUseSmoothing();
+}
+
++ (void)_setSmoothedLayerTextEnabled:(BOOL)f
+{
+    GraphicsLayer::setSmoothedLayerTextEnabled(f);
+}
+
++ (BOOL)_smoothedLayerTextEnabled
+{
+    return GraphicsLayer::smoothedLayerTextEnabled();
 }
 
 #if !PLATFORM(IOS)
@@ -4851,9 +4862,6 @@ static Vector<String> toStringVector(NSArray* patterns)
 {   
     applicationIsTerminating = YES;
 
-    if (resourceLoadStatisticsStore)
-        resourceLoadStatisticsStore->writeDataToDisk();
-
     if (fastDocumentTeardownEnabled())
         [self closeAllWebViews];
 
@@ -6033,7 +6041,10 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
         flags |= DragApplicationHasAttachedSheet;
     if ([draggingInfo draggingSource] == self)
         flags |= DragApplicationIsSource;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     if ([[NSApp currentEvent] modifierFlags] & NSAlternateKeyMask)
+#pragma clang diagnostic pop
         flags |= DragApplicationIsCopyKeyDown;
     return static_cast<DragApplicationFlags>(flags);
 }

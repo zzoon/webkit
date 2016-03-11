@@ -45,6 +45,17 @@ ProxyObject::ProxyObject(VM& vm, Structure* structure)
 {
 }
 
+Structure* ProxyObject::structureForTarget(JSGlobalObject* globalObject, JSValue target)
+{
+    if (!target.isObject())
+        return globalObject->proxyObjectStructure();
+
+    JSObject* targetAsObject = jsCast<JSObject*>(target);
+    CallData ignoredCallData;
+    bool isCallable = targetAsObject->methodTable()->getCallData(targetAsObject, ignoredCallData) != CallType::None;
+    return isCallable ? globalObject->callableProxyObjectStructure() : globalObject->proxyObjectStructure();
+}
+
 void ProxyObject::finishCreation(VM& vm, ExecState* exec, JSValue target, JSValue handler)
 {
     Base::finishCreation(vm);
@@ -53,10 +64,8 @@ void ProxyObject::finishCreation(VM& vm, ExecState* exec, JSValue target, JSValu
         return;
     }
     if (ProxyObject* targetAsProxy = jsDynamicCast<ProxyObject*>(target)) {
-        // FIXME: Add tests for this once we implement Proxy.revoke(.).
-        // https://bugs.webkit.org/show_bug.cgi?id=154321
         if (targetAsProxy->handler().isNull()) {
-            throwTypeError(exec, ASCIILiteral("If a Proxy's handler is another Proxy object, the other Proxy object must have a non-null handler."));
+            throwTypeError(exec, ASCIILiteral("If a Proxy's handler is another Proxy object, the other Proxy should not have been revoked."));
             return;
         }
     }
@@ -69,6 +78,10 @@ void ProxyObject::finishCreation(VM& vm, ExecState* exec, JSValue target, JSValu
 
     CallData ignoredCallData;
     m_isCallable = targetAsObject->methodTable(vm)->getCallData(targetAsObject, ignoredCallData) != CallType::None;
+    if (m_isCallable) {
+        TypeInfo info = structure(vm)->typeInfo();
+        RELEASE_ASSERT(info.implementsHasInstance() && info.implementsDefaultHasInstance());
+    }
 
     ConstructData ignoredConstructData;
     m_isConstructible = jsCast<JSObject*>(target)->methodTable(vm)->getConstructData(jsCast<JSObject*>(target), ignoredConstructData) != ConstructType::None;
@@ -76,6 +89,8 @@ void ProxyObject::finishCreation(VM& vm, ExecState* exec, JSValue target, JSValu
     m_target.set(vm, this, targetAsObject);
     m_handler.set(vm, this, handler);
 }
+
+static const char* s_proxyAlreadyRevokedErrorMessage = "Proxy has already been revoked. No more operations are allowed to be performed on it.";
 
 static EncodedJSValue performProxyGet(ExecState* exec, EncodedJSValue thisValue, PropertyName propertyName)
 {
@@ -101,6 +116,9 @@ static EncodedJSValue performProxyGet(ExecState* exec, EncodedJSValue thisValue,
     ProxyObject* proxyObject = jsCast<ProxyObject*>(proxyObjectAsObject);
     JSObject* target = proxyObject->target();
 
+    if (propertyName == vm.propertyNames->underscoreProto)
+        return JSValue::encode(proxyObject->performGetPrototype(exec));
+
     auto performDefaultGet = [&] {
         return JSValue::encode(target->get(exec, propertyName));
     };
@@ -110,7 +128,7 @@ static EncodedJSValue performProxyGet(ExecState* exec, EncodedJSValue thisValue,
 
     JSValue handlerValue = proxyObject->handler();
     if (handlerValue.isNull())
-        return throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        return throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
 
     JSObject* handler = jsCast<JSObject*>(handlerValue);
     CallData callData;
@@ -161,7 +179,7 @@ bool ProxyObject::performInternalMethodGetOwnProperty(ExecState* exec, PropertyN
 
     JSValue handlerValue = this->handler();
     if (handlerValue.isNull()) {
-        throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
         return false;
     }
 
@@ -264,7 +282,7 @@ bool ProxyObject::performHasProperty(ExecState* exec, PropertyName propertyName,
 
     JSValue handlerValue = this->handler();
     if (handlerValue.isNull()) {
-        throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
         return false;
     }
 
@@ -357,7 +375,7 @@ void ProxyObject::performPut(ExecState* exec, JSValue putValue, JSValue thisValu
 
     JSValue handlerValue = this->handler();
     if (handlerValue.isNull()) {
-        throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
         return;
     }
 
@@ -444,7 +462,7 @@ static EncodedJSValue JSC_HOST_CALL performProxyCall(ExecState* exec)
     ProxyObject* proxy = jsCast<ProxyObject*>(exec->callee());
     JSValue handlerValue = proxy->handler();
     if (handlerValue.isNull())
-        return throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        return throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
 
     JSObject* handler = jsCast<JSObject*>(handlerValue);
     CallData callData;
@@ -489,7 +507,7 @@ static EncodedJSValue JSC_HOST_CALL performProxyConstruct(ExecState* exec)
     ProxyObject* proxy = jsCast<ProxyObject*>(exec->callee());
     JSValue handlerValue = proxy->handler();
     if (handlerValue.isNull())
-        return throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        return throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
 
     JSObject* handler = jsCast<JSObject*>(handlerValue);
     CallData callData;
@@ -543,7 +561,7 @@ bool ProxyObject::performDelete(ExecState* exec, PropertyName propertyName, Defa
 
     JSValue handlerValue = this->handler();
     if (handlerValue.isNull()) {
-        throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
         return false;
     }
 
@@ -612,7 +630,7 @@ bool ProxyObject::performPreventExtensions(ExecState* exec)
 
     JSValue handlerValue = this->handler();
     if (handlerValue.isNull()) {
-        throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
         return false;
     }
 
@@ -660,7 +678,7 @@ bool ProxyObject::performIsExtensible(ExecState* exec)
 
     JSValue handlerValue = this->handler();
     if (handlerValue.isNull()) {
-        throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
         return false;
     }
 
@@ -722,7 +740,7 @@ bool ProxyObject::performDefineOwnProperty(ExecState* exec, PropertyName propert
 
     JSValue handlerValue = this->handler();
     if (handlerValue.isNull()) {
-        throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
         return false;
     }
 
@@ -806,7 +824,7 @@ void ProxyObject::performGetOwnPropertyNames(ExecState* exec, PropertyNameArray&
     VM& vm = exec->vm();
     JSValue handlerValue = this->handler();
     if (handlerValue.isNull()) {
-        throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
         return;
     }
 
@@ -967,7 +985,7 @@ bool ProxyObject::performSetPrototype(ExecState* exec, JSValue prototype, bool s
 
     JSValue handlerValue = this->handler();
     if (handlerValue.isNull()) {
-        throwVMTypeError(exec, ASCIILiteral("Proxy 'handler' is null. It should be an Object."));
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
         return false;
     }
 
@@ -1019,6 +1037,72 @@ bool ProxyObject::performSetPrototype(ExecState* exec, JSValue prototype, bool s
 bool ProxyObject::setPrototype(JSObject* object, ExecState* exec, JSValue prototype, bool shouldThrowIfCantSet)
 {
     return jsCast<ProxyObject*>(object)->performSetPrototype(exec, prototype, shouldThrowIfCantSet);
+}
+
+JSValue ProxyObject::performGetPrototype(ExecState* exec)
+{
+    VM& vm = exec->vm();
+
+    JSValue handlerValue = this->handler();
+    if (handlerValue.isNull()) {
+        throwVMTypeError(exec, ASCIILiteral(s_proxyAlreadyRevokedErrorMessage));
+        return JSValue();
+    }
+
+    JSObject* handler = jsCast<JSObject*>(handlerValue);
+    CallData callData;
+    CallType callType;
+    JSValue getPrototypeOfMethod = handler->getMethod(exec, callData, callType, makeIdentifier(vm, "getPrototypeOf"), ASCIILiteral("'getPrototypeOf' property of a Proxy's handler should be callable."));
+    if (vm.exception())
+        return JSValue();
+
+    JSObject* target = this->target();
+    if (getPrototypeOfMethod.isUndefined())
+        return target->getPrototype(vm, exec);
+
+    MarkedArgumentBuffer arguments;
+    arguments.append(target);
+    JSValue trapResult = call(exec, getPrototypeOfMethod, callType, callData, handler, arguments);
+    if (vm.exception())
+        return JSValue();
+
+    if (!trapResult.isObject() && !trapResult.isNull()) {
+        throwVMTypeError(exec, ASCIILiteral("Proxy handler's 'getPrototypeOf' trap should either return an object or null."));
+        return JSValue();
+    }
+
+    bool targetIsExtensible = target->isExtensible(exec);
+    if (vm.exception())
+        return JSValue();
+    if (targetIsExtensible)
+        return trapResult;
+
+    JSValue targetPrototype = target->getPrototype(vm, exec);
+    if (vm.exception())
+        return JSValue();
+    if (!sameValue(exec, targetPrototype, trapResult)) {
+        throwVMTypeError(exec, ASCIILiteral("Proxy's 'getPrototypeOf' trap for a non-extensible target should return the same value as the target's prototype."));
+        return JSValue();
+    }
+
+    return trapResult;
+}
+
+JSValue ProxyObject::getPrototype(JSObject* object, ExecState* exec)
+{
+    return jsCast<ProxyObject*>(object)->performGetPrototype(exec);
+}
+
+void ProxyObject::revoke(VM& vm)
+{ 
+    // This should only ever be called once and we should strictly transition from Object to null.
+    RELEASE_ASSERT(!m_handler.get().isNull() && m_handler.get().isObject());
+    m_handler.set(vm, this, jsNull());
+}
+
+bool ProxyObject::isRevoked() const
+{
+    return handler().isNull();
 }
 
 void ProxyObject::visitChildren(JSCell* cell, SlotVisitor& visitor)

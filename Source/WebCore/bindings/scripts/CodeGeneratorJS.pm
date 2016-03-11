@@ -673,9 +673,8 @@ sub InterfaceRequiresAttributesOnInstance
     # Some of them are unavoidable due to DOM weirdness, in which case we should
     # add an IDL attribute for them
 
-    # FIXME: These two should be fixed by removing the custom override of message, etc
-    return 1 if $interfaceName =~ "Exception";
-    return 1 if $interfaceName =~ "Error";
+    # FIXME: We should be able to drop this once <rdar://problem/24466097> is fixed.
+    return 1 if $interface->isException;
 
     return 1 if IsDOMGlobalObject($interface);
 
@@ -2882,13 +2881,12 @@ sub GenerateImplementation
                 push(@implContent, "#if ${conditionalString}\n");
             }
 
-
+            my $functionReturn = "EncodedJSValue JSC_HOST_CALL";
             if (!$isCustom && $isOverloaded) {
                 # Append a number to an overloaded method's name to make it unique:
                 $functionName = $functionName . $function->{overloadIndex};
-                # Make this function static to avoid compiler warnings, since we
-                # don't generate a prototype for it in the header.
-                push(@implContent, "static ");
+                # Make this function static to avoid compiler warnings, since we don't generate a prototype for it in the header.
+                $functionReturn = "static inline EncodedJSValue";
             }
 
             my $functionImplementationName = $function->signature->extendedAttributes->{"ImplementedAs"} || $codeGenerator->WK_lcfirst($function->signature->name);
@@ -2896,17 +2894,18 @@ sub GenerateImplementation
             if (IsReturningPromise($function) && !$isCustom) {
                 AddToImplIncludes("JSDOMPromise.h");
 
-                push(@implContent, "static inline EncodedJSValue ${functionName}Promise(ExecState*, JSPromiseDeferred*);\n");
-                push(@implContent, "EncodedJSValue JSC_HOST_CALL ${functionName}(ExecState* state)\n");
-                push(@implContent, "{\n");
+                push(@implContent, <<END);
+static EncodedJSValue ${functionName}Promise(ExecState*, JSPromiseDeferred*);
+${functionReturn} ${functionName}(ExecState* state)
+{
+    return JSValue::encode(callPromiseFunction(*state, ${functionName}Promise));
+}
 
-                push(@implContent, "    return JSValue::encode(callPromiseFunction(*state, ${functionName}Promise));\n");
-
-                push(@implContent, "}\n");
-                push(@implContent, "\nstatic inline EncodedJSValue ${functionName}Promise(ExecState* state, JSPromiseDeferred* promiseDeferred)\n");
+static inline EncodedJSValue ${functionName}Promise(ExecState* state, JSPromiseDeferred* promiseDeferred)
+END
             }
             else {
-                push(@implContent, "EncodedJSValue JSC_HOST_CALL ${functionName}(ExecState* state)\n");
+                push(@implContent, "${functionReturn} ${functionName}(ExecState* state)\n");
             }
 
             push(@implContent, "{\n");
@@ -3287,7 +3286,7 @@ sub GenerateCallWith
         push(@$outputArray, "    auto* scriptContext = jsCast<JSDOMGlobalObject*>(state->lexicalGlobalObject())->scriptExecutionContext();\n");
         push(@$outputArray, "    if (!scriptContext)\n");
         push(@$outputArray, "        return" . ($returnValue ? " " . $returnValue : "") . ";\n");
-        push(@callWithArgs, "scriptContext");
+        push(@callWithArgs, "*scriptContext");
     }
     if ($function and $codeGenerator->ExtendedAttributeContains($callWith, "ScriptArguments")) {
         push(@$outputArray, "    RefPtr<Inspector::ScriptArguments> scriptArguments(Inspector::createScriptArguments(state, " . @{$function->parameters} . "));\n");
@@ -4318,11 +4317,10 @@ sub NativeToJSValue
         return "toJSNewlyCreated(state, $globalObject, WTF::getPtr($value))";
     }
 
-    # $type has to be used here because SVGViewSpec.transform is of type SVGTransformList.
-    if ($codeGenerator->IsSVGTypeNeedingTearOff($type) and $type =~ /(?<!String)List$/) {
+    if ($codeGenerator->IsSVGAnimatedType($interfaceName) or ($interfaceName eq "SVGViewSpec" and $type eq "SVGTransformList")) {
         # Convert from abstract RefPtr<ListProperty> to real type, so the right toJS() method can be invoked.
         $value = "static_cast<" . GetNativeType($type) . ">($value" . ".get())";
-    } elsif ($codeGenerator->IsSVGAnimatedType($interfaceName) or $interfaceName eq "SVGViewSpec") {
+    } elsif ($interfaceName eq "SVGViewSpec") {
         # Convert from abstract SVGProperty to real type, so the right toJS() method can be invoked.
         $value = "static_cast<" . GetNativeType($type) . ">($value)";
     } elsif ($codeGenerator->IsSVGTypeNeedingTearOff($type) and not $interfaceName =~ /List$/) {
@@ -4820,6 +4818,7 @@ template<> EncodedJSValue JSC_HOST_CALL ${constructorClassName}::construct(ExecS
     if (!initializerValue.isUndefinedOrNull()) {
         // Given the above test, this will always yield an object.
         JSObject* initializerObject = initializerValue.toObject(state);
+        ASSERT(!state->hadException());
 
         // Create the dictionary wrapper from the initializer object.
         JSDictionary dictionary(state, initializerObject);

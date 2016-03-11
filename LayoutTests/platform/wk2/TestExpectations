@@ -574,11 +574,6 @@ http/tests/security/feed-urls-from-remote.html
 # First two lines are reversed when test is flaky.
 fast/preloader/document-write-2.html [ Pass Failure ]
 
-# These two IDB tests are, by their nature, very slow.
-# Give them some extra time. (Why only for WebKit 2?)
-webkit.org/b/155028 storage/indexeddb/modern/256-open-databases.html [ Skip ]
-storage/indexeddb/modern/exceed-open-file-limit.html [ Skip ]
-
 ### END OF (3) Unclassified failures
 ########################################
 
@@ -625,6 +620,7 @@ platform/mac/fast/events/objc-event-api.html
 # https://bugs.webkit.org/show_bug.cgi?id=64285
 editing/pasteboard/file-drag-to-editable.html
 editing/pasteboard/file-input-files-access.html
+fast/dom/HTMLImageElement/image-with-blob-url-blocked-by-csp-img-src-star.html
 fast/dom/Window/window-postmessage-clone-frames.html
 fast/dom/Window/window-postmessage-clone.html
 fast/events/data-transfer-files-attribute-identity.html
@@ -677,6 +673,7 @@ http/tests/local/formdata/send-form-data.html
 http/tests/local/formdata/send-form-data-with-empty-file-filename.html
 http/tests/local/formdata/upload-events.html
 http/tests/security/clipboard/clipboard-file-access.html
+media/video-with-blob-url-allowed-by-csp-media-src-star.html
 media/video-src-blob.html
 storage/indexeddb/noblobs.html
 storage/indexeddb/noblobs-private.html

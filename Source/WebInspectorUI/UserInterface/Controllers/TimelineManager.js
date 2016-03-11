@@ -34,6 +34,7 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         WebInspector.Frame.addEventListener(WebInspector.Frame.Event.ResourceWasAdded, this._resourceWasAdded, this);
 
         WebInspector.heapManager.addEventListener(WebInspector.HeapManager.Event.GarbageCollected, this._garbageCollected, this);
+        WebInspector.memoryManager.addEventListener(WebInspector.MemoryManager.Event.MemoryPressure, this._memoryPressure, this);
 
         this._persistentNetworkTimeline = new WebInspector.NetworkTimeline;
 
@@ -52,14 +53,24 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
 
     static defaultInstruments()
     {
-        if (WebInspector.debuggableType === WebInspector.DebuggableType.JavaScript)
-            return [new WebInspector.ScriptInstrument];
+        if (WebInspector.debuggableType === WebInspector.DebuggableType.JavaScript) {
+            let defaults = [new WebInspector.ScriptInstrument];
+            if (WebInspector.HeapAllocationsInstrument.supported())
+                defaults.push(new WebInspector.HeapAllocationsInstrument);
+            return defaults;
+        }
 
         let defaults = [
             new WebInspector.NetworkInstrument,
             new WebInspector.LayoutInstrument,
             new WebInspector.ScriptInstrument,
         ];
+
+        if (WebInspector.MemoryInstrument.supported())
+            defaults.push(new WebInspector.MemoryInstrument);
+
+        if (WebInspector.HeapAllocationsInstrument.supported())
+            defaults.push(new WebInspector.HeapAllocationsInstrument);
 
         if (WebInspector.FPSInstrument.supported())
             defaults.push(new WebInspector.FPSInstrument);
@@ -302,6 +313,29 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
     memoryTrackingComplete()
     {
         // Called from WebInspector.MemoryObserver.
+    }
+
+    heapTrackingStarted(timestamp, snapshot)
+    {
+        // Called from WebInspector.HeapObserver.
+
+        this._addRecord(new WebInspector.HeapAllocationsTimelineRecord(timestamp, snapshot));
+
+        this.capturingStarted(timestamp);
+    }
+
+    heapTrackingCompleted(timestamp, snapshot)
+    {
+        // Called from WebInspector.HeapObserver.
+
+        this._addRecord(new WebInspector.HeapAllocationsTimelineRecord(timestamp, snapshot));
+    }
+
+    heapSnapshotAdded(timestamp, snapshot)
+    {
+        // Called from WebInspector.HeapAllocationsInstrument.
+
+        this._addRecord(new WebInspector.HeapAllocationsTimelineRecord(timestamp, snapshot));
     }
 
     // Private
@@ -668,6 +702,14 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
 
         let collection = event.data.collection;
         this._addRecord(new WebInspector.ScriptTimelineRecord(WebInspector.ScriptTimelineRecord.EventType.GarbageCollected, collection.startTime, collection.endTime, null, null, collection));
+    }
+
+    _memoryPressure(event)
+    {
+        if (!this._isCapturing)
+            return;
+
+        this.activeRecording.addMemoryPressureEvent(event.data.memoryPressureEvent);
     }
 
     _scriptProfilerTypeToScriptTimelineRecordType(type)

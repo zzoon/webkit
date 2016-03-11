@@ -44,6 +44,7 @@ WebInspector.TimelineRecording = class TimelineRecording extends WebInspector.Ob
             WebInspector.TimelineRecord.Type.Script,
             WebInspector.TimelineRecord.Type.RenderingFrame,
             WebInspector.TimelineRecord.Type.Memory,
+            WebInspector.TimelineRecord.Type.HeapAllocations,
         ];
 
         for (let type of timelines) {
@@ -243,7 +244,8 @@ WebInspector.TimelineRecording = class TimelineRecording extends WebInspector.Ob
         // Some records don't have source code timelines.
         if (record.type === WebInspector.TimelineRecord.Type.Network
             || record.type === WebInspector.TimelineRecord.Type.RenderingFrame
-            || record.type === WebInspector.TimelineRecord.Type.Memory)
+            || record.type === WebInspector.TimelineRecord.Type.Memory
+            || record.type === WebInspector.TimelineRecord.Type.HeapAllocations)
             return;
 
         if (!WebInspector.TimelineRecording.sourceCodeTimelinesSupported())
@@ -272,6 +274,16 @@ WebInspector.TimelineRecording = class TimelineRecording extends WebInspector.Ob
 
         if (newTimeline)
             this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.SourceCodeTimelineAdded, {sourceCodeTimeline});
+    }
+
+    addMemoryPressureEvent(memoryPressureEvent)
+    {
+        let memoryTimeline = this._timelines.get(WebInspector.TimelineRecord.Type.Memory);
+        console.assert(memoryTimeline, this._timelines);
+        if (!memoryTimeline)
+            return;
+
+        memoryTimeline.addMemoryPressureEvent(memoryPressureEvent);
     }
 
     computeElapsedTime(timestamp)

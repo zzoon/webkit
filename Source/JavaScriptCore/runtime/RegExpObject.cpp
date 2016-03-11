@@ -32,6 +32,7 @@
 #include "JSCInlines.h"
 #include "RegExpConstructor.h"
 #include "RegExpMatchesArray.h"
+#include "RegExpObjectInlines.h"
 #include "RegExpPrototype.h"
 #include <wtf/text/StringBuilder.h>
 
@@ -161,41 +162,13 @@ void RegExpObject::put(JSCell* cell, ExecState* exec, PropertyName propertyName,
 
 JSValue RegExpObject::exec(ExecState* exec, JSGlobalObject* globalObject, JSString* string)
 {
-    if (MatchResult result = match(exec, globalObject, string))
-        return createRegExpMatchesArray(exec, globalObject, string, regExp(), result);
-    return jsNull();
+    return execInline(exec, globalObject, string);
 }
 
 // Shared implementation used by test and exec.
 MatchResult RegExpObject::match(ExecState* exec, JSGlobalObject* globalObject, JSString* string)
 {
-    RegExp* regExp = this->regExp();
-    RegExpConstructor* regExpConstructor = globalObject->regExpConstructor();
-    String input = string->value(exec);
-    VM& vm = globalObject->vm();
-    if (!regExp->global())
-        return regExpConstructor->performMatch(vm, regExp, string, input, 0);
-
-    JSValue jsLastIndex = getLastIndex();
-    unsigned lastIndex;
-    if (LIKELY(jsLastIndex.isUInt32())) {
-        lastIndex = jsLastIndex.asUInt32();
-        if (lastIndex > input.length()) {
-            setLastIndex(exec, 0);
-            return MatchResult::failed();
-        }
-    } else {
-        double doubleLastIndex = jsLastIndex.toInteger(exec);
-        if (doubleLastIndex < 0 || doubleLastIndex > input.length()) {
-            setLastIndex(exec, 0);
-            return MatchResult::failed();
-        }
-        lastIndex = static_cast<unsigned>(doubleLastIndex);
-    }
-
-    MatchResult result = regExpConstructor->performMatch(vm, regExp, string, input, lastIndex);
-    setLastIndex(exec, result.end);
-    return result;
+    return matchInline(exec, globalObject, string);
 }
 
 } // namespace JSC

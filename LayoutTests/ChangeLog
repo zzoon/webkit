@@ -1,3 +1,1095 @@
+2016-03-11  Frederic Wang  <fwang@igalia.com>
+
+        Skip content-editable-as-textarea.html on GTK as it uses AX API.
+
+        Unreviewed test gardening.
+
+        * platform/gtk/TestExpectations:
+
+2016-03-10  Jer Noble  <jer.noble@apple.com>
+
+        CRASH at WebCore::RenderView::updateVisibleViewportRect
+        https://bugs.webkit.org/show_bug.cgi?id=155209
+        <rdar://problem/23997530>
+
+        Reviewed by Simon Fraser.
+
+        (These files were mistakenly landed in a previous commit:)
+        * media/video-crash-invisible-autoplay-display-none-expected.txt: Added.
+        * media/video-crash-invisible-autoplay-display-none.html: Added.
+
+2016-03-10  Zalan Bujtas  <zalan@apple.com>
+
+        Simple line layout: Add text-align: justify support.
+        https://bugs.webkit.org/show_bug.cgi?id=155006
+
+        Reviewed by Antti Koivisto.
+
+        Rebaseline based on simple line layout output.
+
+        * fast/text/whitespace/023-expected.txt:
+        * platform/mac/css2.1/t0905-c5525-fltwidth-00-c-g-expected.txt:
+
+2016-03-10  Nan Wang  <n_wang@apple.com>
+
+        AX: Force allow user zoom
+        https://bugs.webkit.org/show_bug.cgi?id=155056
+
+        Reviewed by Simon Fraser.
+
+        * fast/viewport/ios/force-always-user-scalable-expected.txt: Added.
+        * fast/viewport/ios/force-always-user-scalable.html: Added.
+        * platform/ios-simulator-wk2/TestExpectations:
+
+2016-03-10  Jiewen Tan  <jiewen_tan@apple.com>
+
+        WebKit should not be redirected to an invalid URL
+        https://bugs.webkit.org/show_bug.cgi?id=155263
+        <rdar://problem/22820172>
+
+        Reviewed by Brent Fulgham.
+
+        * http/tests/navigation/redirect-to-invalid-url-expected.txt: Added.
+        * http/tests/navigation/redirect-to-invalid-url.html: Added.
+        * http/tests/navigation/resources/redirect-to-invalid-url-frame.php: Added.
+
+2016-03-10  Nan Wang  <n_wang@apple.com>
+
+        AX: Implement bounds/position and index related text marker functions using TextIterator
+        https://bugs.webkit.org/show_bug.cgi?id=154976
+
+        Reviewed by Chris Fleizach.
+
+        * accessibility/mac/text-marker-for-index-expected.txt: Added.
+        * accessibility/mac/text-marker-for-index.html: Added.
+        * accessibility/mac/text-marker-word-nav-expected.txt:
+        * accessibility/mac/text-marker-word-nav.html:
+
+2016-03-10  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [Cocoa] Test gardening after r197933
+        <rdar://problem/25091368>
+
+        Unreviewed.
+
+        * fast/text/woff2-expected.html:
+        * fast/text/woff2.html:
+
+2016-03-10  Daniel Bates  <dabates@apple.com>
+
+        CSP: Implement frame-ancestors directive
+        https://bugs.webkit.org/show_bug.cgi?id=154345
+        <rdar://problem/24702161>
+
+        Reviewed by Brent Fulgham.
+
+        Adds new tests to ensure we ignore directive frame-ancestors when defined a policy delivered
+        in an HTML meta element or in a report-only policy (i.e. delivered via HTTP header Content-
+        Security-Policy-Report-Only). Also adds new test to ensure that we send a violation report
+        when the directive frame-ancestors is violated.
+
+        Updated many existing tests and test results that unnecessarily depended on a DOM SecurityError
+        exception being thrown when accessing the content of a cross-origin frame. It is sufficient
+        and more direct to test directive frame-ancestors by dumping the contents of all children frames
+        on the page. We design the tests such that a child frame that was blocked by the frame-ancestors
+        directive is expected to have no content. A child frame that was allowed by the frame-ancestors
+        directive is expected to have content.
+
+        * TestExpectations: Mark frame-ancestors tests as PASS so that we run them.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-in-meta-element-ignored-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-in-meta-element-ignored.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-in-report-only-ignored-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-in-report-only-ignored.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-none-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-none-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-self-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-self-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-star-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-star-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-url-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-url-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-url-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-cross-url-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-none-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-none-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-self-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-self-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-star-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-star-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-url-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-url-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-url-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-cross-in-same-url-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-none-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-none-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-self-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-self-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-star-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-star-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-url-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-url-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-url-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-cross-url-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-none-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-none-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-self-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-self-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-star-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-star-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-url-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-url-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-url-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-nested-same-in-same-url-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-none-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-none-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-protocolless-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-protocolless-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-self-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-self-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-self-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-self-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-star-allow-crossorigin-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-star-allow-crossorigin.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-star-allow-sameorigin-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-star-allow-sameorigin.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-url-allow-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-url-allow.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-url-block-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/frame-ancestors-url-block.html:
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-cross-origin-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-cross-origin-https-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-cross-origin-https.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-cross-origin.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-same-origin-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-same-origin-https-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-same-origin-https.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/frame-ancestors/report-frame-ancestors-same-origin.html: Added.
+        * http/tests/security/contentSecurityPolicy/resources/echo-intertag.pl: Added.
+        * http/tests/security/contentSecurityPolicy/resources/frame-ancestors-test.js:
+        (done): Added.
+        (injectIFrame): Modified to make use of handleFrameEvent().
+        (handleFrameEvent): Added.
+        (iframeLoaded): Deleted.
+        * http/tests/security/contentSecurityPolicy/resources/frame-in-frame.pl:
+
+2016-03-10  Andy VanWagoner  <andy@instructure.com>
+
+        Add shouldNotBe to standalone test harness
+        https://bugs.webkit.org/show_bug.cgi?id=155300
+
+        Reviewed by Saam Barati.
+
+        Copy over the shouldNotBe function from js-test-pre. This fixes errors
+        introduced be new Intl tests.
+
+        * resources/standalone-pre.js:
+        (shouldNotBe):
+
+2016-03-10  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Rebaseline two inspector tests after r197954 changed the results.
+
+        Unreviewed test gardening.
+
+        * inspector/debugger/command-line-api-exception-expected.txt:
+        * platform/mac/inspector/model/remote-object-expected.txt:
+
+2016-03-10  Michael Saboff  <msaboff@apple.com>
+
+        [ES6] Allow RegExp constructor to take pattern from an existing RegExp with new flags
+        https://bugs.webkit.org/show_bug.cgi?id=155315
+
+        Reviewed by Saam Barati.
+
+        New and updated test for change.
+
+        * fast/regex/constructor-expected.txt:
+        * fast/regex/script-tests/constructor.js:
+        Changed test for new behavior.`
+
+        * js/regexp-old-regexp-new-flags-expected.txt: Added.
+        * js/regexp-old-regexp-new-flags.html: Added.
+        * js/script-tests/regexp-old-regexp-new-flags.js: Added.
+        New test.
+
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.3/S15.10.3.1_A2_T1-expected.txt: Removed.
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.3/S15.10.3.1_A2_T1.html: Removed.
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.3/S15.10.3.1_A2_T2-expected.txt: Removed.
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.3/S15.10.3.1_A2_T2.html: Removed.
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.4/S15.10.4.1_A2_T1-expected.txt: Removed.
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.4/S15.10.4.1_A2_T1.html: Removed.
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.4/S15.10.4.1_A2_T2-expected.txt: Removed.
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.4/S15.10.4.1_A2_T2.html: Removed.
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.4/S15.10.4.1_A8_T8-expected.txt: Removed.
+        * sputnik/Conformance/15_Native_Objects/15.10_RegExp/15.10.4/S15.10.4.1_A8_T8.html: Removed.
+        Removed obsolete tests.
+
+2016-03-10  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [OS X] Main frame scrollbars should appear on the left on RTL systems
+        https://bugs.webkit.org/show_bug.cgi?id=155149
+
+        Reviewed by Simon Fraser.
+
+        * fast/scrolling/rtl-scrollbars-expected.html: Added.
+        * fast/scrolling/rtl-scrollbars-simple-expected-mismatch.html: Added.
+        * fast/scrolling/rtl-scrollbars-simple.html: Added.
+        * fast/scrolling/rtl-scrollbars.html: Added.
+        * platform/mac-wk1/TestExpectations:
+        * platform/mac/TestExpectations:
+        * platform/efl/TestExpectations:
+        * platform/gtk/TestExpectations:
+        * platform/ios-simulator/TestExpectations:
+        * platform/win/TestExpectations:
+
+2016-03-07  Jer Noble  <jer.noble@apple.com>
+
+        Add separate WK and WK2 preferences for requiring user gestures for video media, distinct from user gestures for media generally
+        https://bugs.webkit.org/show_bug.cgi?id=155141
+
+        Reviewed by Beth Dakin.
+
+        Update layout tests to reflect new restriction name.
+
+        * media/audio-playback-restriction-play-expected.txt:
+        * media/audio-playback-restriction-play.html:
+        * media/no-autoplay-with-user-gesture-requirement.html:
+        * media/video-load-require-user-gesture.html:
+        * media/video-play-require-user-gesture.html:
+        * media/video-crash-invisible-autoplay-display-none-expected.txt: Added.
+        * media/video-crash-invisible-autoplay-display-none.html: Added.
+        * media/video-main-content-allow-expected.txt:
+        * media/video-main-content-allow-then-deny-expected.txt:
+        * media/video-main-content-allow-then-deny.html:
+        * media/video-main-content-allow.html:
+        * media/video-main-content-deny-display-none-expected.txt:
+        * media/video-main-content-deny-display-none.html:
+        * media/video-main-content-deny-not-in-dom-expected.txt:
+        * media/video-main-content-deny-not-in-dom.html:
+        * media/video-main-content-deny-not-visible-expected.txt:
+        * media/video-main-content-deny-not-visible.html:
+        * media/video-main-content-deny-obscured-expected.txt:
+        * media/video-main-content-deny-obscured.html:
+        * media/video-main-content-deny-too-small-expected.txt:
+        * media/video-main-content-deny-too-small.html:
+
+2016-03-10  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Add :defined support
+        https://bugs.webkit.org/show_bug.cgi?id=155108
+
+        Reviewed by Antti Koivisto.
+
+        Added W3C style testharness.js tests and ref tests for :defined pseudo class.
+
+        * fast/custom-elements/defined-pseudo-class-expected.txt: Added.
+        * fast/custom-elements/defined-pseudo-class.html: Added.
+        * fast/custom-elements/defined-rule-expected.html: Added.
+        * fast/custom-elements/defined-rule.html: Added.
+
+2016-03-10  Daniel Bates  <dabates@apple.com>
+
+        CSP: Implement support for script and style nonces
+        https://bugs.webkit.org/show_bug.cgi?id=116508
+        <rdar://problem/24963980>
+
+        Reviewed by Brent Fulgham.
+
+        Update expected results due to differences between Blink and WebKit violation message formats.
+
+        Additionally mark script- and style- nonce tests as PASS in LayoutTests/TestExpectations so
+        that we run them.
+
+        * TestExpectations:
+        * http/tests/security/contentSecurityPolicy/1.1/scriptnonce-and-scripthash-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scriptnonce-and-scripthash.html:
+        * http/tests/security/contentSecurityPolicy/1.1/scriptnonce-basic-blocked-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scriptnonce-ignore-unsafeinline-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scriptnonce-invalidnonce-expected.txt: Also update result
+        to reflect that we consider "'n-" an invalid source expression (as expected).
+        * http/tests/security/contentSecurityPolicy/1.1/stylenonce-allowed-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/stylenonce-blocked-expected.txt:
+
+2016-03-10  David Kilzer  <ddkilzer@apple.com>
+
+        [iOS] DumpRenderTree crashes when accessing window.testRunner.inspectorTestStubURL
+        <http://webkit.org/b/155295>
+
+        Reviewed by Brent Fulgham.
+
+        * platform/ios-simulator-wk1/TestExpectations:
+        * platform/ios-simulator-wk2/TestExpectations:
+        - Remove all "inspector/" tests.  They are already skipped in
+          platform/ios-simulator/TestExpectations, so no need to
+          resurrect them here.
+
+2016-03-10  Daniel Bates  <dabates@apple.com>
+
+        CSP: Implement support for inline script and inline style hashes
+        https://bugs.webkit.org/show_bug.cgi?id=155007
+        <rdar://problem/24964098>
+
+        Reviewed by Brent Fulgham.
+
+        Add new test http/tests/security/contentSecurityPolicy/1.1/scripthash-tests.html to ensure that
+        script hashes are interpreted correctly. Update many existing tests that had a hash source with
+        a SHA-1 hash to use a SHA-256 hash. The valid hash algorithms are SHA-256, SHA-384, and SHA-512
+        per the Content Security Policy Level 3 spec. At the time of writing, Blink also supports SHA-1.
+
+        * TestExpectations: Mark many CSP 1.1 tests as PASS so that we run them. Remove entries for tests
+        http/tests/security/contentSecurityPolicy/1.1/{script, style}hash-default-src.html as these tests
+        now pass.
+        * http/tests/security/contentSecurityPolicy/1.1/resources/didRunInlineScriptEpilogue.js: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/resources/didRunInlineScriptPrologue.js: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/resources/testScriptHash.php: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-allowed.html: Update test as SHA-1 is not
+        a supported hash algorithm per the Content Security Policy Level 3 spec.
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-basic-blocked-expected.txt: Ditto.
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-basic-blocked.html: Ditto.
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-default-src-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-ignore-unsafeinline-expected.txt: Ditto.
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-ignore-unsafeinline.html: Ditto.
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-malformed-expected.txt:
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-tests-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-tests.html: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/scripthash-unicode-normalization.html: Update test
+        as SHA-1 is not a supported hash algorithm per the Content Security Policy Level 3 spec.
+        * http/tests/security/contentSecurityPolicy/1.1/stylehash-allowed-expected.txt: Ditto.
+        * http/tests/security/contentSecurityPolicy/1.1/stylehash-allowed.html: Ditto.
+        * http/tests/security/contentSecurityPolicy/1.1/stylehash-basic-blocked-error-event.html: Ditto.
+        * http/tests/security/contentSecurityPolicy/1.1/stylehash-basic-blocked-expected.txt: Ditto.
+        * http/tests/security/contentSecurityPolicy/1.1/stylehash-basic-blocked.html: Ditto.
+        * http/tests/security/contentSecurityPolicy/1.1/stylehash-default-src-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/1.1/stylehash-svg-style-basic-blocked-error-event.html: Update test
+        as SHA-1 is not a supported hash algorithm per the Content Security Policy Level 3 spec.
+
+2016-03-10  Frederic Wang  <fwang@igalia.com>
+
+        [GTK] Add support for WOFF2
+        https://bugs.webkit.org/show_bug.cgi?id=152616
+
+        Reviewed by Carlos Garcia Campos.
+
+        * fast/text/woff2-expected.html: Adjust font-size to work around anti-aliasing effects.
+        * fast/text/woff2.html: Ditto.
+        * platform/gtk/TestExpectations: Update test expectation of woff2 test for GTK.
+
+2016-03-10  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [css-grid] Fix placement for unknown named grid lines
+        https://bugs.webkit.org/show_bug.cgi?id=155230
+
+        Reviewed by Sergio Villar Senin.
+
+        Updated current tests to the new expected behavior and created a new
+        test checking different cases explicitly.
+
+        * fast/css-grid-layout/grid-container-change-named-grid-lines-recompute-child.html:
+        * fast/css-grid-layout/grid-item-bad-named-area-auto-placement-expected.txt:
+        * fast/css-grid-layout/grid-item-bad-named-area-auto-placement.html:
+        * fast/css-grid-layout/grid-item-named-grid-area-resolution.html:
+        * fast/css-grid-layout/grid-item-named-grid-line-resolution-expected.txt:
+        * fast/css-grid-layout/grid-item-named-grid-line-resolution.html:
+        * fast/css-grid-layout/grid-item-negative-position-resolution.html:
+        * fast/css-grid-layout/grid-item-position-changed-dynamic.html:
+        * fast/css-grid-layout/grid-item-unknown-named-grid-line-resolution-expected.txt: Added.
+        * fast/css-grid-layout/grid-item-unknown-named-grid-line-resolution.html: Added.
+        * fast/css-grid-layout/named-grid-lines-with-named-grid-areas-resolution.html:
+
+2016-03-09  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Get a RemoteObject or ObjectPreview from HeapSnapshot Object Identifier
+        https://bugs.webkit.org/show_bug.cgi?id=155264
+        <rdar://problem/25070716>
+
+        Reviewed by Timothy Hatcher.
+
+        * inspector/heap/getPreview-expected.txt: Added.
+        * inspector/heap/getPreview.html: Added.
+        * inspector/heap/getRemoteObject-expected.txt: Added.
+        * inspector/heap/getRemoteObject.html: Added.
+        Test the new protocol methods in different scenarios.
+
+        * inspector/heap/snapshot-expected.txt:
+        * inspector/heap/snapshot.html:
+        Fix typo.
+
+2016-03-09  Andy VanWagoner  <thetalecrafter@gmail.com>
+
+        [INTL] Intl Constructors not web compatible with Object.create usage
+        https://bugs.webkit.org/show_bug.cgi?id=153679
+
+        Reviewed by Darin Adler.
+
+        Add tests for Object.create + contructor.call initialization of NumberFormat
+        and DateTimeFormat objects.
+
+        * js/intl-datetimeformat-expected.txt:
+        * js/intl-numberformat-expected.txt:
+        * js/script-tests/intl-datetimeformat.js:
+        * js/script-tests/intl-numberformat.js:
+
+2016-03-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        defineElement should upgrade existing unresolved custom elements
+        https://bugs.webkit.org/show_bug.cgi?id=155107
+
+        Reviewed by Darin Adler.
+
+        Added W3C style testharness.js tests for asynchronously defining custom elements.
+
+        * fast/custom-elements/upgrading/Node-cloneNode.html:
+        * fast/custom-elements/upgrading/upgrading-parser-created-element-expected.txt: Added.
+        * fast/custom-elements/upgrading/upgrading-parser-created-element.html: Added.
+
+2016-03-09  Saam Barati  <sbarati@apple.com>
+
+        ES6: Implement lexical scoping for function definitions in strict mode
+        https://bugs.webkit.org/show_bug.cgi?id=152844
+
+        Reviewed by Geoffrey Garen.
+
+        * js/let-syntax-expected.txt:
+        * js/parser-syntax-check-expected.txt:
+        * js/script-tests/parser-syntax-check.js:
+        (testFailed):
+        (runTest):
+
+2016-03-09  Jer Noble  <jer.noble@apple.com>
+
+        Add heuristic for "main content" videos which override user gesture requirements
+        https://bugs.webkit.org/show_bug.cgi?id=155224
+
+        Reviewed by Eric Carlson.
+
+        * media/video-main-content-allow-expected.txt: Added.
+        * media/video-main-content-allow-then-deny-expected.txt: Added.
+        * media/video-main-content-allow-then-deny.html: Added.
+        * media/video-main-content-allow.html: Added.
+        * media/video-main-content-deny-display-none-expected.txt: Added.
+        * media/video-main-content-deny-display-none.html: Added.
+        * media/video-main-content-deny-not-in-dom-expected.txt: Added.
+        * media/video-main-content-deny-not-in-dom.html: Added.
+        * media/video-main-content-deny-not-visible-expected.txt: Added.
+        * media/video-main-content-deny-not-visible.html: Added.
+        * media/video-main-content-deny-obscured-expected.txt: Added.
+        * media/video-main-content-deny-obscured.html: Added.
+        * media/video-main-content-deny-too-small-expected.txt: Added.
+        * media/video-main-content-deny-too-small.html: Added.
+
+2016-03-09  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skipping js/regress/getter-richards-try-catch.html on ios-simulator debug
+        https://bugs.webkit.org/show_bug.cgi?id=155271
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-03-09  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skip two flaky tests on mac-wk1
+        https://bugs.webkit.org/show_bug.cgi?id=155196
+
+        Unreviewed test gardening.
+
+        media/video-with-blob-url-allowed-by-csp-media-src-star.html and media/video-with-data-url-allowed-by-csp-media-src-star.html
+        are flaky on mac-wk1. Skipping to get bots to green during investigation.
+
+        * platform/mac-wk1/TestExpectations:
+
+2016-03-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Rename Node.treeRoot to rootNode and turn it on by default
+        https://bugs.webkit.org/show_bug.cgi?id=155226
+
+        Reviewed by Antonio Gomes.
+        
+        Split Node-interface-treeRoot.html into two pieces, the one that doesn't invoke shadow DOM and the other that tests
+        shadow DOM related cases. I intend to upstream these tests to W3C at some point so keep them in testharness.js form.
+
+        * fast/dom/Node/rootNode-expected.txt: Added.
+        * fast/dom/Node/rootNode.html: Copied from LayoutTests/fast/shadow-dom/Node-interface-treeRoot.html.
+        * fast/shadow-dom/Node-interface-rootNode-expected.txt: Renamed from Node-interface-treeRoot-expected.txt.
+        * fast/shadow-dom/Node-interface-rootNode.html: Renamed from LayoutTests/fast/shadow-dom/Node-interface-treeRoot.html.
+        * js/dom/dom-static-property-for-in-iteration-expected.txt:
+        * platform/efl/js/dom/dom-static-property-for-in-iteration-expected.txt:
+        * platform/gtk/js/dom/dom-static-property-for-in-iteration-expected.txt:
+
+2016-03-09  Michael Saboff  <msaboff@apple.com>
+
+        [ES6] Implement RegExp sticky flag and related functionality
+        https://bugs.webkit.org/show_bug.cgi?id=155177
+
+        Reviewed by Saam Barati.
+
+        New and updated tests.
+
+        * js/Object-getOwnPropertyNames-expected.txt:
+        * js/regexp-flags-expected.txt:
+        * js/regexp-sticky-expected.txt: Added.
+        * js/regexp-sticky.html: Added.
+        * js/script-tests/Object-getOwnPropertyNames.js:
+        * js/script-tests/regexp-flags.js:
+        (RegExp.prototype.hasOwnProperty): Deleted check for sticky property.
+        * js/script-tests/regexp-sticky.js: New test.
+        (asString):
+        (testStickyExec):
+        (testStickyMatch):
+
+2016-03-09  Mark Lam  <mark.lam@apple.com>
+
+        FunctionExecutable::ecmaName() should not be based on inferredName().
+        https://bugs.webkit.org/show_bug.cgi?id=155203
+
+        Reviewed by Michael Saboff.
+
+        * js/script-tests/function-toString-vs-name.js:
+        - Fixed up object property test section and added new test cases.
+        * platform/mac/http/tests/media/media-source/mediasource-sourcebuffer-mode-expected.txt:
+
+2016-03-09  Chris Dumez  <cdumez@apple.com>
+
+        Align HTMLKeygenElement.keytype with the specification
+        https://bugs.webkit.org/show_bug.cgi?id=155214
+
+        Reviewed by Darin Adler.
+
+        Add test coverage for HTMLKeygenElement.keytype.
+
+        * fast/dom/HTMLKeygenElement/keygen-keytype-expected.txt: Added.
+        * fast/dom/HTMLKeygenElement/keygen-keytype.html: Added.
+
+2016-03-09  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Cleaning up TestExpectations files to remove deleted tests and duplicate entries for ios-simulator.
+
+        Unreviewed test gardening.
+
+        * TestExpectations:
+        * platform/ios-simulator/TestExpectations:
+
+2016-03-09  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skipping fast/events/max-tabindex-focus.html on ios-simulator
+        https://bugs.webkit.org/show_bug.cgi?id=155233
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-03-08  Brent Fulgham  <bfulgham@apple.com>
+
+        Local HTML should be blocked from localStorage access unless "Disable Local File Restrictions" is checked..
+        https://bugs.webkit.org/show_bug.cgi?id=155185
+        <rdar://problem/11101440>
+
+        Reviewed by Zalan Bujtas.
+
+        * storage/domstorage/localstorage/blocked-file-access-expected.txt: Added.
+        * storage/domstorage/localstorage/blocked-file-access.html: Added.
+        * storage/domstorage/localstorage/resources/blocked-example.html: Added.
+
+2016-03-09  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [css-grid] Allow to place positioned grid items on the padding
+        https://bugs.webkit.org/show_bug.cgi?id=155199
+
+        Reviewed by Sergio Villar Senin.
+
+        Add new tests and updated results in a current one.
+
+        * fast/css-grid-layout/grid-positioned-items-implicit-grid.html:
+        * fast/css-grid-layout/grid-positioned-items-padding-expected.txt: Added.
+        * fast/css-grid-layout/grid-positioned-items-padding.html: Added.
+        * fast/css-grid-layout/grid-positioned-items-within-grid-implicit-track-expected.txt: Added.
+        * fast/css-grid-layout/grid-positioned-items-within-grid-implicit-track.html: Added.
+
+2016-03-09  Andreas Kling  <akling@apple.com>
+
+        ImageDocuments leak their world.
+        <https://webkit.org/b/155167>
+        <rdar://problem/24987363>
+
+        Reviewed by Antti Koivisto.
+
+        Made a little test that loads an image into an <iframe> 10 times and then
+        triggers a garbage collection and checks that all the documents got destroyed.
+
+        Prior to this change, all 10 ImageDocuments would remain alive at the end.
+
+        This got rolled out the first time because it failed on bots. It failed due
+        to expecting a specific number of documents to be live at the start of the
+        test, which was not reliable on bots since we appear to have more leaks(!)
+
+        Tweaked the test to check the delta in live document count instead.
+
+        * fast/dom/ImageDocument-world-leak-expected.txt: Added.
+        * fast/dom/ImageDocument-world-leak.html: Added.
+
+2016-03-08  Sergio Villar Senin  <svillar@igalia.com>
+
+        [css-grid] Fix auto-track sizing with min-size:auto and specific sizes
+        https://bugs.webkit.org/show_bug.cgi?id=155165
+
+        Reviewed by Darin Adler.
+
+        * fast/css-grid-layout/grid-automatic-minimum-for-auto-columns-expected.txt:
+        * fast/css-grid-layout/grid-automatic-minimum-for-auto-columns.html:
+        * fast/css-grid-layout/grid-automatic-minimum-for-auto-rows-expected.txt:
+        * fast/css-grid-layout/grid-automatic-minimum-for-auto-rows.html:
+
+2016-03-09  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [css-grid] Initial support for implicit grid before explicit grid
+        https://bugs.webkit.org/show_bug.cgi?id=155014
+
+        Reviewed by Darin Adler.
+
+        Updated results in current tests and added specific test for this.
+
+        * fast/css-grid-layout/grid-auto-flow-resolution.html:
+        * fast/css-grid-layout/grid-item-negative-position-resolution.html:
+        * fast/css-grid-layout/grid-item-spanning-resolution.html:
+        * fast/css-grid-layout/implicit-tracks-before-explicit-expected.txt: Added.
+        * fast/css-grid-layout/implicit-tracks-before-explicit.html: Added.
+
+2016-03-09  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [iOS] Arabic text on Wikipedia is shown as boxes
+        https://bugs.webkit.org/show_bug.cgi?id=155129
+        <rdar://problem/24919902>
+
+        Reviewed by Darin Adler.
+
+        This test is iOS-specific.
+
+        * platform/efl/TestExpectations:
+        * platform/gtk/TestExpectations:
+        * platform/mac/TestExpectations:
+        * platform/win/TestExpectations:
+        * fast/text/arabic-blacklisted-expected.html: Added.
+        * fast/text/arabic-blacklisted.html: Added.
+
+2016-03-08  Chris Dumez  <cdumez@apple.com>
+
+        Element with maximum tabIndex cannot be returned by nextElementWithGreaterTabIndex()
+        https://bugs.webkit.org/show_bug.cgi?id=155215
+
+        Reviewed by Ryosuke Niwa.
+
+        Add test to make sure that an Element with a tabIndex equal to
+        2147483647 (maximum tabIndex) can be focused.
+
+        * fast/events/max-tabindex-focus-expected.txt: Added.
+        * fast/events/max-tabindex-focus.html: Added.
+
+2016-03-08  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG should be able to constant-fold strings
+        https://bugs.webkit.org/show_bug.cgi?id=155200
+
+        Reviewed by Geoffrey Garen.
+
+        * js/regress/script-tests/strcat-const.js: Added.
+        (foo):
+        (bar):
+        * js/regress/script-tests/strcat-length-const.js: Added.
+        (foo):
+        (bar):
+        * js/regress/strcat-const-expected.txt: Added.
+        * js/regress/strcat-const.html: Added.
+        * js/regress/strcat-length-const-expected.txt: Added.
+        * js/regress/strcat-length-const.html: Added.
+
+2016-03-08  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Add Heap domain start/stop tracking commands
+        https://bugs.webkit.org/show_bug.cgi?id=155190
+
+        Reviewed by Brian Burg.
+
+        * inspector/heap/tracking-expected.txt: Added.
+        * inspector/heap/tracking.html: Added.
+
+2016-03-08  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Add a way to create a Heap Snapshot
+        https://bugs.webkit.org/show_bug.cgi?id=155188
+
+        Reviewed by Brian Burg.
+
+        * inspector/heap/snapshot-expected.txt: Added.
+        * inspector/heap/snapshot.html: Added.
+
+2016-03-08  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Move two indexeddb test skips out of wk2/TestExpectations and in to TestExpectations.
+
+        Unreviewed test gardening.
+
+        * TestExpectations:
+        * platform/wk2/TestExpectations:
+
+2016-03-08  Mark Lam  <mark.lam@apple.com>
+
+        Implement Function.name support for getters/setters and inferring name of function properties.
+        https://bugs.webkit.org/show_bug.cgi?id=154865
+
+        Reviewed by Geoffrey Garen.
+
+        * js/function-toString-vs-name-expected.txt: Added.
+        * js/function-toString-vs-name.html: Added.
+        * js/script-tests/function-toString-vs-name.js: Added.
+
+2016-03-08  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Font size computed style is innaccurate
+        https://bugs.webkit.org/show_bug.cgi?id=154705
+        <rdar://problem/23474068>
+
+        Reviewed by Timothy Hatcher.
+
+        Update expected results.
+
+        * css3/calc/font-size-fractional-expected.txt:
+        * css3/viewport-percentage-lengths/viewport-percentage-lengths-relative-font-size.html:
+        * css3/viewport-percentage-lengths/viewport-percentage-lengths-relative-font-size-expected.txt:
+        * editing/mac/attributed-string/font-size-expected.txt:
+        * editing/mac/attributed-string/vertical-align-expected.txt:
+        * platform/mac-mavericks/editing/mac/attributed-string/font-size-expected.txt:
+        * platform/mac-mavericks/editing/mac/attributed-string/vertical-align-expected.txt:
+        * platform/mac-yosemite/editing/mac/attributed-string/font-size-expected.txt:
+        * platform/mac-yosemite/editing/mac/attributed-string/vertical-align-expected.txt:
+
+2016-03-08  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking storage/domstorage/events/basic-body-attribute.html as flaky on ios-simulator-wk2
+        https://bugs.webkit.org/show_bug.cgi?id=155201
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator-wk2/TestExpectations:
+
+2016-03-08  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        [Font Loading] Crash when a single load request causes multiple fonts to fail loading
+        https://bugs.webkit.org/show_bug.cgi?id=155009
+
+        Reviewed by Simon Fraser.
+
+        * fast/text/font-face-set-document-multiple-failure-expected.txt: Added.
+        * fast/text/font-face-set-document-multiple-failure.html: Added.
+
+2016-03-08  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skip fast/events/prevent-default-prevents-interaction-with-scrollbars.html on ios-simulator
+
+        Unreviewed test gardening.
+
+        The test relies on mouse events, which are unsupported on ios-simulator.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-03-08  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skip css3/filters tests that seem to cause a crash on ios-simulator
+        https://bugs.webkit.org/show_bug.cgi?id=153933
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-03-08  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r197766.
+        https://bugs.webkit.org/show_bug.cgi?id=155183
+
+        Has platform-specific code in non-platform files (Requested by
+        smfr on #webkit).
+
+        Reverted changeset:
+
+        "AX: Force allow user zoom"
+        https://bugs.webkit.org/show_bug.cgi?id=155056
+        http://trac.webkit.org/changeset/197766
+
+2016-03-08  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skip svg/animations/animate-marker-orient-from-angle-to-autostartreverse.html on ios-simulator
+        https://bugs.webkit.org/show_bug.cgi?id=155174
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-03-08  Antonio Gomes  <tonikitoo@webkit.org>
+
+        Scrolling does not work when the mouse down is handled by a node
+        https://bugs.webkit.org/show_bug.cgi?id=19033
+
+        Reviewed by Simon Fraser.
+
+        * fast/events/prevent-default-prevents-interaction-with-scrollbars-expected.txt: Added.
+        * fast/events/prevent-default-prevents-interaction-with-scrollbars.html: Added.
+
+2016-03-08  Michael Saboff  <msaboff@apple.com>
+
+        [ES6] Regular Expression canonicalization tables for Unicode need to be updated to use Unicode CaseFolding.txt
+        https://bugs.webkit.org/show_bug.cgi?id=155114
+
+        Reviewed by Darin Adler.
+
+        Updated test cases.
+
+        * js/regexp-unicode-expected.txt:
+        * js/script-tests/regexp-unicode.js:
+
+2016-03-08  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r197765.
+        https://bugs.webkit.org/show_bug.cgi?id=155172
+
+        The test added with this change is failing on all platforms.
+        (Requested by ryanhaddad on #webkit).
+
+        Reverted changeset:
+
+        "ImageDocuments leak their world."
+        https://bugs.webkit.org/show_bug.cgi?id=155167
+        http://trac.webkit.org/changeset/197765
+
+2016-03-08  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Rebaseline WPT reflection tests for ios-simulator after r197726
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/imported/w3c/web-platform-tests/html/dom/reflection-embedded-expected.txt:
+        * platform/ios-simulator/imported/w3c/web-platform-tests/html/dom/reflection-forms-expected.txt:
+
+2016-03-08  Nan Wang  <n_wang@apple.com>
+
+        AX: Force allow user zoom
+        https://bugs.webkit.org/show_bug.cgi?id=155056
+
+        Reviewed by Chris Fleizach.
+
+        * accessibility/ios-simulator/force-user-scalable-expected.txt: Added.
+        * accessibility/ios-simulator/force-user-scalable.html: Added.
+
+2016-03-08  Andreas Kling  <akling@apple.com>
+
+        ImageDocuments leak their world.
+        <https://webkit.org/b/155167>
+        <rdar://problem/24987363>
+
+        Reviewed by Antti Koivisto.
+
+        Made a little test that loads an image into an <iframe> 10 times and then
+        triggers a garbage collection and checks that all the documents got destroyed.
+
+        Prior to this change, all 10 ImageDocuments would remain alive at the end.
+
+        * fast/dom/ImageDocument-world-leak-expected.txt: Added.
+        * fast/dom/ImageDocument-world-leak.html: Added.
+
+2016-03-08  Alejandro G. Castro  <alex@igalia.com>
+
+        Unreviewed EFL build fix after r197752.
+
+        * platform/efl/TestExpectations: Avoid running the mediastream
+        tests until the support is implemented and compiled by default.
+
+2016-03-08  Alejandro G. Castro  <alex@igalia.com>
+
+        [GTK] [EFL] Avoid running mediastream tests by default until we compile by default
+        https://bugs.webkit.org/show_bug.cgi?id=153540
+
+        Reviewed by Philippe Normand.
+
+        After bumping gstreamer to 1.6.3 in r196804 we can enable again
+        compilation of mediastream and running the tests. We have updated
+        the expectations accordingly.
+
+        * platform/efl/TestExpectations:
+        * platform/gtk/TestExpectations:
+
+2016-03-08  Youenn Fablet  <youenn.fablet@crf.canon.fr>
+
+        [Fetch API] Implement fetch skeleton
+        https://bugs.webkit.org/show_bug.cgi?id=155111
+
+        Reviewed by Darin Adler.
+
+        * TestExpectations: Marking some tests as flaky.
+
+2016-03-08  Nikos Andronikos  <nikos.andronikos-webkit@cisra.canon.com.au>
+
+        [SVG2] Implement marker orient='auto-start-reverse'
+        https://bugs.webkit.org/show_bug.cgi?id=138456
+
+        Reviewed by Darin Adler.
+
+        * svg/animations/animate-marker-orient-from-angle-to-autostartreverse-expected.txt: Added.
+        * svg/animations/animate-marker-orient-from-angle-to-autostartreverse.html: Added.
+        * svg/animations/animate-marker-orienttype-4-expected.html: Added.
+        * svg/animations/animate-marker-orienttype-4.html: Added.
+          Verify output after animation has run - ensure animation reflected in visual result.
+        * svg/animations/script-tests/animate-marker-orient-from-angle-to-autostartreverse.js: Added.
+          Test DOM values at various snap-shot times throughout the animation.
+        (sample1):
+        (sample2):
+        (sample3):
+        (executeTest):
+        * svg/custom/marker-auto-start-reverse-expected.html: Added.
+        * svg/custom/marker-auto-start-reverse.html: Added.
+          Verify static result - start marker is oriented at 180 degrees to direction of path.
+        * svg/dom/SVGAnimatedEnumeration-SVGMarkerElement-expected.txt:
+        * svg/dom/script-tests/SVGAnimatedEnumeration-SVGMarkerElement.js:
+          Check attributes are treated as case sensitive.
+          Check UNKNOWN is returned for enum value when auto-start-reverse set.
+
+2016-03-07  Chris Dumez  <cdumez@apple.com>
+
+        Stop clamping HTMLElement.tabIndex to the range of a short
+        https://bugs.webkit.org/show_bug.cgi?id=155159
+
+        Reviewed by Ryosuke Niwa.
+
+        Drop outdated test.
+
+        * fast/dom/tabindex-clamp-expected.txt: Removed.
+        * fast/dom/tabindex-clamp.html: Removed.
+
+2016-03-07  Daniel Bates  <dabates@apple.com>
+
+        CSP: Source '*' should not match URLs with schemes blob, data, or filesystem
+        https://bugs.webkit.org/show_bug.cgi?id=154122
+        <rdar://problem/24613336>
+
+        Reviewed by Brent Fulgham.
+
+        Add tests to ensure that we do not regress our interpretation of * with respect to directives
+        img-src, media-src, style-src, and default-src.
+
+        When running in WebKitTestRunner, skip the tests fast/dom/HTMLImageElement/image-with-blob-url-blocked-by-csp-img-src-star.html
+        and media/video-with-blob-url-allowed-by-csp-media-src-star.html as they make use of eventSender.beginDragWithFiles(),
+        which is not implement. We will need to fix <https://bugs.webkit.org/show_bug.cgi?id=64285>
+        before we can run these tests in WebKitTestRunner.
+
+        * TestExpectations:
+        * fast/dom/HTMLImageElement/image-with-blob-url-blocked-by-csp-img-src-star-expected.html: Added.
+        * fast/dom/HTMLImageElement/image-with-blob-url-blocked-by-csp-img-src-star.html: Added.
+        * fast/dom/HTMLImageElement/image-with-data-url-allowed-by-csp-img-src-star-expected.html: Added.
+        * fast/dom/HTMLImageElement/image-with-data-url-allowed-by-csp-img-src-star.html: Added.
+        * fast/dom/HTMLImageElement/image-with-file-url-blocked-by-csp-img-src-star-expected.html: Added.
+        * fast/dom/HTMLImageElement/image-with-file-url-blocked-by-csp-img-src-star.html: Added.
+        * fast/dom/HTMLImageElement/resources/green.png: Added.
+        * fast/dom/HTMLLinkElement/link-with-blob-url-blocked-by-csp-style-src-star-expected.html: Added.
+        * fast/dom/HTMLLinkElement/link-with-blob-url-blocked-by-csp-style-src-star.html: Added.
+        * fast/dom/HTMLLinkElement/link-with-data-url-blocked-by-csp-style-src-star-expected.html: Added.
+        * fast/dom/HTMLLinkElement/link-with-data-url-blocked-by-csp-style-src-star.html: Added.
+        * fast/dom/HTMLLinkElement/link-with-file-url-blocked-by-csp-style-src-star-expected.html: Added.
+        * fast/dom/HTMLLinkElement/link-with-file-url-blocked-by-csp-style-src-star.html: Added.
+        * fast/dom/HTMLLinkElement/resources/red-background-color.css: Added.
+        (#test):
+        * http/tests/security/contentSecurityPolicy/image-with-http-url-allowed-by-csp-img-src-star-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/image-with-http-url-allowed-by-csp-img-src-star.html: Added.
+        * http/tests/security/contentSecurityPolicy/image-with-https-url-allowed-by-csp-img-src-star-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/image-with-https-url-allowed-by-csp-img-src-star.html: Added.
+        * http/tests/security/contentSecurityPolicy/javascript-url-blocked-by-default-src-star-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/javascript-url-blocked-by-default-src-star.html: Added.
+        * http/tests/security/contentSecurityPolicy/link-with-http-url-allowed-by-csp-style-src-star-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/link-with-http-url-allowed-by-csp-style-src-star.html: Added.
+        * http/tests/security/contentSecurityPolicy/link-with-https-url-allowed-by-csp-style-src-star-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/link-with-https-url-allowed-by-csp-style-src-star.html: Added.
+        * http/tests/security/contentSecurityPolicy/video-with-http-url-allowed-by-csp-media-src-star-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/video-with-http-url-allowed-by-csp-media-src-star.html: Added.
+        * http/tests/security/contentSecurityPolicy/video-with-https-url-allowed-by-csp-media-src-star-expected.txt: Added.
+        * http/tests/security/contentSecurityPolicy/video-with-https-url-allowed-by-csp-media-src-star.html: Added.
+        * media/video-with-blob-url-allowed-by-csp-media-src-star-expected.html: Added.
+        * media/video-with-blob-url-allowed-by-csp-media-src-star.html: Added.
+        * media/video-with-data-url-allowed-by-csp-media-src-star-expected.html: Added.
+        * media/video-with-data-url-allowed-by-csp-media-src-star.html: Added.
+        * media/video-with-file-url-blocked-by-csp-media-src-star-expected.html: Added.
+        * media/video-with-file-url-blocked-by-csp-media-src-star.html: Added.
+        * platform/wk2/TestExpectations:
+
+2016-03-07  Alex Christensen  <achristensen@webkit.org>
+
+        Fix cookies with private browsing and NetworkSession
+        https://bugs.webkit.org/show_bug.cgi?id=155147
+        rdar://problem/25018279
+
+        Reviewed by Brady Eidson.
+
+        * http/tests/cookies/private-cookie-storage-expected.txt: Added.
+        * http/tests/cookies/private-cookie-storage.html: Added.
+
+2016-03-07  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking media/track/track-cues-pause-on-exit.html as flaky on ElCapitan Debug WK2
+        https://bugs.webkit.org/show_bug.cgi?id=155151
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-03-07  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking imported/w3c/indexeddb/idbcursor-advance-continue-async.htm as flaky on Yosemite Release WK2
+        https://bugs.webkit.org/show_bug.cgi?id=154606
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-03-07  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking js/promises-tests/promises-tests-2-3-3.html as flaky on mac
+        https://bugs.webkit.org/show_bug.cgi?id=155140
+
+        Unreviewed test gardening.
+
+        * platform/mac/TestExpectations:
+
+2016-03-07  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Marking inspector/console/addInspectedNode.html as flaky on Yosemite WK2
+        https://bugs.webkit.org/show_bug.cgi?id=155138
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
+2016-03-07  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skipping css3/filters/huge-region-composited.html on ios-simulator in an 
+        attempt to eliminate a flaky crash.
+        https://bugs.webkit.org/show_bug.cgi?id=153933
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-03-07  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skip unsupported plugin tests from r197697 on ios-simulator
+
+        Unreviewed test gardening.
+
+        * platform/ios-simulator/TestExpectations:
+
+2016-03-07  Ryan Haddad  <ryanhaddad@apple.com>
+
+        Skip storage/indexeddb/intversion-open-in-upgradeneeded.html on mac-wk2
+        https://bugs.webkit.org/show_bug.cgi?id=155050
+
+        Unreviewed test gardening.
+
+        * platform/mac-wk2/TestExpectations:
+
 2016-03-07  Adam Bergkvist  <adam.bergkvist@ericsson.com>
 
         WebRTC: Implement MediaEndpointPeerConnection::createOffer()

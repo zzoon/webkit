@@ -5167,6 +5167,7 @@ WebPageCreationParameters WebPageProxy::creationParameters()
     parameters.userContentControllerID = m_userContentController->identifier();
     parameters.visitedLinkTableID = m_visitedLinkStore->identifier();
     parameters.websiteDataStoreID = m_websiteDataStore->identifier();
+    parameters.mediaShouldUsePersistentCache = m_websiteDataStore->isPersistent();
     parameters.canRunBeforeUnloadConfirmPanel = m_uiClient->canRunBeforeUnloadConfirmPanel();
     parameters.canRunModal = m_canRunModal;
     parameters.deviceScaleFactor = deviceScaleFactor();
@@ -6000,16 +6001,18 @@ void WebPageProxy::isPlayingMediaDidChange(MediaProducer::MediaStateFlags state,
     if (state == m_mediaState)
         return;
 
+    MediaProducer::MediaStateFlags playingMediaMask = MediaProducer::IsPlayingAudio | MediaProducer::IsPlayingVideo;
     MediaProducer::MediaStateFlags oldState = m_mediaState;
     m_mediaState = state;
 
-    if ((oldState & MediaProducer::IsPlayingAudio) == (m_mediaState & MediaProducer::IsPlayingAudio))
-        return;
-
 #if PLATFORM(MAC)
-    m_pageClient.isPlayingMediaDidChange();
+    if ((oldState & playingMediaMask) != (m_mediaState & playingMediaMask))
+        m_pageClient.isPlayingMediaDidChange();
 #endif
-    m_uiClient->isPlayingAudioDidChange(*this);
+
+    playingMediaMask |= MediaProducer::HasActiveMediaCaptureDevice;
+    if ((oldState & playingMediaMask) != (m_mediaState & playingMediaMask))
+        m_uiClient->isPlayingAudioDidChange(*this);
 }
 
 bool WebPageProxy::isPlayingVideoWithAudio() const

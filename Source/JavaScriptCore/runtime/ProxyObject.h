@@ -38,19 +38,22 @@ public:
 
     // We lie an say we override getPropertyNames() because it prevents
     // property name enumeration caching.
-    const static unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot | TypeOfShouldCallGetCallData | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames;
+    const static unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot | TypeOfShouldCallGetCallData | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames | ProhibitsPropertyCaching;
 
-    static ProxyObject* create(ExecState* exec, Structure* structure, JSValue target, JSValue handler)
+    static ProxyObject* create(ExecState* exec, JSGlobalObject* globalObject, JSValue target, JSValue handler)
     {
         VM& vm = exec->vm();
-        ProxyObject* proxy = new (NotNull, allocateCell<ProxyObject>(vm.heap)) ProxyObject(vm, structure);
+        ProxyObject* proxy = new (NotNull, allocateCell<ProxyObject>(vm.heap)) ProxyObject(vm, ProxyObject::structureForTarget(globalObject, target));
         proxy->finishCreation(vm, exec, target, handler);
         return proxy;
     }
 
-    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype, bool isCallable)
     {
-        Structure* result = Structure::create(vm, globalObject, prototype, TypeInfo(ProxyObjectType, StructureFlags), info(), NonArray | MayHaveIndexedAccessors);
+        unsigned flags = StructureFlags;
+        if (isCallable)
+            flags |= (ImplementsHasInstance | ImplementsDefaultHasInstance);
+        Structure* result = Structure::create(vm, globalObject, prototype, TypeInfo(ProxyObjectType, flags), info(), NonArray | MayHaveIndexedAccessors);
         result->setIsQuickPropertyAccessAllowedForEnumeration(false);
         RELEASE_ASSERT(!result->canAccessPropertiesQuicklyForEnumeration());
         RELEASE_ASSERT(!result->canCachePropertyNameEnumerator());
@@ -59,16 +62,20 @@ public:
 
     DECLARE_EXPORT_INFO;
 
-    JSObject* target() { return m_target.get(); }
-    JSValue handler() { return m_handler.get(); }
+    JSObject* target() const { return m_target.get(); }
+    JSValue handler() const { return m_handler.get(); }
 
     static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
     static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
     void putByIndexCommon(ExecState*, JSValue thisValue, unsigned propertyName, JSValue putValue, bool shouldThrow);
+    JSValue performGetPrototype(ExecState*);
+    void revoke(VM&);
+    bool isRevoked() const;
 
 private:
     ProxyObject(VM&, Structure*);
     void finishCreation(VM&, ExecState*, JSValue target, JSValue handler);
+    static Structure* structureForTarget(JSGlobalObject*, JSValue target);
 
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
     static bool getOwnPropertySlotByIndex(JSObject*, ExecState*, unsigned propertyName, PropertySlot&);
@@ -84,6 +91,7 @@ private:
     static NO_RETURN_DUE_TO_CRASH void getStructurePropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     static NO_RETURN_DUE_TO_CRASH void getGenericPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     static bool setPrototype(JSObject*, ExecState*, JSValue prototype, bool shouldThrowIfCantSet);
+    static JSValue getPrototype(JSObject*, ExecState*);
     static void visitChildren(JSCell*, SlotVisitor&);
 
     bool getOwnPropertySlotCommon(ExecState*, PropertyName, PropertySlot&);

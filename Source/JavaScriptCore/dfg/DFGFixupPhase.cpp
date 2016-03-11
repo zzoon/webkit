@@ -1270,7 +1270,6 @@ private:
         case CheckTierUpInLoop:
         case CheckTierUpAtReturn:
         case CheckTierUpAndOSREnter:
-        case CheckTierUpWithNestedTriggerAndOSREnter:
         case InvalidationPoint:
         case CheckArray:
         case CheckInBounds:
@@ -1451,6 +1450,7 @@ private:
         // Have these no-op cases here to ensure that nobody forgets to add handlers for new opcodes.
         case SetArgument:
         case JSConstant:
+        case LazyJSConstant:
         case DoubleConstant:
         case GetLocal:
         case GetCallee:

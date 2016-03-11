@@ -357,6 +357,8 @@ public:
     WEBCORE_EXPORT void invalidateStylesForAllLinks();
     WEBCORE_EXPORT void invalidateStylesForLink(LinkHash);
 
+    void invalidateInjectedStyleSheetCacheInAllFrames();
+
     StorageNamespace* sessionStorage(bool optionalCreate = true);
     void setSessionStorage(RefPtr<StorageNamespace>&&);
 
@@ -507,6 +509,11 @@ public:
     bool isControlledByAutomation() const { return m_controlledByAutomation; }
     void setControlledByAutomation(bool controlled) { m_controlledByAutomation = controlled; }
 
+    bool isAlwaysOnLoggingAllowed() const;
+
+    String captionUserPreferencesStyleSheet();
+    void setCaptionUserPreferencesStyleSheet(const String&);
+
 private:
     WEBCORE_EXPORT void initGroup();
 
@@ -606,6 +613,8 @@ private:
     mutable String m_userStyleSheet;
     mutable bool m_didLoadUserStyleSheet;
     mutable time_t m_userStyleSheetModificationTime;
+
+    String m_captionUserPreferencesStyleSheet;
 
     std::unique_ptr<PageGroup> m_singlePageGroup;
     PageGroup* m_group;

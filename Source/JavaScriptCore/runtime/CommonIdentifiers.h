@@ -197,6 +197,7 @@
     macro(sourceCode) \
     macro(sourceURL) \
     macro(stack) \
+    macro(sticky) \
     macro(subarray) \
     macro(target) \
     macro(test) \
@@ -358,6 +359,7 @@
     macro(Collator) \
     macro(DateTimeFormat) \
     macro(NumberFormat) \
+    macro(intlSubstituteValue) \
     macro(thisTimeValue) \
     macro(newTargetLocal) \
     macro(derivedConstructor) \

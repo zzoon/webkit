@@ -214,16 +214,21 @@ namespace JSC {
 
     class VariableEnvironmentNode : public ParserArenaDeletable {
     public:
+        typedef DeclarationStacks::FunctionStack FunctionStack;
+
         VariableEnvironmentNode()
         {
         }
 
         VariableEnvironmentNode(VariableEnvironment& lexicalDeclaredVariables);
+        VariableEnvironmentNode(VariableEnvironment& lexicalDeclaredVariables, FunctionStack&&);
 
         VariableEnvironment& lexicalVariables() { return m_lexicalVariables; }
+        FunctionStack& functionStack() { return m_functionStack; }
 
     protected:
         VariableEnvironment m_lexicalVariables;
+        FunctionStack m_functionStack;
     };
 
     class ConstantNode : public ExpressionNode {
@@ -1303,7 +1308,7 @@ namespace JSC {
     public:
         using ParserArenaDeletable::operator new;
 
-        BlockNode(const JSTokenLocation&, SourceElements*, VariableEnvironment&);
+        BlockNode(const JSTokenLocation&, SourceElements*, VariableEnvironment&, FunctionStack&&);
 
         StatementNode* singleStatement() const;
         StatementNode* lastStatement() const;
@@ -1551,10 +1556,9 @@ namespace JSC {
 
     class ScopeNode : public StatementNode, public ParserArenaRoot, public VariableEnvironmentNode {
     public:
-        typedef DeclarationStacks::FunctionStack FunctionStack;
 
         ScopeNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, bool inStrictContext);
-        ScopeNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, const SourceCode&, SourceElements*, VariableEnvironment&, FunctionStack&, VariableEnvironment&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
+        ScopeNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, const SourceCode&, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
 
         using ParserArenaRoot::operator new;
 
@@ -1587,13 +1591,13 @@ namespace JSC {
         bool usesThis() const { return m_features & ThisFeature; }
         bool usesSuperCall() const { return m_features & SuperCallFeature; }
         bool usesSuperProperty() const { return m_features & SuperPropertyFeature; }
+        bool usesNewTarget() const { return m_features & NewTargetFeature; }
         bool needsActivation() const { return (hasCapturedVariables()) || (m_features & (EvalFeature | WithFeature)); }
         bool hasCapturedVariables() const { return m_varDeclarations.hasCapturedVariables(); }
         bool captures(UniquedStringImpl* uid) { return m_varDeclarations.captures(uid); }
         bool captures(const Identifier& ident) { return captures(ident.impl()); }
 
         VariableEnvironment& varDeclarations() { return m_varDeclarations; }
-        FunctionStack& functionStack() { return m_functionStack; }
 
         int neededConstants()
         {
@@ -1618,14 +1622,13 @@ namespace JSC {
         InnerArrowFunctionCodeFeatures m_innerArrowFunctionCodeFeatures;
         SourceCode m_source;
         VariableEnvironment m_varDeclarations;
-        FunctionStack m_functionStack;
         int m_numConstants;
         SourceElements* m_statements;
     };
 
     class ProgramNode : public ScopeNode {
     public:
-        ProgramNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&, VariableEnvironment&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
+        ProgramNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
 
         unsigned startColumn() const { return m_startColumn; }
         unsigned endColumn() const { return m_endColumn; }
@@ -1640,7 +1643,7 @@ namespace JSC {
 
     class EvalNode : public ScopeNode {
     public:
-        EvalNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&, VariableEnvironment&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
+        EvalNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
 
         ALWAYS_INLINE unsigned startColumn() const { return 0; }
         unsigned endColumn() const { return m_endColumn; }
@@ -1655,7 +1658,7 @@ namespace JSC {
 
     class ModuleProgramNode : public ScopeNode {
     public:
-        ModuleProgramNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&, VariableEnvironment&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
+        ModuleProgramNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
 
         unsigned startColumn() const { return m_startColumn; }
         unsigned endColumn() const { return m_endColumn; }
@@ -1841,6 +1844,8 @@ namespace JSC {
         
         void overrideName(const Identifier& ident) { m_ident = ident; }
         const Identifier& ident() { return m_ident; }
+        void setEcmaName(const Identifier& ecmaName) { ASSERT(!ecmaName.isNull()); m_ecmaName = ecmaName; }
+        const Identifier& ecmaName() { return m_ident.isEmpty() ? m_ecmaName : m_ident; }
         void setInferredName(const Identifier& inferredName) { ASSERT(!inferredName.isNull()); m_inferredName = inferredName; }
         const Identifier& inferredName() { return m_inferredName.isEmpty() ? m_ident : m_inferredName; }
 
@@ -1874,6 +1879,7 @@ namespace JSC {
 
     protected:
         Identifier m_ident;
+        Identifier m_ecmaName;
         Identifier m_inferredName;
         FunctionMode m_functionMode;
         unsigned m_startColumn;
@@ -1894,7 +1900,7 @@ namespace JSC {
 
     class FunctionNode final : public ScopeNode {
     public:
-        FunctionNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&, VariableEnvironment&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
+        FunctionNode(ParserArena&, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VariableEnvironment&, FunctionStack&&, VariableEnvironment&, FunctionParameters*, const SourceCode&, CodeFeatures, InnerArrowFunctionCodeFeatures, int numConstants);
 
         FunctionParameters* parameters() const { return m_parameters; }
 
@@ -2200,7 +2206,7 @@ namespace JSC {
     public:
         using ParserArenaDeletable::operator new;
 
-        SwitchNode(const JSTokenLocation&, ExpressionNode*, CaseBlockNode*, VariableEnvironment&);
+        SwitchNode(const JSTokenLocation&, ExpressionNode*, CaseBlockNode*, VariableEnvironment&, FunctionStack&&);
 
     private:
         void emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;

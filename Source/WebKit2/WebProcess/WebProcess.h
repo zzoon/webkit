@@ -216,6 +216,10 @@ private:
     void initializeWebProcess(WebProcessCreationParameters&&);
     void platformInitializeWebProcess(WebProcessCreationParameters&&);
 
+#if USE(OS_STATE)
+    void registerWithStateDumper();
+#endif
+
     void clearCachedCredentials();
 
     void platformTerminate();
@@ -234,6 +238,8 @@ private:
     void setDefaultRequestTimeoutInterval(double);
     void setAlwaysUsesComplexTextCodePath(bool);
     void setShouldUseFontSmoothing(bool);
+    void enableSmoothedLayerText(bool);
+
     void setResourceLoadStatisticsEnabled(bool);
     void userPreferredLanguagesChanged(const Vector<String>&) const;
     void fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled);
