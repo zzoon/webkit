@@ -47,7 +47,7 @@ class RTCIceCandidateDescriptor;
 class RTCIceCandidate : public RefCounted<RTCIceCandidate>, public ScriptWrappable {
 public:
     static RefPtr<RTCIceCandidate> create(const Dictionary&, ExceptionCode&);
-    static Ref<RTCIceCandidate> create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
+    static Ref<RTCIceCandidate> create(const String& candidate, const String& sdpMid, int sdpMLineIndex);
     virtual ~RTCIceCandidate() { }
 
     const String& candidate() const { return m_candidate; }
@@ -56,15 +56,15 @@ public:
     const String& sdpMid() const { return m_sdpMid; }
     void setSdpMid(const String& sdpMid) { m_sdpMid = sdpMid; }
 
-    unsigned short sdpMLineIndex() const { return m_sdpMLineIndex; }
-    void setSdpMLineIndex(unsigned short sdpMLineIndex) { m_sdpMLineIndex = sdpMLineIndex; }
+    int sdpMLineIndex() const { return m_sdpMLineIndex; }
+    void setSdpMLineIndex(int sdpMLineIndex) { m_sdpMLineIndex = sdpMLineIndex; }
 
 private:
-    explicit RTCIceCandidate(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex);
+    explicit RTCIceCandidate(const String& candidate, const String& sdpMid, int sdpMLineIndex);
 
     String m_candidate;
     String m_sdpMid;
-    unsigned short m_sdpMLineIndex;
+    int m_sdpMLineIndex;
 };
 
 } // namespace WebCore

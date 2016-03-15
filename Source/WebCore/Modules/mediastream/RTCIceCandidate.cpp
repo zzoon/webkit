@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
  * Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
- * Copyright (C) 2015 Ericsson AB. All rights reserved.
+ * Copyright (C) 2015, 2016 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -52,20 +52,20 @@ RefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary, Ex
     String sdpMid;
     dictionary.get("sdpMid", sdpMid);
 
-    unsigned short sdpMLineIndex = 0;
+    int sdpMLineIndex = -1;
     String sdpMLineIndexString;
-    bool hasSdpMLineIndex = dictionary.get("sdpMLineIndex", sdpMLineIndexString);
 
-    if (hasSdpMLineIndex) {
+    if (dictionary.get("sdpMLineIndex", sdpMLineIndexString)) {
         bool intConversionOk;
-        sdpMLineIndex = sdpMLineIndexString.toUIntStrict(&intConversionOk);
-        if (!intConversionOk) {
+        unsigned result = sdpMLineIndexString.toUIntStrict(&intConversionOk);
+        if (!intConversionOk || result > 65535) {
             ec = TypeError;
             return nullptr;
         }
+        sdpMLineIndex = result;
     }
 
-    if (sdpMid.isNull() && !hasSdpMLineIndex) {
+    if (sdpMid.isNull() && sdpMLineIndex == -1) {
         ec = TypeError;
         return nullptr;
     }
@@ -73,12 +73,12 @@ RefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary, Ex
     return adoptRef(new RTCIceCandidate(candidate, sdpMid, sdpMLineIndex));
 }
 
-Ref<RTCIceCandidate> RTCIceCandidate::create(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex)
+Ref<RTCIceCandidate> RTCIceCandidate::create(const String& candidate, const String& sdpMid, int sdpMLineIndex)
 {
     return adoptRef(*new RTCIceCandidate(candidate, sdpMid, sdpMLineIndex));
 }
 
-RTCIceCandidate::RTCIceCandidate(const String& candidate, const String& sdpMid, unsigned short sdpMLineIndex)
+RTCIceCandidate::RTCIceCandidate(const String& candidate, const String& sdpMid, int sdpMLineIndex)
     : m_candidate(candidate)
     , m_sdpMid(sdpMid)
     , m_sdpMLineIndex(sdpMLineIndex)
