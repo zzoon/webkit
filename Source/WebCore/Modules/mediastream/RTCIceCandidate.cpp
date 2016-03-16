@@ -52,7 +52,7 @@ RefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary, Ex
     String sdpMid;
     dictionary.get("sdpMid", sdpMid);
 
-    int sdpMLineIndex = -1;
+    Optional<unsigned short> sdpMLineIndex;
     String sdpMLineIndexString;
 
     if (dictionary.get("sdpMLineIndex", sdpMLineIndexString)) {
@@ -65,7 +65,7 @@ RefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary, Ex
         sdpMLineIndex = result;
     }
 
-    if (sdpMid.isNull() && sdpMLineIndex == -1) {
+    if (sdpMid.isNull() && !sdpMLineIndex) {
         ec = TypeError;
         return nullptr;
     }
@@ -73,12 +73,12 @@ RefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary, Ex
     return adoptRef(new RTCIceCandidate(candidate, sdpMid, sdpMLineIndex));
 }
 
-Ref<RTCIceCandidate> RTCIceCandidate::create(const String& candidate, const String& sdpMid, int sdpMLineIndex)
+Ref<RTCIceCandidate> RTCIceCandidate::create(const String& candidate, const String& sdpMid, Optional<unsigned short> sdpMLineIndex)
 {
     return adoptRef(*new RTCIceCandidate(candidate, sdpMid, sdpMLineIndex));
 }
 
-RTCIceCandidate::RTCIceCandidate(const String& candidate, const String& sdpMid, int sdpMLineIndex)
+RTCIceCandidate::RTCIceCandidate(const String& candidate, const String& sdpMid, Optional<unsigned short> sdpMLineIndex)
     : m_candidate(candidate)
     , m_sdpMid(sdpMid)
     , m_sdpMLineIndex(sdpMLineIndex)

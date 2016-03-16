@@ -637,7 +637,8 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
     }
 
     const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
-    unsigned mdescIndex = rtcCandidate.sdpMLineIndex();
+    // Optional<unsigned short> sdpMLineIndex = ;
+    unsigned mdescIndex = rtcCandidate.sdpMLineIndex().valueOr(0);
 
     if (mdescIndex >= remoteMediaDescriptions.size()) {
         // FIXME: Error type?

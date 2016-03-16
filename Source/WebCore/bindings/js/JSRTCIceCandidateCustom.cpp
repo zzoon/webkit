@@ -73,8 +73,8 @@ JSValue JSRTCIceCandidate::sdpMid(ExecState& state) const
 
 JSValue JSRTCIceCandidate::sdpMLineIndex(ExecState& state) const
 {
-    int index = wrapped().sdpMLineIndex();
-    return index >= 0 ? JSValue(index) : jsNull();
+    Optional<unsigned short> index = wrapped().sdpMLineIndex();
+    return index ? JSValue(index.value()) : jsNull();
 }
 
 } // namespace WebCore
