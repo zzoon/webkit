@@ -58,7 +58,7 @@ RefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary, Ex
     if (dictionary.get("sdpMLineIndex", sdpMLineIndexString)) {
         bool intConversionOk;
         unsigned result = sdpMLineIndexString.toUIntStrict(&intConversionOk);
-        if (!intConversionOk || result > 65535) {
+        if (!intConversionOk || result > USHRT_MAX) {
             ec = TypeError;
             return nullptr;
         }
