@@ -292,35 +292,32 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
 
     const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
     for (unsigned i = 0; i < remoteMediaDescriptions.size(); ++i) {
-        RefPtr<PeerMediaDescription> remoteMediaDescription = remoteMediaDescriptions[i];
-        RefPtr<PeerMediaDescription> localMediaDescription;
+        PeerMediaDescription& remoteMediaDescription = *remoteMediaDescriptions[i];
 
-        if (i < configurationSnapshot->mediaDescriptions().size())
-            localMediaDescription = configurationSnapshot->mediaDescriptions()[i];
-        else {
-            localMediaDescription = PeerMediaDescription::create();
-            localMediaDescription->setType(remoteMediaDescription->type());
-            localMediaDescription->setPort(9);
-            localMediaDescription->setAddress("0.0.0.0");
-            localMediaDescription->setDtlsSetup(remoteMediaDescription->dtlsSetup() == "active" ? "passive" : "active");
-            localMediaDescription->setDtlsFingerprintHashFunction(m_dtlsFingerprintFunction);
-            localMediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
-            localMediaDescription->setCname(m_cname);
-            localMediaDescription->setIceUfrag(m_iceUfrag);
-            localMediaDescription->setIcePassword(m_icePassword);
+        if (i >= configurationSnapshot->mediaDescriptions().size()) {
+            RefPtr<PeerMediaDescription> newMediaDescription = PeerMediaDescription::create();
 
-            configurationSnapshot->addMediaDescription(localMediaDescription.copyRef());
+            newMediaDescription->setType(remoteMediaDescription.type());
+            newMediaDescription->setDtlsSetup(remoteMediaDescription.dtlsSetup() == "active" ? "passive" : "active");
+            newMediaDescription->setDtlsFingerprintHashFunction(m_dtlsFingerprintFunction);
+            newMediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
+            newMediaDescription->setCname(m_cname);
+            newMediaDescription->setIceUfrag(m_iceUfrag);
+            newMediaDescription->setIcePassword(m_icePassword);
+
+            configurationSnapshot->addMediaDescription(WTFMove(newMediaDescription));
         }
 
-        localMediaDescription->setPayloads(remoteMediaDescription->payloads());
+        PeerMediaDescription& localMediaDescription = *configurationSnapshot->mediaDescriptions()[i];
 
-        localMediaDescription->setRtcpMux(remoteMediaDescription->rtcpMux());
+        localMediaDescription.setPayloads(remoteMediaDescription.payloads());
+        localMediaDescription.setRtcpMux(remoteMediaDescription.rtcpMux());
 
-        if (!localMediaDescription->ssrcs().size())
-            localMediaDescription->addSsrc(cryptographicallyRandomNumber());
+        if (!localMediaDescription.ssrcs().size())
+            localMediaDescription.addSsrc(cryptographicallyRandomNumber());
 
-        if (localMediaDescription->dtlsSetup() == "actpass")
-            localMediaDescription->setDtlsSetup("passive");
+        if (localMediaDescription.dtlsSetup() == "actpass")
+            localMediaDescription.setDtlsSetup("passive");
     }
 
     RtpSenderVector senders = m_client->getSenders();
