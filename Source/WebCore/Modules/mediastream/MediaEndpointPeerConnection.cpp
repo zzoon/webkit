@@ -656,7 +656,7 @@ void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::St
     promise.reject(DOMError::create("Not implemented"));
 }
 
-void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, MediaStreamTrack& withTrack, PeerConnection::VoidPromise&& promise)
+void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise&& promise)
 {
     size_t mdescIndex = notFound;
     SessionDescription* localDescription = internalLocalDescription();
@@ -665,25 +665,25 @@ void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, MediaStream
         mdescIndex = indexOfMediaDescriptionWithTrackId(localDescription->configuration()->mediaDescriptions(), sender.trackId());
 
     if (mdescIndex == notFound) {
-        sender.setTrack(withTrack);
+        sender.setTrack(WTFMove(withTrack));
         promise.resolve(nullptr);
         return;
     }
 
     RefPtr<RTCRtpSender> protectedSender = &sender;
-    RefPtr<MediaStreamTrack> protectedTrack = &withTrack;
+    RefPtr<MediaStreamTrack> protectedTrack = withTrack;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
 
-    runTask([this, protectedSender, mdescIndex, protectedTrack, wrappedPromise]() {
-        replaceTrackTask(*protectedSender, mdescIndex, *protectedTrack, wrappedPromise->promise());
+    runTask([this, protectedSender, mdescIndex, protectedTrack, wrappedPromise]() mutable {
+        replaceTrackTask(*protectedSender, mdescIndex, WTFMove(protectedTrack), wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, size_t mdescIndex, MediaStreamTrack& withTrack, PeerConnection::VoidPromise& promise)
+void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, size_t mdescIndex, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise& promise)
 {
-    m_mediaEndpoint->replaceSendSource(withTrack.source(), mdescIndex);
+    m_mediaEndpoint->replaceSendSource(withTrack->source(), mdescIndex);
 
-    sender.setTrack(withTrack);
+    sender.setTrack(WTFMove(withTrack));
     promise.resolve(nullptr);
 }
 

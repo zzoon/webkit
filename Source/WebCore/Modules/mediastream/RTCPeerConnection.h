@@ -56,6 +56,7 @@ class RTCConfiguration;
 class RTCDataChannel;
 class RTCIceCandidate;
 class RTCPeerConnectionErrorCallback;
+class RTCRtpTransceiver;
 class RTCSessionDescription;
 class RTCStatsCallback;
 
@@ -64,7 +65,7 @@ public:
     static RefPtr<RTCPeerConnection> create(ScriptExecutionContext&, const Dictionary& rtcConfiguration, ExceptionCode&);
     ~RTCPeerConnection();
 
-    Vector<RefPtr<RTCRtpSender>> getSenders() const override { return m_senderSet; }
+    Vector<RefPtr<RTCRtpSender>> getSenders() const override;
     Vector<RefPtr<RTCRtpReceiver>> getReceivers() const { return m_receiverSet; }
 
     RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, Vector<MediaStream*>, ExceptionCode&);
@@ -133,14 +134,14 @@ private:
     PeerConnectionStates::IceConnectionState internalIceConnectionState() const override { return m_iceConnectionState; }
 
     // RTCRtpSenderClient
-    void replaceTrack(RTCRtpSender&, MediaStreamTrack&, PeerConnection::VoidPromise&&) override;
+    void replaceTrack(RTCRtpSender&, RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&&) override;
 
     PeerConnectionStates::SignalingState m_signalingState;
     PeerConnectionStates::IceGatheringState m_iceGatheringState;
     PeerConnectionStates::IceConnectionState m_iceConnectionState;
 
-    Vector<RefPtr<RTCRtpSender>> m_senderSet;
     Vector<RefPtr<RTCRtpReceiver>> m_receiverSet;
+    Vector<RefPtr<RTCRtpTransceiver>> m_transceiverSet;
 
     Vector<RefPtr<RTCDataChannel>> m_dataChannels;
 

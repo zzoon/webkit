@@ -39,16 +39,37 @@
 
 namespace WebCore {
 
-RTCRtpSender::RTCRtpSender(RefPtr<MediaStreamTrack>&& track, Vector<String>&& mediaStreamIds, RTCRtpSenderClient& client)
-    : RTCRtpSenderReceiverBase(WTFMove(track))
+Ref<RTCRtpSender> RTCRtpSender::create(RefPtr<MediaStreamTrack>&& track, Vector<String>&& mediaStreamIds, RTCRtpSenderClient& client)
+{
+    const String& trackKind = track->kind();
+    return adoptRef(*new RTCRtpSender(WTFMove(track), trackKind, WTFMove(mediaStreamIds), client));
+}
+
+Ref<RTCRtpSender> RTCRtpSender::create(const String& trackKind, Vector<String>&& mediaStreamIds, RTCRtpSenderClient& client)
+{
+    return adoptRef(*new RTCRtpSender(nullptr, trackKind, WTFMove(mediaStreamIds), client));
+}
+
+RTCRtpSender::RTCRtpSender(RefPtr<MediaStreamTrack>&& track, const String& trackKind, Vector<String>&& mediaStreamIds, RTCRtpSenderClient& client)
+    : RTCRtpSenderReceiverBase()
+    , m_trackKind(trackKind)
     , m_mediaStreamIds(WTFMove(mediaStreamIds))
     , m_client(&client)
 {
-    // The original track id is always used in negotiation even if the track is replaced.
-    m_trackId = m_track->id();
+    setTrack(WTFMove(track));
 }
 
-void RTCRtpSender::replaceTrack(MediaStreamTrack* withTrack, PeerConnection::VoidPromise&& promise, ExceptionCode& ec)
+void RTCRtpSender::setTrack(RefPtr<MediaStreamTrack>&& track)
+{
+    // Save the id from the first non-null track set. That id will be used to negotiate the sender
+    // even if the track is replaced.
+    if (!m_track && track)
+        m_trackId = track->id();
+
+    m_track = WTFMove(track);
+}
+
+void RTCRtpSender::replaceTrack(RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise&& promise, ExceptionCode& ec)
 {
     if (!withTrack) {
         ec = TypeError;
@@ -60,12 +81,12 @@ void RTCRtpSender::replaceTrack(MediaStreamTrack* withTrack, PeerConnection::Voi
         return;
     }
 
-    if (m_track->kind() != withTrack->kind()) {
+    if (m_trackKind != withTrack->kind()) {
         ec = TypeError;
         return;
     }
 
-    m_client->replaceTrack(*this, *withTrack, WTFMove(promise));
+    m_client->replaceTrack(*this, WTFMove(withTrack), WTFMove(promise));
 }
 
 } // namespace WebCore

@@ -70,7 +70,7 @@ public:
 
     void getStats(MediaStreamTrack*, PeerConnection::StatsPromise&&) override;
 
-    void replaceTrack(RTCRtpSender&, MediaStreamTrack&, PeerConnection::VoidPromise&&) override;
+    void replaceTrack(RTCRtpSender&, RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&&) override;
 
     void stop() override;
 
@@ -90,7 +90,7 @@ private:
 
     void addIceCandidateTask(RTCIceCandidate&, PeerConnection::VoidPromise&);
 
-    void replaceTrackTask(RTCRtpSender&, size_t mdescIndex, MediaStreamTrack&, PeerConnection::VoidPromise&);
+    void replaceTrackTask(RTCRtpSender&, size_t mdescIndex, RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&);
 
     bool localDescriptionTypeValidForState(SessionDescription::Type) const;
     bool remoteDescriptionTypeValidForState(SessionDescription::Type) const;

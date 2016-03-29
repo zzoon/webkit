@@ -28,39 +28,53 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RTCRtpSenderReceiverBase_h
-#define RTCRtpSenderReceiverBase_h
+#ifndef RTCRtpTransceiver_h
+#define RTCRtpTransceiver_h
 
-#if ENABLE(WEB_RTC)
+#if ENABLE(MEDIA_STREAM)
 
-#include "MediaStreamTrack.h"
 #include "ScriptWrappable.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
+class Dictionary;
 class MediaStreamTrack;
 
-class RTCRtpSenderReceiverBase : public RefCounted<RTCRtpSenderReceiverBase>, public ScriptWrappable {
+class RTCRtpSender;
+
+class RTCRtpTransceiver : public RefCounted<RTCRtpTransceiver>, public ScriptWrappable {
 public:
-    virtual ~RTCRtpSenderReceiverBase() { }
+    enum class DirectionalityStatus {
+        Enabled,
+        Disabled
+    };
 
-    MediaStreamTrack* track() const {  return m_track.get(); }
+    static Ref<RTCRtpTransceiver> create(RefPtr<RTCRtpSender>&&);
+    virtual ~RTCRtpTransceiver() { }
 
-protected:
-    RTCRtpSenderReceiverBase()
-    { }
+    bool configureWithDictionary(const Dictionary&);
 
-    RTCRtpSenderReceiverBase(RefPtr<MediaStreamTrack>&& track)
-        : m_track(track)
-    { }
+    DirectionalityStatus sendStatus() const { return m_sendStatus; }
+    void setSendStatus(DirectionalityStatus status) { m_sendStatus = status; }
 
-    RefPtr<MediaStreamTrack> m_track;
+    DirectionalityStatus receiveStatus() const { return m_receiveStatus; }
+    void setReceiveStatus(DirectionalityStatus status) { m_receiveStatus = status; }
+
+    RTCRtpSender* sender() const { return m_sender.get(); }
+
+private:
+    RTCRtpTransceiver(RefPtr<RTCRtpSender>&&);
+
+    DirectionalityStatus m_sendStatus { DirectionalityStatus::Enabled };
+    DirectionalityStatus m_receiveStatus { DirectionalityStatus::Enabled };
+
+    RefPtr<RTCRtpSender> m_sender;
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(WEB_RTC)
+#endif // ENABLE(MEDIA_STREAM)
 
-#endif // RTCRtpSenderReceiverBase_h
+#endif // RTCRtpTransceiver_h

@@ -49,6 +49,7 @@
 #include "RTCIceCandidate.h"
 #include "RTCIceCandidateEvent.h"
 #include "RTCOfferAnswerOptions.h"
+#include "RTCRtpTransceiver.h"
 #include "RTCSessionDescription.h"
 #include "RTCTrackEvent.h"
 #include <wtf/MainThread.h>
@@ -101,6 +102,17 @@ RTCPeerConnection::~RTCPeerConnection()
     stop();
 }
 
+Vector<RefPtr<RTCRtpSender>> RTCPeerConnection::getSenders() const
+{
+    Vector<RefPtr<RTCRtpSender>> senders;
+    senders.reserveCapacity(m_transceiverSet.size());
+
+    for (auto& transceiver : m_transceiverSet)
+        senders.append(transceiver->sender());
+
+    return senders;
+}
+
 RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, Vector<MediaStream*> streams, ExceptionCode& ec)
 {
     if (!track) {
@@ -119,7 +131,7 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
         return nullptr;
     }
 
-    for (auto& sender : m_senderSet) {
+    for (auto& sender : getSenders()) {
         if (sender->trackId() == track->id()) {
             // FIXME: Spec says InvalidParameter
             ec = INVALID_MODIFICATION_ERR;
@@ -131,12 +143,29 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
     for (auto stream : streams)
         mediaStreamIds.append(stream->id());
 
-    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), WTFMove(mediaStreamIds), *this);
-    m_senderSet.append(sender);
+    RefPtr<RTCRtpTransceiver> transceiver;
+
+    for (auto& existingTransceiver : m_transceiverSet) {
+        // Reuse an existing sender if it has never been used to send before.
+        if (existingTransceiver->sendStatus() == RTCRtpTransceiver::DirectionalityStatus::Disabled &&
+                existingTransceiver->sender()->trackId().isNull()) {
+            transceiver = existingTransceiver;
+            transceiver->setSendStatus(RTCRtpTransceiver::DirectionalityStatus::Enabled);
+            transceiver->sender()->setTrack(WTFMove(track));
+            // FIXME: Spec does not mention how the streams parameter should be used in this case.
+            break;
+        }
+    }
+
+    if (!transceiver) {
+        RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), WTFMove(mediaStreamIds), *this);
+        transceiver = RTCRtpTransceiver::create(WTFMove(sender));
+        m_transceiverSet.append(transceiver.copyRef());
+    }
 
     m_backend->markAsNeedingNegotiation();
 
-    return sender;
+    return transceiver->sender();
 }
 
 void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
@@ -151,7 +180,7 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
         return;
     }
 
-    if (!m_senderSet.contains(sender))
+    if (!getSenders().contains(sender))
         return;
 
     sender->stop();
@@ -371,8 +400,8 @@ void RTCPeerConnection::close()
     m_iceConnectionState = IceConnectionState::Closed;
     m_signalingState = SignalingState::Closed;
 
-    for (auto& sender : m_senderSet)
-        sender->stop();
+    for (auto& transceiver : m_transceiverSet)
+        transceiver->sender()->stop();
 }
 
 void RTCPeerConnection::stop()
@@ -434,9 +463,9 @@ void RTCPeerConnection::fireEvent(Event& event)
     dispatchEvent(event);
 }
 
-void RTCPeerConnection::replaceTrack(RTCRtpSender& sender, MediaStreamTrack& withTrack, PeerConnection::VoidPromise&& promise)
+void RTCPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise&& promise)
 {
-    m_backend->replaceTrack(sender, withTrack, WTFMove(promise));
+    m_backend->replaceTrack(sender, WTFMove(withTrack), WTFMove(promise));
 }
 
 } // namespace WebCore

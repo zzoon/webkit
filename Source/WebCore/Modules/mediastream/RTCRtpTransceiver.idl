@@ -28,39 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef RTCRtpSenderReceiverBase_h
-#define RTCRtpSenderReceiverBase_h
-
-#if ENABLE(WEB_RTC)
-
-#include "MediaStreamTrack.h"
-#include "ScriptWrappable.h"
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
-
-namespace WebCore {
-
-class MediaStreamTrack;
-
-class RTCRtpSenderReceiverBase : public RefCounted<RTCRtpSenderReceiverBase>, public ScriptWrappable {
-public:
-    virtual ~RTCRtpSenderReceiverBase() { }
-
-    MediaStreamTrack* track() const {  return m_track.get(); }
-
-protected:
-    RTCRtpSenderReceiverBase()
-    { }
-
-    RTCRtpSenderReceiverBase(RefPtr<MediaStreamTrack>&& track)
-        : m_track(track)
-    { }
-
-    RefPtr<MediaStreamTrack> m_track;
+[
+    Conditional=MEDIA_STREAM
+] interface RTCRtpTransceiver {
+    readonly attribute RTCRtpSender sender;
 };
-
-} // namespace WebCore
-
-#endif // ENABLE(WEB_RTC)
-
-#endif // RTCRtpSenderReceiverBase_h
