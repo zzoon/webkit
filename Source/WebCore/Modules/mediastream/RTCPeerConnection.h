@@ -43,6 +43,7 @@
 #include "PeerConnectionBackend.h"
 #include "RTCRtpReceiver.h"
 #include "RTCRtpSender.h"
+#include "RTCRtpTransceiver.h"
 #include "ScriptWrappable.h"
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
@@ -56,7 +57,6 @@ class RTCConfiguration;
 class RTCDataChannel;
 class RTCIceCandidate;
 class RTCPeerConnectionErrorCallback;
-class RTCRtpTransceiver;
 class RTCSessionDescription;
 class RTCStatsCallback;
 
@@ -67,9 +67,13 @@ public:
 
     Vector<RefPtr<RTCRtpSender>> getSenders() const override;
     Vector<RefPtr<RTCRtpReceiver>> getReceivers() const { return m_receiverSet; }
+    Vector<RefPtr<RTCRtpTransceiver>> getTransceivers() const { return m_transceiverSet; }
 
     RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, Vector<MediaStream*>, ExceptionCode&);
     void removeTrack(RTCRtpSender*, ExceptionCode&);
+
+    RefPtr<RTCRtpTransceiver> addTransceiver(RefPtr<MediaStreamTrack>&&, const Dictionary& init, ExceptionCode&);
+    RefPtr<RTCRtpTransceiver> addTransceiver(const String& kind, const Dictionary& init, ExceptionCode&);
 
     void queuedCreateOffer(const Dictionary& offerOptions, PeerConnection::SessionDescriptionPromise&&);
     void queuedCreateAnswer(const Dictionary& answerOptions, PeerConnection::SessionDescriptionPromise&&);
@@ -110,6 +114,8 @@ public:
 
 private:
     RTCPeerConnection(ScriptExecutionContext&, RefPtr<RTCConfiguration>&&, ExceptionCode&);
+
+    RefPtr<RTCRtpTransceiver> completeAddTransceiver(Ref<RTCRtpTransceiver>&&, const Dictionary& init, ExceptionCode&);
 
     // EventTarget implementation.
     void refEventTarget() override { ref(); }

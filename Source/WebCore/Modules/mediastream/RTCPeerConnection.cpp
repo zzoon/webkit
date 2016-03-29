@@ -49,7 +49,6 @@
 #include "RTCIceCandidate.h"
 #include "RTCIceCandidateEvent.h"
 #include "RTCOfferAnswerOptions.h"
-#include "RTCRtpTransceiver.h"
 #include "RTCSessionDescription.h"
 #include "RTCTrackEvent.h"
 #include <wtf/MainThread.h>
@@ -186,6 +185,35 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
     sender->stop();
 
     m_backend->markAsNeedingNegotiation();
+}
+
+RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(RefPtr<MediaStreamTrack>&& track, const Dictionary& init, ExceptionCode& ec)
+{
+    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), Vector<String>(), *this);
+    Ref<RTCRtpTransceiver> transceiver = RTCRtpTransceiver::create(WTFMove(sender));
+
+    return completeAddTransceiver(WTFMove(transceiver), init, ec);
+}
+
+RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(const String& kind, const Dictionary& init, ExceptionCode& ec)
+{
+    RefPtr<RTCRtpSender> sender = RTCRtpSender::create(kind, Vector<String>(), *this);
+    Ref<RTCRtpTransceiver> transceiver = RTCRtpTransceiver::create(WTFMove(sender));
+
+    return completeAddTransceiver(WTFMove(transceiver), init, ec);
+}
+
+RefPtr<RTCRtpTransceiver> RTCPeerConnection::completeAddTransceiver(Ref<RTCRtpTransceiver>&& transceiver, const Dictionary& init, ExceptionCode& ec)
+{
+    if (!transceiver->configureWithDictionary(init)) {
+        ec = TypeError;
+        return nullptr;
+    }
+
+    m_transceiverSet.append(transceiver.copyRef());
+    m_backend->markAsNeedingNegotiation();
+
+    return WTFMove(transceiver);
 }
 
 void RTCPeerConnection::queuedCreateOffer(const Dictionary& offerOptions, SessionDescriptionPromise&& promise)

@@ -61,9 +61,13 @@
 
     sequence<RTCRtpSender> getSenders();
     sequence<RTCRtpReceiver> getReceivers();
+    sequence<RTCRtpTransceiver> getTransceivers();
 
     [StrictTypeChecking, RaisesException] RTCRtpSender addTrack(MediaStreamTrack track, MediaStream... streams);
     [StrictTypeChecking, RaisesException] void removeTrack(RTCRtpSender sender);
+
+    [StrictTypeChecking, RaisesException] RTCRtpTransceiver addTransceiver(MediaStreamTrack track, optional Dictionary init);
+    [StrictTypeChecking, RaisesException] RTCRtpTransceiver addTransceiver(DOMString kind, optional Dictionary init);
 
     [JSBuiltin] Promise setLocalDescription(RTCSessionDescription description);
     // Legacy signature: void setLocalDescription(RTCSessionDescription description
