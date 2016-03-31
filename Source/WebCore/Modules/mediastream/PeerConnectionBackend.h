@@ -48,6 +48,7 @@ class RTCIceCandidate;
 class RTCOfferOptions;
 class RTCRtpReceiver;
 class RTCRtpSender;
+class RTCRtpTransceiver;
 class RTCSessionDescription;
 class RTCStatsResponse;
 class ScriptExecutionContext;
@@ -61,6 +62,7 @@ typedef DOMPromise<RefPtr<RTCStatsResponse>, RefPtr<DOMError>> StatsPromise;
 class PeerConnectionBackendClient {
 public:
     virtual Vector<RefPtr<RTCRtpSender>> getSenders() const = 0;
+    virtual const Vector<RefPtr<RTCRtpTransceiver>>& getTransceivers() const = 0;
     virtual void fireEvent(Event&) = 0;
 
     virtual void addReceiver(RTCRtpReceiver&) = 0;

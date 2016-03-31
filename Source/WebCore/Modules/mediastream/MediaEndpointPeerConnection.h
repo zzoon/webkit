@@ -46,6 +46,7 @@ class SDPProcessor;
 
 typedef Vector<RefPtr<PeerMediaDescription>> MediaDescriptionVector;
 typedef Vector<RefPtr<RTCRtpSender>> RtpSenderVector;
+typedef Vector<RefPtr<RTCRtpTransceiver>> RtpTransceiverVector;
 
 class MediaEndpointPeerConnection : public PeerConnectionBackend, public MediaEndpointClient {
 public:
