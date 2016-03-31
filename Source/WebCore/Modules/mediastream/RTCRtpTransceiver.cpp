@@ -59,6 +59,12 @@ Ref<RTCRtpTransceiver> RTCRtpTransceiver::create(RefPtr<RTCRtpSender>&& sender)
     return adoptRef(*new RTCRtpTransceiver(WTFMove(sender)));
 }
 
+String RTCRtpTransceiver::getNextMid()
+{
+    static unsigned mid = 0;
+    return String::number(++mid);
+}
+
 RTCRtpTransceiver::RTCRtpTransceiver(RefPtr<RTCRtpSender>&& sender)
     : m_sender(sender)
 {
@@ -93,6 +99,13 @@ bool RTCRtpTransceiver::configureWithDictionary(const Dictionary& dictionary)
 
     // FIMXE: fix streams
     return true;
+}
+
+const String& RTCRtpTransceiver::directionalityString() const
+{
+    if (m_sendStatus == DirectionalityStatus::Enabled)
+        return m_receiveStatus == DirectionalityStatus::Enabled ? sendrecvString() : sendonlyString();
+    return m_receiveStatus == DirectionalityStatus::Enabled ? recvonlyString() : inactiveString();
 }
 
 } // namespace WebCore

@@ -36,6 +36,7 @@
 #include "ScriptWrappable.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -54,6 +55,7 @@ public:
     static Ref<RTCRtpTransceiver> create(RefPtr<RTCRtpSender>&&);
     virtual ~RTCRtpTransceiver() { }
 
+
     bool configureWithDictionary(const Dictionary&);
 
     DirectionalityStatus sendStatus() const { return m_sendStatus; }
@@ -62,15 +64,29 @@ public:
     DirectionalityStatus receiveStatus() const { return m_receiveStatus; }
     void setReceiveStatus(DirectionalityStatus status) { m_receiveStatus = status; }
 
+    const String& directionalityString() const;
+
+    const String& provisionalMid() const { return m_provisionalMid; }
+    const String& mid() const { return m_mid; }
+    void setMid(const String& mid) { m_mid = mid; }
+
     RTCRtpSender* sender() const { return m_sender.get(); }
+
+    bool stopped() const { return m_stopped; }
+    void stop() { m_stopped = true; }
 
 private:
     RTCRtpTransceiver(RefPtr<RTCRtpSender>&&);
 
+    static String getNextMid();
+
     DirectionalityStatus m_sendStatus { DirectionalityStatus::Enabled };
     DirectionalityStatus m_receiveStatus { DirectionalityStatus::Enabled };
 
+    String m_provisionalMid { getNextMid() };
+    String m_mid;
     RefPtr<RTCRtpSender> m_sender;
+    bool m_stopped { false };
 };
 
 } // namespace WebCore
