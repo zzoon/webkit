@@ -52,6 +52,7 @@ public:
     static Ref<RTCRtpSender> create(const String& trackKind, Vector<String>&& mediaStreamIds, RTCRtpSenderClient&);
 
     const String& trackId() const { return m_trackId; }
+    const String& trackKind() const { return m_trackKind; }
     const Vector<String>& mediaStreamIds() const { return m_mediaStreamIds; }
 
     void stop() { m_client = nullptr; }
