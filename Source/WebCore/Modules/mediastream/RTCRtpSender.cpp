@@ -56,7 +56,8 @@ RTCRtpSender::RTCRtpSender(RefPtr<MediaStreamTrack>&& track, const String& track
     , m_mediaStreamIds(WTFMove(mediaStreamIds))
     , m_client(&client)
 {
-    setTrack(WTFMove(track));
+    if (track)
+        setTrack(WTFMove(track));
 }
 
 void RTCRtpSender::setTrack(RefPtr<MediaStreamTrack>&& track)
