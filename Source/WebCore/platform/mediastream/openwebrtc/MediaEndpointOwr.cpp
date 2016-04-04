@@ -264,6 +264,27 @@ void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, unsigned mdes
     internalAddRemoteCandidate(m_sessions[mdescIndex], candidate, ufrag, password);
 }
 
+RefPtr<RealtimeMediaSource> MediaEndpointOwr::createMutedRemoteSource(PeerMediaDescription& mediaDescription, unsigned mdescIndex)
+{
+    String name;
+    String id("not used");
+    RealtimeMediaSource::Type sourceType;
+
+    if (mediaDescription.type() == "audio") {
+        name = "remote audio";
+        sourceType = RealtimeMediaSource::Audio;
+    } else if (mediaDescription.type() == "video") {
+        name = "remote video";
+        sourceType = RealtimeMediaSource::Video;
+    } else
+        ASSERT_NOT_REACHED();
+
+    RefPtr<RealtimeMediaSourceOwr> source = adoptRef(new RealtimeMediaSourceOwr(nullptr, id, sourceType, name));
+    m_mutedRemoteSources.set(mdescIndex, source);
+
+    return source;
+}
+
 void MediaEndpointOwr::replaceSendSource(RealtimeMediaSource& newSource, unsigned mdescIndex)
 {
     RealtimeMediaSourceOwr& owrSource = static_cast<RealtimeMediaSourceOwr&>(newSource);
@@ -308,9 +329,16 @@ void MediaEndpointOwr::dispatchDtlsFingerprint(gchar* privateKey, gchar* certifi
     m_client.gotDtlsFingerprint(fingerprint, fingerprintFunction);
 }
 
-void MediaEndpointOwr::dispatchRemoteSource(unsigned sessionIndex, RefPtr<RealtimeMediaSource>&& source)
+void MediaEndpointOwr::unmuteRemoteSource(unsigned sessionIndex, OwrMediaSource* realSource)
 {
-    m_client.gotRemoteSource(sessionIndex, WTFMove(source));
+    RefPtr<RealtimeMediaSourceOwr> remoteSource = m_mutedRemoteSources.get(sessionIndex);
+    if (!remoteSource) {
+        LOG_ERROR("Unable to find muted remote source.");
+        return;
+    }
+
+    if (!remoteSource->stopped())
+        remoteSource->swapOutShallowSource(*realSource);
 }
 
 void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription* mediaDescription)
@@ -500,24 +528,7 @@ static void candidateGatheringDone(OwrSession* session, MediaEndpointOwr* mediaE
 
 static void gotIncomingSource(OwrMediaSession* mediaSession, OwrMediaSource* source, MediaEndpointOwr* mediaEndpoint)
 {
-    String name;
-    String id("not used");
-    OwrMediaType mediaType;
-
-    g_object_get(source, "media-type", &mediaType, nullptr);
-
-    RealtimeMediaSource::Type sourceType;
-    if (mediaType == OWR_MEDIA_TYPE_AUDIO) {
-        sourceType = RealtimeMediaSource::Audio;
-        name = "remote audio";
-    } else if (mediaType == OWR_MEDIA_TYPE_VIDEO) {
-        sourceType = RealtimeMediaSource::Video;
-        name = "remote video";
-    } else
-        ASSERT_NOT_REACHED();
-
-    RefPtr<RealtimeMediaSourceOwr> mediaSource = adoptRef(new RealtimeMediaSourceOwr(source, id, sourceType, name));
-    mediaEndpoint->dispatchRemoteSource(mediaEndpoint->sessionIndex(OWR_SESSION(mediaSession)), WTFMove(mediaSource));
+    mediaEndpoint->unmuteRemoteSource(mediaEndpoint->sessionIndex(OWR_SESSION(mediaSession)), source);
 }
 
 } // namespace WebCore

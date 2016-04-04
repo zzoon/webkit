@@ -42,6 +42,7 @@ class IceCandidate;
 class MediaEndpoint;
 class MediaEndpointSessionConfiguration;
 class MediaPayload;
+class PeerMediaDescription;
 class RealtimeMediaSource;
 
 class MediaEndpointClient {
@@ -49,7 +50,6 @@ public:
     virtual void gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction) = 0;
     virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) = 0;
     virtual void doneGatheringCandidates(unsigned mdescIndex) = 0;
-    virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) = 0;
 
     virtual ~MediaEndpointClient() { }
 };
@@ -78,6 +78,7 @@ public:
 
     virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) = 0;
 
+    virtual RefPtr<RealtimeMediaSource> createMutedRemoteSource(PeerMediaDescription&, unsigned mdescIndex) = 0;
     virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) = 0;
 
     virtual void stop() = 0;

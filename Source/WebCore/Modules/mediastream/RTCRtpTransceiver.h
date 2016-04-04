@@ -33,6 +33,8 @@
 
 #if ENABLE(MEDIA_STREAM)
 
+#include "RTCRtpReceiver.h"
+#include "RTCRtpSender.h"
 #include "ScriptWrappable.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -43,8 +45,6 @@ namespace WebCore {
 class Dictionary;
 class MediaStreamTrack;
 
-class RTCRtpSender;
-
 class RTCRtpTransceiver : public RefCounted<RTCRtpTransceiver>, public ScriptWrappable {
 public:
     enum class DirectionalityStatus {
@@ -52,7 +52,7 @@ public:
         Disabled
     };
 
-    static Ref<RTCRtpTransceiver> create(RefPtr<RTCRtpSender>&&);
+    static Ref<RTCRtpTransceiver> create(RefPtr<RTCRtpSender>&&, RefPtr<RTCRtpReceiver>&&);
     virtual ~RTCRtpTransceiver() { }
 
 
@@ -71,12 +71,13 @@ public:
     void setMid(const String& mid) { m_mid = mid; }
 
     RTCRtpSender* sender() const { return m_sender.get(); }
+    RTCRtpReceiver* receiver() const { return m_receiver.get(); }
 
     bool stopped() const { return m_stopped; }
     void stop() { m_stopped = true; }
 
 private:
-    RTCRtpTransceiver(RefPtr<RTCRtpSender>&&);
+    RTCRtpTransceiver(RefPtr<RTCRtpSender>&&, RefPtr<RTCRtpReceiver>&&);
 
     static String getNextMid();
 
@@ -86,6 +87,7 @@ private:
     String m_provisionalMid { getNextMid() };
     String m_mid;
     RefPtr<RTCRtpSender> m_sender;
+    RefPtr<RTCRtpReceiver> m_receiver;
     bool m_stopped { false };
 };
 

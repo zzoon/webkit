@@ -158,7 +158,9 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
 
     if (!transceiver) {
         RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), WTFMove(mediaStreamIds), *this);
-        transceiver = RTCRtpTransceiver::create(WTFMove(sender));
+        RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create();
+        transceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
+
         m_transceiverSet.append(transceiver.copyRef());
     }
 
@@ -190,7 +192,8 @@ void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
 RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(RefPtr<MediaStreamTrack>&& track, const Dictionary& init, ExceptionCode& ec)
 {
     RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), Vector<String>(), *this);
-    Ref<RTCRtpTransceiver> transceiver = RTCRtpTransceiver::create(WTFMove(sender));
+    RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create();
+    Ref<RTCRtpTransceiver> transceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
 
     return completeAddTransceiver(WTFMove(transceiver), init, ec);
 }
@@ -198,7 +201,8 @@ RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(RefPtr<MediaStreamTr
 RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(const String& kind, const Dictionary& init, ExceptionCode& ec)
 {
     RefPtr<RTCRtpSender> sender = RTCRtpSender::create(kind, Vector<String>(), *this);
-    Ref<RTCRtpTransceiver> transceiver = RTCRtpTransceiver::create(WTFMove(sender));
+    RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create();
+    Ref<RTCRtpTransceiver> transceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
 
     return completeAddTransceiver(WTFMove(transceiver), init, ec);
 }
@@ -448,9 +452,9 @@ bool RTCPeerConnection::canSuspendForDocumentSuspension() const
     return false;
 }
 
-void RTCPeerConnection::addReceiver(RTCRtpReceiver& receiver)
+void RTCPeerConnection::addTransceiver(RefPtr<RTCRtpTransceiver>&& transceiver)
 {
-    m_receiverSet.append(&receiver);
+    m_transceiverSet.append(WTFMove(transceiver));
 }
 
 void RTCPeerConnection::setSignalingState(SignalingState newState)

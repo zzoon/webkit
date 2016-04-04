@@ -44,8 +44,6 @@
 #include "RTCIceCandidate.h"
 #include "RTCIceCandidateEvent.h"
 #include "RTCOfferAnswerOptions.h"
-#include "RTCRtpReceiver.h"
-#include "RTCRtpSender.h"
 #include "RTCRtpTransceiver.h"
 #include "RTCSessionDescription.h"
 #include "RTCTrackEvent.h"
@@ -593,6 +591,60 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
         return;
     }
 
+    const RtpTransceiverVector& transceivers = m_client->getTransceivers();
+    for (unsigned i = 0; i < mediaDescriptions.size(); ++i) {
+        PeerMediaDescription* mediaDescription = mediaDescriptions[i].get();
+
+        RTCRtpTransceiver* transceiver = matchTransceiver(transceivers, [&mediaDescription] (RTCRtpTransceiver& current) {
+            return current.mid() == mediaDescription->mid();
+        });
+
+        if (!transceiver) {
+            bool receiveOnlyFlag = false;
+
+            if (mediaDescription->mode() == "sendrecv" || mediaDescription->mode() == "recvonly") {
+                // Try to match an existing transceiver.
+                transceiver = matchTransceiver(transceivers, [&mediaDescription] (RTCRtpTransceiver& current) {
+                    return !current.stopped() && current.mid().isNull() && current.sender()->trackKind() == mediaDescription->type();
+                });
+
+                if (transceiver)
+                    transceiver->setMid(mediaDescription->mid());
+                else
+                    receiveOnlyFlag = true;
+            }
+
+            if (!transceiver) {
+                RefPtr<RTCRtpSender> sender = RTCRtpSender::create(mediaDescription->type(), Vector<String>(), m_client->senderClient());
+                RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create();
+
+                Ref<RTCRtpTransceiver> newTransceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
+                if (receiveOnlyFlag)
+                    transceiver->setSendStatus(RTCRtpTransceiver::DirectionalityStatus::Disabled);
+
+                transceiver = newTransceiver.ptr();
+                m_client->addTransceiver(WTFMove(newTransceiver));
+            }
+        }
+
+        if (mediaDescription->mode() == "sendrecv" || mediaDescription->mode() == "sendonly") {
+            // Create a muted remote source that will be unmuted once media starts arriving.
+            RefPtr<RealtimeMediaSource> remoteSource = m_mediaEndpoint->createMutedRemoteSource(*mediaDescription, i);
+            String remoteTrackId = mediaDescription->mediaStreamTrackId();
+            if (remoteTrackId.isEmpty()) {
+                // Non WebRTC media description (e.g. legacy)
+                remoteTrackId = createCanonicalUUIDString();
+            }
+
+            RefPtr<MediaStreamTrackPrivate> remoteTrackPrivate = MediaStreamTrackPrivate::create(WTFMove(remoteSource), remoteTrackId);
+            RefPtr<MediaStreamTrack> remoteTrack = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *remoteTrackPrivate);
+            transceiver->receiver()->setTrack(WTFMove(remoteTrack));
+
+            m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false,
+                *transceiver->receiver(), *transceiver->receiver()->track(), *transceiver));
+        }
+    }
+
     SignalingState newSignalingState;
 
     // Update state and local descriptions according to setLocal/RemoteDescription processing model
@@ -856,39 +908,6 @@ void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned)
 
     // FIXME: Fire event when all media descriptions that are currently gathering have recevied
     // this signal. Old broken implementation was removed.
-}
-
-void MediaEndpointPeerConnection::gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&& source)
-{
-    ASSERT(isMainThread());
-
-    if (m_client->internalSignalingState() == SignalingState::Closed)
-        return;
-
-    const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
-
-    if (mdescIndex >= remoteMediaDescriptions.size()) {
-        printf("Warning: No remote configuration for incoming source.\n");
-        return;
-    }
-
-    PeerMediaDescription& mediaDescription = *remoteMediaDescriptions[mdescIndex];
-    String trackId = mediaDescription.mediaStreamTrackId();
-
-    if (trackId.isEmpty()) {
-        // Non WebRTC media description (e.g. legacy)
-        trackId = createCanonicalUUIDString();
-    }
-
-    // FIXME: track should be set to muted (not supported yet)
-    // FIXME: MediaStream handling not implemented
-
-    RefPtr<MediaStreamTrackPrivate> trackPrivate = MediaStreamTrackPrivate::create(WTFMove(source), trackId);
-    RefPtr<MediaStreamTrack> track = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *trackPrivate);
-    RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create(track.copyRef());
-
-    m_client->addReceiver(*receiver);
-    m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false, WTFMove(receiver), WTFMove(track)));
 }
 
 } // namespace WebCore

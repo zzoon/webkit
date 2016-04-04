@@ -33,6 +33,7 @@
 ] interface RTCRtpTransceiver {
     readonly attribute DOMString mid;
     readonly attribute RTCRtpSender sender;
+    readonly attribute RTCRtpReceiver receiver;
     readonly attribute boolean stopped;
 
     void stop();

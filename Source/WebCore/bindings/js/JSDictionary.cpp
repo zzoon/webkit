@@ -59,6 +59,7 @@
 
 #if ENABLE(WEB_RTC)
 #include "JSRTCRtpReceiver.h"
+#include "JSRTCRtpTransceiver.h"
 #endif
 
 #if ENABLE(GAMEPAD)
@@ -258,6 +259,11 @@ void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Medi
 void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<RTCRtpReceiver>& result)
 {
     result = JSRTCRtpReceiver::toWrapped(value);
+}
+
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<RTCRtpTransceiver>& result)
+{
+    result = JSRTCRtpTransceiver::toWrapped(value);
 }
 #endif
 

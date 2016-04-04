@@ -40,6 +40,7 @@
 namespace WebCore {
 
 class PeerMediaDescription;
+class RealtimeMediaSourceOwr;
 class RTCConfigurationPrivate;
 
 class MediaEndpointOwr : public MediaEndpoint {
@@ -58,6 +59,7 @@ public:
 
     virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
 
+    RefPtr<RealtimeMediaSource> createMutedRemoteSource(PeerMediaDescription&, unsigned mdescIndex) override;
     virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) override;
 
     virtual void stop() override;
@@ -67,7 +69,7 @@ public:
     void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&);
     void dispatchGatheringDone(unsigned sessionIndex);
     void dispatchDtlsFingerprint(gchar* privateKey, gchar* certificate, const String& fingerprint, const String& fingerprintFunction);
-    void dispatchRemoteSource(unsigned sessionIndex, RefPtr<RealtimeMediaSource>&&);
+    void unmuteRemoteSource(unsigned sessionIndex, OwrMediaSource*);
 
 private:
     enum SessionType { SessionTypeMedia };
@@ -87,6 +89,7 @@ private:
 
     OwrTransportAgent* m_transportAgent;
     Vector<OwrSession*> m_sessions;
+    HashMap<unsigned, RefPtr<RealtimeMediaSourceOwr>> m_mutedRemoteSources;
 
     MediaEndpointClient& m_client;
 

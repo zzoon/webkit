@@ -41,8 +41,6 @@
 // FIXME: Workaround for bindings bug http://webkit.org/b/150121
 #include "JSMediaStream.h"
 #include "PeerConnectionBackend.h"
-#include "RTCRtpReceiver.h"
-#include "RTCRtpSender.h"
 #include "RTCRtpTransceiver.h"
 #include "ScriptWrappable.h"
 #include <wtf/HashMap.h>
@@ -115,6 +113,7 @@ public:
 private:
     RTCPeerConnection(ScriptExecutionContext&, RefPtr<RTCConfiguration>&&, ExceptionCode&);
 
+    RTCRtpSenderClient& senderClient() { return *this; }
     RefPtr<RTCRtpTransceiver> completeAddTransceiver(Ref<RTCRtpTransceiver>&&, const Dictionary& init, ExceptionCode&);
 
     // EventTarget implementation.
@@ -127,7 +126,7 @@ private:
     bool canSuspendForDocumentSuspension() const override;
 
     // PeerConnectionBackendClient
-    void addReceiver(RTCRtpReceiver&) override;
+    void addTransceiver(RefPtr<RTCRtpTransceiver>&&) override;
     void setSignalingState(PeerConnectionStates::SignalingState) override;
     void updateIceGatheringState(PeerConnectionStates::IceGatheringState) override;
     void updateIceConnectionState(PeerConnectionStates::IceConnectionState) override;

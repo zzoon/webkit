@@ -34,6 +34,7 @@
 #include "MockMediaEndpoint.h"
 
 #include "MediaPayload.h"
+#include "RealtimeMediaSource.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
@@ -151,6 +152,14 @@ void MockMediaEndpoint::addRemoteCandidate(IceCandidate& candidate, unsigned mde
     UNUSED_PARAM(mdescIndex);
     UNUSED_PARAM(ufrag);
     UNUSED_PARAM(password);
+}
+
+RefPtr<RealtimeMediaSource> MockMediaEndpoint::createMutedRemoteSource(PeerMediaDescription& mediaDescription,unsigned mdescIndex)
+{
+    UNUSED_PARAM(mediaDescription);
+    UNUSED_PARAM(mdescIndex);
+
+    return nullptr;
 }
 
 void MockMediaEndpoint::replaceSendSource(RealtimeMediaSource& newSource, unsigned mdescIndex)

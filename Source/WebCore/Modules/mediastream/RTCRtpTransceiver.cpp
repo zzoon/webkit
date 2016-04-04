@@ -38,7 +38,6 @@
 #include "ExceptionCode.h"
 #include "JSDOMError.h"
 #include "MediaStreamTrack.h"
-#include "RTCRtpSender.h"
 
 namespace WebCore {
 
@@ -54,9 +53,9 @@ STRING_FUNCTION(sendonly)
 STRING_FUNCTION(recvonly)
 STRING_FUNCTION(inactive)
 
-Ref<RTCRtpTransceiver> RTCRtpTransceiver::create(RefPtr<RTCRtpSender>&& sender)
+Ref<RTCRtpTransceiver> RTCRtpTransceiver::create(RefPtr<RTCRtpSender>&& sender, RefPtr<RTCRtpReceiver>&& receiver)
 {
-    return adoptRef(*new RTCRtpTransceiver(WTFMove(sender)));
+    return adoptRef(*new RTCRtpTransceiver(WTFMove(sender), WTFMove(receiver)));
 }
 
 String RTCRtpTransceiver::getNextMid()
@@ -65,8 +64,9 @@ String RTCRtpTransceiver::getNextMid()
     return String::number(++mid);
 }
 
-RTCRtpTransceiver::RTCRtpTransceiver(RefPtr<RTCRtpSender>&& sender)
+RTCRtpTransceiver::RTCRtpTransceiver(RefPtr<RTCRtpSender>&& sender, RefPtr<RTCRtpReceiver>&& receiver)
     : m_sender(sender)
+    , m_receiver(receiver)
 {
 }
 
