@@ -348,8 +348,9 @@ public:
 
     bool isFromCurrentWorld(Deprecated::ScriptValue) const;
 
-    void setUsesOverlayScrollbars(bool enabled);
-    void setUsesMockScrollAnimator(bool enabled);
+    void setUsesOverlayScrollbars(bool);
+    void setUsesMockScrollAnimator(bool);
+    void setMockScrollbarsEnabled(bool);
 
     String getCurrentCursorInfo(ExceptionCode&);
 
@@ -370,9 +371,12 @@ public:
 #endif
 
 #if ENABLE(MEDIA_STREAM)
+    void setMockMediaCaptureDevicesEnabled(bool);
+#endif
+
+#if ENABLE(WEB_RTC)
     void enableMockMediaEndpoint();
     void enableMockRTCPeerConnectionHandler();
-    void setMockMediaCaptureDevicesEnabled(bool);
 #endif
 
     String getImageSourceURL(Element*, ExceptionCode&);

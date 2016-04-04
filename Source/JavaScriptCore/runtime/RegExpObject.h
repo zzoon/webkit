@@ -70,9 +70,11 @@ public:
     bool testInline(ExecState* exec, JSGlobalObject* globalObject, JSString* string) { return !!matchInline(exec, globalObject, string); }
     JSValue exec(ExecState*, JSGlobalObject*, JSString*);
     JSValue execInline(ExecState*, JSGlobalObject*, JSString*);
+    MatchResult match(ExecState*, JSGlobalObject*, JSString*);
+    JSValue matchGlobal(ExecState*, JSGlobalObject*, JSString*);
 
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
-    static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
+    static bool put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
 
     DECLARE_EXPORT_INFO;
 
@@ -102,9 +104,9 @@ protected:
     JS_EXPORT_PRIVATE static void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     JS_EXPORT_PRIVATE static void getGenericPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool shouldThrow);
+    unsigned advanceStringUnicode(String, unsigned, unsigned);
 
 private:
-    MatchResult match(ExecState*, JSGlobalObject*, JSString*);
     MatchResult matchInline(ExecState*, JSGlobalObject*, JSString*);
 
     WriteBarrier<RegExp> m_regExp;

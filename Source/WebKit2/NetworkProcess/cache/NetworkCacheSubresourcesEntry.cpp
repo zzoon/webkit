@@ -40,6 +40,7 @@ void SubresourceInfo::encode(Encoder& encoder) const
 {
     encoder << firstPartyForCookies;
     encoder << isTransient;
+    requestHeaders.encode(encoder);
 }
 
 bool SubresourceInfo::decode(Decoder& decoder, SubresourceInfo& info)
@@ -47,6 +48,8 @@ bool SubresourceInfo::decode(Decoder& decoder, SubresourceInfo& info)
     if (!decoder.decode(info.firstPartyForCookies))
         return false;
     if (!decoder.decode(info.isTransient))
+        return false;
+    if (!WebCore::HTTPHeaderMap::decode(decoder, info.requestHeaders))
         return false;
     return true;
 }
@@ -90,7 +93,7 @@ SubresourcesEntry::SubresourcesEntry(Key&& key, const Vector<std::unique_ptr<Sub
 {
     ASSERT(m_key.type() == "subresources");
     for (auto& subresourceLoad : subresourceLoads)
-        m_subresources.add(subresourceLoad->key, SubresourceInfo(subresourceLoad->request.firstPartyForCookies()));
+        m_subresources.add(subresourceLoad->key, SubresourceInfo(subresourceLoad->request));
 }
 
 void SubresourcesEntry::updateSubresourceLoads(const Vector<std::unique_ptr<SubresourceLoad>>& subresourceLoads)
@@ -100,7 +103,7 @@ void SubresourcesEntry::updateSubresourceLoads(const Vector<std::unique_ptr<Subr
     // Mark keys that are common with last load as non-Transient.
     for (auto& subresourceLoad : subresourceLoads) {
         bool isTransient = !oldSubresources.contains(subresourceLoad->key);
-        m_subresources.add(subresourceLoad->key, SubresourceInfo(subresourceLoad->request.firstPartyForCookies(), isTransient));
+        m_subresources.add(subresourceLoad->key, SubresourceInfo(subresourceLoad->request, isTransient));
     }
 }
 

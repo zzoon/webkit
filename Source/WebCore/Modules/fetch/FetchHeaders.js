@@ -35,10 +35,9 @@ function initializeFetchHeaders(headersInit)
     if (!@isObject(headersInit))
         throw new @TypeError("headersInit must be an object");
 
-    if (this.constructor === headersInit.constructor) {
-         headersInit.forEach((value, name) => {
-             this.@appendFromJS(name, value);
-         });
+    if (headersInit instanceof this.constructor) {
+        this.@fillFromJS(headersInit);
+        return this;
     }
 
     if (headersInit instanceof @Array) {
@@ -51,9 +50,11 @@ function initializeFetchHeaders(headersInit)
         return this;
     }
 
-    @Object.@getOwnPropertyNames(headersInit).forEach((name) => {
+    let propertyNames = @Object.@getOwnPropertyNames(headersInit);
+    for (let i = 0; i < propertyNames.length; ++i) {
+        let name = propertyNames[i];
         this.@appendFromJS(name, headersInit[name]);
-    });
+    }
 
     return this;
 }

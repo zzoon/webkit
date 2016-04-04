@@ -35,7 +35,20 @@
 namespace WebKit {
 
 WebProcessCreationParameters::WebProcessCreationParameters()
-    : defaultRequestTimeoutInterval(INT_MAX)
+    : shouldAlwaysUseComplexTextCodePath(false)
+    , shouldEnableMemoryPressureReliefLogging(false)
+    , shouldUseFontSmoothing(true)
+    , defaultRequestTimeoutInterval(INT_MAX)
+#if PLATFORM(COCOA)
+    , shouldEnableJIT(false)
+    , shouldEnableFTLJIT(false)
+#endif
+    , memoryCacheDisabled(false)
+#if ENABLE(SERVICE_CONTROLS)
+    , hasImageServices(false)
+    , hasSelectionServices(false)
+    , hasRichContentServices(false)
+#endif
 {
 }
 
@@ -83,11 +96,9 @@ void WebProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << shouldEnableMemoryPressureReliefLogging;
     encoder << shouldSuppressMemoryPressureHandler;
     encoder << shouldUseFontSmoothing;
-    encoder << enabledSmoothedLayerText;
     encoder << resourceLoadStatisticsEnabled;
     encoder << fontWhitelist;
     encoder << iconDatabaseEnabled;
-    encoder << shouldRewriteConstAsVar;
     encoder << terminationTimeout;
     encoder << languages;
     encoder << textCheckerState;
@@ -202,15 +213,11 @@ bool WebProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebProc
         return false;
     if (!decoder.decode(parameters.shouldUseFontSmoothing))
         return false;
-    if (!decoder.decode(parameters.enabledSmoothedLayerText))
-        return false;
     if (!decoder.decode(parameters.resourceLoadStatisticsEnabled))
         return false;
     if (!decoder.decode(parameters.fontWhitelist))
         return false;
     if (!decoder.decode(parameters.iconDatabaseEnabled))
-        return false;
-    if (!decoder.decode(parameters.shouldRewriteConstAsVar))
         return false;
     if (!decoder.decode(parameters.terminationTimeout))
         return false;

@@ -1369,14 +1369,9 @@ void SpeculativeJIT::compileObjectEquality(Node* node)
                 MacroAssembler::Address(op2GPR, JSCell::typeInfoFlagsOffset()), 
                 MacroAssembler::TrustedImm32(MasqueradesAsUndefined)));
     }
-    
-    MacroAssembler::Jump falseCase = m_jit.branch64(MacroAssembler::NotEqual, op1GPR, op2GPR);
-    m_jit.move(TrustedImm32(ValueTrue), resultGPR);
-    MacroAssembler::Jump done = m_jit.jump();
-    falseCase.link(&m_jit);
-    m_jit.move(TrustedImm32(ValueFalse), resultGPR);
-    done.link(&m_jit);
 
+    m_jit.compare64(MacroAssembler::Equal, op1GPR, op2GPR, resultGPR);
+    m_jit.or32(TrustedImm32(ValueFalse), resultGPR);
     jsValueResult(resultGPR, m_currentNode, DataFormatJSBoolean);
 }
 
@@ -1468,8 +1463,8 @@ void SpeculativeJIT::compileObjectToObjectOrOtherEquality(Edge leftChild, Edge r
     // At this point we know that we can perform a straight-forward equality comparison on pointer
     // values because both left and right are pointers to objects that have no special equality
     // protocols.
-    MacroAssembler::Jump falseCase = m_jit.branch64(MacroAssembler::NotEqual, op1GPR, op2GPR);
-    MacroAssembler::Jump trueCase = m_jit.jump();
+    m_jit.compare64(MacroAssembler::Equal, op1GPR, op2GPR, resultGPR);
+    MacroAssembler::Jump done = m_jit.jump();
     
     rightNotCell.link(&m_jit);
     
@@ -1485,14 +1480,10 @@ void SpeculativeJIT::compileObjectToObjectOrOtherEquality(Edge leftChild, Edge r
                 MacroAssembler::NotEqual, resultGPR,
                 MacroAssembler::TrustedImm64(ValueNull)));
     }
-    
-    falseCase.link(&m_jit);
-    m_jit.move(TrustedImm32(ValueFalse), resultGPR);
-    MacroAssembler::Jump done = m_jit.jump();
-    trueCase.link(&m_jit);
-    m_jit.move(TrustedImm32(ValueTrue), resultGPR);
+    m_jit.move(TrustedImm32(0), result.gpr());
+
     done.link(&m_jit);
-    
+    m_jit.or32(TrustedImm32(ValueFalse), resultGPR);
     jsValueResult(resultGPR, m_currentNode, DataFormatJSBoolean);
 }
 
@@ -2453,6 +2444,7 @@ void SpeculativeJIT::compile(Node* node)
     case ArithRound:
     case ArithFloor:
     case ArithCeil:
+    case ArithTrunc:
         compileArithRounding(node);
         break;
 
@@ -2997,6 +2989,11 @@ void SpeculativeJIT::compile(Node* node)
     }
 
     case RegExpExec: {
+        bool sample = false;
+
+        if (sample)
+            m_jit.incrementSuperSamplerCount();
+        
         SpeculateCellOperand globalObject(this, node->child1());
         GPRReg globalObjectGPR = globalObject.gpr();
         
@@ -3015,6 +3012,9 @@ void SpeculativeJIT::compile(Node* node)
                 m_jit.exceptionCheck();
                 
                 jsValueResult(result.gpr(), node);
+
+                if (sample)
+                    m_jit.decrementSuperSamplerCount();
                 break;
             }
             
@@ -3030,6 +3030,9 @@ void SpeculativeJIT::compile(Node* node)
             m_jit.exceptionCheck();
         
             jsValueResult(result.gpr(), node);
+
+            if (sample)
+                m_jit.decrementSuperSamplerCount();
             break;
         }
         
@@ -3044,6 +3047,9 @@ void SpeculativeJIT::compile(Node* node)
         m_jit.exceptionCheck();
         
         jsValueResult(result.gpr(), node);
+
+        if (sample)
+            m_jit.decrementSuperSamplerCount();
         break;
     }
 
@@ -3102,6 +3108,11 @@ void SpeculativeJIT::compile(Node* node)
     }
 
     case StringReplace: {
+        bool sample = false;
+
+        if (sample)
+            m_jit.incrementSuperSamplerCount();
+        
         if (node->child1().useKind() == StringUse
             && node->child2().useKind() == RegExpObjectUse
             && node->child3().useKind() == StringUse) {
@@ -3121,6 +3132,8 @@ void SpeculativeJIT::compile(Node* node)
                         regExpGPR);
                     m_jit.exceptionCheck();
                     cellResult(result.gpr(), node);
+                    if (sample)
+                        m_jit.decrementSuperSamplerCount();
                     break;
                 }
             }
@@ -3142,6 +3155,8 @@ void SpeculativeJIT::compile(Node* node)
                 replaceGPR);
             m_jit.exceptionCheck();
             cellResult(result.gpr(), node);
+            if (sample)
+                m_jit.decrementSuperSamplerCount();
             break;
         }
         
@@ -3159,6 +3174,8 @@ void SpeculativeJIT::compile(Node* node)
             replaceGPR);
         m_jit.exceptionCheck();
         cellResult(result.gpr(), node);
+        if (sample)
+            m_jit.decrementSuperSamplerCount();
         break;
     }
         
@@ -4156,7 +4173,6 @@ void SpeculativeJIT::compile(Node* node)
         break;
         
     case GetButterfly:
-    case GetButterflyReadOnly:
         compileGetButterfly(node);
         break;
 
@@ -4604,6 +4620,10 @@ void SpeculativeJIT::compile(Node* node)
         compileNewFunction(node);
         break;
 
+    case SetFunctionName:
+        compileSetFunctionName(node);
+        break;
+
     case In:
         compileIn(node);
         break;
@@ -4639,7 +4659,6 @@ void SpeculativeJIT::compile(Node* node)
         noResult(node);
         break;
         
-    case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
     case PhantomLocal:
@@ -4827,7 +4846,6 @@ void SpeculativeJIT::compile(Node* node)
         // Otherwise it's out of line
         outOfLineAccess.link(&m_jit);
         m_jit.loadPtr(MacroAssembler::Address(baseGPR, JSObject::butterflyOffset()), scratch2GPR);
-        slowPath.append(m_jit.branchIfNotToSpace(scratch2GPR));
         m_jit.move(indexGPR, scratch1GPR);
         m_jit.sub32(MacroAssembler::Address(enumeratorGPR, JSPropertyNameEnumerator::cachedInlineCapacityOffset()), scratch1GPR);
         m_jit.neg32(scratch1GPR);

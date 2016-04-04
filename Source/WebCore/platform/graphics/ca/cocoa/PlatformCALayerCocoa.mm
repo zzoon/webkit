@@ -33,6 +33,7 @@
 #import "LengthFunctions.h"
 #import "PlatformCAAnimationCocoa.h"
 #import "PlatformCAFilters.h"
+#import "PlatformScreen.h"
 #import "QuartzCoreSPI.h"
 #import "ScrollbarThemeMac.h"
 #import "SoftLinking.h"
@@ -57,22 +58,6 @@
 #import "WebCoreThread.h"
 #else
 #import "ThemeMac.h"
-#endif
-
-#if ENABLE(FILTERS_LEVEL_2)
-@interface CABackdropLayer : CALayer
-@property BOOL windowServerAware;
-@end
-#endif
-
-#if USE(APPLE_INTERNAL_SDK)
-#import <WebKitAdditions/LayerBackingStoreAdditions.mm>
-#else
-namespace WebCore {
-static void setBackingStoreFormat(CALayer *, PlatformCALayer::ContentsFormatFlags)
-{
-}
-} // namespace WebCore
 #endif
 
 SOFT_LINK_FRAMEWORK_OPTIONAL(AVFoundation)
@@ -307,8 +292,12 @@ void PlatformCALayerCocoa::commonInit()
     else
         [m_layer setDelegate:[WebActionDisablingCALayerDelegate shared]];
 
-    if (m_layerType == LayerTypeWebLayer || m_layerType == LayerTypeTiledBackingTileLayer)
-        setBackingStoreFormat(m_layer.get(), 0);
+    if (m_layerType == LayerTypeWebLayer || m_layerType == LayerTypeTiledBackingTileLayer) {
+#if PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90300
+        if (screenSupportsExtendedColor())
+            [m_layer setContentsFormat:kCAContentsFormatRGBA10XR];
+#endif
+    }
 
     // So that the scrolling thread's performance logging code can find all the tiles, mark this as being a tile.
     if (m_layerType == LayerTypeTiledBackingTileLayer)
@@ -543,22 +532,6 @@ void PlatformCALayerCocoa::setOpaque(bool value)
     BEGIN_BLOCK_OBJC_EXCEPTIONS
     [m_layer setOpaque:value];
     END_BLOCK_OBJC_EXCEPTIONS
-}
-
-void PlatformCALayerCocoa::setContentsFormat(ContentsFormatFlags flags)
-{
-    if (flags == m_contentsFormatFlags)
-        return;
-
-    m_contentsFormatFlags = flags;
-
-    if (usesTiledBackingLayer()) {
-        WebTiledBackingLayer* tiledBackingLayer = static_cast<WebTiledBackingLayer*>(m_layer.get());
-        tiledBackingLayer.tiledBacking->setTileContentsFormatFlags(flags);
-        return;
-    }
-
-    setBackingStoreFormat(m_layer.get(), flags);
 }
 
 FloatRect PlatformCALayerCocoa::bounds() const
@@ -1072,7 +1045,7 @@ void PlatformCALayer::drawLayerContents(CGContextRef context, WebCore::PlatformC
     graphicsContext.setIsCALayerContext(true);
     graphicsContext.setIsAcceleratedContext(platformCALayer->acceleratesDrawing());
     
-    if (!layerContents->platformCALayerContentsOpaque() && !(platformCALayer->contentsFormat() & SmoothedFonts)) {
+    if (!layerContents->platformCALayerContentsOpaque()) {
         // Turn off font smoothing to improve the appearance of text rendered onto a transparent background.
         graphicsContext.setShouldSmoothFonts(false);
     }

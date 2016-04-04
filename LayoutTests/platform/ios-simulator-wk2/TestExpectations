@@ -1363,13 +1363,6 @@ platform/ios-simulator/ios/fast/coordinates/mouse-event.html
 platform/ios-simulator/ios/fast/coordinates/touch-event-zoomed.html
 platform/ios-simulator/ios/fast/coordinates/touch-event.html
 
-platform/ios-simulator/ios/fast/forms/range-input-container-touches.html
-platform/ios-simulator/ios/fast/forms/range-input-readonly-and-disabled.html
-platform/ios-simulator/ios/fast/forms/range-input-touches.html
-platform/ios-simulator/ios/fast/html/textarea-auto-sizing-disable.html
-platform/ios-simulator/ios/fast/text/data-detectors/phone-disabled.html
-platform/ios-simulator/ios/fast/text/data-detectors/phone.html
-
 # Flaky tests:
 compositing/overflow/clipping-behaviour-change-is-not-propagated-to-descendants.html [ Failure Pass ]
 compositing/overflow/clipping-behaviour-change-is-not-propagated-to-descendants2.html [ Failure Pass ]
@@ -1950,3 +1943,21 @@ webkit.org/b/155201 storage/domstorage/events/basic-body-attribute.html [ Pass F
 
 # Forcing always allow user scalable is not supported on certain OS version.
 webkit.org/b/155056 fast/viewport/ios/force-always-user-scalable.html [ Skip ]
+
+webkit.org/b/155501 animations/3d/transform-origin-vs-functions.html [ Pass Failure ]
+
+webkit.org/b/155495 compositing/visible-rect/animated-from-none.html [ Pass Failure ]
+
+webkit.org/b/155755 perf/document-contains.html [ Pass Timeout ]
+
+webkit.org/b/155737 compositing/repaint/become-overlay-composited-layer.html [ Pass Failure ]
+
+webkit.org/b/155947 [ Debug ] fast/loader/scroll-position-restored-on-back.html [ Pass Failure ]
+
+webkit.org/b/155948 transitions/cancel-transition.html [ Pass Failure ]
+
+# <a download> is not supported with NETWORK_SESSION yet.
+webkit.org/b/156067 http/tests/security/anchor-download-allow-blob.html [ Skip ]
+webkit.org/b/156067 http/tests/security/anchor-download-allow-data.html [ Skip ]
+webkit.org/b/156067 http/tests/security/anchor-download-allow-sameorigin.html [ Skip ]
+webkit.org/b/156067 http/tests/security/anchor-download-block-crossorigin.html [ Skip ]

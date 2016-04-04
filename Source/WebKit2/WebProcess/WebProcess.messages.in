@@ -42,7 +42,6 @@ messages -> WebProcess LegacyReceiver {
     SetDefaultRequestTimeoutInterval(double timeoutInterval)
     SetAlwaysUsesComplexTextCodePath(bool alwaysUseComplexText)
     SetShouldUseFontSmoothing(bool useFontSmoothing)
-    EnableSmoothedLayerText(bool smoothedLayerText)
     SetResourceLoadStatisticsEnabled(bool resourceLoadStatisticsEnabled);
     UserPreferredLanguagesChanged(Vector<String> languages)
     FullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled)
@@ -92,6 +91,9 @@ messages -> WebProcess LegacyReceiver {
 #if ENABLE(SERVICE_CONTROLS)
     SetEnabledServices(bool hasImageServices, bool hasSelectionServices, bool hasRichContentServices)
 #endif
+
+    EnsureAutomationSessionProxy(String sessionIdentifier)
+    DestroyAutomationSessionProxy()
 
     ProcessWillSuspendImminently() -> (bool handled)
     PrepareToSuspend()

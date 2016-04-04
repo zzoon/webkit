@@ -33,6 +33,8 @@
 
 #include "ActiveDOMObject.h"
 #include "FetchBody.h"
+#include "FetchLoader.h"
+#include "FetchLoaderClient.h"
 
 namespace WebCore {
 
@@ -41,23 +43,56 @@ public:
     FetchBodyOwner(ScriptExecutionContext&, FetchBody&&);
 
     // Exposed Body API
-    bool isDisturbed() const { return m_body.isDisturbed(); }
-    void arrayBuffer(FetchBody::ArrayBufferPromise&& promise) { m_body.arrayBuffer(WTFMove(promise)); }
-    void formData(FetchBody::FormDataPromise&& promise) { m_body.formData(WTFMove(promise)); }
-    void blob(FetchBody::BlobPromise&& promise) { m_body.blob(WTFMove(promise)); }
-    void json(JSC::ExecState& state, FetchBody::JSONPromise&& promise) { m_body.json(state, WTFMove(promise)); }
-    void text(FetchBody::TextPromise&& promise) { m_body.text(WTFMove(promise)); }
+    bool isDisturbed() const { return m_isDisturbed; }
+
+    void arrayBuffer(DeferredWrapper&&);
+    void blob(DeferredWrapper&&);
+    void formData(DeferredWrapper&&);
+    void json(DeferredWrapper&&);
+    void text(DeferredWrapper&&);
+
+    void loadBlob(Blob&, FetchLoader::Type);
+
+    bool isActive() const { return !!m_blobLoader; }
+
+protected:
+    const FetchBody& body() const { return m_body; }
+    FetchBody& body() { return m_body; }
+
+    // ActiveDOMObject API
+    void stop() override;
+
+    void setDisturbed() { m_isDisturbed = true; }
+
+private:
+    // Blob loading routines
+    void loadedBlobAsText(String&&);
+    void loadedBlobAsArrayBuffer(RefPtr<ArrayBuffer>&& buffer) { m_body.loadedAsArrayBuffer(WTFMove(buffer)); }
+    void blobLoadingSucceeded() { finishBlobLoading(); }
+    void blobLoadingFailed();
+    void finishBlobLoading();
+
+    struct BlobLoader final : FetchLoaderClient {
+        BlobLoader(FetchBodyOwner&);
+
+        // FetchLoaderClient API
+        void didFinishLoadingAsText(String&& text) final { owner.loadedBlobAsText(WTFMove(text)); }
+        void didFinishLoadingAsArrayBuffer(RefPtr<ArrayBuffer>&& buffer) final { owner.loadedBlobAsArrayBuffer(WTFMove(buffer)); }
+        void didReceiveResponse(const ResourceResponse&) final;
+        void didFail() final;
+        void didSucceed() final { owner.blobLoadingSucceeded(); }
+
+        FetchBodyOwner& owner;
+        std::unique_ptr<FetchLoader> loader;
+    };
 
 protected:
     FetchBody m_body;
-};
+    bool m_isDisturbed { false };
 
-inline FetchBodyOwner::FetchBodyOwner(ScriptExecutionContext& context, FetchBody&& body)
-    : ActiveDOMObject(&context)
-    , m_body(WTFMove(body))
-{
-    suspendIfNeeded();
-}
+private:
+    Optional<BlobLoader> m_blobLoader;
+};
 
 } // namespace WebCore
 

@@ -24,7 +24,6 @@
 #include "JSCJSValue.h"
 #include "PropertyName.h"
 #include "PropertyOffset.h"
-#include "Register.h"
 #include <wtf/Assertions.h>
 
 namespace JSC {
@@ -52,6 +51,11 @@ enum Attribute {
     BuiltinOrFunctionOrAccessorOrConstant = Builtin | Function | Accessor | ConstantInteger, // helper only used by static hashtables
 };
 
+enum CacheabilityType : uint8_t {
+    CachingDisallowed,
+    CachingAllowed
+};
+
 inline unsigned attributesForStructure(unsigned attributes)
 {
     // The attributes that are used just for the static hashtable are at bit 8 and higher.
@@ -64,11 +68,6 @@ class PropertySlot {
         TypeValue,
         TypeGetter,
         TypeCustom
-    };
-
-    enum CacheabilityType : uint8_t {
-        CachingDisallowed,
-        CachingAllowed
     };
 
 public:
@@ -87,6 +86,7 @@ public:
         , m_cacheability(CachingAllowed)
         , m_propertyType(TypeUnset)
         , m_internalMethodType(internalMethodType)
+        , m_isTaintedByProxy(false)
     {
     }
 
@@ -103,6 +103,8 @@ public:
     bool isCacheableValue() const { return isCacheable() && isValue(); }
     bool isCacheableGetter() const { return isCacheable() && isAccessor(); }
     bool isCacheableCustom() const { return isCacheable() && isCustom(); }
+    void setIsTaintedByProxy() { m_isTaintedByProxy = true; }
+    bool isTaintedByProxy() const { return m_isTaintedByProxy; }
 
     InternalMethodType internalMethodType() const { return m_internalMethodType; }
 
@@ -279,6 +281,7 @@ private:
     CacheabilityType m_cacheability;
     PropertyType m_propertyType;
     InternalMethodType m_internalMethodType;
+    bool m_isTaintedByProxy;
 };
 
 ALWAYS_INLINE JSValue PropertySlot::getValue(ExecState* exec, PropertyName propertyName) const

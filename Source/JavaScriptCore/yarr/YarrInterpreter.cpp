@@ -27,6 +27,7 @@
 #include "config.h"
 #include "YarrInterpreter.h"
 
+#include "SuperSampler.h"
 #include "Yarr.h"
 #include "YarrCanonicalize.h"
 #include <wtf/BumpPointerAllocator.h>
@@ -506,14 +507,16 @@ public:
         }
 
         case QuantifierGreedy: {
-            backTrack->begin = input.getPos();
+            unsigned position = input.getPos();
+            backTrack->begin = position;
             unsigned matchAmount = 0;
             while ((matchAmount < term.atom.quantityCount) && input.checkInput(1)) {
                 if (!checkCharacterClass(term.atom.characterClass, term.invert(), term.inputPosition + 1)) {
-                    input.uncheckInput(1);
+                    input.setPos(position);
                     break;
                 }
                 ++matchAmount;
+                position = input.getPos();
             }
             backTrack->matchAmount = matchAmount;
 
@@ -1221,7 +1224,7 @@ public:
             if (unicode) {
                 if (!U_IS_BMP(currentTerm().atom.patternCharacter)) {
                     for (unsigned matchAmount = 0; matchAmount < currentTerm().atom.quantityCount; ++matchAmount) {
-                        if (!checkSurrogatePair(currentTerm().atom.patternCharacter, currentTerm().inputPosition - matchAmount)) {
+                        if (!checkSurrogatePair(currentTerm().atom.patternCharacter, currentTerm().inputPosition - 2 * matchAmount)) {
                             BACKTRACK();
                         }
                     }
@@ -1241,12 +1244,14 @@ public:
         case ByteTerm::TypePatternCharacterGreedy: {
             BackTrackInfoPatternCharacter* backTrack = reinterpret_cast<BackTrackInfoPatternCharacter*>(context->frame + currentTerm().frameLocation);
             unsigned matchAmount = 0;
+            unsigned position = input.getPos(); // May need to back out reading a surrogate pair.
             while ((matchAmount < currentTerm().atom.quantityCount) && input.checkInput(1)) {
                 if (!checkCharacter(currentTerm().atom.patternCharacter, currentTerm().inputPosition + 1)) {
-                    input.uncheckInput(1);
+                    input.setPos(position);
                     break;
                 }
                 ++matchAmount;
+                position = input.getPos();
             }
             backTrack->matchAmount = matchAmount;
 
@@ -2034,6 +2039,7 @@ std::unique_ptr<BytecodePattern> byteCompile(YarrPattern& pattern, BumpPointerAl
 
 unsigned interpret(BytecodePattern* bytecode, const String& input, unsigned start, unsigned* output)
 {
+    SuperSamplerScope superSamplerScope(false);
     if (input.is8Bit())
         return Interpreter<LChar>(bytecode, output, input.characters8(), input.length(), start).interpret();
     return Interpreter<UChar>(bytecode, output, input.characters16(), input.length(), start).interpret();
@@ -2041,11 +2047,13 @@ unsigned interpret(BytecodePattern* bytecode, const String& input, unsigned star
 
 unsigned interpret(BytecodePattern* bytecode, const LChar* input, unsigned length, unsigned start, unsigned* output)
 {
+    SuperSamplerScope superSamplerScope(false);
     return Interpreter<LChar>(bytecode, output, input, length, start).interpret();
 }
 
 unsigned interpret(BytecodePattern* bytecode, const UChar* input, unsigned length, unsigned start, unsigned* output)
 {
+    SuperSamplerScope superSamplerScope(false);
     return Interpreter<UChar>(bytecode, output, input, length, start).interpret();
 }
 

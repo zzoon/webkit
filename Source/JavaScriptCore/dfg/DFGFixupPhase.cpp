@@ -365,7 +365,8 @@ private:
 
         case ArithRound:
         case ArithFloor:
-        case ArithCeil: {
+        case ArithCeil:
+        case ArithTrunc: {
             if (m_graph.unaryArithShouldSpeculateInt32(node, FixupPass)) {
                 fixIntOrBooleanEdge(node->child1());
                 insertCheck<Int32Use>(m_indexInBlock, node->child1().node());
@@ -1151,8 +1152,7 @@ private:
         case CheckStructure:
         case CheckCell:
         case CreateThis:
-        case GetButterfly:
-        case GetButterflyReadOnly: {
+        case GetButterfly: {
             fixEdge<CellUse>(node->child1());
             break;
         }
@@ -1440,6 +1440,14 @@ private:
             break;
         }
 
+        case SetFunctionName: {
+            // The first child is guaranteed to be a cell because op_set_function_name is only used
+            // on a newly instantiated function object (the first child).
+            fixEdge<KnownCellUse>(node->child1());
+            fixEdge<UntypedUse>(node->child2());
+            break;
+        }
+
         case CopyRest: {
             fixEdge<KnownCellUse>(node->child1());
             fixEdge<KnownInt32Use>(node->child2());
@@ -1479,7 +1487,6 @@ private:
         case NewObject:
         case NewArrayBuffer:
         case NewRegexp:
-        case Breakpoint:
         case ProfileWillCall:
         case ProfileDidCall:
         case IsUndefined:
@@ -2439,7 +2446,6 @@ private:
     
 bool performFixup(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG Fixup Phase");
     return runPhase<FixupPhase>(graph);
 }
 

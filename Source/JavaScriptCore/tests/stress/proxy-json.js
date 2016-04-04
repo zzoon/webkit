@@ -1,6 +1,6 @@
 function assert(b) {
     if (!b)
-        throw new Error("Bad assertion.");
+        throw new Error("Bad assertion");
 }
 
 function test(f) {
@@ -81,7 +81,7 @@ test(function() {
         JSON.stringify(proxy); // Things are not ok.
     } catch(e) {
         threw = true;
-        assert(e.toString() === "TypeError: Proxy has already been revoked. No more operations are allowed to be performed on it.");
+        assert(e.toString() === "TypeError: Proxy has already been revoked. No more operations are allowed to be performed on it");
     }
     assert(threw);
 });
@@ -108,7 +108,54 @@ test(function() {
         JSON.stringify(proxy); // Things are not ok.
     } catch(e) {
         threw = true;
-        assert(e.toString() === "TypeError: Proxy has already been revoked. No more operations are allowed to be performed on it.");
+        assert(e.toString() === "TypeError: Proxy has already been revoked. No more operations are allowed to be performed on it");
     }
     assert(threw);
+});
+
+test(function() {
+    let arr = ["foo", 25, "bar"];
+    let handler = {
+        get: function(theTarget, propName) {
+            assert(propName === "toJSON");
+            return function() {
+                return arr;
+            }
+        }
+    };
+    let proxy = new Proxy({}, handler);
+    assert(JSON.stringify(proxy) === JSON.stringify(arr));
+});
+
+test(function() {
+    let arr = ["foo", 25, "bar"];
+    let handler = {
+        get: function(theTarget, propName) {
+            assert(propName === "toJSON");
+            return function() {
+                return arr;
+            }
+        }
+    };
+    let proxy = new Proxy({}, handler);
+    let o1 = {foo: arr};
+    let o2 = {foo: proxy};
+    assert(JSON.stringify(o1) === JSON.stringify(o2));
+});
+
+test(function() {
+    let arr = ["foo", 25, "bar"];
+    let proxy = new Proxy(function() { return arr; }, {});
+    assert(JSON.stringify({toJSON: proxy}) === JSON.stringify(arr));
+});
+
+test(function() {
+    let arr = ["foo", 25, "bar"];
+    let proxy = new Proxy({}, {});
+    let o = {foo: 20};
+    Object.defineProperty(o, "toJSON", {
+        enumerable: false,
+        value: proxy
+    });
+    assert(JSON.stringify(o) === JSON.stringify({foo: 20}));
 });

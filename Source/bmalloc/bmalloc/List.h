@@ -62,6 +62,13 @@ public:
         return static_cast<T*>(result);
     }
 
+    T* popFront()
+    {
+        ListNode<T>* result = head();
+        remove(result);
+        return static_cast<T*>(result);
+    }
+
     void insertAfter(ListNode<T>* it, ListNode<T>* node)
     {
         ListNode<T>* prev = it;
@@ -81,6 +88,9 @@ public:
 
         next->prev = prev;
         prev->next = next;
+        
+        node->prev = node;
+        node->next = node;
     }
 
 private:

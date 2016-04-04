@@ -3256,26 +3256,19 @@ void SpeculativeJIT::compileArithAdd(Node* node)
 
         if (node->child2()->isInt32Constant()) {
             SpeculateInt32Operand op1(this, node->child1());
-            GPRTemporary result(this, Reuse, op1);
-
-            GPRReg gpr1 = op1.gpr();
             int32_t imm2 = node->child2()->asInt32();
-            GPRReg gprResult = result.gpr();
 
             if (!shouldCheckOverflow(node->arithMode())) {
-                m_jit.add32(Imm32(imm2), gpr1, gprResult);
-                int32Result(gprResult, node);
+                GPRTemporary result(this, Reuse, op1);
+                m_jit.add32(Imm32(imm2), op1.gpr(), result.gpr());
+                int32Result(result.gpr(), node);
                 return;
             }
 
-            MacroAssembler::Jump check = m_jit.branchAdd32(MacroAssembler::Overflow, gpr1, Imm32(imm2), gprResult);
-            if (gpr1 == gprResult) {
-                speculationCheck(Overflow, JSValueRegs(), 0, check,
-                    SpeculationRecovery(SpeculativeAddImmediate, gpr1, imm2));
-            } else
-                speculationCheck(Overflow, JSValueRegs(), 0, check);
+            GPRTemporary result(this);
+            speculationCheck(Overflow, JSValueRegs(), 0, m_jit.branchAdd32(MacroAssembler::Overflow, op1.gpr(), Imm32(imm2), result.gpr()));
 
-            int32Result(gprResult, node);
+            int32Result(result.gpr(), node);
             return;
         }
                 
@@ -4512,6 +4505,14 @@ void SpeculativeJIT::compileArithRounding(Node* node)
             return;
         }
 
+        case ArithTrunc: {
+            FPRTemporary rounded(this);
+            FPRReg resultFPR = rounded.fpr();
+            m_jit.roundTowardZeroDouble(valueFPR, resultFPR);
+            setResult(resultFPR);
+            return;
+        }
+
         default:
             RELEASE_ASSERT_NOT_REACHED();
         }
@@ -4523,9 +4524,11 @@ void SpeculativeJIT::compileArithRounding(Node* node)
             callOperation(jsRound, resultFPR, valueFPR);
         else if (node->op() == ArithFloor)
             callOperation(floor, resultFPR, valueFPR);
-        else {
-            ASSERT(node->op() == ArithCeil);
+        else if (node->op() == ArithCeil)
             callOperation(ceil, resultFPR, valueFPR);
+        else {
+            ASSERT(node->op() == ArithTrunc);
+            callOperation(trunc, resultFPR, valueFPR);
         }
         m_jit.exceptionCheck();
         setResult(resultFPR);
@@ -5233,10 +5236,7 @@ void SpeculativeJIT::compileGetIndexedPropertyStorage(Node* node)
     default:
         ASSERT(isTypedView(node->arrayMode().typedArrayType()));
 
-        JITCompiler::Jump fail = m_jit.loadTypedArrayVector(baseReg, storageReg);
-
-        addSlowPathGenerator(
-            slowPathCall(fail, this, operationGetArrayBufferVector, storageReg, baseReg));
+        m_jit.loadPtr(JITCompiler::Address(baseReg, JSArrayBufferView::offsetOfVector()), storageReg);
         break;
     }
     
@@ -5259,13 +5259,7 @@ void SpeculativeJIT::compileGetTypedArrayByteOffset(Node* node)
         TrustedImm32(WastefulTypedArray));
 
     m_jit.loadPtr(MacroAssembler::Address(baseGPR, JSObject::butterflyOffset()), dataGPR);
-    m_jit.removeSpaceBits(dataGPR);
     m_jit.loadPtr(MacroAssembler::Address(baseGPR, JSArrayBufferView::offsetOfVector()), vectorGPR);
-    JITCompiler::JumpList vectorReady;
-    vectorReady.append(m_jit.branchIfToSpace(vectorGPR));
-    vectorReady.append(m_jit.branchIfNotFastTypedArray(baseGPR));
-    m_jit.removeSpaceBits(vectorGPR);
-    vectorReady.link(&m_jit);
     m_jit.loadPtr(MacroAssembler::Address(dataGPR, Butterfly::offsetOfArrayBuffer()), dataGPR);
     m_jit.loadPtr(MacroAssembler::Address(dataGPR, ArrayBuffer::offsetOfData()), dataGPR);
     m_jit.subPtr(dataGPR, vectorGPR);
@@ -5611,6 +5605,20 @@ void SpeculativeJIT::compileNewFunction(Node* node)
     }
 
     cellResult(resultGPR, node);
+}
+
+void SpeculativeJIT::compileSetFunctionName(Node* node)
+{
+    SpeculateCellOperand func(this, node->child1());
+    GPRReg funcGPR = func.gpr();
+    JSValueOperand nameValue(this, node->child2());
+    JSValueRegs nameValueRegs = nameValue.jsValueRegs();
+
+    flushRegisters();
+    callOperation(operationSetFunctionName, funcGPR, nameValueRegs);
+    m_jit.exceptionCheck();
+
+    noResult(node);
 }
 
 void SpeculativeJIT::compileForwardVarargs(Node* node)
@@ -5973,7 +5981,7 @@ void SpeculativeJIT::compileCreateClonedArguments(Node* node)
         1, [&] (GPRReg destGPR) {
             m_jit.move(
                 TrustedImmPtr(
-                    m_jit.globalObjectFor(node->origin.semantic)->outOfBandArgumentsStructure()),
+                    m_jit.globalObjectFor(node->origin.semantic)->clonedArgumentsStructure()),
                 destGPR);
         });
     m_jit.setupArgument(0, [&] (GPRReg destGPR) { m_jit.move(GPRInfo::callFrameRegister, destGPR); });
@@ -6329,23 +6337,6 @@ void SpeculativeJIT::compileGetButterfly(Node* node)
     
     m_jit.loadPtr(JITCompiler::Address(baseGPR, JSObject::butterflyOffset()), resultGPR);
 
-    switch (node->op()) {
-    case GetButterfly:
-        addSlowPathGenerator(
-            slowPathCall(
-                m_jit.branchIfNotToSpace(resultGPR),
-                this, operationGetButterfly, resultGPR, baseGPR));
-        break;
-
-    case GetButterflyReadOnly:
-        m_jit.removeSpaceBits(resultGPR);
-        break;
-
-    default:
-        DFG_CRASH(m_jit.graph(), node, "Bad node type");
-        break;
-    }
-    
     storageResult(resultGPR, node);
 }
 

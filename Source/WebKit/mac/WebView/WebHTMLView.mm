@@ -347,6 +347,8 @@ static Optional<ContextMenuAction> toAction(NSInteger tag)
         return ContextMenuItemTagToggleMediaLoop;
     case WebMenuItemTagEnterVideoFullscreen:
         return ContextMenuItemTagEnterVideoFullscreen;
+    case WebMenuItemTagToggleVideoEnhancedFullscreen:
+        return ContextMenuItemTagToggleVideoEnhancedFullscreen;
     case WebMenuItemTagMediaPlayPause:
         return ContextMenuItemTagMediaPlayPause;
     case WebMenuItemTagMediaMute:
@@ -533,6 +535,8 @@ static Optional<NSInteger> toTag(ContextMenuAction action)
         return WebMenuItemTagToggleVideoFullscreen;
     case ContextMenuItemTagShareMenu:
         return WebMenuItemTagShareMenu;
+    case ContextMenuItemTagToggleVideoEnhancedFullscreen:
+        return WebMenuItemTagToggleVideoEnhancedFullscreen;
 
     case ContextMenuItemBaseCustomTag ... ContextMenuItemLastCustomTag:
         // We just pass these through.
@@ -7145,7 +7149,7 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
         return;
 
     BOOL needToRemoveSoftSpace = NO;
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+#if HAVE(ADVANCED_SPELL_CHECKING)
     if (_private->softSpaceRange.location != NSNotFound && (replacementRange.location == NSMaxRange(_private->softSpaceRange) || replacementRange.location == NSNotFound) && !replacementRange.length && [[NSSpellChecker sharedSpellChecker] deletesAutospaceBeforeString:text language:nil]) {
         replacementRange = _private->softSpaceRange;
         needToRemoveSoftSpace = YES;

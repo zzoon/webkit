@@ -200,7 +200,6 @@ typedef const char* optionString;
     v(bool, useMovHintRemoval, true, nullptr) \
     v(bool, usePutStackSinking, true, nullptr) \
     v(bool, useObjectAllocationSinking, true, nullptr) \
-    v(bool, useCopyBarrierOptimization, true, nullptr) \
     \
     v(bool, useConcurrentJIT, true, "allows the DFG / FTL compilation in threads other than the executing JS thread") \
     v(unsigned, numberOfDFGCompilerThreads, computeNumberOfWorkerThreads(2, 2) - 1, nullptr) \
@@ -209,6 +208,7 @@ typedef const char* optionString;
     v(int32, priorityDeltaOfFTLCompilerThreads, computePriorityDeltaOfWorkerThreads(-2, 0), nullptr) \
     \
     v(bool, useProfiler, false, nullptr) \
+    v(bool, disassembleBaselineForProfiler, true, nullptr) \
     \
     v(bool, useArchitectureSpecificOptimizations, true, nullptr) \
     \
@@ -349,6 +349,8 @@ typedef const char* optionString;
     v(bool, dumpModuleRecord, false, nullptr) \
     v(bool, dumpModuleLoadingState, false, nullptr) \
     v(bool, exposeInternalModuleLoader, false, "expose the internal module loader object to the global space for debugging") \
+    \
+    v(bool, useSuperSampler, false, nullptr)
 
 enum OptionEquivalence {
     SameOption,
@@ -371,7 +373,6 @@ enum OptionEquivalence {
     v(enablePolymorphicCallInlining, usePolymorphicCallInlining, SameOption) \
     v(enableMovHintRemoval, useMovHintRemoval, SameOption) \
     v(enableObjectAllocationSinking, useObjectAllocationSinking, SameOption) \
-    v(enableCopyBarrierOptimization, useCopyBarrierOptimization, SameOption) \
     v(enableConcurrentJIT, useConcurrentJIT, SameOption) \
     v(enableProfiler, useProfiler, SameOption) \
     v(enableArchitectureSpecificOptimizations, useArchitectureSpecificOptimizations, SameOption) \

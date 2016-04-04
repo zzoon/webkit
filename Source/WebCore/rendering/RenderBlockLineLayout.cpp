@@ -71,9 +71,9 @@ static void determineDirectionality(TextDirection& dir, InlineIterator iter)
     }
 }
 
-inline BidiRun* createRun(int start, int end, RenderObject& obj, InlineBidiResolver& resolver)
+inline std::unique_ptr<BidiRun> createRun(int start, int end, RenderObject& obj, InlineBidiResolver& resolver)
 {
-    return new BidiRun(start, end, obj, resolver.context(), resolver.dir());
+    return std::make_unique<BidiRun>(start, end, obj, resolver.context(), resolver.dir());
 }
 
 void RenderBlockFlow::appendRunsForObject(BidiRunList<BidiRun>* runs, int start, int end, RenderObject& obj, InlineBidiResolver& resolver)
@@ -100,7 +100,7 @@ void RenderBlockFlow::appendRunsForObject(BidiRunList<BidiRun>* runs, int start,
     } else {
         if (!haveNextMidpoint || (&obj != nextMidpoint.renderer())) {
             if (runs)
-                runs->addRun(createRun(start, end, obj, resolver));
+                runs->appendRun(createRun(start, end, obj, resolver));
             return;
         }
 
@@ -111,10 +111,10 @@ void RenderBlockFlow::appendRunsForObject(BidiRunList<BidiRun>* runs, int start,
             if (nextMidpoint.refersToEndOfPreviousNode())
                 return;
             if (static_cast<int>(nextMidpoint.offset() + 1) > start && runs)
-                runs->addRun(createRun(start, nextMidpoint.offset() + 1, obj, resolver));
+                runs->appendRun(createRun(start, nextMidpoint.offset() + 1, obj, resolver));
             appendRunsForObject(runs, nextMidpoint.offset() + 1, end, obj, resolver);
         } else if (runs)
-            runs->addRun(createRun(start, end, obj, resolver));
+            runs->appendRun(createRun(start, end, obj, resolver));
     }
 }
 
@@ -337,7 +337,7 @@ RootInlineBox* RenderBlockFlow::constructLine(BidiRunList<BidiRun>& bidiRuns, co
     // paint borders/margins/padding.  This knowledge will ultimately be used when
     // we determine the horizontal positions and widths of all the inline boxes on
     // the line.
-    bool isLogicallyLastRunWrapped = bidiRuns.logicallyLastRun()->renderer().isText() ? !reachedEndOfTextRenderer(bidiRuns) : true;
+    bool isLogicallyLastRunWrapped = bidiRuns.logicallyLastRun()->renderer().isText() ? !reachedEndOfTextRenderer(bidiRuns) : !is<RenderInline>(bidiRuns.logicallyLastRun()->renderer());
     lastRootBox()->determineSpacingForFlowBoxes(lineInfo.isLastLine(), isLogicallyLastRunWrapped, &bidiRuns.logicallyLastRun()->renderer());
 
     // Now mark the line boxes as being constructed.
@@ -1036,13 +1036,13 @@ inline BidiRun* RenderBlockFlow::handleTrailingSpaces(BidiRunList<BidiRun>& bidi
         while (BidiContext* parent = baseContext->parent())
             baseContext = parent;
 
-        BidiRun* newTrailingRun = new BidiRun(firstSpace, trailingSpaceRun->m_stop, trailingSpaceRun->renderer(), baseContext, U_OTHER_NEUTRAL);
+        std::unique_ptr<BidiRun> newTrailingRun = std::make_unique<BidiRun>(firstSpace, trailingSpaceRun->m_stop, trailingSpaceRun->renderer(), baseContext, U_OTHER_NEUTRAL);
         trailingSpaceRun->m_stop = firstSpace;
+        trailingSpaceRun = newTrailingRun.get();
         if (direction == LTR)
-            bidiRuns.addRun(newTrailingRun);
+            bidiRuns.appendRun(WTFMove(newTrailingRun));
         else
-            bidiRuns.prependRun(newTrailingRun);
-        trailingSpaceRun = newTrailingRun;
+            bidiRuns.prependRun(WTFMove(newTrailingRun));
         return trailingSpaceRun;
     }
     if (!shouldReorder)
@@ -1321,7 +1321,7 @@ void RenderBlockFlow::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, I
         if (resolver.position().atEnd()) {
             // FIXME: We shouldn't be creating any runs in nextLineBreak to begin with!
             // Once BidiRunList is separated from BidiResolver this will not be needed.
-            resolver.runs().deleteRuns();
+            resolver.runs().clear();
             resolver.markCurrentRunEmpty(); // FIXME: This can probably be replaced by an ASSERT (or just removed).
             layoutState.setCheckForFloatsFromLastLine(true);
             resolver.setPosition(InlineIterator(resolver.position().root(), 0, 0), 0);
@@ -1362,7 +1362,7 @@ void RenderBlockFlow::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, I
             LayoutUnit oldLogicalHeight = logicalHeight();
             RootInlineBox* lineBox = createLineBoxesFromBidiRuns(resolver.status().context->level(), bidiRuns, end, layoutState.lineInfo(), verticalPositionCache, trailingSpaceRun, wordMeasurements);
 
-            bidiRuns.deleteRuns();
+            bidiRuns.clear();
             resolver.markCurrentRunEmpty(); // FIXME: This can probably be replaced by an ASSERT (or just removed).
 
             if (lineBox) {
@@ -2079,8 +2079,8 @@ void RenderBlockFlow::checkLinesForTextOverflow()
     const FontCascade& font = style().fontCascade();
     static NeverDestroyed<AtomicString> ellipsisStr(&horizontalEllipsis, 1);
     const FontCascade& firstLineFont = firstLineStyle().fontCascade();
-    float firstLineEllipsisWidth = firstLineFont.width(constructTextRun(this, firstLineFont, &horizontalEllipsis, 1, firstLineStyle()));
-    float ellipsisWidth = (font == firstLineFont) ? firstLineEllipsisWidth : font.width(constructTextRun(this, font, &horizontalEllipsis, 1, style()));
+    float firstLineEllipsisWidth = firstLineFont.width(constructTextRun(&horizontalEllipsis, 1, firstLineStyle()));
+    float ellipsisWidth = (font == firstLineFont) ? firstLineEllipsisWidth : font.width(constructTextRun(&horizontalEllipsis, 1, style()));
 
     // For LTR text truncation, we want to get the right edge of our padding box, and then we want to see
     // if the right edge of a line box exceeds that.  For RTL, we use the left edge of the padding box and

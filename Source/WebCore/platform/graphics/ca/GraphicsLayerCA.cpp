@@ -309,26 +309,6 @@ bool GraphicsLayer::supportsBackgroundColorContent()
     return true;
 }
 
-static bool isSmoothedLayerTextEnabled = true;
-
-bool GraphicsLayer::supportsSmoothedLayerText()
-{
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-    return isSmoothedLayerTextEnabled;
-#endif
-    return false;
-}
-
-void GraphicsLayer::setSmoothedLayerTextEnabled(bool flag)
-{
-    isSmoothedLayerTextEnabled = flag;
-}
-
-bool GraphicsLayer::smoothedLayerTextEnabled()
-{
-    return isSmoothedLayerTextEnabled;
-}
-
 std::unique_ptr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerFactory* factory, GraphicsLayerClient& client, Type layerType)
 {
     std::unique_ptr<GraphicsLayer> graphicsLayer;
@@ -729,15 +709,6 @@ void GraphicsLayerCA::setContentsOpaque(bool opaque)
     noteLayerPropertyChanged(ContentsOpaqueChanged);
 }
 
-void GraphicsLayerCA::setSupportsSmoothedFonts(bool supportsSmoothedFonts)
-{
-    if (m_supportsSmoothedFonts == supportsSmoothedFonts)
-        return;
-
-    GraphicsLayer::setSupportsSmoothedFonts(supportsSmoothedFonts);
-    noteLayerPropertyChanged(ContentsFormatChanged);
-}
-
 void GraphicsLayerCA::setBackfaceVisibility(bool visible)
 {
     if (m_backfaceVisibility == visible)
@@ -1037,16 +1008,16 @@ void GraphicsLayerCA::setContentsToSolidColor(const Color& color)
 void GraphicsLayerCA::setContentsToImage(Image* image)
 {
     if (image) {
-        CGImageRef newImage = image->nativeImageForCurrentFrame();
+        auto newImage = image->nativeImageForCurrentFrame();
         if (!newImage)
             return;
 
         // FIXME: probably don't need m_uncorrectedContentsImage at all now.
-        if (m_uncorrectedContentsImage && m_uncorrectedContentsImage.get() == newImage)
+        if (m_uncorrectedContentsImage == newImage)
             return;
         
-        m_uncorrectedContentsImage = newImage;
-        m_pendingContentsImage = newImage;
+        m_uncorrectedContentsImage = WTFMove(newImage);
+        m_pendingContentsImage = m_uncorrectedContentsImage;
 
         m_contentsLayerPurpose = ContentsLayerForImage;
         if (!m_contentsLayer)
@@ -1609,9 +1580,6 @@ void GraphicsLayerCA::commitLayerChangesBeforeSublayers(CommitState& commitState
     if (m_uncommittedChanges & ContentsOpaqueChanged)
         updateContentsOpaque(pageScaleFactor);
 
-    if (m_uncommittedChanges & ContentsFormatChanged)
-        updateContentsFormat();
-
     if (m_uncommittedChanges & BackfaceVisibilityChanged)
         updateBackfaceVisibility();
 
@@ -1919,20 +1887,6 @@ void GraphicsLayerCA::updateContentsOpaque(float pageScaleFactor)
     if (LayerMap* layerCloneMap = m_layerClones.get()) {
         for (auto& layer : layerCloneMap->values())
             layer->setOpaque(contentsOpaque);
-    }
-}
-
-void GraphicsLayerCA::updateContentsFormat()
-{
-    PlatformCALayer::ContentsFormatFlags formatFlags = 0;
-    if (supportsSmoothedFonts())
-        formatFlags |= PlatformCALayer::SmoothedFonts;
-
-    m_layer->setContentsFormat(formatFlags);
-
-    if (LayerMap* layerCloneMap = m_layerClones.get()) {
-        for (auto& layer : layerCloneMap->values())
-            layer->setContentsFormat(formatFlags);
     }
 }
 
@@ -2721,11 +2675,8 @@ void GraphicsLayerCA::repaintLayerDirtyRects()
         return;
     }
 
-    if (!m_dirtyRects.size())
-        return;
-
-    for (size_t i = 0; i < m_dirtyRects.size(); ++i)
-        m_layer->setNeedsDisplayInRect(m_dirtyRects[i]);
+    for (auto& dirtyRect : m_dirtyRects)
+        m_layer->setNeedsDisplayInRect(dirtyRect);
     
     m_dirtyRects.clear();
 }

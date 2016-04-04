@@ -78,7 +78,7 @@ Graph::Graph(VM& vm, Plan& plan, LongLivedState& longLivedState)
 {
     ASSERT(m_profiledBlock);
     
-    m_hasDebuggerEnabled = m_profiledBlock->globalObject()->hasDebugger()
+    m_hasDebuggerEnabled = m_profiledBlock->globalObject()->hasInteractiveDebugger()
         || Options::forceDebuggerBytecodeGeneration();
 }
 
@@ -512,7 +512,7 @@ void Graph::dump(PrintStream& out, DumpContext* context)
             RELEASE_ASSERT(block->ssa);
             out.print("  Availability: ", block->ssa->availabilityAtHead, "\n");
             out.print("  Live: ", nodeListDump(block->ssa->liveAtHead), "\n");
-            out.print("  Values: ", nodeMapDump(block->ssa->valuesAtHead, context), "\n");
+            out.print("  Values: ", nodeValuePairListDump(block->ssa->valuesAtHead, context), "\n");
             break;
         } }
         for (size_t i = 0; i < block->size(); ++i) {
@@ -567,8 +567,6 @@ void Graph::dethread()
     
     if (logCompilationChanges())
         dataLog("Dethreading DFG graph.\n");
-    
-    SamplingRegion samplingRegion("DFG Dethreading");
     
     for (BlockIndex blockIndex = m_blocks.size(); blockIndex--;) {
         BasicBlock* block = m_blocks[blockIndex].get();

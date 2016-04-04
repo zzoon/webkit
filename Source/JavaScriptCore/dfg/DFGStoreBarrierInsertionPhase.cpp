@@ -283,6 +283,11 @@ private:
                 break;
             }
                 
+            case SetFunctionName: {
+                considerBarrier(m_node->child1(), m_node->child2());
+                break;
+            }
+
             default:
                 break;
             }
@@ -529,13 +534,11 @@ private:
 
 bool performFastStoreBarrierInsertion(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG Fast Store Barrier Insertion Phase");
     return runPhase<StoreBarrierInsertionPhase<PhaseMode::Fast>>(graph);
 }
 
 bool performGlobalStoreBarrierInsertion(Graph& graph)
 {
-    SamplingRegion samplingRegion("DFG Global Store Barrier Insertion Phase");
     return runPhase<StoreBarrierInsertionPhase<PhaseMode::Global>>(graph);
 }
 

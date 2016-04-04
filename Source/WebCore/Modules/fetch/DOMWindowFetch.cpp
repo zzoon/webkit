@@ -31,16 +31,24 @@
 
 #if ENABLE(FETCH_API)
 
+#include "DOMWindow.h"
+#include "FetchRequest.h"
+#include "FetchResponse.h"
+
 namespace WebCore {
 
-void DOMWindowFetch::fetch(DOMWindow&, FetchRequest*, const Dictionary&, FetchPromise&& promise)
+void DOMWindowFetch::fetch(DOMWindow& window, FetchRequest& input, const Dictionary& dictionary, DeferredWrapper&& promise)
 {
-    promise.reject(ASCIILiteral("Fetch is not yet implemented"));
+    if (!window.scriptExecutionContext())
+        return;
+    FetchResponse::fetch(*window.scriptExecutionContext(), input, dictionary, WTFMove(promise));
 }
 
-void DOMWindowFetch::fetch(DOMWindow&, const String&, const Dictionary&, FetchPromise&& promise)
+void DOMWindowFetch::fetch(DOMWindow& window, const String& url, const Dictionary& dictionary, DeferredWrapper&& promise)
 {
-    promise.reject(ASCIILiteral("Fetch is not yet implemented"));
+    if (!window.scriptExecutionContext())
+        return;
+    FetchResponse::fetch(*window.scriptExecutionContext(), url, dictionary, WTFMove(promise));
 }
 
 } // namespace WebCore

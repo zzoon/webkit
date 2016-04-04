@@ -111,9 +111,11 @@ public:
     void scheduleRelayout();
     void scheduleRelayoutOfSubtree(RenderElement&);
     void unscheduleRelayout();
+    void queuePostLayoutCallback(std::function<void()>);
     bool layoutPending() const;
-    bool isInLayout() const { return m_layoutPhase == InLayout; }
-    WEBCORE_EXPORT bool inPaintableState() { return m_layoutPhase != InLayout && m_layoutPhase != InViewSizeAdjust && m_layoutPhase != InPostLayout; }
+    bool isInLayout() const { return m_layoutPhase != OutsideLayout; }
+    bool isInRenderTreeLayout() const { return m_layoutPhase == InRenderTreeLayout; }
+    WEBCORE_EXPORT bool inPaintableState() { return m_layoutPhase != InRenderTreeLayout && m_layoutPhase != InViewSizeAdjust && m_layoutPhase != InPostLayout; }
 
     RenderElement* layoutRoot() const { return m_layoutRoot; }
     void clearLayoutRoot() { m_layoutRoot = nullptr; }
@@ -508,6 +510,8 @@ public:
 
     WEBCORE_EXPORT void availableContentSizeChanged(AvailableSizeChangeReason) override;
 
+    void adjustTiledBackingScrollability();
+
     void addPaintPendingMilestones(LayoutMilestones);
     void firePaintRelatedMilestonesIfNeeded();
     void fireLayoutRelatedMilestonesIfNeeded();
@@ -572,7 +576,7 @@ private:
         OutsideLayout,
         InPreLayout,
         InPreLayoutStyleUpdate,
-        InLayout,
+        InRenderTreeLayout,
         InViewSizeAdjust,
         InPostLayout,
         InPostLayerPositionsUpdatedAfterLayout,
@@ -604,6 +608,7 @@ private:
     WEBCORE_EXPORT void paintControlTints();
 
     void forceLayoutParentViewIfNeeded();
+    void flushPostLayoutTasksQueue();
     void performPostLayoutTasks();
     void autoSizeIfEnabled();
 
@@ -620,7 +625,7 @@ private:
     void delegatesScrollingDidChange() override;
 
     // ScrollableArea interface
-    void invalidateScrollbarRect(Scrollbar*, const IntRect&) override;
+    void invalidateScrollbarRect(Scrollbar&, const IntRect&) override;
     void scrollTo(const ScrollPosition&) override;
     void setVisibleScrollerThumbRect(const IntRect&) override;
     ScrollableArea* enclosingScrollableArea() const override;
@@ -632,6 +637,11 @@ private:
     GraphicsLayer* layerForScrollCorner() const override;
 #if ENABLE(RUBBER_BANDING)
     GraphicsLayer* layerForOverhangAreas() const override;
+#endif
+    void contentsResized() override;
+
+#if PLATFORM(IOS)
+    void unobscuredContentSizeChanged() override;
 #endif
 
     bool usesCompositedScrolling() const override;
@@ -817,6 +827,7 @@ private:
     ScrollPinningBehavior m_scrollPinningBehavior;
 
     IntRect* m_cachedWindowClipRect { nullptr };
+    Vector<std::function<void()>> m_postLayoutCallbackQueue;
 };
 
 inline void FrameView::incrementVisuallyNonEmptyCharacterCount(unsigned count)

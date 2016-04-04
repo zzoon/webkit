@@ -73,6 +73,8 @@ public:
 
     virtual void notifyPageThatContentAreaWillPaint() const;
 
+    IntPoint locationOfContents() const;
+
     // NOTE: This should only be called by the overriden setScrollOffset from ScrollableArea.
     virtual void scrollTo(const ScrollPosition&);
 
@@ -284,7 +286,7 @@ public:
 
     WEBCORE_EXPORT IntPoint rootViewToContents(const IntPoint&) const;
     WEBCORE_EXPORT IntPoint contentsToRootView(const IntPoint&) const;
-    IntRect rootViewToContents(const IntRect&) const;
+    WEBCORE_EXPORT IntRect rootViewToContents(const IntRect&) const;
     WEBCORE_EXPORT IntRect contentsToRootView(const IntRect&) const;
 
     IntPoint viewToContents(const IntPoint&) const;
@@ -365,10 +367,10 @@ public:
     virtual void paintScrollCorner(GraphicsContext&, const IntRect& cornerRect);
     virtual void paintScrollbar(GraphicsContext&, Scrollbar&, const IntRect&);
 
-    IntRect convertFromScrollbarToContainingView(const Scrollbar*, const IntRect&) const override;
-    IntRect convertFromContainingViewToScrollbar(const Scrollbar*, const IntRect&) const override;
-    IntPoint convertFromScrollbarToContainingView(const Scrollbar*, const IntPoint&) const override;
-    IntPoint convertFromContainingViewToScrollbar(const Scrollbar*, const IntPoint&) const override;
+    IntRect convertFromScrollbarToContainingView(const Scrollbar&, const IntRect&) const override;
+    IntRect convertFromContainingViewToScrollbar(const Scrollbar&, const IntRect&) const override;
+    IntPoint convertFromScrollbarToContainingView(const Scrollbar&, const IntPoint&) const override;
+    IntPoint convertFromContainingViewToScrollbar(const Scrollbar&, const IntPoint&) const override;
 
     void calculateAndPaintOverhangAreas(GraphicsContext&, const IntRect& dirtyRect);
 
@@ -418,6 +420,10 @@ protected:
     virtual bool shouldDeferScrollUpdateAfterContentSizeChange() { return false; }
 
     virtual void scrollOffsetChangedViaPlatformWidgetImpl(const ScrollOffset&, const ScrollOffset&) { }
+
+#if PLATFORM(IOS)
+    virtual void unobscuredContentSizeChanged() { }
+#endif
 
 private:
     IntRect visibleContentRectInternal(VisibleContentRectIncludesScrollbars, VisibleContentRectBehavior) const override;

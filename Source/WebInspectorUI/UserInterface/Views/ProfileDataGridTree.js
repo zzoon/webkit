@@ -38,7 +38,7 @@ WebInspector.ProfileDataGridTree = class ProfileDataGridTree extends WebInspecto
         this._callingContextTree = callingContextTree;
         this._startTime = startTime;
         this._endTime = endTime;
-        this._numberOfSamples = this._callingContextTree.numberOfSamplesInTimeRange(startTime, endTime);
+        this._totalSampleTime = this._callingContextTree.totalDurationInTimeRange(startTime, endTime);
 
         this._focusNodes = [];
         this._modifiers = [];
@@ -60,15 +60,6 @@ WebInspector.ProfileDataGridTree = class ProfileDataGridTree extends WebInspecto
     // Public
 
     get callingContextTree() { return this._callingContextTree; }
-
-    get sampleInterval()
-    {
-        // FIXME: It would be good to bound this, but the startTime/endTime can be beyond the
-        // bounds of when the calling context tree was sampling. This could be improved when a
-        // subset within the timeline is selected (a better bounding start/end). For now just
-        // assume a constant rate, as that roughly matches what the intent is.
-        return 1 / 1000; // 1ms per sample
-    }
 
     get focusNodes()
     {
@@ -99,11 +90,11 @@ WebInspector.ProfileDataGridTree = class ProfileDataGridTree extends WebInspecto
         return this._endTime;
     }
 
-    get numberOfSamples()
+    get totalSampleTime()
     {
         if (this._focusNodes.length)
-            return this._currentFocusNumberOfSamples;
-        return this._numberOfSamples;
+            return this._currentFocusTotalSampleTime;
+        return this._totalSampleTime;
     }
 
     get children()
@@ -154,7 +145,7 @@ WebInspector.ProfileDataGridTree = class ProfileDataGridTree extends WebInspecto
         console.assert(profileDataGridNode instanceof WebInspector.ProfileDataGridNode);
 
         // Save the original parent for when we rollback.
-        profileDataGridNode.__previousParent = profileDataGridNode.parent === profileDataGridNode.dataGrid ? this : profileDataGridNode.parent;
+        this._saveFocusedNodeOriginalParent(profileDataGridNode);
 
         this._focusNodes.push(profileDataGridNode);
         this._focusChanged();
@@ -170,6 +161,8 @@ WebInspector.ProfileDataGridTree = class ProfileDataGridTree extends WebInspecto
         if (index === -1)
             return;
 
+        this._focusParentsToExpand = [];
+
         for (let i = index + 1; i < this._focusNodes.length; ++i)
             this._restoreFocusedNodeToOriginalParent(this._focusNodes[i]);
 
@@ -180,6 +173,8 @@ WebInspector.ProfileDataGridTree = class ProfileDataGridTree extends WebInspecto
 
     clearFocusNodes()
     {
+        this._focusParentsToExpand = [];
+
         for (let profileDataGridNode of this._focusNodes)
             this._restoreFocusedNodeToOriginalParent(profileDataGridNode);
 
@@ -227,31 +222,56 @@ WebInspector.ProfileDataGridTree = class ProfileDataGridTree extends WebInspecto
     _focusChanged()
     {
         let profileDataGridNode = this.currentFocusNode;
-        if (profileDataGridNode) {
+        if (profileDataGridNode)
             this._updateCurrentFocusDetails(profileDataGridNode);
-
-            if (profileDataGridNode.parent)
-                profileDataGridNode.parent.removeChild(profileDataGridNode);
-        }
 
         // FIXME: This re-creates top level children, without remembering their expanded / unexpanded state.
         this._repopulate();
 
         this.dispatchEventToListeners(WebInspector.ProfileDataGridTree.Event.FocusChanged);
+
+        if (this._focusParentsToExpand) {
+            for (let profileDataGridNode of this._focusParentsToExpand)
+                profileDataGridNode.expand();
+            this._focusParentsToExpand = null;
+        }
     }
 
     _updateCurrentFocusDetails(focusDataGridNode)
     {
         let cctNode = focusDataGridNode.node;
-        let timestampsInRange = cctNode.filteredTimestamps(this._startTime, this._endTime);
+        let {timestamps, duration} = cctNode.filteredTimestampsAndDuration(this._startTime, this._endTime);
 
-        this._currentFocusStartTime = timestampsInRange[0];
-        this._currentFocusEndTime = timestampsInRange.lastValue;
-        this._currentFocusNumberOfSamples = timestampsInRange.length;
+        this._currentFocusStartTime = timestamps[0];
+        this._currentFocusEndTime = timestamps.lastValue;
+        this._currentFocusTotalSampleTime = duration;
+    }
+
+    _saveFocusedNodeOriginalParent(focusDataGridNode)
+    {
+        focusDataGridNode.__previousParent = focusDataGridNode.parent;
+        focusDataGridNode.__previousParent.removeChild(focusDataGridNode);
     }
 
     _restoreFocusedNodeToOriginalParent(focusDataGridNode)
     {
+        // NOTE: A DataGridTree maintains a list of children but those
+        // children get adopted by the DataGrid in ProfileView and
+        // actually displayed. When we focused this DataGridNode, its
+        // parent was removed from the real DataGrid, but if it was not
+        // at the top level it was not detached. When we re-append
+        // ourselves onto the previous parent, if it still thinks it is
+        // attached and expanded it will attach us immediately, which
+        // can create an orphaned <tr> in the DataGrid that is not one
+        // of the DataGrid's immediate children.
+        //
+        // Workaround this by:
+        //   - collapsing our parent to prevent attaching when we get added.
+        //   - reparent to our previous parent.
+        //   - expanding our parent after the DataGrid has had a chance to update.
+        focusDataGridNode.__previousParent.collapse();
+        this._focusParentsToExpand.push(focusDataGridNode.__previousParent);
+
         focusDataGridNode.__previousParent.appendChild(focusDataGridNode);
         focusDataGridNode.__previousParent = undefined;
     }

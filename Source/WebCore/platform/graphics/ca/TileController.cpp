@@ -36,6 +36,10 @@
 #include <utility>
 #include <wtf/MainThread.h>
 
+#if USE(IOSURFACE)
+#include "IOSurface.h"
+#endif
+
 #if PLATFORM(IOS)
 #include "MemoryPressureHandler.h"
 #include "TileControllerMemoryHandlerIOS.h"
@@ -172,15 +176,6 @@ void TileController::setTilesOpaque(bool opaque)
         return;
     m_tilesAreOpaque = opaque;
 
-    tileGrid().updateTileLayerProperties();
-}
-
-void TileController::setTileContentsFormatFlags(PlatformCALayer::ContentsFormatFlags flags)
-{
-    if (flags == m_contentsFormatFlags)
-        return;
-
-    m_contentsFormatFlags = flags;
     tileGrid().updateTileLayerProperties();
 }
 
@@ -372,8 +367,8 @@ void TileController::adjustTileCoverageRect(FloatRect& coverageRect, const Float
         return;
     }
 
-    double horizontalMargin = tileSize().width() / contentsScale;
-    double verticalMargin = tileSize().height() / contentsScale;
+    double horizontalMargin = kDefaultTileSize / contentsScale;
+    double verticalMargin = kDefaultTileSize / contentsScale;
 
     double currentTime = monotonicallyIncreasingTime();
     double timeDelta = currentTime - m_velocity.lastUpdateTime;
@@ -498,15 +493,25 @@ IntSize TileController::tileSize() const
     if (m_inLiveResize || m_tileSizeLocked)
         return tileGrid().tileSize();
 
+    IntSize maxTileSize(kGiantTileSize, kGiantTileSize);
+#if USE(IOSURFACE)
+    IntSize surfaceSizeLimit = IOSurface::maximumSize();
+    surfaceSizeLimit.scale(1 / m_deviceScaleFactor);
+    maxTileSize = maxTileSize.shrunkTo(surfaceSizeLimit);
+#endif
+    
     if (owningGraphicsLayer()->platformCALayerUseGiantTiles())
-        return IntSize(kGiantTileSize, kGiantTileSize);
+        return maxTileSize;
 
     IntSize tileSize(kDefaultTileSize, kDefaultTileSize);
 
-    if (m_scrollability == NotScrollable)
-        tileSize = boundsWithoutMargin().size().constrainedBetween(IntSize(kDefaultTileSize, kDefaultTileSize), IntSize(kGiantTileSize, kGiantTileSize));
-    else if (m_scrollability == VerticallyScrollable)
-        tileSize.setWidth(std::min(std::max(boundsWithoutMargin().width(), kDefaultTileSize), kGiantTileSize));
+    if (m_scrollability == NotScrollable) {
+        IntSize scaledSize = expandedIntSize(boundsWithoutMargin().size() * tileGrid().scale());
+        tileSize = scaledSize.constrainedBetween(IntSize(kDefaultTileSize, kDefaultTileSize), maxTileSize);
+    } else if (m_scrollability == VerticallyScrollable)
+        tileSize.setWidth(std::min(std::max<int>(ceilf(boundsWithoutMargin().width() * tileGrid().scale()), kDefaultTileSize), maxTileSize.width()));
+
+    LOG_WITH_STREAM(Scrolling, stream << "TileController::tileSize newSize=" << tileSize);
 
     m_tileSizeLocked = true;
     return tileSize;
@@ -684,7 +689,6 @@ RefPtr<PlatformCALayer> TileController::createTileLayer(const IntRect& tileRect,
     layer->setBorderWidth(m_tileDebugBorderWidth);
     layer->setEdgeAntialiasingMask(0);
     layer->setOpaque(m_tilesAreOpaque);
-    layer->setContentsFormat(m_contentsFormatFlags);
 #ifndef NDEBUG
     layer->setName("Tile");
 #endif

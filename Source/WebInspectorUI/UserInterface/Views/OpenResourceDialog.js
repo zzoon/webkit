@@ -49,9 +49,11 @@ WebInspector.OpenResourceDialog = class OpenResourceDialog extends WebInspector.
         this._clearIconElement.addEventListener("click", this._handleClickEvent.bind(this));
 
         this._treeOutline = new WebInspector.TreeOutline(document.createElement("ol"));
+        this._treeOutline.allowsRepeatSelection = true;
         this._treeOutline.disclosureButtons = false;
         this._treeOutline.large = true;
 
+        this._treeOutline.addEventListener(WebInspector.TreeOutline.Event.SelectionDidChange, this._treeSelectionDidChange, this);
         this._treeOutline.element.addEventListener("focus", () => {this._inputElement.focus();});
 
         this.element.appendChild(this._treeOutline.element);
@@ -90,7 +92,7 @@ WebInspector.OpenResourceDialog = class OpenResourceDialog extends WebInspector.
         }
 
         if (this._treeOutline.children.length)
-            this._treeOutline.children[0].select(true);
+            this._treeOutline.children[0].select(true, false, true, true);
     }
 
     didPresentDialog()
@@ -132,6 +134,7 @@ WebInspector.OpenResourceDialog = class OpenResourceDialog extends WebInspector.
         } else if (event.keyCode === WebInspector.KeyboardShortcut.Key.Enter.keyCode) {
             if (this._treeOutline.selectedTreeElement) {
                 this.dismiss(this._treeOutline.selectedTreeElement.representedObject);
+                event.preventDefault();
                 return;
             }
 
@@ -160,6 +163,10 @@ WebInspector.OpenResourceDialog = class OpenResourceDialog extends WebInspector.
 
     _handleBlurEvent(event)
     {
+        // Prevent the dialog from being dismissed while handling a tree item click event.
+        if (event.relatedTarget === this._treeOutline.element)
+            return;
+
         this.dismiss();
     }
 
@@ -168,7 +175,7 @@ WebInspector.OpenResourceDialog = class OpenResourceDialog extends WebInspector.
         this._inputElement.select();
 
         // This ensures we don't get a "blur" event triggered for the text field
-        // which would end up dimissing the dialog, which is not the intent.
+        // that would cause the dialog to be dismissed.
         event.preventDefault();
     }
 
@@ -194,11 +201,8 @@ WebInspector.OpenResourceDialog = class OpenResourceDialog extends WebInspector.
         if (!filterText)
             return;
 
-        let escapedFilterText = filterText.escapeForRegExp();
-        let r0 = new RegExp("^" + escapedFilterText, "i");
-        let r1 = simpleGlobStringToRegExp(filterText, "i");
-        let r2 = new RegExp("^" + escapedFilterText.toUpperCase().split("").join(".*?"));
-        let filters = [r0, r1, r2];
+        // FIXME: <https://webkit.org/b/155324> Web Inspector: Improve filtering in OpenResourceDialog
+        let filters = [simpleGlobStringToRegExp(filterText)];
 
         for (let resource of this._resources) {
             for (let i = 0; i < filters.length; ++i) {
@@ -222,6 +226,18 @@ WebInspector.OpenResourceDialog = class OpenResourceDialog extends WebInspector.
         this._populateResourceTreeOutline();
         if (this._treeOutline.children.length)
             this._treeOutline.hidden = false;
+    }
+
+    _treeSelectionDidChange(event)
+    {
+        let treeElement = event.data.selectedElement;
+        if (!treeElement)
+            return;
+
+        if (!event.data.selectedByUser)
+            return;
+
+        this.dismiss(treeElement.representedObject);
     }
 };
 

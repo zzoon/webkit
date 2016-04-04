@@ -789,6 +789,13 @@ bool RenderStyle::changeRequiresLayerRepaint(const RenderStyle& other, unsigned&
         // Don't return; keep looking for another change.
     }
 
+#if ENABLE(FILTERS_LEVEL_2)
+    if (rareNonInheritedData->m_backdropFilter != other.rareNonInheritedData->m_backdropFilter) {
+        changedContextSensitiveProperties |= ContextSensitivePropertyFilter;
+        // Don't return; keep looking for another change.
+    }
+#endif
+
     if (rareNonInheritedData->m_mask != other.rareNonInheritedData->m_mask
         || rareNonInheritedData->m_maskBoxImage != other.rareNonInheritedData->m_maskBoxImage)
         return true;
@@ -1974,6 +1981,22 @@ void RenderStyle::setScrollSnapCoordinates(Vector<LengthSize> coordinates)
 
 #endif
 
+bool RenderStyle::hasReferenceFilterOnly() const
+{
+    if (!hasFilter())
+        return false;
+
+    const FilterOperations& filterOperations = rareNonInheritedData->m_filter->m_operations;
+    if (filterOperations.size() != 1)
+        return false;
+
+    const FilterOperation& filterOperation = *filterOperations.at(0);
+    if (filterOperation.type() != FilterOperation::REFERENCE)
+        return false;
+
+    return true;
+}
+
 void RenderStyle::checkVariablesInCustomProperties()
 {
     if (!rareInheritedData->m_customProperties->containsVariables())
@@ -2040,6 +2063,17 @@ float RenderStyle::outlineOffset() const
     if (outlineStyleIsAuto())
         return (m_background->outline().offset() + RenderTheme::platformFocusRingOffset(outlineWidth()));
     return m_background->outline().offset();
+}
+
+bool RenderStyle::shouldPlaceBlockDirectionScrollbarOnLeft() const
+{
+#if PLATFORM(MAC)
+    return ScrollableArea::systemLanguageIsRTL();
+#elif USE(RTL_SCROLLBAR)
+    return !isLeftToRightDirection() && isHorizontalWritingMode();
+#else
+    return false;
+#endif
 }
 
 } // namespace WebCore

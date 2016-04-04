@@ -76,6 +76,7 @@ class InjectedBundle;
 class NetworkProcessConnection;
 class ObjCObjectGraph;
 class UserData;
+class WebAutomationSessionProxy;
 class WebConnectionToUIProcess;
 class WebFrame;
 class WebIconDatabaseProxy;
@@ -174,6 +175,7 @@ public:
     void statisticsChangedTimerFired();
 
 #if PLATFORM(COCOA)
+    RetainPtr<CFDataRef> sourceApplicationAuditData() const;
     void destroyRenderingResources();
 #endif
 
@@ -184,9 +186,6 @@ public:
     void processWillSuspendImminently(bool& handled);
     void prepareToSuspend();
     void cancelPrepareToSuspend();
-    bool markAllLayersVolatileIfPossible();
-    void setAllLayerTreeStatesFrozen(bool);
-    void processSuspensionCleanupTimerFired();
     void processDidResume();
 
 #if PLATFORM(IOS)
@@ -209,6 +208,8 @@ public:
 
     void prefetchDNS(const String&);
 
+    WebAutomationSessionProxy* automationSessionProxy() { return m_automationSessionProxy.get(); }
+
 private:
     WebProcess();
     ~WebProcess();
@@ -219,6 +220,11 @@ private:
 #if USE(OS_STATE)
     void registerWithStateDumper();
 #endif
+
+    void markAllLayersVolatile(std::function<void()> completionHandler);
+    void cancelMarkAllLayersVolatile();
+    void setAllLayerTreeStatesFrozen(bool);
+    void processSuspensionCleanupTimerFired();
 
     void clearCachedCredentials();
 
@@ -238,8 +244,6 @@ private:
     void setDefaultRequestTimeoutInterval(double);
     void setAlwaysUsesComplexTextCodePath(bool);
     void setShouldUseFontSmoothing(bool);
-    void enableSmoothedLayerText(bool);
-
     void setResourceLoadStatisticsEnabled(bool);
     void userPreferredLanguagesChanged(const Vector<String>&) const;
     void fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled);
@@ -285,6 +289,9 @@ private:
     enum class ShouldAcknowledgeWhenReadyToSuspend { No, Yes };
     void actualPrepareToSuspend(ShouldAcknowledgeWhenReadyToSuspend);
 
+    void ensureAutomationSessionProxy(const String& sessionIdentifier);
+    void destroyAutomationSessionProxy();
+
     // ChildProcess
     void initializeProcess(const ChildProcessInitializationParameters&) override;
     void initializeProcessName(const ChildProcessInitializationParameters&) override;
@@ -322,7 +329,6 @@ private:
 #if PLATFORM(IOS)
     RefPtr<ViewUpdateDispatcher> m_viewUpdateDispatcher;
 #endif
-    WebCore::Timer m_processSuspensionCleanupTimer;
 
     bool m_inDidClose;
 
@@ -354,6 +360,8 @@ private:
     HashSet<String> m_dnsPrefetchedHosts;
     WebCore::HysteresisActivity m_dnsPrefetchHystereris;
 
+    std::unique_ptr<WebAutomationSessionProxy> m_automationSessionProxy;
+
 #if ENABLE(DATABASE_PROCESS)
     void ensureWebToDatabaseProcessConnection();
     RefPtr<WebToDatabaseProcessConnection> m_webToDatabaseProcessConnection;
@@ -379,7 +387,7 @@ private:
 
     Ref<WebCore::ResourceLoadStatisticsStore> m_resourceLoadStatisticsStorage;
 
-    ShouldAcknowledgeWhenReadyToSuspend m_shouldAcknowledgeWhenReadyToSuspend;
+    unsigned m_pagesMarkingLayersAsVolatile { 0 };
     bool m_suppressMemoryPressureHandler { false };
 };
 

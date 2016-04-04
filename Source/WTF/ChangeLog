@@ -1,3 +1,451 @@
+2016-03-31  Konstantin Tokarev  <annulen@yandex.ru>
+
+        Removed leftovers of ENABLE(INSPECTOR) and ENABLE(VIEWPORT).
+        https://bugs.webkit.org/show_bug.cgi?id=156064
+
+        Reviewed by Csaba Osztrogonác.
+
+        This ifdef guards were removed in r178820 and r147714, respectively.
+
+        * wtf/FeatureDefines.h:
+
+2016-03-31  Brent Fulgham  <bfulgham@apple.com>
+
+        [WK2] Support download attribute feature
+        https://bugs.webkit.org/show_bug.cgi?id=102914
+        <rdar://problem/13177492>
+
+        Reviewed by Darin Adler.
+
+        * wtf/FeatureDefines.h: Turn the ENABLE_DOWNLOAD_ATTRIBUTE flag
+        on to see what happens.
+
+2016-03-30  Brian Burg  <bburg@apple.com>
+
+        Web Automation: Add Automation.performKeyboardInteractions
+        https://bugs.webkit.org/show_bug.cgi?id=155990
+        <rdar://problem/25426408>
+
+        Reviewed by Timothy Hatcher.
+
+        Add a missing NSEventType declaration.
+
+        * wtf/mac/AppKitCompatibilityDeclarations.h:
+
+2016-03-29  Benjamin Poulain  <bpoulain@apple.com>
+
+        [WTF] Removing a smart pointer from HashTable issues two stores to the same location
+        https://bugs.webkit.org/show_bug.cgi?id=155676
+
+        Reviewed by Darin Adler.
+
+        While working on the hot loop of r198376, I noticed something
+        weird...
+        Every time we removed a smart pointer from the hash table,
+        the code generated was something like:
+            Load([bucket]) -> Tmp
+            Store(0 -> [bucket])
+            JumpIfZero(Tmp, ->End)
+            Call fastFree()
+            Store(-1 -> [bucket])
+            -> End:
+
+        The useless store before the branch is annoying, especially on ARM.
+
+        Here is what happens:
+            1) The destructor of the smart pointer swaps its internal value with nullptr.
+            2) Since the smart pointer is not a local in-register value, that nullptr
+               is stored in memory because it could be observable from fastFree().
+            3) The destructor destroy the value if not zero (or deref for RefPtr).
+               The "if-not-zero" may or may not be eliminated depending on what
+               is between getting the iterator and the call to remove().
+            4) fastFree() is called.
+            5) The deleted value is set in the bucket.
+
+        This patch adds custom deletion for those cases to avoid the useless
+        store. The useless null check is still eliminated when we are lucky.
+
+        I went this path instead of changing the destructor of RefPtr for two reasons:
+        -I need this to work in unique_ptr for JSC.
+        -Nulling the memory may have security advantages in the cases where we do not immediately
+         write over that memory again.
+
+        This patch removes 13kb out of x86_64 WebCore.
+
+        * wtf/HashTable.h:
+        (WTF::HashTable::deleteBucket):
+        (WTF::KeyTraits>::removeIf):
+        * wtf/HashTraits.h:
+        (WTF::HashTraits<RefPtr<P>>::customDeleteBucket):
+        (WTF::hashTraitsDeleteBucket):
+        (WTF::KeyValuePairHashTraits::customDeleteBucket):
+        * wtf/text/AtomicStringHash.h:
+        (WTF::HashTraits<WTF::AtomicString>::isEmptyValue):
+        (WTF::HashTraits<WTF::AtomicString>::customDeleteBucket):
+        * wtf/text/StringHash.h:
+        (WTF::HashTraits<String>::customDeleteBucket):
+
+2016-03-28  Brian Burg  <bburg@apple.com>
+
+        Web Automation: implement Automation.performMouseInteraction
+        https://bugs.webkit.org/show_bug.cgi?id=155606
+        <rdar://problem/25227576>
+
+        Reviewed by Timothy Hatcher.
+
+        * wtf/mac/AppKitCompatibilityDeclarations.h: Add missing some NSEventTypes.
+
+2016-03-29  Yusuke Suzuki  <utatane.tea@gmail.com>
+
+        REGRESSION(r192914): 10% regression on Sunspider's date-format-tofte
+        https://bugs.webkit.org/show_bug.cgi?id=155559
+
+        Reviewed by Saam Barati.
+
+        Add HashTable::inlineLookup and HashMap::fastGet.
+
+        * wtf/HashMap.h:
+        * wtf/HashTable.h:
+
+2016-03-25  Alex Christensen  <achristensen@webkit.org>
+
+        Add a compile time flag for using QTKit
+        https://bugs.webkit.org/show_bug.cgi?id=155868
+
+        Reviewed by Dan Bates.
+
+        * wtf/Platform.h:
+
+2016-03-24  Alex Christensen  <achristensen@webkit.org>
+
+        Fix iOS9 performance regression after r197572
+        https://bugs.webkit.org/show_bug.cgi?id=155845
+        <rdar://problem/25144924>
+
+        Reviewed by Chris Dumez.
+
+        * wtf/Platform.h:
+        Use CFURLConnection instead of NSURLConnection on internal iOS9 builds.
+
+2016-03-23  Saam Barati  <sbarati@apple.com>
+
+        SmallPtrSet leaks memory in its move assignment operator when !this->isSmall()
+        https://bugs.webkit.org/show_bug.cgi?id=155701
+
+        Reviewed by Darin Adler.
+
+        * wtf/SmallPtrSet.h:
+        (WTF::SmallPtrSet::SmallPtrSet):
+        (WTF::SmallPtrSet::operator=):
+
+2016-03-22  Per Arne Vollan  <peavo@outlook.com>
+
+        [Win] [64-bit] Remove MSVC 2013 FMA3 Bug Workaround
+        https://bugs.webkit.org/show_bug.cgi?id=141499
+
+        Reviewed by Brent Fulgham.
+
+        As we have moved on to VS2015, this workaround is no longer needed.
+
+        * wtf/PlatformWin.cmake:
+        * wtf/win/WTFDLL.cpp: Removed.
+
+2016-03-20  Dan Bernstein  <mitz@apple.com>
+
+        [Mac] Determine TARGET_MAC_OS_X_VERSION_MAJOR from MACOSX_DEPLOYMENT_TARGET rather than from MAC_OS_X_VERSION_MAJOR
+        https://bugs.webkit.org/show_bug.cgi?id=155707
+        <rdar://problem/24980691>
+
+        Reviewed by Darin Adler.
+
+        * Configurations/Base.xcconfig: Set TARGET_MAC_OS_X_VERSION_MAJOR based on the last
+          component of MACOSX_DEPLOYMENT_TARGET.
+        * Configurations/DebugRelease.xcconfig: For engineering builds, preserve the behavior of
+          TARGET_MAC_OS_X_VERSION_MAJOR being the host’s OS version.
+
+2016-03-20  Dan Bernstein  <mitz@apple.com>
+
+        Update build settings
+
+        Rubber-stamped by Andy Estes.
+
+        * Configurations/DebugRelease.xcconfig:
+
+2016-03-17  Benjamin Poulain  <bpoulain@apple.com>
+
+        [JSC] Make CSE's ImpureData faster when dealing with large blocks
+        https://bugs.webkit.org/show_bug.cgi?id=155594
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/HashSet.h:
+        (WTF::V>::removeIf):
+
+2016-03-17  Saam barati  <sbarati@apple.com>
+
+        Implement SmallPtrSet and integrate it into the Parser
+        https://bugs.webkit.org/show_bug.cgi?id=155552
+
+        Reviewed by Filip Pizlo.
+
+        This patch implements the SmallPtrSet data struture.
+        Inspired by the implementation in llvm:
+        http://llvm.org/docs/doxygen/html/SmallPtrSet_8h_source.html
+
+        The data structure uses an inline array for storage up until
+        a fixed limit (8 entries in our implementation). If that storage
+        fills up, we fall back to a simple hash table implementation.
+        Crucially, this implementation doesn't support the remove
+        operation. This is on purpose. The hash table will only ever
+        grow.
+
+        Also, the implementation allows for it to be memcopied around.
+        I.e, we can put SmallPtrSet inside a Vector and allow that
+        Vector to use memcpy as its move operation (of course this
+        is only valid if the SmallPtrSet in the old memory doesn't have 
+        its destructor called unless it is set back to its initial state.)
+
+        For now, SmallPtrSet only supports pointer types that are trivially
+        destructible. It's probably not too difficult to extend this to
+        smart pointers, but it's not part of this original implementation.
+
+        I've also implemented a pure forwarding varargs constructAndAppend
+        method on Vector. This allows you to do:
+        Vector<T> v;
+        v.constructAndAppend(a1, a2, ...)
+        as long as T has a constructor that accepts arguments (a1, a2, ...).
+
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/SmallPtrSet.h: Added.
+        (WTF::SmallPtrSet::SmallPtrSet):
+        (WTF::SmallPtrSet::operator=):
+        (WTF::SmallPtrSet::~SmallPtrSet):
+        (WTF::SmallPtrSet::add):
+        (WTF::SmallPtrSet::contains):
+        (WTF::SmallPtrSet::iterator::operator++):
+        (WTF::SmallPtrSet::iterator::operator*):
+        (WTF::SmallPtrSet::iterator::operator==):
+        (WTF::SmallPtrSet::iterator::operator!=):
+        (WTF::SmallPtrSet::begin):
+        (WTF::SmallPtrSet::end):
+        (WTF::SmallPtrSet::size):
+        (WTF::SmallPtrSet::emptyValue):
+        (WTF::SmallPtrSet::isValidEntry):
+        (WTF::SmallPtrSet::isSmall):
+        (WTF::SmallPtrSet::initialize):
+        (WTF::SmallPtrSet::grow):
+        (WTF::SmallPtrSet::bucket):
+        * wtf/Vector.h:
+        (WTF::Vector::append):
+        (WTF::Vector::uncheckedAppend):
+        (WTF::minCapacity>::append):
+        (WTF::minCapacity>::constructAndAppend):
+        (WTF::minCapacity>::appendSlowCase):
+        (WTF::minCapacity>::constructAndAppendSlowCase):
+
+2016-03-16  Filip Pizlo  <fpizlo@apple.com>
+
+        Replace all of the various non-working and non-compiling sampling profiler hacks with a single super hack
+        https://bugs.webkit.org/show_bug.cgi?id=155561
+
+        Reviewed by Saam Barati.
+
+        This patch replaces all of our various ad hoc profiling hacks with a single ad hoc profiling hack.
+        That needs to be able to sleep a thread, so I added a portable way to do it.
+
+        This also removes a bunch of ENABLE flags for all of the old non-working hacks.
+
+        * wtf/CurrentTime.cpp:
+        (WTF::currentCPUTime):
+        (WTF::sleep):
+        * wtf/CurrentTime.h:
+        (WTF::sleepMS):
+        * wtf/Platform.h:
+
+2016-03-17  Chris Dumez  <cdumez@apple.com>
+
+        Set the WebContent process's main thread QoS to USER-INTERACTIVE
+        https://bugs.webkit.org/show_bug.cgi?id=155595
+        <rdar://problem/22534965>
+
+        Reviewed by Antti Koivisto.
+
+        Add a relativePriority parameter to setCurrentThreadIsUser*() so that
+        we can do more fine-grained prioritization of threads that have the
+        same QoS.
+
+        * wtf/Threading.cpp:
+        (WTF::setCurrentThreadIsUserInteractive):
+        (WTF::setCurrentThreadIsUserInitiated):
+        (WTF::createThread): Deleted.
+        * wtf/Threading.h:
+
+2016-03-17  Filip Pizlo  <fpizlo@apple.com>
+
+        Silence leaks in ParkingLot
+        https://bugs.webkit.org/show_bug.cgi?id=155510
+
+        Reviewed by Alexey Proskuryakov.
+
+        ParkingLot has a concurrent hashtable that it reallocates on demand. It will not reallocate
+        it in steady state. The hashtable is sized to accommodate the high watermark of the number
+        of active threads - so long as the program doesn't just keep starting an unbounded number
+        of threads that are all active, the hashtable will stop resizing. Each resize operation is
+        designed to stay out of the way of the data-access-parallel normal path, in which two
+        threads operating on different lock addresses don't have to synchronize. To do this, it
+        simply drops the old hashtable without deleting it, so that threads that were still using
+        it don't crash. They will realize that they have the wrong hashtable before doing anything
+        bad, but we don't have a way of proving when all of those threads are no longer going to
+        read from the old hashtables. So, we just leak them.
+
+        This is a bounded leak, since the hashtable resizes exponentially. Thus the total memory
+        utilization of all hashtables, including the leaked ones, converges to a linear function of
+        the current hashtable's size (it's 2 * size of current hashtable).
+
+        But this leak is a problem for leaks tools, which will always report this leak. This is not
+        useful. It's better to silence the leak. That's what this patch does by ensuring that all
+        hashtables, including leaked ones, end up in a global vector. This is perf-neutral.
+
+        This requires making a StaticWordLock variant of WordLock. That's probably the biggest part
+        of this change.
+
+        * wtf/ParkingLot.cpp:
+        * wtf/WordLock.cpp:
+        (WTF::WordLockBase::lockSlow):
+        (WTF::WordLockBase::unlockSlow):
+        (WTF::WordLock::lockSlow): Deleted.
+        (WTF::WordLock::unlockSlow): Deleted.
+        * wtf/WordLock.h:
+        (WTF::WordLockBase::lock):
+        (WTF::WordLockBase::isLocked):
+        (WTF::WordLock::WordLock):
+        (WTF::WordLock::lock): Deleted.
+        (WTF::WordLock::isLocked): Deleted.
+
+2016-03-16  Chris Dumez  <cdumez@apple.com>
+
+        Unreviewed, rolling out r198235, r198240, r198241, and
+        r198252.
+
+        Causing crashes on ARM
+
+        Reverted changesets:
+
+        "Remove compile time define for SEPARATED_HEAP"
+        https://bugs.webkit.org/show_bug.cgi?id=155508
+        http://trac.webkit.org/changeset/198235
+
+        "Gardening: build fix after r198235."
+        http://trac.webkit.org/changeset/198240
+
+        "Build fix."
+        http://trac.webkit.org/changeset/198241
+
+        "Rename performJITMemcpy to something more inline with our
+        normal webkit function names"
+        https://bugs.webkit.org/show_bug.cgi?id=155525
+        http://trac.webkit.org/changeset/198252
+
+2016-03-15  Oliver Hunt  <oliver@apple.com>
+
+        Remove compile time define for SEPARATED_HEAP
+        https://bugs.webkit.org/show_bug.cgi?id=155508
+
+        Reviewed by Mark Lam.
+
+        Remove the feature define.
+
+        * wtf/FeatureDefines.h:
+        * wtf/Platform.h:
+
+2016-03-14  Mark Lam  <mark.lam@apple.com>
+
+        Need to distinguish between Symbol() and Symbol("").
+        https://bugs.webkit.org/show_bug.cgi?id=155438
+
+        Reviewed by Saam Barati.
+
+        While toString of both Symbol() and Symbol("") yields "Symbol()", Function.name
+        should yield "" and "[]" respectively.  Hence, we need to tell between the two.
+        This functionality will be needed later in https://bugs.webkit.org/show_bug.cgi?id=155437.
+
+        We achieve this by creating another singleton instance like the empty StringImpl
+        as the null StringImpl.  isNullSymbol() tests if the Stringimpl instance is a
+        symbol, and its substring is the null() singleton.
+
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::createSymbol):
+        (WTF::StringImpl::createNullSymbol):
+        (WTF::StringImpl::containsOnlyWhitespace):
+        (WTF::StringImpl::createSymbolEmpty): Deleted.
+        * wtf/text/StringImpl.h:
+        (WTF::StringImpl::tryCreateUninitialized):
+        (WTF::StringImpl::stringKind):
+        (WTF::StringImpl::isSymbol):
+        (WTF::StringImpl::isAtomic):
+        (WTF::StringImpl::isNullSymbol):
+        * wtf/text/StringStatics.cpp:
+        (WTF::StringImpl::null):
+
+2016-03-13  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Remove ENABLE(ES6_TEMPLATE_LITERAL_SYNTAX) guards
+        https://bugs.webkit.org/show_bug.cgi?id=155417
+
+        Reviewed by Yusuke Suzuki.
+
+        * wtf/FeatureDefines.h:
+
+2016-03-13  Konstantin Tokarev  <annulen@yandex.ru>
+
+        Added new port JSCOnly.
+        https://bugs.webkit.org/show_bug.cgi?id=154512
+
+        Reviewed by Michael Catanzaro.
+
+        This port allows to build JavaScriptCore engine with minimal
+        dependencies.
+
+        * wtf/PlatformJSCOnly.cmake: Added.
+        * wtf/none/MainThreadNone.cpp: Added.
+        * wtf/none/RunLoopNone.cpp: Added.
+        * wtf/none/WorkQueueNone.cpp: Added.
+
+2016-03-13  David Kilzer  <ddkilzer@apple.com>
+
+        REGRESSION (r198079): Windows build broke because of "%PRId64" format specifier
+
+        This fixes the following build failure in WebCore for Windows:
+            C:\Source\WebCore\page\DOMTimer.cpp(396): error C2146: syntax error: missing ')' before identifier 'PRId64' [C:\WebKitBuild\Debug\Source\WebCore\WebCore.vcxproj]
+            C:\Source\WebCore\page\DOMTimer.cpp(399): error C2146: syntax error: missing ')' before identifier 'PRId64' [C:\WebKitBuild\Debug\Source\WebCore\WebCore.vcxproj]
+
+        * wtf/StdLibExtras.h: Define "PRId64" for Windows here so it may
+        be shared.  This should fix DOMTimer.cpp after r198079 since it
+        already includes StdLibExtras.h.
+
+2016-03-11  Youenn Fablet  <youenn.fablet@crf.canon.fr>
+
+        WTF should have a similar function as equalLettersIgnoringASCIICase to match beginning of strings
+        https://bugs.webkit.org/show_bug.cgi?id=153419
+
+        Reviewed by Darin Adler.
+
+        Introducing startsWithLettersIgnoringASCIICase, to check the beginning of a string.
+        Moving some code from WTF::equalLettersIgnoringASCIICaseCommonWithoutLength in
+        WTF::hasPrefixWithLettersIgnoringASCIICaseCommon to enable reuse in
+        WTF::startsWithLettersIgnoringASCIICaseCommon.
+
+        * wtf/text/StringCommon.h:
+        (WTF::hasPrefixWithLettersIgnoringASCIICaseCommon):
+        (WTF::equalLettersIgnoringASCIICaseCommonWithoutLength):
+        (WTF::startsWithLettersIgnoringASCIICaseCommonWithoutLength):
+        (WTF::startsWithLettersIgnoringASCIICaseCommon):
+        * wtf/text/StringImpl.h:
+        (WTF::startsWithLettersIgnoringASCIICase):
+        * wtf/text/WTFString.h:
+        (WTF::startsWithLettersIgnoringASCIICase):
+
 2016-03-10  Frederic Wang  <fwang@igalia.com>
 
         [GTK] Add support for WOFF2

@@ -179,6 +179,8 @@ public:
     IntPoint lastKnownMouseGlobalPosition() const { return m_lastKnownMouseGlobalPosition; }
     Cursor currentMouseCursor() const { return m_currentMouseCursor; }
 
+    IntPoint effectiveMousePositionForSelectionAutoscroll() const;
+
     static Frame* subframeForTargetNode(Node*);
     static Frame* subframeForHitTestResult(const MouseEventWithHitTestResults&);
 
@@ -459,6 +461,7 @@ private:
     void autoHideCursorTimerFired();
 #endif
 
+    void clearOrScheduleClearingLatchedStateIfNeeded(const PlatformWheelEvent&);
     void clearLatchedState();
 
     Frame& m_frame;
@@ -487,6 +490,9 @@ private:
     Timer m_cursorUpdateTimer;
 #endif
 
+#if PLATFORM(MAC)
+    Timer m_pendingMomentumWheelEventsTimer;
+#endif
     std::unique_ptr<AutoscrollController> m_autoscrollController;
     bool m_mouseDownMayStartAutoscroll { false };
     bool m_mouseDownWasInSubframe { false };
@@ -512,10 +518,10 @@ private:
     RefPtr<Node> m_clickNode;
 
 #if ENABLE(IOS_GESTURE_EVENTS)
+    float m_gestureInitialDiameter { GestureUnknown };
     float m_gestureInitialRotation { GestureUnknown };
 #endif
 #if ENABLE(IOS_GESTURE_EVENTS) || ENABLE(MAC_GESTURE_EVENTS)
-    float m_gestureInitialDiameter { GestureUnknown };
     float m_gestureLastDiameter { GestureUnknown };
     float m_gestureLastRotation { GestureUnknown };
     EventTargetSet m_gestureTargets;

@@ -46,6 +46,7 @@ class AnalysisTaskPage extends PageWithHeading {
         this._currentTestGroup = null;
         this._filteredTestGroups = null;
         this._showHiddenTestGroups = false;
+        this._selectionWasModifiedByUser = false;
 
         this._chartPane = this.content().querySelector('analysis-task-chart-pane').component();
         this._chartPane.setPage(this);
@@ -61,9 +62,15 @@ class AnalysisTaskPage extends PageWithHeading {
         this.content().querySelector('.change-type-form').onsubmit = this._updateChangeType.bind(this);
         this._taskStatusControl = this.content().querySelector('.change-type-form select');
 
-        this.content().querySelector('.associate-bug-form').onsubmit = this._associateBug.bind(this);
-        this._bugTrackerControl = this.content().querySelector('.bug-tracker-control');
-        this._bugNumberControl = this.content().querySelector('.bug-number-control');
+        this._bugList = this.content().querySelector('.associated-bugs mutable-list-view').component();
+        this._bugList.setKindList(BugTracker.all());
+        this._bugList.setAddCallback(this._associateBug.bind(this));
+
+        this._causeList = this.content().querySelector('.cause-list mutable-list-view').component();
+        this._causeList.setAddCallback(this._associateCommit.bind(this, 'cause'));
+
+        this._fixList = this.content().querySelector('.fix-list mutable-list-view').component();
+        this._fixList.setAddCallback(this._associateCommit.bind(this, 'fix'));
 
         this._newTestGroupFormForChart = this.content().querySelector('.overview-chart customizable-test-group-form').component();
         this._newTestGroupFormForChart.setStartCallback(this._createNewTestGroupFromChart.bind(this));
@@ -229,24 +236,32 @@ class AnalysisTaskPage extends PageWithHeading {
             this.renderReplace(anchor, metric.fullName() + ' on ' + platform.label());
             anchor.href = this.router().url('charts', ChartsPage.createStateForAnalysisTask(this._task));
 
-            var bugs = [];
-            for (var bug of this._task.bugs()) {
-                bugs.push(element('li', [
-                    bug.bugTracker().label() + ' ',
-                    link(bug.label(), bug.title(), bug.url()),
-                    ' ',
-                    link(new CloseButton, 'Disassociate this bug', this._disassociateBug.bind(this, bug))]));
-            }
-            this.renderReplace(this.content().querySelector('.associated-bugs'), bugs);
+            var self = this;
+            this._bugList.setList(this._task.bugs().map(function (bug) {
+                return new MutableListItem(bug.bugTracker(), bug.label(), bug.title(), bug.url(),
+                    'Dissociate this bug', self._dissociateBug.bind(self, bug));
+            }));
+
+            this._causeList.setList(this._task.causes().map(this._makeCommitListItem.bind(this)));
+            this._fixList.setList(this._task.fixes().map(this._makeCommitListItem.bind(this)));
 
             this._taskStatusControl.value = this._task.changeType() || 'unconfirmed';
         }
 
-        var element = ComponentBase.createElement;
-        this.renderReplace(this._bugTrackerControl,
-            BugTracker.all().map(function (tracker) {
-                return element('option', {value: tracker.id()}, tracker.label());
-            }));
+        var repositoryList;
+        if (this._startPoint) {
+            var rootSet = this._startPoint.rootSet();
+            repositoryList = Repository.sortByNamePreferringOnesWithURL(rootSet.repositories());
+        } else
+            repositoryList = Repository.sortByNamePreferringOnesWithURL(Repository.all());
+
+        this._bugList.render();
+
+        this._causeList.setKindList(repositoryList);
+        this._causeList.render();
+
+        this._fixList.setKindList(repositoryList);
+        this._fixList.render();
 
         this.content().querySelector('.analysis-task-status').style.display = this._task ? null : 'none';
         this.content().querySelector('.overview-chart').style.display = this._task ? null : 'none';
@@ -277,6 +292,9 @@ class AnalysisTaskPage extends PageWithHeading {
         this._renderTestGroupList();
         this._renderTestGroupDetails();
 
+        if (!this._renderedCurrentTestGroup && !this._selectionWasModifiedByUser && this._startPoint && this._endPoint)
+            this._chartPane.setMainSelection([this._startPoint.time, this._endPoint.time]);
+
         var points = this._chartPane.selectedPoints();
         this._newTestGroupFormForChart.setRootSetMap(points && points.length >= 2 ?
                 {'A': points[0].rootSet(), 'B': points[points.length - 1].rootSet()} : null);
@@ -288,6 +306,12 @@ class AnalysisTaskPage extends PageWithHeading {
         this._testGroupResultsTable.render();
 
         Instrumentation.endMeasuringTime('AnalysisTaskPage', 'render');
+    }
+
+    _makeCommitListItem(commit)
+    {
+        return new MutableListItem(commit.repository(), commit.label(), commit.title(), commit.url(),
+            'Disassociate this commit', this._dissociateCommit.bind(this, commit));
     }
 
     _renderTestGroupList()
@@ -446,14 +470,10 @@ class AnalysisTaskPage extends PageWithHeading {
         });
     }
 
-    _associateBug(event)
+    _associateBug(tracker, bugNumber)
     {
-        event.preventDefault();
-        console.assert(this._task);
-
-        var tracker = BugTracker.findById(this._bugTrackerControl.value);
-        console.assert(tracker);
-        var bugNumber = parseInt(this._bugNumberControl.value);
+        console.assert(tracker instanceof BugTracker);
+        bugNumber = parseInt(bugNumber);
 
         var render = this.render.bind(this);
         return this._task.associateBug(tracker, bugNumber).then(render, function (error) {
@@ -462,12 +482,30 @@ class AnalysisTaskPage extends PageWithHeading {
         });
     }
 
-    _disassociateBug(bug)
+    _dissociateBug(bug)
     {
         var render = this.render.bind(this);
-        return this._task.disassociateBug(bug).then(render, function (error) {
+        return this._task.dissociateBug(bug).then(render, function (error) {
             render();
-            alert('Failed to disassociate the bug: ' + error);
+            alert('Failed to dissociate the bug: ' + error);
+        });
+    }
+
+    _associateCommit(kind, repository, revision)
+    {
+        var render = this.render.bind(this);
+        return this._task.associateCommit(kind, repository, revision).then(render, function (error) {
+            render();
+            alert('Failed to associate the commit: ' + error);
+        });
+    }
+
+    _dissociateCommit(commit)
+    {
+        var render = this.render.bind(this);
+        return this._task.dissociateCommit(commit).then(render, function (error) {
+            render();
+            alert('Failed to dissociate the commit: ' + error);
         });
     }
 
@@ -487,6 +525,7 @@ class AnalysisTaskPage extends PageWithHeading {
 
     _chartSelectionDidChange()
     {
+        this._selectionWasModifiedByUser = true;
         this.render();
     }
 
@@ -595,14 +634,15 @@ class AnalysisTaskPage extends PageWithHeading {
                             <button type="submit">Save</button>
                         </form>
                     </section>
-                    <section>
+                    <section class="associated-bugs">
                         <h3>Associated Bugs</h3>
-                        <ul class="associated-bugs"></ul>
-                        <form class="associate-bug-form">
-                            <select class="bug-tracker-control"></select>
-                            <input type="number" class="bug-number-control">
-                            <button type="submit">Add</button>
-                        </form>
+                        <mutable-list-view></mutable-list-view>
+                    </section>
+                    <section class="cause-fix">
+                        <h3>Caused by</h3>
+                        <span class="cause-list"><mutable-list-view></mutable-list-view></span>
+                        <h3>Fixed by</h3>
+                        <span class="fix-list"><mutable-list-view></mutable-list-view></span>
                     </section>
                     <section class="related-tasks">
                         <h3>Related Tasks</h3>
@@ -680,16 +720,18 @@ class AnalysisTaskPage extends PageWithHeading {
 
             .analysis-task-status > section {
                 flex-grow: 1;
+                flex-shrink: 0;
                 border-left: solid 1px #eee;
                 padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            .analysis-task-status > section.related-tasks {
+                flex-shrink: 1;
             }
 
             .analysis-task-status > section:first-child {
                 border-left: none;
-            }
-
-            .associated-bugs:not(:empty) {
-                margin-bottom: 1rem;
             }
 
             .analysis-task-status h3 {

@@ -479,6 +479,8 @@ static ThunkGenerator thunkGeneratorForIntrinsic(Intrinsic intrinsic)
         return floorThunkGenerator;
     case CeilIntrinsic:
         return ceilThunkGenerator;
+    case TruncIntrinsic:
+        return truncThunkGenerator;
     case RoundIntrinsic:
         return roundThunkGenerator;
     case ExpIntrinsic:
@@ -528,16 +530,6 @@ void VM::resetDateCache()
     dateInstanceCache.reset();
 }
 
-void VM::startSampling()
-{
-    interpreter->startSampling();
-}
-
-void VM::stopSampling()
-{
-    interpreter->stopSampling();
-}
-
 void VM::whenIdle(std::function<void()> callback)
 {
     if (!entryScope) {
@@ -573,14 +565,6 @@ void VM::deleteAllCode()
         heap.deleteAllUnlinkedCodeBlocks();
         heap.reportAbandonedObjectGraph();
     });
-}
-
-void VM::dumpSampleData(ExecState* exec)
-{
-    interpreter->dumpSampleData(exec);
-#if ENABLE(ASSEMBLER)
-    ExecutableAllocator::dumpProfile();
-#endif
 }
 
 SourceProviderCache* VM::addSourceProviderCache(SourceProvider* sourceProvider)

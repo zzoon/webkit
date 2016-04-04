@@ -36,6 +36,8 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         WebInspector.heapManager.addEventListener(WebInspector.HeapManager.Event.GarbageCollected, this._garbageCollected, this);
         WebInspector.memoryManager.addEventListener(WebInspector.MemoryManager.Event.MemoryPressure, this._memoryPressure, this);
 
+        this._enabledTimelineTypesSetting = new WebInspector.Setting("enabled-instrument-types", WebInspector.TimelineManager.defaultTimelineTypes());
+
         this._persistentNetworkTimeline = new WebInspector.NetworkTimeline;
 
         this._isCapturing = false;
@@ -51,31 +53,40 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
 
     // Static
 
-    static defaultInstruments()
+    static defaultTimelineTypes()
     {
         if (WebInspector.debuggableType === WebInspector.DebuggableType.JavaScript) {
-            let defaults = [new WebInspector.ScriptInstrument];
+            let defaultTypes = [WebInspector.TimelineRecord.Type.Script];
             if (WebInspector.HeapAllocationsInstrument.supported())
-                defaults.push(new WebInspector.HeapAllocationsInstrument);
-            return defaults;
+                defaultTypes.push(WebInspector.TimelineRecord.Type.HeapAllocations);
+            return defaultTypes;
         }
 
-        let defaults = [
-            new WebInspector.NetworkInstrument,
-            new WebInspector.LayoutInstrument,
-            new WebInspector.ScriptInstrument,
+        let defaultTypes = [
+            WebInspector.TimelineRecord.Type.Network,
+            WebInspector.TimelineRecord.Type.Layout,
+            WebInspector.TimelineRecord.Type.Script,
         ];
 
+        if (WebInspector.FPSInstrument.supported())
+            defaultTypes.push(WebInspector.TimelineRecord.Type.RenderingFrame);
+
+        return defaultTypes;
+    }
+
+    static availableTimelineTypes()
+    {
+        let types = WebInspector.TimelineManager.defaultTimelineTypes();
+        if (WebInspector.debuggableType === WebInspector.DebuggableType.JavaScript)
+            return types;
+
         if (WebInspector.MemoryInstrument.supported())
-            defaults.push(new WebInspector.MemoryInstrument);
+            types.push(WebInspector.TimelineRecord.Type.Memory);
 
         if (WebInspector.HeapAllocationsInstrument.supported())
-            defaults.push(new WebInspector.HeapAllocationsInstrument);
+            types.push(WebInspector.TimelineRecord.Type.HeapAllocations);
 
-        if (WebInspector.FPSInstrument.supported())
-            defaults.push(new WebInspector.FPSInstrument);
-
-        return defaults;
+        return types;
     }
 
     // Public
@@ -119,6 +130,17 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         this._autoCaptureOnPageLoad = autoCapture;
     }
 
+    get enabledTimelineTypes()
+    {
+        let availableTimelineTypes = WebInspector.TimelineManager.availableTimelineTypes();
+        return this._enabledTimelineTypesSetting.value.filter((type) => availableTimelineTypes.includes(type));
+    }
+
+    set enabledTimelineTypes(x)
+    {
+        this._enabledTimelineTypesSetting.value = x || [];
+    }
+
     isCapturing()
     {
         return this._isCapturing;
@@ -135,6 +157,8 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
 
         if (!this._activeRecording || shouldCreateRecording)
             this._loadNewRecording();
+
+        this.dispatchEventToListeners(WebInspector.TimelineManager.Event.CapturingWillStart);
 
         this._activeRecording.start();
     }
@@ -546,12 +570,9 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         if (this._activeRecording && this._activeRecording.isEmpty())
             return;
 
-        // FIXME: <https://webkit.org/b/153672> Web Inspector: Timelines UI redesign: Provide a way to configure which instruments to use
-        // FIXME: Move the list of instruments for a new recording to a Setting when new Instruments are supported.
-        let instruments = WebInspector.TimelineManager.defaultInstruments();
-
-        var identifier = this._nextRecordingIdentifier++;
-        var newRecording = new WebInspector.TimelineRecording(identifier, WebInspector.UIString("Timeline Recording %d").format(identifier), instruments);
+        let instruments = this.enabledTimelineTypes.map((type) => WebInspector.Instrument.createForTimelineType(type));
+        let identifier = this._nextRecordingIdentifier++;
+        let newRecording = new WebInspector.TimelineRecording(identifier, WebInspector.UIString("Timeline Recording %d").format(identifier), instruments);
 
         this._recordings.push(newRecording);
         this.dispatchEventToListeners(WebInspector.TimelineManager.Event.RecordingCreated, {recording: newRecording});
@@ -752,17 +773,45 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
         console.assert(!this._webTimelineScriptRecordsExpectingScriptProfilerEvents || this._scriptProfilerRecords.length >= this._webTimelineScriptRecordsExpectingScriptProfilerEvents.length);
 
         if (samples) {
-            // Associate the stackTraces with the ScriptProfiler created records.
-            let {totalTime: totalExecutionTime, stackTraces} = samples;
+            let {stackTraces} = samples;
             let topDownCallingContextTree = this.activeRecording.topDownCallingContextTree;
             let bottomUpCallingContextTree = this.activeRecording.bottomUpCallingContextTree;
 
-            topDownCallingContextTree.increaseExecutionTime(totalExecutionTime);
-            bottomUpCallingContextTree.increaseExecutionTime(totalExecutionTime);
+            // Calculate a per-sample duration.
+            let timestampIndex = 0;
+            let timestampCount = stackTraces.length;
+            let sampleDurations = new Array(timestampCount);
+            let sampleDurationIndex = 0;
+            const defaultDuration = 1 / 1000; // 1ms.
+            for (let i = 0; i < this._scriptProfilerRecords.length; ++i) {
+                let record = this._scriptProfilerRecords[i];
+
+                // Use a default duration for timestamps recorded outside of ScriptProfiler events.
+                while (timestampIndex < timestampCount && stackTraces[timestampIndex].timestamp < record.startTime) {
+                    sampleDurations[sampleDurationIndex++] = defaultDuration;
+                    timestampIndex++;
+                }
+
+                // Average the duration per sample across all samples during the record.
+                let samplesInRecord = 0;
+                while (timestampIndex < timestampCount && stackTraces[timestampIndex].timestamp < record.endTime) {
+                    timestampIndex++;
+                    samplesInRecord++;
+                }
+                if (samplesInRecord) {
+                    let averageDuration = (record.endTime - record.startTime) / samplesInRecord;
+                    sampleDurations.fill(averageDuration, sampleDurationIndex, sampleDurationIndex + samplesInRecord);
+                    sampleDurationIndex += samplesInRecord;
+                }
+            }
+
+            // Use a default duration for timestamps recorded outside of ScriptProfiler events.
+            if (timestampIndex < timestampCount)
+                sampleDurations.fill(defaultDuration, sampleDurationIndex);
 
             for (let i = 0; i < stackTraces.length; i++) {
-                topDownCallingContextTree.updateTreeWithStackTrace(stackTraces[i]);
-                bottomUpCallingContextTree.updateTreeWithStackTrace(stackTraces[i]);
+                topDownCallingContextTree.updateTreeWithStackTrace(stackTraces[i], sampleDurations[i]);
+                bottomUpCallingContextTree.updateTreeWithStackTrace(stackTraces[i], sampleDurations[i]);
             }
 
             // FIXME: This transformation should not be needed after introducing ProfileView.
@@ -847,6 +896,7 @@ WebInspector.TimelineManager = class TimelineManager extends WebInspector.Object
 WebInspector.TimelineManager.Event = {
     RecordingCreated: "timeline-manager-recording-created",
     RecordingLoaded: "timeline-manager-recording-loaded",
+    CapturingWillStart: "timeline-manager-capturing-will-start",
     CapturingStarted: "timeline-manager-capturing-started",
     CapturingStopped: "timeline-manager-capturing-stopped"
 };

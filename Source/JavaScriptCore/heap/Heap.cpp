@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2003-2009, 2011, 2013-2015 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003-2009, 2011, 2013-2016 Apple Inc. All rights reserved.
  *  Copyright (C) 2007 Eric Seidel <eric@webkit.org>
  *
  *  This library is free software; you can redistribute it and/or
@@ -52,6 +52,7 @@
 #include "WeakSetInlines.h"
 #include <algorithm>
 #include <wtf/CurrentTime.h>
+#include <wtf/MainThread.h>
 #include <wtf/ParallelVectorIterator.h>
 #include <wtf/ProcessID.h>
 #include <wtf/RAMSize.h>
@@ -381,6 +382,7 @@ void Heap::lastChanceToFinalize()
     RELEASE_ASSERT(!m_vm->entryScope);
     RELEASE_ASSERT(m_operationInProgress == NoOperation);
 
+    m_arrayBuffers.lastChanceToFinalize();
     m_codeBlocks.lastChanceToFinalize();
     m_objectSpace.lastChanceToFinalize();
     releaseDelayedReleasedObjects();
@@ -515,8 +517,6 @@ void Heap::completeAllDFGPlans()
 
 void Heap::markRoots(double gcStartTime, void* stackOrigin, void* stackTop, MachineThreads::RegisterState& calleeSavedRegisters)
 {
-    SamplingRegion samplingRegion("Garbage Collection: Marking");
-
     GCPHASE(MarkRoots);
     ASSERT(isValidThreadState(m_vm));
 
@@ -1083,24 +1083,12 @@ void Heap::addToRememberedSet(const JSCell* cell)
     m_slotVisitor.appendToMarkStack(const_cast<JSCell*>(cell));
 }
 
-void* Heap::copyBarrier(const JSCell*, void*& pointer)
-{
-    // Do nothing for now, except making sure that the low bits are masked off. This helps to
-    // simulate enough of this barrier that at least we can test the low bits assumptions.
-    pointer = bitwise_cast<void*>(
-        bitwise_cast<uintptr_t>(pointer) & ~static_cast<uintptr_t>(CopyBarrierBase::spaceBits));
-    
-    return pointer;
-}
-
 void Heap::collectAndSweep(HeapOperation collectionType)
 {
     if (!m_isSafeToCollect)
         return;
 
     collect(collectionType);
-
-    SamplingRegion samplingRegion("Garbage Collection: Sweeping");
 
     DeferGCForAWhile deferGC(*this);
     m_objectSpace.sweep();
@@ -1130,8 +1118,6 @@ NEVER_INLINE void Heap::collectImpl(HeapOperation collectionType, void* stackOri
         dataLog("[GC: ", capacity() / 1024, " kb ");
         before = currentTimeMS();
     }
-    
-    SamplingRegion samplingRegion("Garbage Collection");
     
     if (vm()->typeProfiler()) {
         DeferGCForAWhile awhile(*this);
@@ -1185,11 +1171,6 @@ NEVER_INLINE void Heap::collectImpl(HeapOperation collectionType, void* stackOri
     removeDeadCompilerWorklistEntries();
     deleteUnmarkedCompiledCode();
     deleteSourceProviderCaches();
-
-    if (HeapProfiler* heapProfiler = m_vm->heapProfiler()) {
-        gatherExtraHeapSnapshotData(*heapProfiler);
-        removeDeadHeapSnapshotNodes(*heapProfiler);
-    }
 
     notifyIncrementalSweeper();
     writeBarrierCurrentlyExecutingCodeBlocks();
@@ -1472,6 +1453,11 @@ void Heap::didFinishCollection(double gcStartTime)
     if (Options::logGC() == GCLogging::Verbose)
         GCLogging::dumpObjectGraph(this);
 
+    if (HeapProfiler* heapProfiler = m_vm->heapProfiler()) {
+        gatherExtraHeapSnapshotData(*heapProfiler);
+        removeDeadHeapSnapshotNodes(*heapProfiler);
+    }
+
     RELEASE_ASSERT(m_operationInProgress == EdenCollection || m_operationInProgress == FullCollection);
     m_operationInProgress = NoOperation;
     JAVASCRIPTCORE_GC_END();
@@ -1612,10 +1598,7 @@ public:
 void Heap::zombifyDeadObjects()
 {
     // Sweep now because destructors will crash once we're zombified.
-    {
-        SamplingRegion samplingRegion("Garbage Collection: Sweeping");
-        m_objectSpace.zombifySweep();
-    }
+    m_objectSpace.zombifySweep();
     HeapIterationScope iterationScope(*this);
     m_objectSpace.forEachDeadCell<Zombify>(iterationScope);
 }

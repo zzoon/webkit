@@ -838,8 +838,11 @@ class Port(object):
             'XDG_RUNTIME_DIR',
 
             # Darwin:
+            'DYLD_FRAMEWORK_PATH',
             'DYLD_LIBRARY_PATH',
             'HOME',
+            '__XPC_DYLD_FRAMEWORK_PATH',
+            '__XPC_DYLD_LIBRARY_PATH',
 
             # CYGWIN:
             'HOMEDRIVE',
@@ -1182,8 +1185,8 @@ class Port(object):
     def _driver_tempdir(self):
         return self._filesystem.mkdtemp(prefix='%s-' % self.driver_name())
 
-    def remove_cache_directory(self, name):
-        pass
+    def _path_to_user_cache_directory(self, suffix=None):
+        return None
 
     def _path_to_webcore_library(self):
         """Returns the full path to a built copy of WebCore."""

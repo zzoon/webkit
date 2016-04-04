@@ -31,6 +31,7 @@
 #include "FrameView.h"
 #include "HTMLInputElement.h"
 #include "MouseEvent.h"
+#include "NoEventDispatchAssertion.h"
 #include "PseudoElement.h"
 #include "ScopedEventQueue.h"
 #include "ShadowRoot.h"
@@ -41,7 +42,7 @@ namespace WebCore {
 
 class WindowEventContext {
 public:
-    WindowEventContext(PassRefPtr<Node>, const EventContext*);
+    WindowEventContext(Node*, const EventContext*);
 
     DOMWindow* window() const { return m_window.get(); }
     EventTarget* target() const { return m_target.get(); }
@@ -52,14 +53,14 @@ private:
     RefPtr<EventTarget> m_target;
 };
 
-WindowEventContext::WindowEventContext(PassRefPtr<Node> node, const EventContext* topEventContext)
+WindowEventContext::WindowEventContext(Node* node, const EventContext* topEventContext)
 {
-    Node* topLevelContainer = topEventContext ? topEventContext->node() : node.get();
+    Node* topLevelContainer = topEventContext ? topEventContext->node() : node;
     if (!is<Document>(*topLevelContainer))
         return;
 
     m_window = downcast<Document>(*topLevelContainer).domWindow();
-    m_target = topEventContext ? topEventContext->target() : node.get();
+    m_target = topEventContext ? topEventContext->target() : node;
 }
 
 bool WindowEventContext::handleLocalEvents(Event& event)
@@ -177,8 +178,11 @@ bool EventDispatcher::dispatchEvent(Node* origin, Event& event)
     if (is<HTMLInputElement>(*node))
         downcast<HTMLInputElement>(*node).willDispatchEvent(event, clickHandlingState);
 
-    if (!event.propagationStopped() && !eventPath.isEmpty())
+    if (!event.propagationStopped() && !eventPath.isEmpty()) {
+        event.setEventPath(eventPath);
         dispatchEventInDOM(event, eventPath, windowEventContext);
+        event.clearEventPath();
+    }
 
     event.setTarget(EventPath::eventTargetRespectingTargetRules(*node));
     event.setCurrentTarget(nullptr);

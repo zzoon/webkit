@@ -33,6 +33,7 @@
 #include "NodeRenderStyle.h"
 #include "RenderStyle.h"
 #include "SVGElement.h"
+#include "StyleUpdate.h"
 #include "StyledElement.h"
 #include "VisitedLinkState.h"
 #include "WebVTTElement.h"
@@ -42,9 +43,9 @@ namespace WebCore {
 namespace Style {
 
 static const unsigned cStyleSearchThreshold = 10;
-static const unsigned cStyleSearchLevelThreshold = 10;
 
 struct SharingResolver::Context {
+    const Update& update;
     const StyledElement& element;
     bool elementAffectedByClassRules;
     EInsideLink elementLinkState;
@@ -68,7 +69,7 @@ static inline bool elementHasDirectionAuto(const Element& element)
     return is<HTMLElement>(element) && downcast<HTMLElement>(element).hasDirectionAuto();
 }
 
-const Element* SharingResolver::resolve(const Element& searchElement) const
+RefPtr<RenderStyle> SharingResolver::resolve(const Element& searchElement, const Update& update)
 {
     if (!is<StyledElement>(searchElement))
         return nullptr;
@@ -78,7 +79,7 @@ const Element* SharingResolver::resolve(const Element& searchElement) const
     auto& parentElement = *element.parentElement();
     if (parentElement.shadowRoot())
         return nullptr;
-    if (!parentElement.renderStyle())
+    if (!update.elementStyle(parentElement))
         return nullptr;
     // If the element has inline style it is probably unique.
     if (element.inlineStyle())
@@ -96,6 +97,7 @@ const Element* SharingResolver::resolve(const Element& searchElement) const
         return nullptr;
 
     Context context {
+        update,
         element,
         element.hasClass() && classNamesAffectedByRules(element.classNames()),
         m_document.visitedLinkState().determineLinkState(element)
@@ -103,14 +105,13 @@ const Element* SharingResolver::resolve(const Element& searchElement) const
 
     // Check previous siblings and their cousins.
     unsigned count = 0;
-    unsigned visitedNodeCount = 0;
     StyledElement* shareElement = nullptr;
     Node* cousinList = element.previousSibling();
     while (cousinList) {
         shareElement = findSibling(context, cousinList, count);
         if (shareElement)
             break;
-        cousinList = locateCousinList(cousinList->parentElement(), visitedNodeCount);
+        cousinList = locateCousinList(cousinList->parentElement());
     }
 
     // If we have exhausted all our budget or our cousins.
@@ -127,7 +128,9 @@ const Element* SharingResolver::resolve(const Element& searchElement) const
     if (parentElementPreventsSharing(parentElement))
         return nullptr;
 
-    return shareElement;
+    m_elementsSharingStyle.add(&element, shareElement);
+
+    return RenderStyle::clone(update.elementStyle(*shareElement));
 }
 
 StyledElement* SharingResolver::findSibling(const Context& context, Node* node, unsigned& count) const
@@ -143,47 +146,18 @@ StyledElement* SharingResolver::findSibling(const Context& context, Node* node, 
     return downcast<StyledElement>(node);
 }
 
-Node* SharingResolver::locateCousinList(Element* parent, unsigned& visitedNodeCount) const
+Node* SharingResolver::locateCousinList(const Element* parent) const
 {
-    if (visitedNodeCount >= cStyleSearchThreshold * cStyleSearchLevelThreshold)
-        return nullptr;
-    if (!is<StyledElement>(parent))
-        return nullptr;
-    auto& styledParent = downcast<StyledElement>(*parent);
-    if (styledParent.inlineStyle())
-        return nullptr;
-    if (is<SVGElement>(styledParent) && downcast<SVGElement>(styledParent).animatedSMILStyleProperties())
-        return nullptr;
-    if (styledParent.hasID() && m_ruleSets.features().idsInRules.contains(styledParent.idForStyleResolution().impl()))
-        return nullptr;
-
-    RenderStyle* parentStyle = styledParent.renderStyle();
-    unsigned subcount = 0;
-    Node* thisCousin = &styledParent;
-    Node* currentNode = styledParent.previousSibling();
-
-    // Reserve the tries for this level. This effectively makes sure that the algorithm
-    // will never go deeper than cStyleSearchLevelThreshold levels into recursion.
-    visitedNodeCount += cStyleSearchThreshold;
-    while (thisCousin) {
-        for (; currentNode; currentNode = currentNode->previousSibling()) {
-            if (++subcount > cStyleSearchThreshold)
-                return nullptr;
-            if (!is<Element>(*currentNode))
-                continue;
-            auto& currentElement = downcast<Element>(*currentNode);
-            if (currentElement.renderStyle() != parentStyle)
-                continue;
-            if (!currentElement.lastChild())
-                continue;
-            if (!parentElementPreventsSharing(currentElement)) {
-                // Adjust for unused reserved tries.
-                visitedNodeCount -= cStyleSearchThreshold - subcount;
-                return currentNode->lastChild();
-            }
+    const unsigned maximumSearchCount = 10;
+    for (unsigned count = 0; count < maximumSearchCount; ++count) {
+        auto* elementSharingParentStyle = m_elementsSharingStyle.get(parent);
+        if (!elementSharingParentStyle)
+            return nullptr;
+        if (!parentElementPreventsSharing(*elementSharingParentStyle)) {
+            if (auto* cousin = elementSharingParentStyle->lastChild())
+                return cousin;
         }
-        currentNode = locateCousinList(thisCousin->parentElement(), visitedNodeCount);
-        thisCousin = currentNode;
+        parent = elementSharingParentStyle;
     }
 
     return nullptr;
@@ -224,7 +198,7 @@ static bool canShareStyleWithControl(const HTMLFormControlElement& element, cons
 bool SharingResolver::canShareStyleWithElement(const Context& context, const StyledElement& candidateElement) const
 {
     auto& element = context.element;
-    auto* style = candidateElement.renderStyle();
+    auto* style = context.update.elementStyle(candidateElement);
     if (!style)
         return false;
     if (style->unique())

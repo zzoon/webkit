@@ -230,7 +230,7 @@ bool MediaPlayerPrivateMediaFoundation::seeking() const
     return false;
 }
 
-void MediaPlayerPrivateMediaFoundation::seekDouble(double time)
+void MediaPlayerPrivateMediaFoundation::seek(float time)
 {
     PROPVARIANT propVariant;
     PropVariantInit(&propVariant);
@@ -244,7 +244,7 @@ void MediaPlayerPrivateMediaFoundation::seekDouble(double time)
     m_player->timeChanged();
 }
 
-void MediaPlayerPrivateMediaFoundation::setRateDouble(double rate)
+void MediaPlayerPrivateMediaFoundation::setRate(float rate)
 {
     COMPtr<IMFRateControl> rateControl;
 
@@ -258,7 +258,7 @@ void MediaPlayerPrivateMediaFoundation::setRateDouble(double rate)
     rateControl->SetRate(reduceSamplesInStream, rate);
 }
 
-double MediaPlayerPrivateMediaFoundation::durationDouble() const
+float MediaPlayerPrivateMediaFoundation::duration() const
 {
     if (!m_mediaSource)
         return 0;
@@ -272,7 +272,7 @@ double MediaPlayerPrivateMediaFoundation::durationDouble() const
         duration = 0;
     descriptor->Release();
     
-    return static_cast<double>(duration) / tenMegahertz;
+    return static_cast<float>(duration) / tenMegahertz;
 }
 
 float MediaPlayerPrivateMediaFoundation::currentTime() const
@@ -350,7 +350,8 @@ void MediaPlayerPrivateMediaFoundation::setSize(const IntSize& size)
 {
     m_size = size;
 
-    if (!m_videoDisplay)
+    auto videoDisplay = this->videoDisplay();
+    if (!videoDisplay)
         return;
 
     IntPoint positionInWindow(m_lastPaintRect.location());
@@ -379,7 +380,7 @@ void MediaPlayerPrivateMediaFoundation::setSize(const IntSize& size)
         ::MoveWindow(m_hwndVideo, x, y, w, h, FALSE);
 
     RECT rc = { 0, 0, w, h };
-    m_videoDisplay->SetVideoPosition(nullptr, &rc);
+    videoDisplay->SetVideoPosition(nullptr, &rc);
 }
 
 void MediaPlayerPrivateMediaFoundation::paint(GraphicsContext& context, const FloatRect& rect)
@@ -763,6 +764,19 @@ bool MediaPlayerPrivateMediaFoundation::createSourceStreamNode(COMPtr<IMFStreamD
     return true;
 }
 
+COMPtr<IMFVideoDisplayControl> MediaPlayerPrivateMediaFoundation::videoDisplay()
+{
+    if (m_videoDisplay)
+        return m_videoDisplay;
+
+    if (!MFGetServicePtr())
+        return nullptr;
+
+    MFGetServicePtr()(m_mediaSession.get(), MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS(&m_videoDisplay));
+
+    return m_videoDisplay;
+}
+
 void MediaPlayerPrivateMediaFoundation::onCreatedMediaSource()
 {
     if (!createTopologyFromSource())
@@ -775,13 +789,9 @@ void MediaPlayerPrivateMediaFoundation::onCreatedMediaSource()
 
 void MediaPlayerPrivateMediaFoundation::onTopologySet()
 {
-    if (!MFGetServicePtr())
-        return;
-
-    if (SUCCEEDED(MFGetServicePtr()(m_mediaSession.get(), MR_VIDEO_RENDER_SERVICE, IID_PPV_ARGS(&m_videoDisplay)))) {
-        ASSERT(m_videoDisplay);
+    if (auto videoDisplay = this->videoDisplay()) {
         RECT rc = { 0, 0, m_size.width(), m_size.height() };
-        m_videoDisplay->SetVideoPosition(nullptr, &rc);
+        videoDisplay->SetVideoPosition(nullptr, &rc);
     }
 
     m_readyState = MediaPlayer::HaveFutureData;
@@ -1167,6 +1177,7 @@ HRESULT MediaPlayerPrivateMediaFoundation::CustomVideoPresenter::ActivateObject(
 
     if (riid == IID_IMFVideoPresenter) {
         *ppv = static_cast<IMFVideoPresenter*>(this);
+        AddRef();
         return S_OK;
     }
     return E_FAIL;

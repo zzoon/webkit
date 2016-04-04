@@ -1,10 +1,8 @@
-(function() {
-
 Leaf = Utilities.createSubclass(Particle,
     function(stage)
     {
         this.element = document.createElement("img");
-        this.element.setAttribute("src", stage.images[Stage.randomInt(0, stage.images.length - 1)].src);
+        this.element.setAttribute("src", Stage.randomElementInArray(stage.images).src);
         var sizeString = this.sizeMinimum + "px";
         this.element.style.width = sizeString;
         this.element.style.height = sizeString;
@@ -20,7 +18,7 @@ Leaf = Utilities.createSubclass(Particle,
     {
         Particle.prototype.reset.call(this);
         this._life = Stage.randomInt(20, 100);
-        this._position = new Point(Stage.random(-this.size.width, this.maxPosition.x), Stage.random(-this.size.height, this.maxPosition.y));
+        this._position = new Point(Stage.random(0, this.maxPosition.x), Stage.random(-this.size.height, this.maxPosition.y));
         this._velocity = new Point(Stage.random(-6, -2), .1 * this.size.y + Stage.random(-1, 1));
     },
 
@@ -32,11 +30,11 @@ Leaf = Utilities.createSubclass(Particle,
         this._position.y += this._velocity.y;
 
         this._life--;
-        if (!this._life || this._position.y > this.stage.size.y)
+        if (!this._life || this._position.y > this.stage.size.height)
             this.reset();
 
-        if (this._position.x < -this.size.width || this._position.x > this.maxPosition.x)
-            this._position.x = (this._position.x + this.maxPosition.x) % this.maxPosition.x;
+        if (this._position.x < -this.size.width || this._position.x > this.stage.size.width)
+            this._position.x = this._position.x - Math.sign(this._position.x) * (this.size.width + this.stage.size.width);
         this.move();
     },
 
@@ -72,7 +70,7 @@ Utilities.extendObject(ParticlesStage.prototype, {
         var lastPromise;
         var images = this.images;
         this.imageSrcs.forEach(function(imageSrc) {
-            var promise = this._loadImage("resources/" + imageSrc + "100.png");
+            var promise = this._loadImage("../master/resources/" + imageSrc + "100.png");
             if (!lastPromise)
                 lastPromise = promise;
             else {
@@ -135,5 +133,3 @@ LeavesBenchmark = Utilities.createSubclass(Benchmark,
 });
 
 window.benchmarkClass = LeavesBenchmark;
-
-})();

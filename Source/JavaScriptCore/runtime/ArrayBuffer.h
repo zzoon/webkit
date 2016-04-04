@@ -29,7 +29,6 @@
 #include "GCIncomingRefCounted.h"
 #include "Weak.h"
 #include <functional>
-#include <wtf/PassRefPtr.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
 
@@ -98,15 +97,19 @@ private:
 
 class ArrayBuffer : public GCIncomingRefCounted<ArrayBuffer> {
 public:
-    static inline PassRefPtr<ArrayBuffer> create(unsigned numElements, unsigned elementByteSize);
-    static inline PassRefPtr<ArrayBuffer> create(ArrayBuffer*);
-    static inline PassRefPtr<ArrayBuffer> create(const void* source, unsigned byteLength);
-    static inline PassRefPtr<ArrayBuffer> create(ArrayBufferContents&);
-    static inline PassRefPtr<ArrayBuffer> createAdopted(const void* data, unsigned byteLength);
-    static inline PassRefPtr<ArrayBuffer> createFromBytes(const void* data, unsigned byteLength, ArrayBufferDestructorFunction&&);
+    static inline Ref<ArrayBuffer> create(unsigned numElements, unsigned elementByteSize);
+    static inline Ref<ArrayBuffer> create(ArrayBuffer&);
+    static inline Ref<ArrayBuffer> create(const void* source, unsigned byteLength);
+    static inline Ref<ArrayBuffer> create(ArrayBufferContents&);
+    static inline Ref<ArrayBuffer> createAdopted(const void* data, unsigned byteLength);
+    static inline Ref<ArrayBuffer> createFromBytes(const void* data, unsigned byteLength, ArrayBufferDestructorFunction&&);
+    static inline RefPtr<ArrayBuffer> tryCreate(unsigned numElements, unsigned elementByteSize);
+    static inline RefPtr<ArrayBuffer> tryCreate(ArrayBuffer&);
+    static inline RefPtr<ArrayBuffer> tryCreate(const void* source, unsigned byteLength);
 
     // Only for use by Uint8ClampedArray::createUninitialized and SharedBuffer::createArrayBuffer.
-    static inline PassRefPtr<ArrayBuffer> createUninitialized(unsigned numElements, unsigned elementByteSize);
+    static inline Ref<ArrayBuffer> createUninitialized(unsigned numElements, unsigned elementByteSize);
+    static inline RefPtr<ArrayBuffer> tryCreateUninitialized(unsigned numElements, unsigned elementByteSize);
 
     inline void* data();
     inline const void* data() const;
@@ -114,8 +117,8 @@ public:
     
     inline size_t gcSizeEstimateInBytes() const;
 
-    inline PassRefPtr<ArrayBuffer> slice(int begin, int end) const;
-    inline PassRefPtr<ArrayBuffer> slice(int begin) const;
+    inline RefPtr<ArrayBuffer> slice(int begin, int end) const;
+    inline RefPtr<ArrayBuffer> slice(int begin) const;
     
     inline void pin();
     inline void unpin();
@@ -129,10 +132,11 @@ public:
     ~ArrayBuffer() { }
 
 private:
-    static inline PassRefPtr<ArrayBuffer> create(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy);
-
+    static inline Ref<ArrayBuffer> create(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy);
+    static inline Ref<ArrayBuffer> createInternal(ArrayBufferContents&, const void*, unsigned);
+    static inline RefPtr<ArrayBuffer> tryCreate(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy);
     inline ArrayBuffer(ArrayBufferContents&);
-    inline PassRefPtr<ArrayBuffer> sliceImpl(unsigned begin, unsigned end) const;
+    inline RefPtr<ArrayBuffer> sliceImpl(unsigned begin, unsigned end) const;
     inline unsigned clampIndex(int index) const;
     static inline int clampValue(int x, int left, int right);
 
@@ -154,56 +158,95 @@ int ArrayBuffer::clampValue(int x, int left, int right)
     return x;
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::create(unsigned numElements, unsigned elementByteSize)
+Ref<ArrayBuffer> ArrayBuffer::create(unsigned numElements, unsigned elementByteSize)
 {
-    return create(numElements, elementByteSize, ArrayBufferContents::ZeroInitialize);
+    auto buffer = tryCreate(numElements, elementByteSize);
+    if (!buffer)
+        CRASH();
+    return buffer.releaseNonNull();
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::create(ArrayBuffer* other)
+Ref<ArrayBuffer> ArrayBuffer::create(ArrayBuffer& other)
 {
-    return ArrayBuffer::create(other->data(), other->byteLength());
+    return ArrayBuffer::create(other.data(), other.byteLength());
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::create(const void* source, unsigned byteLength)
+Ref<ArrayBuffer> ArrayBuffer::create(const void* source, unsigned byteLength)
 {
-    ArrayBufferContents contents;
-    ArrayBufferContents::tryAllocate(byteLength, 1, ArrayBufferContents::ZeroInitialize, contents);
-    if (!contents.m_data)
-        return 0;
-    RefPtr<ArrayBuffer> buffer = adoptRef(new ArrayBuffer(contents));
-    ASSERT(!byteLength || source);
-    memcpy(buffer->data(), source, byteLength);
-    return buffer.release();
+    auto buffer = tryCreate(source, byteLength);
+    if (!buffer)
+        CRASH();
+    return buffer.releaseNonNull();
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::create(ArrayBufferContents& contents)
+Ref<ArrayBuffer> ArrayBuffer::create(ArrayBufferContents& contents)
 {
-    return adoptRef(new ArrayBuffer(contents));
+    return adoptRef(*new ArrayBuffer(contents));
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::createAdopted(const void* data, unsigned byteLength)
+Ref<ArrayBuffer> ArrayBuffer::createAdopted(const void* data, unsigned byteLength)
 {
     return createFromBytes(data, byteLength, WTFMove(arrayBufferDestructorDefault));
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::createFromBytes(const void* data, unsigned byteLength, ArrayBufferDestructorFunction&& destructor)
+Ref<ArrayBuffer> ArrayBuffer::createFromBytes(const void* data, unsigned byteLength, ArrayBufferDestructorFunction&& destructor)
 {
     ArrayBufferContents contents(const_cast<void*>(data), byteLength, WTFMove(destructor));
     return create(contents);
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::createUninitialized(unsigned numElements, unsigned elementByteSize)
+RefPtr<ArrayBuffer> ArrayBuffer::tryCreate(unsigned numElements, unsigned elementByteSize)
+{
+    return tryCreate(numElements, elementByteSize, ArrayBufferContents::ZeroInitialize);
+}
+
+RefPtr<ArrayBuffer> ArrayBuffer::tryCreate(ArrayBuffer& other)
+{
+    return tryCreate(other.data(), other.byteLength());
+}
+
+RefPtr<ArrayBuffer> ArrayBuffer::tryCreate(const void* source, unsigned byteLength)
+{
+    ArrayBufferContents contents;
+    ArrayBufferContents::tryAllocate(byteLength, 1, ArrayBufferContents::ZeroInitialize, contents);
+    if (!contents.m_data)
+        return nullptr;
+    return createInternal(contents, source, byteLength);
+}
+
+Ref<ArrayBuffer> ArrayBuffer::createUninitialized(unsigned numElements, unsigned elementByteSize)
 {
     return create(numElements, elementByteSize, ArrayBufferContents::DontInitialize);
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::create(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy policy)
+RefPtr<ArrayBuffer> ArrayBuffer::tryCreateUninitialized(unsigned numElements, unsigned elementByteSize)
+{
+    return tryCreate(numElements, elementByteSize, ArrayBufferContents::DontInitialize);
+}
+
+Ref<ArrayBuffer> ArrayBuffer::create(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy policy)
+{
+    auto buffer = tryCreate(numElements, elementByteSize, policy);
+    if (!buffer)
+        CRASH();
+    return buffer.releaseNonNull();
+}
+
+Ref<ArrayBuffer> ArrayBuffer::createInternal(ArrayBufferContents& contents, const void* source, unsigned byteLength)
+{
+    ASSERT(!byteLength || source);
+    auto buffer = adoptRef(*new ArrayBuffer(contents));
+    memcpy(buffer->data(), source, byteLength);
+    return buffer;
+}
+
+RefPtr<ArrayBuffer> ArrayBuffer::tryCreate(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy policy)
 {
     ArrayBufferContents contents;
     ArrayBufferContents::tryAllocate(numElements, elementByteSize, policy, contents);
     if (!contents.m_data)
-        return 0;
-    return adoptRef(new ArrayBuffer(contents));
+        return nullptr;
+    return adoptRef(*new ArrayBuffer(contents));
 }
 
 ArrayBuffer::ArrayBuffer(ArrayBufferContents& contents)
@@ -233,17 +276,17 @@ size_t ArrayBuffer::gcSizeEstimateInBytes() const
     return sizeof(ArrayBuffer) + static_cast<size_t>(byteLength());
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::slice(int begin, int end) const
+RefPtr<ArrayBuffer> ArrayBuffer::slice(int begin, int end) const
 {
     return sliceImpl(clampIndex(begin), clampIndex(end));
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::slice(int begin) const
+RefPtr<ArrayBuffer> ArrayBuffer::slice(int begin) const
 {
     return sliceImpl(clampIndex(begin), byteLength());
 }
 
-PassRefPtr<ArrayBuffer> ArrayBuffer::sliceImpl(unsigned begin, unsigned end) const
+RefPtr<ArrayBuffer> ArrayBuffer::sliceImpl(unsigned begin, unsigned end) const
 {
     unsigned size = begin <= end ? end - begin : 0;
     return ArrayBuffer::create(static_cast<const char*>(data()) + begin, size);

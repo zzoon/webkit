@@ -553,9 +553,6 @@ public:
 
     JS_EXPORT_PRIVATE void resetDateCache();
 
-    JS_EXPORT_PRIVATE void startSampling();
-    JS_EXPORT_PRIVATE void stopSampling();
-    JS_EXPORT_PRIVATE void dumpSampleData(ExecState*);
     RegExpCache* regExpCache() { return m_regExpCache; }
 #if ENABLE(REGEXP_TRACING)
     void addRegExpToTrace(RegExp*);
@@ -601,8 +598,6 @@ public:
 
     JS_EXPORT_PRIVATE void queueMicrotask(JSGlobalObject*, PassRefPtr<Microtask>);
     JS_EXPORT_PRIVATE void drainMicrotasks();
-    JS_EXPORT_PRIVATE void setShouldRewriteConstAsVar(bool shouldRewrite) { m_shouldRewriteConstAsVar = shouldRewrite; }
-    ALWAYS_INLINE bool shouldRewriteConstAsVar() { return m_shouldRewriteConstAsVar; }
 
     inline bool shouldTriggerTermination(ExecState*);
 
@@ -661,7 +656,6 @@ private:
     Exception* m_lastException { nullptr };
     bool m_failNextNewCodeBlock { false };
     bool m_inDefineOwnProperty;
-    bool m_shouldRewriteConstAsVar { false };
     bool m_shouldBuildPCToCodeOriginMapping { false };
     std::unique_ptr<CodeCache> m_codeCache;
     LegacyProfiler* m_enabledProfiler;

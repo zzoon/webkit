@@ -28,28 +28,17 @@
 
 #if PLATFORM(IOS)
 
-#include "BlockExceptions.h"
 #include "Color.h"
 #include "LegacyTileCache.h"
 #include "LegacyTileGrid.h"
 #include "LegacyTileLayer.h"
 #include "LegacyTileLayerPool.h"
-#include "PlatformCALayer.h"
+#include "PlatformScreen.h"
 #include "QuartzCoreSPI.h"
 #include "WAKWindow.h"
 #include <algorithm>
 #include <functional>
 #include <wtf/NeverDestroyed.h>
-
-#if USE(APPLE_INTERNAL_SDK)
-#import <WebKitAdditions/LayerBackingStoreAdditions.mm>
-#else
-namespace WebCore {
-static void setBackingStoreFormat(CALayer *, PlatformCALayer::ContentsFormatFlags)
-{
-}
-} // namespace WebCore
-#endif
 
 namespace WebCore {
 
@@ -73,7 +62,10 @@ LegacyTileGridTile::LegacyTileGridTile(LegacyTileGrid* tileGrid, const IntRect& 
         m_tileLayer = adoptNS([[LegacyTileLayer alloc] init]);
     }
     LegacyTileLayer* layer = m_tileLayer.get();
-    setBackingStoreFormat(layer, 0);
+#if PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90300
+    if (screenSupportsExtendedColor())
+        layer.contentsFormat = kCAContentsFormatRGBA10XR;
+#endif
     [layer setTileGrid:tileGrid];
     [layer setOpaque:m_tileGrid->tileCache().tilesOpaque()];
     [layer setEdgeAntialiasingMask:0];

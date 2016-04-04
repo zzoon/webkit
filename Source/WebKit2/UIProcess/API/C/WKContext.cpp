@@ -347,11 +347,6 @@ void WKContextSetShouldUseFontSmoothing(WKContextRef contextRef, bool useFontSmo
     toImpl(contextRef)->setShouldUseFontSmoothing(useFontSmoothing);
 }
 
-void WKContextEnableSmoothedLayerText(WKContextRef contextRef, bool smoothedLayerText)
-{
-    toImpl(contextRef)->enableSmoothedLayerText(smoothedLayerText);
-}
-
 void WKContextSetAdditionalPluginsDirectory(WKContextRef contextRef, WKStringRef pluginsDirectory)
 {
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -395,6 +390,11 @@ void WKContextSetDomainRelaxationForbiddenForURLScheme(WKContextRef contextRef, 
 void WKContextSetCanHandleHTTPSServerTrustEvaluation(WKContextRef contextRef, bool value)
 {
     toImpl(contextRef)->setCanHandleHTTPSServerTrustEvaluation(value);
+}
+
+void WKContextSetDiskCacheSpeculativeValidationEnabled(WKContextRef contextRef, bool value)
+{
+    toImpl(contextRef)->configuration().setDiskCacheSpeculativeValidationEnabled(value);
 }
 
 WKCookieManagerRef WKContextGetCookieManager(WKContextRef contextRef)

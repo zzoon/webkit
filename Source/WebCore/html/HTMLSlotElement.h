@@ -39,13 +39,30 @@ public:
 
     const Vector<Node*>* assignedNodes() const;
 
+    void enqueueSlotChangeEvent();
+
 private:
     HTMLSlotElement(const QualifiedName&, Document&);
 
     InsertionNotificationRequest insertedInto(ContainerNode&) override;
     void removedFrom(ContainerNode&) override;
     void attributeChanged(const QualifiedName&, const AtomicString& oldValue, const AtomicString& newValue, AttributeModificationReason) override;
+
+    bool dispatchEvent(Event&) override;
+
+    bool m_hasEnqueuedSlotChangeEvent { false };
 };
+
+// Slots have implicit display:contents until it is supported for reals.
+inline bool hasImplicitDisplayContents(const Element& element) { return is<HTMLSlotElement>(element); }
+
+}
+
+#else
+
+namespace WebCore {
+
+inline bool hasImplicitDisplayContents(const Element&) { return false; }
 
 }
 

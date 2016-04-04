@@ -52,6 +52,7 @@
 #include "Repatch.h"
 #include "ScopedArguments.h"
 #include "StringConstructor.h"
+#include "SuperSampler.h"
 #include "Symbol.h"
 #include "TypeProfilerLog.h"
 #include "TypedArrayInlines.h"
@@ -621,6 +622,8 @@ EncodedJSValue JIT_OPERATION operationArrayPopAndRecoverLength(ExecState* exec, 
         
 EncodedJSValue JIT_OPERATION operationRegExpExecString(ExecState* exec, JSGlobalObject* globalObject, RegExpObject* regExpObject, JSString* argument)
 {
+    SuperSamplerScope superSamplerScope(false);
+    
     VM& vm = globalObject->vm();
     NativeCallFrameTracer tracer(&vm, exec);
     
@@ -629,6 +632,8 @@ EncodedJSValue JIT_OPERATION operationRegExpExecString(ExecState* exec, JSGlobal
         
 EncodedJSValue JIT_OPERATION operationRegExpExec(ExecState* exec, JSGlobalObject* globalObject, RegExpObject* regExpObject, EncodedJSValue encodedArgument)
 {
+    SuperSamplerScope superSamplerScope(false);
+    
     VM& vm = globalObject->vm();
     NativeCallFrameTracer tracer(&vm, exec);
     
@@ -642,6 +647,8 @@ EncodedJSValue JIT_OPERATION operationRegExpExec(ExecState* exec, JSGlobalObject
         
 EncodedJSValue JIT_OPERATION operationRegExpExecGeneric(ExecState* exec, JSGlobalObject* globalObject, EncodedJSValue encodedBase, EncodedJSValue encodedArgument)
 {
+    SuperSamplerScope superSamplerScope(false);
+    
     VM& vm = globalObject->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
@@ -659,6 +666,8 @@ EncodedJSValue JIT_OPERATION operationRegExpExecGeneric(ExecState* exec, JSGloba
         
 size_t JIT_OPERATION operationRegExpTestString(ExecState* exec, JSGlobalObject* globalObject, RegExpObject* regExpObject, JSString* input)
 {
+    SuperSamplerScope superSamplerScope(false);
+    
     VM& vm = globalObject->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
@@ -667,6 +676,8 @@ size_t JIT_OPERATION operationRegExpTestString(ExecState* exec, JSGlobalObject* 
 
 size_t JIT_OPERATION operationRegExpTest(ExecState* exec, JSGlobalObject* globalObject, RegExpObject* regExpObject, EncodedJSValue encodedArgument)
 {
+    SuperSamplerScope superSamplerScope(false);
+    
     VM& vm = globalObject->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
@@ -680,6 +691,8 @@ size_t JIT_OPERATION operationRegExpTest(ExecState* exec, JSGlobalObject* global
 
 size_t JIT_OPERATION operationRegExpTestGeneric(ExecState* exec, JSGlobalObject* globalObject, EncodedJSValue encodedBase, EncodedJSValue encodedArgument)
 {
+    SuperSamplerScope superSamplerScope;
+    
     VM& vm = globalObject->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
@@ -961,15 +974,14 @@ JSCell* JIT_OPERATION operationCreateClonedArgumentsDuringExit(ExecState* exec, 
     
     unsigned length = argumentCount - 1;
     ClonedArguments* result = ClonedArguments::createEmpty(
-        vm, codeBlock->globalObject()->outOfBandArgumentsStructure(), callee);
+        vm, codeBlock->globalObject()->clonedArgumentsStructure(), callee, length);
     
     Register* arguments =
         exec->registers() + (inlineCallFrame ? inlineCallFrame->stackOffset : 0) +
         CallFrame::argumentOffset(0);
     for (unsigned i = length; i--;)
-        result->putDirectIndex(exec, i, arguments[i].jsValue());
-    
-    result->putDirect(vm, vm.propertyNames->length, jsNumber(length));
+        result->initializeIndex(vm, i, arguments[i].jsValue());
+
     
     return result;
 }
@@ -1297,22 +1309,6 @@ int32_t JIT_OPERATION operationSwitchStringAndGetBranchOffset(ExecState* exec, s
     NativeCallFrameTracer tracer(&vm, exec);
 
     return exec->codeBlock()->stringSwitchJumpTable(tableIndex).offsetForValue(string->value(exec).impl(), std::numeric_limits<int32_t>::min());
-}
-
-char* JIT_OPERATION operationGetButterfly(ExecState* exec, JSCell* cell)
-{
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-
-    return bitwise_cast<char*>(jsCast<JSObject*>(cell)->butterfly());
-}
-
-char* JIT_OPERATION operationGetArrayBufferVector(ExecState* exec, JSCell* cell)
-{
-    VM& vm = exec->vm();
-    NativeCallFrameTracer tracer(&vm, exec);
-
-    return bitwise_cast<char*>(jsCast<JSArrayBufferView*>(cell)->vector());
 }
 
 void JIT_OPERATION operationNotifyWrite(ExecState* exec, WatchpointSet* set)

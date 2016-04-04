@@ -58,7 +58,7 @@ NetworkLoad::NetworkLoad(NetworkLoadClient& client, const NetworkLoadParameters&
         if (!parameters.defersLoading)
             m_task->resume();
     } else
-        ASSERT_NOT_REACHED();
+        WTFLogAlways("Attempted to create a NetworkLoad with a session (id=%" PRIu64 ") that does not exist.", parameters.sessionID.sessionID());
 #else
     m_handle = ResourceHandle::create(m_networkingContext.get(), parameters.request, this, parameters.defersLoading, parameters.contentSniffingPolicy == SniffContent);
 #endif
@@ -169,7 +169,7 @@ void NetworkLoad::sharedWillSendRedirectedRequest(const ResourceRequest& request
 
 #if USE(NETWORK_SESSION)
 
-void NetworkLoad::convertTaskToDownload(DownloadID downloadID)
+void NetworkLoad::convertTaskToDownload(DownloadID downloadID, const ResourceRequest& updatedRequest)
 {
     if (!m_task)
         return;
@@ -178,7 +178,7 @@ void NetworkLoad::convertTaskToDownload(DownloadID downloadID)
     
     ASSERT(m_responseCompletionHandler);
     if (m_responseCompletionHandler)
-        NetworkProcess::singleton().findPendingDownloadLocation(*m_task.get(), WTFMove(m_responseCompletionHandler));
+        NetworkProcess::singleton().findPendingDownloadLocation(*m_task.get(), std::exchange(m_responseCompletionHandler, nullptr), updatedRequest);
 }
 
 void NetworkLoad::setPendingDownloadID(DownloadID downloadID)
@@ -206,7 +206,10 @@ void NetworkLoad::didReceiveChallenge(const AuthenticationChallenge& challenge, 
     // Handle server trust evaluation at platform-level if requested, for performance reasons.
     if (challenge.protectionSpace().authenticationScheme() == ProtectionSpaceAuthenticationSchemeServerTrustEvaluationRequested
         && !NetworkProcess::singleton().canHandleHTTPSServerTrustEvaluation()) {
-        completionHandler(AuthenticationChallengeDisposition::RejectProtectionSpace, Credential());
+        if (m_task && m_task->allowsSpecificHTTPSCertificateForHost(challenge))
+            completionHandler(AuthenticationChallengeDisposition::UseCredential, serverTrustCredential(challenge));
+        else
+            completionHandler(AuthenticationChallengeDisposition::RejectProtectionSpace, { });
         return;
     }
 
@@ -227,7 +230,7 @@ void NetworkLoad::didReceiveResponseNetworkSession(const ResourceResponse& respo
 {
     ASSERT(isMainThread());
     if (m_task && m_task->pendingDownloadID().downloadID())
-        NetworkProcess::singleton().findPendingDownloadLocation(*m_task.get(), completionHandler);
+        NetworkProcess::singleton().findPendingDownloadLocation(*m_task.get(), completionHandler, m_task->currentRequest());
     else if (sharedDidReceiveResponse(response) == NetworkLoadClient::ShouldContinueDidReceiveResponse::Yes)
         completionHandler(PolicyUse);
     else
@@ -342,9 +345,12 @@ void NetworkLoad::continueCanAuthenticateAgainstProtectionSpace(bool result)
 #if USE(NETWORK_SESSION)
     ASSERT_WITH_MESSAGE(!m_handle, "Blobs should never give authentication challenges");
     ASSERT(m_challengeCompletionHandler);
-    auto completionHandler = WTFMove(m_challengeCompletionHandler);
+    auto completionHandler = std::exchange(m_challengeCompletionHandler, nullptr);
     if (!result) {
-        completionHandler(AuthenticationChallengeDisposition::RejectProtectionSpace, Credential());
+        if (m_task && m_task->allowsSpecificHTTPSCertificateForHost(m_challenge))
+            completionHandler(AuthenticationChallengeDisposition::UseCredential, serverTrustCredential(m_challenge));
+        else
+            completionHandler(AuthenticationChallengeDisposition::RejectProtectionSpace, { });
         return;
     }
     
@@ -354,17 +360,19 @@ void NetworkLoad::continueCanAuthenticateAgainstProtectionSpace(bool result)
     }
     
     if (m_parameters.clientCredentialPolicy == DoNotAskClientForAnyCredentials) {
-        completionHandler(AuthenticationChallengeDisposition::UseCredential, Credential());
+        completionHandler(AuthenticationChallengeDisposition::UseCredential, { });
         return;
     }
     
-    if (auto* pendingDownload = m_task->pendingDownload())
-        NetworkProcess::singleton().authenticationManager().didReceiveAuthenticationChallenge(*pendingDownload, m_challenge, completionHandler);
-    else
-        NetworkProcess::singleton().authenticationManager().didReceiveAuthenticationChallenge(m_parameters.webPageID, m_parameters.webFrameID, m_challenge, completionHandler);
-#else
-    m_handle->continueCanAuthenticateAgainstProtectionSpace(result);
+    if (m_task) {
+        if (auto* pendingDownload = m_task->pendingDownload())
+            NetworkProcess::singleton().authenticationManager().didReceiveAuthenticationChallenge(*pendingDownload, m_challenge, completionHandler);
+        else
+            NetworkProcess::singleton().authenticationManager().didReceiveAuthenticationChallenge(m_parameters.webPageID, m_parameters.webFrameID, m_challenge, completionHandler);
+    }
 #endif
+    if (m_handle)
+        m_handle->continueCanAuthenticateAgainstProtectionSpace(result);
 }
 #endif
 

@@ -34,6 +34,7 @@
 #include "Document.h"
 #include "Frame.h"
 #include "FrameView.h"
+#include "HTMLAudioElement.h"
 #include "HTMLMediaElement.h"
 #include "HTMLMediaElementEnums.h"
 #include "HTMLNames.h"
@@ -145,6 +146,11 @@ bool MediaElementSession::playbackPermitted(const HTMLMediaElement& element) con
 {
     if (pageExplicitlyAllowsElementToAutoplayInline(element))
         return true;
+
+    if (requiresFullscreenForVideoPlayback(element) && !ScriptController::processingUserGestureForMedia()) {
+        LOG(Media, "MediaElementSession::playbackPermitted - returning FALSE");
+        return false;
+    }
 
     if (m_restrictions & OverrideUserGestureRequirementForMainContent && updateIsMainContent())
         return true;
@@ -386,6 +392,9 @@ MediaPlayer::Preload MediaElementSession::effectivePreloadForElement(const HTMLM
 bool MediaElementSession::requiresFullscreenForVideoPlayback(const HTMLMediaElement& element) const
 {
     if (pageExplicitlyAllowsElementToAutoplayInline(element))
+        return false;
+
+    if (is<HTMLAudioElement>(element))
         return false;
 
     Settings* settings = element.document().settings();

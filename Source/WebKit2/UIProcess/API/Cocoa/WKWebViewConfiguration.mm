@@ -36,12 +36,15 @@
 #import "WeakObjCPtr.h"
 #import "_WKVisitedLinkProvider.h"
 #import "_WKWebsiteDataStoreInternal.h"
+#import <WebCore/RuntimeApplicationChecks.h>
 #import <wtf/RetainPtr.h>
 
 #if PLATFORM(IOS)
 #import "UIKitSPI.h"
 #import <WebCore/Device.h>
 #endif
+
+using namespace WebCore;
 
 template<typename T> class LazyInitialized {
 public:
@@ -108,6 +111,7 @@ private:
 
     BOOL _invisibleAutoplayNotPermitted;
     BOOL _mediaDataLoadsAutomatically;
+    BOOL _attachmentElementEnabled;
     BOOL _requiresUserActionForVideoPlayback;
     BOOL _requiresUserActionForAudioPlayback;
     BOOL _mainContentUserGestureOverrideEnabled;
@@ -142,6 +146,13 @@ private:
     _mainContentUserGestureOverrideEnabled = NO;
     _invisibleAutoplayNotPermitted = NO;
 
+// FIXME: <rdar://problem/25135244> Should default to NO once clients have adopted the setting.
+#if PLATFORM(IOS)
+    _attachmentElementEnabled = IOSApplication::isMobileMail();
+#else
+    _attachmentElementEnabled = MacApplication::isAppleMail();
+#endif
+
 #if PLATFORM(IOS)
     _respectsImageOrientation = YES;
     _printsBackgrounds = YES;
@@ -164,6 +175,7 @@ private:
     _convertsPositionStyleOnCopy = NO;
     _allowsMetaRefresh = YES;
     _allowUniversalAccessFromFileURLs = NO;
+    _treatsSHA1SignedCertificatesAsInsecure = YES;
 
     return self;
 }
@@ -249,6 +261,7 @@ private:
 
     configuration->_invisibleAutoplayNotPermitted = self->_invisibleAutoplayNotPermitted;
     configuration->_mediaDataLoadsAutomatically = self->_mediaDataLoadsAutomatically;
+    configuration->_attachmentElementEnabled = self->_attachmentElementEnabled;
     configuration->_requiresUserActionForVideoPlayback = self->_requiresUserActionForVideoPlayback;
     configuration->_requiresUserActionForAudioPlayback = self->_requiresUserActionForAudioPlayback;
     configuration->_mainContentUserGestureOverrideEnabled = self->_mainContentUserGestureOverrideEnabled;
@@ -563,6 +576,16 @@ static NSString *defaultApplicationNameForUserAgent()
 - (void)_setMediaDataLoadsAutomatically:(BOOL)mediaDataLoadsAutomatically
 {
     _mediaDataLoadsAutomatically = mediaDataLoadsAutomatically;
+}
+
+- (BOOL)_attachmentElementEnabled
+{
+    return _attachmentElementEnabled;
+}
+
+- (void)_setAttachmentElementEnabled:(BOOL)attachmentElementEnabled
+{
+    _attachmentElementEnabled = attachmentElementEnabled;
 }
 
 - (BOOL)_requiresUserActionForVideoPlayback

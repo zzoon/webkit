@@ -335,7 +335,7 @@ void StyleResolver::sweepMatchedPropertiesCache()
     m_matchedPropertiesCacheAdditionsSinceLastSweep = 0;
 }
 
-StyleResolver::State::State(Element& element, RenderStyle* parentStyle, const RenderRegion* regionForStyling, const SelectorFilter* selectorFilter)
+StyleResolver::State::State(Element& element, RenderStyle* parentStyle, RenderStyle* documentElementStyle, const RenderRegion* regionForStyling, const SelectorFilter* selectorFilter)
     : m_element(&element)
     , m_parentStyle(parentStyle)
     , m_regionForStyling(regionForStyling)
@@ -348,7 +348,10 @@ StyleResolver::State::State(Element& element, RenderStyle* parentStyle, const Re
 
     auto& document = element.document();
     auto* documentElement = document.documentElement();
-    m_rootElementStyle = (!documentElement || documentElement == &element) ? document.renderStyle() : documentElement->renderStyle();
+    if (!documentElement || documentElement == &element)
+        m_rootElementStyle = document.renderStyle();
+    else
+        m_rootElementStyle = documentElementStyle ? documentElementStyle : documentElement->renderStyle();
 
     updateConversionData();
 }
@@ -375,7 +378,7 @@ ElementStyle StyleResolver::styleForElement(Element& element, RenderStyle* paren
 {
     RELEASE_ASSERT(!m_inLoadPendingImages);
 
-    m_state = State(element, parentStyle, regionForStyling, selectorFilter);
+    m_state = State(element, parentStyle, m_overrideDocumentElementStyle.get(), regionForStyling, selectorFilter);
     State& state = m_state;
 
     if (state.parentStyle()) {
@@ -888,12 +891,14 @@ void StyleResolver::adjustRenderStyle(RenderStyle& style, const RenderStyle& par
     else
         style.addToTextDecorationsInEffect(style.textDecoration());
 
+    // For now, <marquee> requires an overflow clip to work properly.
+    if (is<HTMLMarqueeElement>(e)) {
+        style.setOverflowX(OHIDDEN);
+        style.setOverflowY(OHIDDEN);
+    }
+
     // If either overflow value is not visible, change to auto.
-    if (style.overflowX() == OMARQUEE && style.overflowY() != OMARQUEE)
-        style.setOverflowY(OMARQUEE);
-    else if (style.overflowY() == OMARQUEE && style.overflowX() != OMARQUEE)
-        style.setOverflowX(OMARQUEE);
-    else if (style.overflowX() == OVISIBLE && style.overflowY() != OVISIBLE) {
+    if (style.overflowX() == OVISIBLE && style.overflowY() != OVISIBLE) {
         // FIXME: Once we implement pagination controls, overflow-x should default to hidden
         // if overflow-y is set to -webkit-paged-x or -webkit-page-y. For now, we'll let it
         // default to auto so we can at least scroll through the pages.

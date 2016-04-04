@@ -36,12 +36,12 @@ namespace bmalloc {
 
 class BeginTag;
 class EndTag;
-class LargeChunk;
+class Chunk;
 class Range;
 
 class BoundaryTag {
 public:
-    static Range init(LargeChunk*);
+    static Range init(Chunk*);
     static unsigned compactBegin(void*);
 
     bool isFree() { return m_isFree; }
@@ -80,8 +80,8 @@ private:
         "compactBegin must be encodable in a BoundaryTag.");
 
     static_assert(
-        (1 << sizeBits) - 1 >= largeMax,
-        "largeMax must be encodable in a BoundaryTag.");
+        (1 << sizeBits) - 1 >= largeObjectMax,
+        "largeObjectMax must be encodable in a BoundaryTag.");
 
     bool m_isFree: 1;
     bool m_isEnd: 1;

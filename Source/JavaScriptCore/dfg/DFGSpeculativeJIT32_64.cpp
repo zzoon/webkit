@@ -2306,6 +2306,7 @@ void SpeculativeJIT::compile(Node* node)
     case ArithRound:
     case ArithFloor:
     case ArithCeil:
+    case ArithTrunc:
         compileArithRounding(node);
         break;
 
@@ -4126,7 +4127,6 @@ void SpeculativeJIT::compile(Node* node)
         break;
         
     case GetButterfly:
-    case GetButterflyReadOnly:
         compileGetButterfly(node);
         break;
 
@@ -4611,6 +4611,10 @@ void SpeculativeJIT::compile(Node* node)
         compileNewFunction(node);
         break;
 
+    case SetFunctionName:
+        compileSetFunctionName(node);
+        break;
+
     case In:
         compileIn(node);
         break;
@@ -4813,7 +4817,6 @@ void SpeculativeJIT::compile(Node* node)
         // We use resultPayloadGPR as a temporary here. We have to make sure clobber it after getting the 
         // value out of indexGPR and enumeratorGPR because resultPayloadGPR could reuse either of those registers.
         m_jit.loadPtr(MacroAssembler::Address(baseGPR, JSObject::butterflyOffset()), resultPayloadGPR);
-        slowPath.append(m_jit.branchIfNotToSpace(resultPayloadGPR));
         int32_t offsetOfFirstProperty = static_cast<int32_t>(offsetInButterfly(firstOutOfLineOffset)) * sizeof(EncodedJSValue);
         m_jit.load32(MacroAssembler::BaseIndex(resultPayloadGPR, scratchGPR, MacroAssembler::TimesEight, offsetOfFirstProperty + OBJECT_OFFSETOF(JSValue, u.asBits.tag)), resultTagGPR);
         m_jit.load32(MacroAssembler::BaseIndex(resultPayloadGPR, scratchGPR, MacroAssembler::TimesEight, offsetOfFirstProperty + OBJECT_OFFSETOF(JSValue, u.asBits.payload)), resultPayloadGPR);
@@ -4969,7 +4972,6 @@ void SpeculativeJIT::compile(Node* node)
         noResult(node);
         break;
 
-    case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
     case PhantomLocal:

@@ -116,6 +116,7 @@
 #include "MutationEvent.h"
 #include "NameNodeList.h"
 #include "NestingLevelIncrementer.h"
+#include "NoEventDispatchAssertion.h"
 #include "NodeIterator.h"
 #include "NodeRareData.h"
 #include "NodeWithIndex.h"
@@ -133,6 +134,7 @@
 #include "ProcessingInstruction.h"
 #include "RenderChildIterator.h"
 #include "RenderLayerCompositor.h"
+#include "RenderTreeUpdater.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
 #include "ResourceLoadObserver.h"
@@ -1926,15 +1928,22 @@ void Document::recalcStyle(Style::Change change)
         }
 
         Style::TreeResolver resolver(*this);
-        resolver.resolve(change);
-
-        updatedCompositingLayers = frameView.updateCompositingLayersAfterStyleChange();
+        auto styleUpdate = resolver.resolve(change);
 
         clearNeedsStyleRecalc();
         clearChildNeedsStyleRecalc();
         unscheduleStyleRecalc();
 
         m_inStyleRecalc = false;
+
+        if (styleUpdate) {
+            TemporaryChange<bool> inRenderTreeUpdate(m_inRenderTreeUpdate, true);
+
+            RenderTreeUpdater updater(*this);
+            updater.commit(WTFMove(styleUpdate));
+        }
+
+        updatedCompositingLayers = frameView.updateCompositingLayersAfterStyleChange();
     }
 
     // If we wanted to call implicitClose() during recalcStyle, do so now that we're finished.
@@ -1968,7 +1977,7 @@ void Document::updateStyleIfNeeded()
     ASSERT(isMainThread());
     ASSERT(!view() || !view()->isPainting());
 
-    if (!view() || view()->isInLayout())
+    if (!view() || view()->isInRenderTreeLayout())
         return;
 
     if (m_optimizedStyleSheetUpdateTimer.isActive())
@@ -1985,7 +1994,7 @@ void Document::updateLayout()
     ASSERT(isMainThread());
 
     FrameView* frameView = view();
-    if (frameView && frameView->isInLayout()) {
+    if (frameView && frameView->isInRenderTreeLayout()) {
         // View layout should not be re-entrant.
         ASSERT_NOT_REACHED();
         return;
@@ -2052,7 +2061,10 @@ Ref<RenderStyle> Document::styleForElementIgnoringPendingStylesheets(Element& el
     TemporaryChange<bool> change(m_ignorePendingStylesheets, true);
     auto elementStyle = element.resolveStyle(parentStyle);
 
-    Style::commitRelationsToDocument(WTFMove(elementStyle.relations));
+    if (elementStyle.relations) {
+        Style::Update emptyUpdate(*this);
+        Style::commitRelations(WTFMove(elementStyle.relations), emptyUpdate);
+    }
 
     return WTFMove(elementStyle.renderStyle);
 }
@@ -2069,7 +2081,7 @@ bool Document::updateLayoutIfDimensionsOutOfDate(Element& element, DimensionsChe
     
     // Check for re-entrancy and assert (same code that is in updateLayout()).
     FrameView* frameView = view();
-    if (frameView && frameView->isInLayout()) {
+    if (frameView && frameView->isInRenderTreeLayout()) {
         // View layout should not be re-entrant.
         ASSERT_NOT_REACHED();
         return true;
@@ -4168,6 +4180,11 @@ void Document::enqueueDocumentEvent(Ref<Event>&& event)
 }
 
 void Document::enqueueOverflowEvent(Ref<Event>&& event)
+{
+    m_eventQueue.enqueueEvent(WTFMove(event));
+}
+
+void Document::enqueueSlotchangeEvent(Ref<Event>&& event)
 {
     m_eventQueue.enqueueEvent(WTFMove(event));
 }

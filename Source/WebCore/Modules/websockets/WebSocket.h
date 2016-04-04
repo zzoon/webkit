@@ -88,7 +88,7 @@ public:
     String extensions() const;
 
     String binaryType() const;
-    void setBinaryType(const String&);
+    void setBinaryType(const String&, ExceptionCode&);
 
     // EventTarget functions.
     EventTargetInterface eventTargetInterface() const override;
@@ -100,7 +100,7 @@ public:
     // WebSocketChannelClient functions.
     void didConnect() override;
     void didReceiveMessage(const String& message) override;
-    void didReceiveBinaryData(Vector<char>&&) override;
+    void didReceiveBinaryData(Vector<uint8_t>&&) override;
     void didReceiveMessageError() override;
     void didUpdateBufferedAmount(unsigned long bufferedAmount) override;
     void didStartClosingHandshake() override;

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright (c) 2014, 2015 Apple Inc. All rights reserved.
+# Copyright (c) 2014-2016 Apple Inc. All rights reserved.
 # Copyright (c) 2014 University of Washington. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -37,12 +37,12 @@ from models import ObjectType, ArrayType
 log = logging.getLogger('global')
 
 
-class CppBackendDispatcherImplementationGenerator(Generator):
+class CppBackendDispatcherImplementationGenerator(CppGenerator):
     def __init__(self, model, input_filepath):
-        Generator.__init__(self, model, input_filepath)
+        CppGenerator.__init__(self, model, input_filepath)
 
     def output_filename(self):
-        return "InspectorBackendDispatchers.cpp"
+        return "%sBackendDispatchers.cpp" % self.protocol_name()
 
     def domains_to_generate(self):
         return filter(lambda domain: len(domain.commands) > 0, Generator.domains_to_generate(self))
@@ -59,11 +59,11 @@ class CppBackendDispatcherImplementationGenerator(Generator):
         if self.model().framework.setting('alternate_dispatchers', False):
             secondary_includes.append('')
             secondary_includes.append('#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)')
-            secondary_includes.append('#include "InspectorAlternateBackendDispatchers.h"')
+            secondary_includes.append('#include "%sAlternateBackendDispatchers.h"' % self.protocol_name())
             secondary_includes.append('#endif')
 
         header_args = {
-            'primaryInclude': '"InspectorBackendDispatchers.h"',
+            'primaryInclude': '"%sBackendDispatchers.h"' % self.protocol_name(),
             'secondaryIncludes': '\n'.join(secondary_includes),
         }
 
@@ -145,6 +145,7 @@ class CppBackendDispatcherImplementationGenerator(Generator):
                 'parameterKey': parameter.parameter_name,
                 'parameterName': parameter.parameter_name,
                 'parameterType': CppGenerator.cpp_type_for_stack_in_parameter(parameter),
+                'helpersNamespace': self.helpers_namespace(),
             }
 
             formal_parameters.append('%s %s' % (CppGenerator.cpp_type_for_formal_async_parameter(parameter), parameter.parameter_name))
@@ -157,7 +158,7 @@ class CppBackendDispatcherImplementationGenerator(Generator):
                     out_parameter_assignments.append('    if (%(parameterName)s)' % param_args)
                     out_parameter_assignments.append('        jsonMessage->%(keyedSetMethod)s(ASCIILiteral("%(parameterKey)s"), %(parameterName)s);' % param_args)
             elif parameter.type.is_enum():
-                out_parameter_assignments.append('    jsonMessage->%(keyedSetMethod)s(ASCIILiteral("%(parameterKey)s"), Inspector::Protocol::getEnumConstantValue(%(parameterName)s));' % param_args)
+                out_parameter_assignments.append('    jsonMessage->%(keyedSetMethod)s(ASCIILiteral("%(parameterKey)s"), Inspector::Protocol::%(helpersNamespace)s::getEnumConstantValue(%(parameterName)s));' % param_args)
             else:
                 out_parameter_assignments.append('    jsonMessage->%(keyedSetMethod)s(ASCIILiteral("%(parameterKey)s"), %(parameterName)s);' % param_args)
 
@@ -238,7 +239,7 @@ class CppBackendDispatcherImplementationGenerator(Generator):
                     'parameterKey': parameter.parameter_name,
                     'parameterName': parameter.parameter_name,
                     'keyedSetMethod': CppGenerator.cpp_setter_method_for_type(parameter.type),
-
+                    'helpersNamespace': self.helpers_namespace(),
                 }
 
                 out_parameter_declarations.append('    %(parameterType)s out_%(parameterName)s;' % param_args)
@@ -250,7 +251,7 @@ class CppBackendDispatcherImplementationGenerator(Generator):
                         out_parameter_assignments.append('        if (out_%(parameterName)s)' % param_args)
                         out_parameter_assignments.append('            result->%(keyedSetMethod)s(ASCIILiteral("%(parameterKey)s"), out_%(parameterName)s);' % param_args)
                 elif parameter.type.is_enum():
-                    out_parameter_assignments.append('        result->%(keyedSetMethod)s(ASCIILiteral("%(parameterKey)s"), Inspector::Protocol::getEnumConstantValue(out_%(parameterName)s));' % param_args)
+                    out_parameter_assignments.append('        result->%(keyedSetMethod)s(ASCIILiteral("%(parameterKey)s"), Inspector::Protocol::%(helpersNamespace)s::getEnumConstantValue(out_%(parameterName)s));' % param_args)
                 else:
                     out_parameter_assignments.append('        result->%(keyedSetMethod)s(ASCIILiteral("%(parameterKey)s"), out_%(parameterName)s);' % param_args)
 

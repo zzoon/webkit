@@ -52,6 +52,7 @@
 #import <WebCore/MemoryPressureHandler.h>
 #import <WebCore/NSAccessibilitySPI.h>
 #import <WebCore/PageCache.h>
+#import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/pthreadSPI.h>
 #import <WebCore/VNodeTracker.h>
 #import <WebCore/WebCoreNSURLExtras.h>
@@ -128,6 +129,8 @@ static id NSApplicationAccessibilityFocusedUIElement(NSApplication*, SEL)
 
 void WebProcess::platformInitializeWebProcess(WebProcessCreationParameters&& parameters)
 {
+    WebCore::setApplicationBundleIdentifier(parameters.uiProcessBundleIdentifier);
+
 #if ENABLE(SANDBOX_EXTENSIONS)
     SandboxExtension::consumePermanently(parameters.uiProcessBundleResourcePathExtensionHandle);
     SandboxExtension::consumePermanently(parameters.webSQLDatabaseDirectoryExtensionHandle);
@@ -299,6 +302,19 @@ void WebProcess::stopRunLoop()
 
 void WebProcess::platformTerminate()
 {
+}
+
+RetainPtr<CFDataRef> WebProcess::sourceApplicationAuditData() const
+{
+#if PLATFORM(IOS)
+    audit_token_t auditToken;
+    ASSERT(parentProcessConnection());
+    if (!parentProcessConnection() || !parentProcessConnection()->getAuditToken(auditToken))
+        return nullptr;
+    return adoptCF(CFDataCreate(nullptr, (const UInt8*)&auditToken, sizeof(auditToken)));
+#else
+    return nullptr;
+#endif
 }
 
 void WebProcess::initializeSandbox(const ChildProcessInitializationParameters& parameters, SandboxInitializationParameters& sandboxParameters)

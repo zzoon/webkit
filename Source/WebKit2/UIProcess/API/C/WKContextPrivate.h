@@ -50,8 +50,6 @@ WK_EXPORT void WKContextSetAlwaysUsesComplexTextCodePath(WKContextRef context, b
 
 WK_EXPORT void WKContextSetShouldUseFontSmoothing(WKContextRef context, bool useFontSmoothing);
 
-WK_EXPORT void WKContextEnableSmoothedLayerText(WKContextRef context, bool);
-
 WK_EXPORT void WKContextRegisterURLSchemeAsSecure(WKContextRef context, WKStringRef urlScheme);
 
 WK_EXPORT void WKContextRegisterURLSchemeAsBypassingContentSecurityPolicy(WKContextRef context, WKStringRef urlScheme);
@@ -61,6 +59,8 @@ WK_EXPORT void WKContextRegisterURLSchemeAsCachePartitioned(WKContextRef context
 WK_EXPORT void WKContextSetDomainRelaxationForbiddenForURLScheme(WKContextRef context, WKStringRef urlScheme);
 
 WK_EXPORT void WKContextSetCanHandleHTTPSServerTrustEvaluation(WKContextRef context, bool value);
+
+WK_EXPORT void WKContextSetDiskCacheSpeculativeValidationEnabled(WKContextRef context, bool value);
 
 WK_EXPORT void WKContextSetIconDatabasePath(WKContextRef context, WKStringRef iconDatabasePath);
 

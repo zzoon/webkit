@@ -156,6 +156,7 @@ public:
     LValue doubleAbs(LValue value) { return m_block->appendNew<B3::Value>(m_proc, B3::Abs, origin(), value); }
     LValue doubleCeil(LValue operand) { return m_block->appendNew<B3::Value>(m_proc, B3::Ceil, origin(), operand); }
     LValue doubleFloor(LValue operand) { return m_block->appendNew<B3::Value>(m_proc, B3::Floor, origin(), operand); }
+    LValue doubleTrunc(LValue);
 
     LValue doubleSin(LValue value)
     {
@@ -306,10 +307,7 @@ public:
         return heap.baseIndex(*this, base, index, indexAsConstant, offset);
     }
 
-    TypedPointer absolute(void* address)
-    {
-        return TypedPointer(m_heaps->absolute[address], constIntPtr(address));
-    }
+    TypedPointer absolute(void* address);
 
     LValue load8SignExt32(LValue base, const AbstractHeap& field) { return load8SignExt32(address(base, field)); }
     LValue load8ZeroExt32(LValue base, const AbstractHeap& field) { return load8ZeroExt32(address(base, field)); }
@@ -453,6 +451,9 @@ public:
         B3::UpsilonValue* upsilon = m_block->appendNew<B3::UpsilonValue>(m_proc, origin(), value);
         return ValueFromBlock(upsilon, m_block);
     }
+
+    void incrementSuperSamplerCount();
+    void decrementSuperSamplerCount();
 
 #if PLATFORM(COCOA)
 #pragma mark - States

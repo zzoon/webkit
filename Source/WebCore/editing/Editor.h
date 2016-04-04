@@ -215,6 +215,7 @@ public:
         String value(Event* triggeringEvent = nullptr) const;
 
         WEBCORE_EXPORT bool isTextInsertion() const;
+        WEBCORE_EXPORT bool allowExecutionWhenDisabled() const;
 
     private:
         const EditorInternalCommand* m_command { nullptr };
@@ -328,7 +329,7 @@ public:
 
     EditingBehavior behavior() const;
 
-    PassRefPtr<Range> selectedRange();
+    RefPtr<Range> selectedRange();
 
 #if PLATFORM(IOS)
     WEBCORE_EXPORT void confirmMarkedText();
@@ -426,7 +427,7 @@ public:
     WEBCORE_EXPORT void toggleAutomaticSpellingCorrection();
 #endif
 
-    PassRefPtr<DocumentFragment> webContentFromPasteboard(Pasteboard&, Range& context, bool allowPlainText, bool& chosePlainText);
+    RefPtr<DocumentFragment> webContentFromPasteboard(Pasteboard&, Range& context, bool allowPlainText, bool& chosePlainText);
 
 #if PLATFORM(COCOA)
     WEBCORE_EXPORT static RenderStyle* styleForSelectionStart(Frame* , Node *&nodeToRemove);
@@ -440,7 +441,7 @@ public:
     void takeFindStringFromSelection();
     WEBCORE_EXPORT void readSelectionFromPasteboard(const String& pasteboardName, MailBlockquoteHandling = MailBlockquoteHandling::RespectBlockquote);
     WEBCORE_EXPORT void replaceNodeFromPasteboard(Node*, const String& pasteboardName);
-    WEBCORE_EXPORT PassRefPtr<SharedBuffer> dataSelectionForPasteboard(const String& pasteboardName);
+    WEBCORE_EXPORT RefPtr<SharedBuffer> dataSelectionForPasteboard(const String& pasteboardName);
     WEBCORE_EXPORT void applyFontStyles(const String& fontFamily, double fontSize, unsigned fontTraits);
 #endif // !PLATFORM(IOS)
     WEBCORE_EXPORT void replaceSelectionWithAttributedString(NSAttributedString *, MailBlockquoteHandling = MailBlockquoteHandling::RespectBlockquote);
@@ -493,10 +494,10 @@ private:
     bool unifiedTextCheckerEnabled() const;
 
 #if PLATFORM(COCOA)
-    PassRefPtr<SharedBuffer> selectionInWebArchiveFormat();
-    PassRefPtr<Range> adjustedSelectionRange();
-    PassRefPtr<DocumentFragment> createFragmentForImageResourceAndAddResource(PassRefPtr<ArchiveResource>);
-    PassRefPtr<DocumentFragment> createFragmentAndAddResources(NSAttributedString *);
+    RefPtr<SharedBuffer> selectionInWebArchiveFormat();
+    RefPtr<Range> adjustedSelectionRange();
+    RefPtr<DocumentFragment> createFragmentForImageResourceAndAddResource(RefPtr<ArchiveResource>&&);
+    RefPtr<DocumentFragment> createFragmentAndAddResources(NSAttributedString *);
     void fillInUserVisibleForm(PasteboardURL&);
 #endif
 

@@ -26,7 +26,7 @@
 
 #include "config.h"
 
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(WEB_RTC)
 
 #include "JSRTCIceCandidate.h"
 
@@ -71,7 +71,7 @@ JSValue JSRTCIceCandidate::sdpMid(ExecState& state) const
     return jsOwnedStringOrNull(&state, wrapped().sdpMid());
 }
 
-JSValue JSRTCIceCandidate::sdpMLineIndex(ExecState& state) const
+JSValue JSRTCIceCandidate::sdpMLineIndex(ExecState&) const
 {
     Optional<unsigned short> index = wrapped().sdpMLineIndex();
     return index ? JSValue(index.value()) : jsNull();
@@ -79,5 +79,5 @@ JSValue JSRTCIceCandidate::sdpMLineIndex(ExecState& state) const
 
 } // namespace WebCore
 
-#endif // ENABLE(MEDIA_STREAM)
+#endif // ENABLE(WEB_RTC)
 

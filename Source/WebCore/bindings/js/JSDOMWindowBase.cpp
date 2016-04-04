@@ -103,7 +103,8 @@ void JSDOMWindowBase::updateDocument()
 {
     ASSERT(m_wrapped->document());
     ExecState* exec = globalExec();
-    symbolTablePutWithAttributesTouchWatchpointSet(this, exec, exec->vm().propertyNames->document, toJS(exec, this, m_wrapped->document()), DontDelete | ReadOnly);
+    bool putResult = false;
+    symbolTablePutWithAttributesTouchWatchpointSet(this, exec, exec->vm().propertyNames->document, toJS(exec, this, m_wrapped->document()), DontDelete | ReadOnly, putResult);
 }
 
 ScriptExecutionContext* JSDOMWindowBase::scriptExecutionContext() const
@@ -261,11 +262,6 @@ VM& JSDOMWindowBase::commonVM()
 
         vm->heap.setIncrementalSweeper(std::make_unique<WebSafeIncrementalSweeper>(&vm->heap));
         vm->heap.machineThreads().addCurrentThread();
-#endif
-
-#if PLATFORM(MAC)
-        if (MacApplication::isITunes() || MacApplication::isIBooks() || Settings::shouldRewriteConstAsVar())
-            vm->setShouldRewriteConstAsVar(true);
 #endif
 
         initNormalWorldClientData(vm);

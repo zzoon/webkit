@@ -140,7 +140,6 @@
 #import <WebCore/GCController.h>
 #import <WebCore/GeolocationController.h>
 #import <WebCore/GeolocationError.h>
-#import <WebCore/GraphicsLayer.h>
 #import <WebCore/HTMLNames.h>
 #import <WebCore/HTMLVideoElement.h>
 #import <WebCore/HistoryController.h>
@@ -1005,7 +1004,7 @@ static void WebKitInitializeGamepadProviderIfNecessary()
     pageConfiguration.progressTrackerClient = new WebProgressTrackerClient(self);
     pageConfiguration.databaseProvider = &WebDatabaseProvider::singleton();
     pageConfiguration.storageNamespaceProvider = &_private->group->storageNamespaceProvider();
-    pageConfiguration.userContentController = &_private->group->userContentController();
+    pageConfiguration.userContentProvider = &_private->group->userContentController();
     pageConfiguration.visitedLinkStore = &_private->group->visitedLinkStore();
     _private->page = new Page(pageConfiguration);
 
@@ -1121,9 +1120,7 @@ static void WebKitInitializeGamepadProviderIfNecessary()
     _private->page->setDeviceScaleFactor([self _deviceScaleFactor]);
 #endif
 
-#if PLATFORM(IOS)
     _private->page->settings().setContentDispositionAttachmentSandboxEnabled(true);
-#endif
 }
 
 - (id)_initWithFrame:(NSRect)f frameName:(NSString *)frameName groupName:(NSString *)groupName
@@ -1250,7 +1247,7 @@ static void WebKitInitializeGamepadProviderIfNecessary()
     pageConfiguration.progressTrackerClient = new WebProgressTrackerClient(self);
     pageConfiguration.databaseProvider = &WebDatabaseProvider::singleton();
     pageConfiguration.storageNamespaceProvider = &_private->group->storageNamespaceProvider();
-    pageConfiguration.userContentController = &_private->group->userContentController();
+    pageConfiguration.userContentProvider = &_private->group->userContentController();
     pageConfiguration.visitedLinkStore = &_private->group->visitedLinkStore();
 
     _private->page = new Page(pageConfiguration);
@@ -2515,6 +2512,10 @@ static bool needsSelfRetainWhileLoadingQuirk()
 #endif
 
     settings.setMediaDataLoadsAutomatically([preferences mediaDataLoadsAutomatically]);
+
+#if ENABLE(ATTACHMENT_ELEMENT)
+    settings.setAttachmentElementEnabled([preferences attachmentElementEnabled]);
+#endif
 }
 
 static inline IMP getMethod(id o, SEL s)
@@ -2863,16 +2864,6 @@ static inline IMP getMethod(id o, SEL s)
         declaredKeys = [[NSArray alloc] initWithObjects:_WebMainFrameURLKey, _WebIsLoadingKey, _WebEstimatedProgressKey,
             _WebCanGoBackKey, _WebCanGoForwardKey, _WebMainFrameTitleKey, _WebMainFrameIconKey, _WebMainFrameDocumentKey, nil];
     return declaredKeys;
-}
-
-- (void)setObservationInfo:(void *)info
-{
-    _private->observationInfo = info;
-}
-
-- (void *)observationInfo
-{
-    return _private->observationInfo;
 }
 
 - (void)_willChangeBackForwardKeys
@@ -3235,16 +3226,6 @@ static inline IMP getMethod(id o, SEL s)
 + (BOOL)_shouldUseFontSmoothing
 {
     return FontCascade::shouldUseSmoothing();
-}
-
-+ (void)_setSmoothedLayerTextEnabled:(BOOL)f
-{
-    GraphicsLayer::setSmoothedLayerTextEnabled(f);
-}
-
-+ (BOOL)_smoothedLayerTextEnabled
-{
-    return GraphicsLayer::smoothedLayerTextEnabled();
 }
 
 #if !PLATFORM(IOS)
@@ -6216,7 +6197,7 @@ static WebFrame *incrementFrame(WebFrame *frame, WebFindOptions options = 0)
     if (!_private->page)
         return;
 
-    _private->page->setUserContentController(&_private->group->userContentController());
+    _private->page->setUserContentProvider(_private->group->userContentController());
     _private->page->setVisitedLinkStore(_private->group->visitedLinkStore());
     _private->page->setGroupName(groupName);
 }

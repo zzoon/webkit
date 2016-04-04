@@ -121,7 +121,7 @@ class ScrollingCoordinator;
 class Settings;
 class StorageNamespace;
 class StorageNamespaceProvider;
-class UserContentController;
+class UserContentProvider;
 class ValidationMessageClient;
 class ViewStateChangeObserver;
 class VisitedLinkStore;
@@ -450,8 +450,8 @@ public:
     StorageNamespaceProvider& storageNamespaceProvider() { return m_storageNamespaceProvider.get(); }
     void setStorageNamespaceProvider(Ref<StorageNamespaceProvider>&&);
 
-    UserContentController* userContentController() { return m_userContentController.get(); }
-    WEBCORE_EXPORT void setUserContentController(UserContentController*);
+    UserContentProvider& userContentProvider();
+    WEBCORE_EXPORT void setUserContentProvider(Ref<UserContentProvider>&&);
 
     VisitedLinkStore& visitedLinkStore();
     WEBCORE_EXPORT void setVisitedLinkStore(Ref<VisitedLinkStore>&&);
@@ -509,10 +509,13 @@ public:
     bool isControlledByAutomation() const { return m_controlledByAutomation; }
     void setControlledByAutomation(bool controlled) { m_controlledByAutomation = controlled; }
 
-    bool isAlwaysOnLoggingAllowed() const;
+    WEBCORE_EXPORT bool isAlwaysOnLoggingAllowed() const;
 
     String captionUserPreferencesStyleSheet();
     void setCaptionUserPreferencesStyleSheet(const String&);
+
+    bool isResourceCachingDisabled() const { return m_resourceCachingDisabled; }
+    void setResourceCachingDisabled(bool disabled) { m_resourceCachingDisabled = disabled; }
 
 private:
     WEBCORE_EXPORT void initGroup();
@@ -676,7 +679,7 @@ private:
     Ref<ApplicationCacheStorage> m_applicationCacheStorage;
     Ref<DatabaseProvider> m_databaseProvider;
     Ref<StorageNamespaceProvider> m_storageNamespaceProvider;
-    RefPtr<UserContentController> m_userContentController;
+    Ref<UserContentProvider> m_userContentProvider;
     Ref<VisitedLinkStore> m_visitedLinkStore;
     RefPtr<WheelEventTestTrigger> m_testTrigger;
 
@@ -694,8 +697,8 @@ private:
     
     bool m_allowsMediaDocumentInlinePlayback { false };
     bool m_showAllPlugins { false };
-
     bool m_controlledByAutomation { false };
+    bool m_resourceCachingDisabled { false };
 };
 
 inline PageGroup& Page::group()

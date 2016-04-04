@@ -1365,43 +1365,23 @@ void RenderThemeMac::adjustMenuListStyle(StyleResolver& styleResolver, RenderSty
     style.setBoxShadow(nullptr);
 }
 
-int RenderThemeMac::popupInternalPaddingLeft(const RenderStyle& style) const
+LengthBox RenderThemeMac::popupInternalPaddingBox(const RenderStyle& style) const
 {
-    if (style.appearance() == MenulistPart)
-        return popupButtonPadding(controlSizeForFont(style))[leftPadding] * style.effectiveZoom();
-    if (style.appearance() == MenulistButtonPart)
-        return styledPopupPaddingLeft * style.effectiveZoom();
-    return 0;
-}
-
-int RenderThemeMac::popupInternalPaddingRight(const RenderStyle& style) const
-{
-    if (style.appearance() == MenulistPart)
-        return popupButtonPadding(controlSizeForFont(style))[rightPadding] * style.effectiveZoom();
-    if (style.appearance() == MenulistButtonPart) {
-        float fontScale = style.fontSize() / baseFontSize;
-        float arrowWidth = baseArrowWidth * fontScale;
-        return static_cast<int>(ceilf(arrowWidth + (arrowPaddingLeft + arrowPaddingRight + paddingBeforeSeparator) * style.effectiveZoom()));
+    if (style.appearance() == MenulistPart) {
+        return { static_cast<int>(popupButtonPadding(controlSizeForFont(style))[topPadding] * style.effectiveZoom()),
+            static_cast<int>(popupButtonPadding(controlSizeForFont(style))[rightPadding] * style.effectiveZoom()),
+            static_cast<int>(popupButtonPadding(controlSizeForFont(style))[bottomPadding] * style.effectiveZoom()),
+            static_cast<int>(popupButtonPadding(controlSizeForFont(style))[leftPadding] * style.effectiveZoom()) };
     }
-    return 0;
-}
 
-int RenderThemeMac::popupInternalPaddingTop(const RenderStyle& style) const
-{
-    if (style.appearance() == MenulistPart)
-        return popupButtonPadding(controlSizeForFont(style))[topPadding] * style.effectiveZoom();
-    if (style.appearance() == MenulistButtonPart)
-        return styledPopupPaddingTop * style.effectiveZoom();
-    return 0;
-}
+    if (style.appearance() == MenulistButtonPart) {
+        float arrowWidth = baseArrowWidth * (style.fontSize() / baseFontSize);
+        return { static_cast<int>(styledPopupPaddingTop * style.effectiveZoom()),
+            static_cast<int>(ceilf(arrowWidth + (arrowPaddingLeft + arrowPaddingRight + paddingBeforeSeparator) * style.effectiveZoom())),
+            static_cast<int>(styledPopupPaddingBottom * style.effectiveZoom()), static_cast<int>(styledPopupPaddingLeft * style.effectiveZoom()) };
+    }
 
-int RenderThemeMac::popupInternalPaddingBottom(const RenderStyle& style) const
-{
-    if (style.appearance() == MenulistPart)
-        return popupButtonPadding(controlSizeForFont(style))[bottomPadding] * style.effectiveZoom();
-    if (style.appearance() == MenulistButtonPart)
-        return styledPopupPaddingBottom * style.effectiveZoom();
-    return 0;
+    return { 0, 0, 0, 0 };
 }
 
 PopupMenuStyle::PopupMenuSize RenderThemeMac::popupMenuSize(const RenderStyle& style, IntRect& rect) const
@@ -1750,9 +1730,10 @@ void RenderThemeMac::adjustSearchFieldCancelButtonStyle(StyleResolver&, RenderSt
     style.setBoxShadow(nullptr);
 }
 
+const int resultsArrowWidth = 5;
 const IntSize* RenderThemeMac::resultsButtonSizes() const
 {
-    static const IntSize sizes[3] = { IntSize(19, 13), IntSize(17, 11), IntSize(17, 9) };
+    static const IntSize sizes[3] = { IntSize(19, 22), IntSize(17, 19), IntSize(17, 15) };
     return sizes;
 }
 
@@ -1806,7 +1787,6 @@ bool RenderThemeMac::paintSearchFieldResultsDecorationPart(const RenderBox& box,
     return false;
 }
 
-const int resultsArrowWidth = 5;
 void RenderThemeMac::adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderStyle& style, Element*) const
 {
     IntSize size = sizeForSystemFont(style, resultsButtonSizes());
@@ -1817,6 +1797,20 @@ void RenderThemeMac::adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderS
 
 bool RenderThemeMac::paintSearchFieldResultsButton(const RenderBox& box, const PaintInfo& paintInfo, const IntRect& r)
 {
+    auto adjustedResultButtonRect = [this, &box] (const FloatRect& localBounds) -> FloatRect
+    {
+        IntSize buttonSize = sizeForSystemFont(box.style(), resultsButtonSizes());
+        buttonSize.expand(resultsArrowWidth, 0);
+        FloatSize diff = localBounds.size() - FloatSize(buttonSize);
+        if (!diff.isZero())
+            return localBounds;
+        // Vertically centered and left aligned.
+        FloatRect adjustedLocalBounds = localBounds;
+        adjustedLocalBounds.move(0, floorToDevicePixel(diff.height() / 2, box.document().deviceScaleFactor()));
+        adjustedLocalBounds.setSize(buttonSize);
+        return adjustedLocalBounds;
+    };
+
     Element* input = box.element()->shadowHost();
     if (!input)
         input = box.element();
@@ -1835,7 +1829,7 @@ bool RenderThemeMac::paintSearchFieldResultsButton(const RenderBox& box, const P
     GraphicsContextStateSaver stateSaver(paintInfo.context());
     float zoomLevel = box.style().effectiveZoom();
 
-    FloatRect localBounds = [search searchButtonRectForBounds:NSRect(snappedIntRect(inputBox.contentBoxRect()))];
+    FloatRect localBounds = adjustedResultButtonRect([search searchButtonRectForBounds:NSRect(snappedIntRect(inputBox.contentBoxRect()))]);
     FloatPoint paintingPos = convertToPaintingPosition(inputBox, box, localBounds.location(), r.location());
     
     FloatRect unzoomedRect(paintingPos, localBounds.size());

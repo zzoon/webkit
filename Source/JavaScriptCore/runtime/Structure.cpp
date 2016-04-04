@@ -630,7 +630,7 @@ Structure* Structure::preventExtensionsTransition(VM& vm, Structure* structure)
 {
     Structure* transition = create(vm, structure);
 
-    // Don't set m_offset, as one can not transition to this.
+    // Don't set m_offset, as one cannot transition to this.
 
     DeferGC deferGC(vm.heap);
     structure->materializePropertyMapIfNecessary(vm, deferGC);
@@ -1060,7 +1060,7 @@ void Structure::getPropertyNamesFromStructure(VM& vm, PropertyNameArray& propert
             if (iter->key->isSymbol() && !propertyNames.includeSymbolProperties())
                 continue;
             if (knownUnique)
-                propertyNames.addKnownUnique(iter->key);
+                propertyNames.addUnchecked(iter->key);
             else
                 propertyNames.add(iter->key);
         }

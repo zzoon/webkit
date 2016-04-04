@@ -305,6 +305,7 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case ArithRound:
     case ArithFloor:
     case ArithCeil:
+    case ArithTrunc:
         def(PureValue(node, static_cast<uintptr_t>(node->arithRoundingMode())));
         return;
 
@@ -344,7 +345,6 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case CheckTierUpAtReturn:
     case CheckTierUpAndOSREnter:
     case LoopHint:
-    case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
     case ProfileType:
@@ -444,6 +444,7 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
     case ToPrimitive:
     case In:
     case ValueAdd:
+    case SetFunctionName:
         read(World);
         write(Heap);
         return;
@@ -803,13 +804,6 @@ void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFu
         def(HeapLocation(ButterflyLoc, JSObject_butterfly, node->child1()), LazyNode(node));
         return;
 
-    case GetButterflyReadOnly:
-        // This rule is separate to prevent CSE of GetButterfly with GetButterflyReadOnly. But in reality,
-        // this works because we don't introduce GetButterflyReadOnly until the bitter end of compilation.
-        read(JSObject_butterfly);
-        def(HeapLocation(ButterflyReadOnlyLoc, JSObject_butterfly, node->child1()), LazyNode(node));
-        return;
-        
     case Arrayify:
     case ArrayifyToStructure:
         read(JSCell_structureID);

@@ -33,6 +33,7 @@
 
 #include "Dictionary.h"
 #include "ExceptionCode.h"
+#include "FetchRequest.h"
 #include "JSFetchResponse.h"
 #include "ScriptExecutionContext.h"
 
@@ -118,7 +119,7 @@ FetchResponse::FetchResponse(ScriptExecutionContext& context, Type type, FetchBo
 
 RefPtr<FetchResponse> FetchResponse::clone(ScriptExecutionContext& context, ExceptionCode& ec)
 {
-    if (m_body.isDisturbed() || m_isLocked) {
+    if (isDisturbed() || m_isLocked) {
         ec = TypeError;
         return nullptr;
     }
@@ -153,6 +154,106 @@ JSC::JSValue JSFetchResponse::body(JSC::ExecState&) const
     return JSC::jsNull();
 }
 
+void FetchResponse::startFetching(ScriptExecutionContext& context, const FetchRequest& request, FetchPromise&& promise)
+{
+    Ref<FetchResponse> response = adoptRef(*new FetchResponse(context, Type::Basic, FetchBody::loadingBody(), FetchHeaders::create(FetchHeaders::Guard::Immutable), ResourceResponse()));
+
+    // Setting pending activity until BodyLoader didFail or didSucceed callback is called.
+    response->setPendingActivity(response.ptr());
+
+    response->m_bodyLoader = BodyLoader(response.get(), WTFMove(promise));
+    if (!response->m_bodyLoader->start(context, request))
+        response->m_bodyLoader = Nullopt;
+}
+
+void FetchResponse::fetch(ScriptExecutionContext& context, FetchRequest& input, const Dictionary& dictionary, FetchPromise&& promise)
+{
+    ExceptionCode ec = 0;
+    RefPtr<FetchRequest> fetchRequest = FetchRequest::create(context, input, dictionary, ec);
+    if (ec) {
+        promise.reject(ec);
+        return;
+    }
+    ASSERT(fetchRequest);
+    startFetching(context, *fetchRequest, WTFMove(promise));
+}
+
+void FetchResponse::fetch(ScriptExecutionContext& context, const String& url, const Dictionary& dictionary, FetchPromise&& promise)
+{
+    ExceptionCode ec = 0;
+    RefPtr<FetchRequest> fetchRequest = FetchRequest::create(context, url, dictionary, ec);
+    if (ec) {
+        promise.reject(ec);
+        return;
+    }
+    ASSERT(fetchRequest);
+    startFetching(context, *fetchRequest, WTFMove(promise));
+}
+
+void FetchResponse::BodyLoader::didSucceed()
+{
+    m_response.m_bodyLoader = Nullopt;
+    m_response.unsetPendingActivity(&m_response);
+}
+
+void FetchResponse::BodyLoader::didFail()
+{
+    if (m_promise)
+        std::exchange(m_promise, Nullopt)->reject(TypeError);
+
+    // Check whether didFail is called as part of FetchLoader::start.
+    if (m_loader->isStarted())
+        m_response.m_bodyLoader = Nullopt;
+
+    // FIXME: Handle the case of failing after didReceiveResponse is called.
+
+    m_response.unsetPendingActivity(&m_response);
+}
+
+FetchResponse::BodyLoader::BodyLoader(FetchResponse& response, FetchPromise&& promise)
+    : m_response(response)
+    , m_promise(WTFMove(promise))
+{
+}
+
+void FetchResponse::BodyLoader::didReceiveResponse(const ResourceResponse& resourceResponse)
+{
+    ASSERT(m_promise);
+
+    m_response.m_response = resourceResponse;
+    m_response.m_headers->filterAndFill(resourceResponse.httpHeaderFields(), FetchHeaders::Guard::Response);
+
+    std::exchange(m_promise, Nullopt)->resolve(&m_response);
+}
+
+void FetchResponse::BodyLoader::didFinishLoadingAsArrayBuffer(RefPtr<ArrayBuffer>&& buffer)
+{
+    m_response.body().loadedAsArrayBuffer(WTFMove(buffer));
+}
+
+bool FetchResponse::BodyLoader::start(ScriptExecutionContext& context, const FetchRequest& request)
+{
+    m_loader = std::make_unique<FetchLoader>(FetchLoader::Type::ArrayBuffer, *this);
+    m_loader->start(context, request);
+    return m_loader->isStarted();
+}
+
+void FetchResponse::BodyLoader::stop()
+{
+    if (m_loader)
+        m_loader->stop();
+}
+
+void FetchResponse::stop()
+{
+    FetchBodyOwner::stop();
+    if (m_bodyLoader) {
+        RefPtr<FetchResponse> protect(this);
+        m_bodyLoader->stop();
+        m_bodyLoader = Nullopt;
+    }
+}
+
 const char* FetchResponse::activeDOMObjectName() const
 {
     return "Response";
@@ -160,7 +261,8 @@ const char* FetchResponse::activeDOMObjectName() const
 
 bool FetchResponse::canSuspendForDocumentSuspension() const
 {
-    return true;
+    // FIXME: We can probably do the same strategy as XHR.
+    return !isActive();
 }
 
 } // namespace WebCore

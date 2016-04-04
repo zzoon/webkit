@@ -34,10 +34,10 @@ XMLHttpRequestProgressEvent
 AudioProcessingEvent conditional=WEB_AUDIO
 OfflineAudioCompletionEvent conditional=WEB_AUDIO
 MediaStreamTrackEvent conditional=MEDIA_STREAM
-RTCIceCandidateEvent conditional=MEDIA_STREAM
-RTCDataChannelEvent conditional=MEDIA_STREAM
-RTCDTMFToneChangeEvent conditional=MEDIA_STREAM
-RTCTrackEvent conditional=MEDIA_STREAM
+RTCIceCandidateEvent conditional=WEB_RTC
+RTCDataChannelEvent conditional=WEB_RTC
+RTCDTMFToneChangeEvent conditional=WEB_RTC
+RTCTrackEvent conditional=WEB_RTC
 SpeechSynthesisEvent conditional=SPEECH_SYNTHESIS
 WebGLContextEvent conditional=WEBGL
 StorageEvent

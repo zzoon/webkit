@@ -126,6 +126,7 @@ public:
 
     void addMessageReceiver(IPC::StringReference messageReceiverName, IPC::MessageReceiver&);
     void addMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID, IPC::MessageReceiver&);
+    void removeMessageReceiver(IPC::StringReference messageReceiverName);
     void removeMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID);
 
     bool dispatchMessage(IPC::Connection&, IPC::MessageDecoder&);
@@ -191,7 +192,6 @@ public:
 
     void setAlwaysUsesComplexTextCodePath(bool);
     void setShouldUseFontSmoothing(bool);
-    void enableSmoothedLayerText(bool);
     
     void registerURLSchemeAsEmptyDocument(const String&);
     void registerURLSchemeAsSecure(const String&);
@@ -259,6 +259,7 @@ public:
 
     void updateAutomationCapabilities() const;
     void setAutomationSession(RefPtr<WebAutomationSession>&&);
+    WebAutomationSession* automationSession() const { return m_automationSession.get(); }
 
     // Defaults to false.
     void setHTTPPipeliningEnabled(bool);
@@ -464,9 +465,8 @@ private:
     HashSet<String> m_schemesToRegisterAsCachePartitioned;
 #endif
 
-    bool m_alwaysUsesComplexTextCodePath { false };
-    bool m_shouldUseFontSmoothing { true };
-    bool m_enabledSmoothedLayerText { true };
+    bool m_alwaysUsesComplexTextCodePath;
+    bool m_shouldUseFontSmoothing;
 
     Vector<String> m_fontWhitelist;
 

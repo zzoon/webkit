@@ -27,13 +27,14 @@
 #ifndef Settings_h
 #define Settings_h
 
+#include "ClipboardAccessPolicy.h"
 #include "EditingBehaviorTypes.h"
 #include "IntSize.h"
-#include "URL.h"
 #include "SecurityOrigin.h"
 #include "SettingsMacros.h"
 #include "TextFlags.h"
 #include "Timer.h"
+#include "URL.h"
 #include <chrono>
 #include <runtime/RuntimeFlags.h>
 #include <unicode/uscript.h>
@@ -181,9 +182,6 @@ public:
     static void setShouldUseHighResolutionTimers(bool);
     static bool shouldUseHighResolutionTimers() { return gShouldUseHighResolutionTimers; }
 #endif
-
-    static bool shouldRewriteConstAsVar() { return gShouldRewriteConstAsVar; }
-    static void setShouldRewriteConstAsVar(bool shouldRewriteConstAsVar) { gShouldRewriteConstAsVar = shouldRewriteConstAsVar; }
 
     WEBCORE_EXPORT void setBackgroundShouldExtendBeyondPage(bool);
     bool backgroundShouldExtendBeyondPage() const { return m_backgroundShouldExtendBeyondPage; }
@@ -365,7 +363,6 @@ private:
 #if PLATFORM(WIN)
     static bool gShouldUseHighResolutionTimers;
 #endif
-    WEBCORE_EXPORT static bool gShouldRewriteConstAsVar;
     static bool gShouldRespectPriorityInCSSAttributeSetters;
 #if PLATFORM(IOS)
     static bool gNetworkDataUsageTrackingEnabled;

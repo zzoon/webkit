@@ -56,13 +56,16 @@ public:
     void registerScrollbar(Scrollbar&) override;
     void unregisterScrollbar(Scrollbar&) override;
 
-    void setNewPainterForScrollbar(Scrollbar&, ScrollbarPainter);
-    ScrollbarPainter painterForScrollbar(Scrollbar&);
+    void setNewPainterForScrollbar(Scrollbar&, NSScrollerImp *);
+    NSScrollerImp *painterForScrollbar(Scrollbar&);
 
     void setPaintCharacteristicsForScrollbar(Scrollbar&);
 
     static bool isCurrentlyDrawingIntoLayer();
     static void setIsCurrentlyDrawingIntoLayer(bool);
+
+    void didCreateScrollerImp(Scrollbar&);
+    bool isLayoutDirectionRTL(Scrollbar&);
 
 #if ENABLE(RUBBER_BANDING)
     WEBCORE_EXPORT static void setUpOverhangAreaBackground(CALayer *, const Color& customBackgroundColor = Color());

@@ -635,6 +635,16 @@ void RenderView::repaintViewRectangle(const LayoutRect& repaintRect) const
 #endif
         adjustedRect.moveBy(-viewRect.location());
         adjustedRect.moveBy(ownerBox->contentBoxRect().location());
+
+        // A dirty rect in an iframe is relative to the contents of that iframe.
+        // When we traverse between parent frames and child frames, we need to make sure
+        // that the coordinate system is mapped appropriately between the iframe's contents
+        // and the Renderer that contains the iframe. This transformation must account for a
+        // left scrollbar (if one exists).
+        FrameView& frameView = this->frameView();
+        if (frameView.verticalScrollbarIsOnLeft() && frameView.verticalScrollbar())
+            adjustedRect.move(LayoutSize(frameView.verticalScrollbar()->occupiedWidth(), 0));
+
         ownerBox->repaintRectangle(adjustedRect);
         return;
     }
@@ -1241,7 +1251,7 @@ void RenderView::setBestTruncatedAt(int y, RenderBoxModelObject* forRenderer, bo
     }
 
     // Prefer the widest object that tries to move the pagination point
-    IntRect boundingBox = forRenderer->borderBoundingBox();
+    LayoutRect boundingBox = forRenderer->borderBoundingBox();
     if (boundingBox.width() > m_legacyPrinting.m_truncatorWidth) {
         m_legacyPrinting.m_truncatorWidth = boundingBox.width();
         m_legacyPrinting.m_bestTruncatedAt = y;

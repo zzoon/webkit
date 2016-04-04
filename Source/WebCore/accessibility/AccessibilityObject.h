@@ -237,6 +237,9 @@ enum AccessibilityTextSource {
     TitleTagText,
     PlaceholderText,
     LabelByElementText,
+    TitleText,
+    SubtitleText,
+    ActionText,
 };
     
 struct AccessibilityText {
@@ -473,7 +476,7 @@ public:
 
     bool accessibilityObjectContainsText(String *) const;
 
-    virtual bool isAttachment() const { return false; }
+    virtual bool isAttachmentElement() const { return false; }
     virtual bool isHeading() const { return false; }
     virtual bool isLink() const { return false; }
     virtual bool isImage() const { return false; }
@@ -490,6 +493,7 @@ public:
     virtual bool isRadioButton() const { return roleValue() == RadioButtonRole; }
     virtual bool isListBox() const { return roleValue() == ListBoxRole; }
     virtual bool isListBoxOption() const { return false; }
+    virtual bool isAttachment() const { return false; }
     virtual bool isMediaTimeline() const { return false; }
     virtual bool isMenuRelated() const { return false; }
     virtual bool isMenu() const { return false; }
@@ -614,14 +618,14 @@ public:
     virtual double estimatedLoadingProgress() const { return 0; }
     static bool isARIAControl(AccessibilityRole);
     static bool isARIAInput(AccessibilityRole);
+
     virtual bool supportsARIAOwns() const { return false; }
-    virtual void ariaOwnsElements(AccessibilityChildrenVector&) const { }
-    virtual bool supportsARIAFlowTo() const { return false; }
-    virtual void ariaFlowToElements(AccessibilityChildrenVector&) const { }
-    virtual bool supportsARIADescribedBy() const { return false; }
-    virtual void ariaDescribedByElements(AccessibilityChildrenVector&) const { }
-    virtual bool supportsARIAControls() const { return false; }
-    virtual void ariaControlsElements(AccessibilityChildrenVector&) const { }
+    void ariaControlsElements(AccessibilityChildrenVector&) const;
+    void ariaDescribedByElements(AccessibilityChildrenVector&) const;
+    void ariaFlowToElements(AccessibilityChildrenVector&) const;
+    void ariaLabelledByElements(AccessibilityChildrenVector&) const;
+    void ariaOwnsElements(AccessibilityChildrenVector&) const;
+
     virtual bool ariaHasPopup() const { return false; }
     bool ariaPressedIsPresent() const;
     bool ariaIsMultiline() const;
@@ -634,7 +638,7 @@ public:
     bool supportsRangeValue() const;
     String identifierAttribute() const;
     void classList(Vector<String>&) const;
-    const AtomicString& roleDescription() const;
+    virtual String roleDescription() const;
     AccessibilityARIACurrentState ariaCurrentState() const;
     
     // This function checks if the object should be ignored when there's a modal dialog displayed.
@@ -891,6 +895,7 @@ public:
 
     virtual String passwordFieldValue() const { return String(); }
     bool isValueAutofilled() const;
+    bool isValueAutofillAvailable() const;
     
     // Used by an ARIA tree to get all its rows.
     void ariaTreeRows(AccessibilityChildrenVector&);
@@ -1036,6 +1041,10 @@ public:
     bool caretBrowsingEnabled() const;
     void setCaretBrowsingEnabled(bool);
 #endif
+
+    AccessibilityObject* focusableAncestor();
+    AccessibilityObject* editableAncestor();
+    AccessibilityObject* highestEditableAncestor();
     
 protected:
     AXID m_id;
@@ -1059,6 +1068,8 @@ protected:
     virtual AccessibilityRole buttonRoleType() const;
     bool isOnscreen() const;
     bool dispatchTouchEvent();
+
+    void ariaElementsFromAttribute(AccessibilityChildrenVector&, const QualifiedName&) const;
 
 #if (PLATFORM(GTK) || PLATFORM(EFL)) && HAVE(ACCESSIBILITY)
     bool allowsTextRanges() const;

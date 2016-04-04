@@ -29,13 +29,16 @@ WebInspector.HeapSnapshotInstancesDataGridTree = class HeapSnapshotInstancesData
     {
         super();
 
-        console.assert(heapSnapshot instanceof WebInspector.HeapSnapshot);
+        console.assert(heapSnapshot instanceof WebInspector.HeapSnapshotProxy || heapSnapshot instanceof WebInspector.HeapSnapshotDiffProxy);
 
         this._heapSnapshot = heapSnapshot;
 
         this._children = [];
         this._sortComparator = sortComparator;
         this._includeInternalObjects = includeInternalObjects;
+
+        this._popover = null;
+        this._popoverNode = null;
 
         this._populateTopLevel();
         this.sort();
@@ -51,6 +54,8 @@ WebInspector.HeapSnapshotInstancesDataGridTree = class HeapSnapshotInstancesData
 
         let comparator;
         switch (columnIdentifier) {
+        case "retainedSize":
+            return numberCompare.bind(this, "retainedSize");
         case "size":
             return numberCompare.bind(this, "size");
         case "count":
@@ -78,6 +83,24 @@ WebInspector.HeapSnapshotInstancesDataGridTree = class HeapSnapshotInstancesData
 
         this._populateTopLevel();
         this.sort();
+    }
+
+    get popover()
+    {
+        if (!this._popover)
+            this._popover = new WebInspector.Popover(this);
+
+        return this._popover;
+    }
+
+    get popoverNode()
+    {
+        return this._popoverNode;
+    }
+
+    set popoverNode(x)
+    {
+        this._popoverNode = x;
     }
 
     get children()
@@ -117,6 +140,19 @@ WebInspector.HeapSnapshotInstancesDataGridTree = class HeapSnapshotInstancesData
         }
     }
 
+    hidden()
+    {
+        if (this._popover && this._popover.visible)
+            this._popover.dismiss();
+    }
+
+    // Popover delegate
+
+    willDismissPopover(popover)
+    {
+        this._popoverNode = null;
+    }
+
     // Private
 
     _populateTopLevel()
@@ -124,13 +160,11 @@ WebInspector.HeapSnapshotInstancesDataGridTree = class HeapSnapshotInstancesData
         this.removeChildren();
 
         // Populate the first level with the different classes.
-        let totalSize = this._heapSnapshot.totalSize;
-        for (let [className, {size, count, internalCount}] of this._heapSnapshot.categories) {
+        for (let [className, {size, retainedSize, count, internalCount}] of this._heapSnapshot.categories) {
             let allInternal = count === internalCount;
             if (!this._includeInternalObjects && allInternal)
                 continue;
-            let percent = (size / totalSize) * 100;
-            this.appendChild(new WebInspector.HeapSnapshotClassDataGridNode({className, size, count, percent, allInternal}, this));
+            this.appendChild(new WebInspector.HeapSnapshotClassDataGridNode({className, size, retainedSize, count, allInternal}, this));
         }
     }
 };

@@ -42,6 +42,7 @@ set(WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/UIProcess/WebsiteData"
     "${WEBKIT2_DIR}/WebProcess"
     "${WEBKIT2_DIR}/WebProcess/ApplicationCache"
+    "${WEBKIT2_DIR}/WebProcess/Automation"
     "${WEBKIT2_DIR}/WebProcess/Battery"
     "${WEBKIT2_DIR}/WebProcess/Cookies"
     "${WEBKIT2_DIR}/WebProcess/Databases"
@@ -278,6 +279,7 @@ set(WebKit2_SOURCES
     Shared/WebRenderLayer.cpp
     Shared/WebRenderObject.cpp
     Shared/WebTouchEvent.cpp
+    Shared/WebUserContentControllerDataTypes.cpp
     Shared/WebWheelEvent.cpp
 
     Shared/API/APIArray.cpp
@@ -404,6 +406,8 @@ set(WebKit2_SOURCES
     UIProcess/API/APIUserContentExtension.cpp
     UIProcess/API/APIUserContentExtensionStore.cpp
     UIProcess/API/APIUserContentWorld.cpp
+    UIProcess/API/APIUserScript.cpp
+    UIProcess/API/APIUserStyleSheet.cpp
     UIProcess/API/APIWebsiteDataStore.cpp
     UIProcess/API/APIWindowFeatures.cpp
 
@@ -462,6 +466,8 @@ set(WebKit2_SOURCES
     UIProcess/Authentication/WebCredential.cpp
     UIProcess/Authentication/WebProtectionSpace.cpp
 
+    UIProcess/Automation/WebAutomationSession.cpp
+
     UIProcess/Databases/DatabaseProcessProxy.cpp
 
     UIProcess/Downloads/DownloadProxy.cpp
@@ -498,6 +504,8 @@ set(WebKit2_SOURCES
 
     WebProcess/WebConnectionToUIProcess.cpp
     WebProcess/WebProcess.cpp
+
+    WebProcess/Automation/WebAutomationSessionProxy.cpp
 
     WebProcess/Battery/WebBatteryManager.cpp
 
@@ -670,6 +678,8 @@ set(WebKit2_MESSAGES_IN_FILES
     UIProcess/WebResourceLoadStatisticsStore.messages.in
     UIProcess/WebVibrationProxy.messages.in
 
+    UIProcess/Automation/WebAutomationSession.messages.in
+
     UIProcess/Databases/DatabaseProcessProxy.messages.in
 
     UIProcess/Downloads/DownloadProxy.messages.in
@@ -685,6 +695,8 @@ set(WebKit2_MESSAGES_IN_FILES
     UIProcess/UserContent/WebUserContentControllerProxy.messages.in
 
     WebProcess/WebProcess.messages.in
+
+    WebProcess/Automation/WebAutomationSessionProxy.messages.in
 
     WebProcess/Battery/WebBatteryManager.messages.in
 
@@ -740,6 +752,12 @@ set(PluginProcess_LIBRARIES
     WebKit2
 )
 
+if (WIN32 AND INTERNAL_BUILD)
+    set(JavaScriptCore_SCRIPTS_DIR "${CMAKE_BINARY_DIR}/../include/private/JavaScriptCore/Scripts")
+else ()
+    set(JavaScriptCore_SCRIPTS_DIR "${DERIVED_SOURCES_DIR}/ForwardingHeaders/JavaScriptCore/Scripts")
+endif ()
+
 # librt is needed for shm_open on Linux.
 find_library(LIBRT_LIBRARIES NAMES rt)
 mark_as_advanced(LIBRT_LIBRARIES)
@@ -779,21 +797,36 @@ set(WebKit2_AUTOMATION_PROTOCOL_GENERATOR_INPUTS
 )
 
 add_custom_command(
-    OUTPUT ${DERIVED_SOURCES_WEBKIT2_DIR}/InspectorBackendDispatchers.h ${DERIVED_SOURCES_WEBKIT2_DIR}/InspectorBackendDispatchers.cpp ${DERIVED_SOURCES_WEBKIT2_DIR}/InspectorProtocolObjects.h ${DERIVED_SOURCES_WEBKIT2_DIR}/InspectorProtocolObjects.cpp
+    OUTPUT ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationBackendDispatchers.h ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationBackendDispatchers.cpp ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationProtocolObjects.h ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationProtocolObjects.cpp
     MAIN_DEPENDENCY ${WebKit2_AUTOMATION_PROTOCOL_GENERATOR_INPUTS}
     DEPENDS ${WebKit2_AUTOMATION_PROTOCOL_GENERATOR_SCRIPTS}
     COMMAND ${PYTHON_EXECUTABLE} ${PROTOCOL_GENERATOR_SCRIPTS_DIR}/generate-inspector-protocol-bindings.py --outputDir "${DERIVED_SOURCES_WEBKIT2_DIR}" --framework WebKit --backend ${WebKit2_AUTOMATION_PROTOCOL_GENERATOR_INPUTS}
     VERBATIM)
 
 list(APPEND WebKit2_HEADERS
-    ${DERIVED_SOURCES_WEBKIT2_DIR}/InspectorBackendDispatchers.h
-    ${DERIVED_SOURCES_WEBKIT2_DIR}/InspectorProtocolObjects.h
+    ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationBackendDispatchers.h
+    ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationProtocolObjects.h
 )
 
 list(APPEND WebKit2_SOURCES
-    ${DERIVED_SOURCES_WEBKIT2_DIR}/InspectorBackendDispatchers.cpp
-    ${DERIVED_SOURCES_WEBKIT2_DIR}/InspectorProtocolObjects.cpp
+    ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationBackendDispatchers.cpp
+    ${DERIVED_SOURCES_WEBKIT2_DIR}/AutomationProtocolObjects.cpp
 )
+
+add_custom_command(
+    OUTPUT ${DERIVED_SOURCES_WEBKIT2_DIR}/WebAutomationSessionProxyScriptSource.h ${DERIVED_SOURCES_WEBKIT2_DIR}/WebAutomationSessionProxy.min.js
+    MAIN_DEPENDENCY ${WEBKIT2_DIR}/WebProcess/Automation/WebAutomationSessionProxy.js
+    DEPENDS ${JavaScriptCore_SCRIPTS_DIR}/xxd.pl ${JavaScriptCore_SCRIPTS_DIR}/jsmin.py
+    COMMAND ${CMAKE_COMMAND} -E echo "//# sourceURL=__WebAutomationInjectedScript__" > ${DERIVED_SOURCES_WEBKIT2_DIR}/WebAutomationSessionProxy.min.js
+    COMMAND ${PYTHON_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/jsmin.py < ${WEBKIT2_DIR}/WebProcess/Automation/WebAutomationSessionProxy.js >> ${DERIVED_SOURCES_WEBKIT2_DIR}/WebAutomationSessionProxy.min.js
+    COMMAND ${PERL_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/xxd.pl WebAutomationSessionProxyScriptSource ${DERIVED_SOURCES_WEBKIT2_DIR}/WebAutomationSessionProxy.min.js ${DERIVED_SOURCES_WEBKIT2_DIR}/WebAutomationSessionProxyScriptSource.h
+    VERBATIM)
+
+list(APPEND WebKit2_HEADERS
+    ${DERIVED_SOURCES_WEBKIT2_DIR}/WebAutomationSessionProxyScriptSource.h
+)
+
+list(APPEND WebKit2_SOURCES ${WebKit2_DERIVED_SOURCES})
 
 WEBKIT_FRAMEWORK(WebKit2)
 add_dependencies(WebKit2 WebCore ${WEBKIT2_EXTRA_DEPENDENCIES})
@@ -824,7 +857,7 @@ if (WebKit2_NetworkProcess_OUTPUT_NAME)
     set_target_properties(NetworkProcess PROPERTIES OUTPUT_NAME ${WebKit2_NetworkProcess_OUTPUT_NAME})
 endif ()
 
-if (ENABLE_PLUGIN_PROCESS)
+if (ENABLE_PLUGIN_PROCESS AND NOT APPLE)
     add_definitions(-DENABLE_PLUGIN_PROCESS=1)
     add_executable(PluginProcess ${PluginProcess_SOURCES})
     add_webkit2_prefix_header(PluginProcess)
@@ -837,7 +870,7 @@ if (ENABLE_PLUGIN_PROCESS)
     endif ()
 endif ()
 
-if (ENABLE_DATABASE_PROCESS)
+if (ENABLE_DATABASE_PROCESS AND NOT APPLE)
     add_definitions(-DENABLE_DATABASE_PROCESS=1)
     add_executable(DatabaseProcess ${DatabaseProcess_SOURCES})
     add_webkit2_prefix_header(DatabaseProcess)
@@ -850,10 +883,37 @@ if (ENABLE_DATABASE_PROCESS)
     endif ()
 endif ()
 
-POPULATE_LIBRARY_VERSION(WEBKIT2)
-set_target_properties(WebKit2 PROPERTIES VERSION ${WEBKIT2_VERSION} SOVERSION ${WEBKIT2_VERSION_MAJOR})
+if (APPLE)
+    set(_web_xpc_dir ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.WebContent.Development.xpc/Contents)
+    make_directory(${_web_xpc_dir}/MacOS)
+    make_directory(${_web_xpc_dir}/Resources)
+    make_directory(${_web_xpc_dir}/_CodeSignature)
 
-if (NOT APPLE)
+    add_custom_target(WebContentProcessNib COMMAND
+        ibtool --compile ${_web_xpc_dir}/Resources/WebContentProcess.nib ${WEBKIT2_DIR}/Resources/WebContentProcess.xib
+        VERBATIM)
+
+    # FIXME: This shouldn't be two operations.
+    file(COPY ${WEBKIT2_DIR}/WebProcess/EntryPoint/mac/XPCService/WebContentService/Info-OSX.plist DESTINATION ${_web_xpc_dir})
+    file(RENAME ${_web_xpc_dir}/Info-OSX.plist ${_web_xpc_dir}/Info.plist)
+
+    set_target_properties(WebProcess PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${_web_xpc_dir}/MacOS")
+
+
+    set(_net_xpc_dir ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/WebKit.framework/Versions/A/XPCServices/com.apple.WebKit.Networking.Development.xpc/Contents)
+    make_directory(${_net_xpc_dir}/MacOS)
+    make_directory(${_net_xpc_dir}/Resources)
+    make_directory(${_net_xpc_dir}/_CodeSignature)
+
+    # FIXME: This shouldn't be two operations.
+    file(COPY ${WEBKIT2_DIR}/NetworkProcess/EntryPoint/mac/XPCService/NetworkService/Info-OSX.plist DESTINATION ${_net_xpc_dir})
+    file(RENAME ${_net_xpc_dir}/Info-OSX.plist ${_net_xpc_dir}/Info.plist)
+
+    set_target_properties(NetworkProcess PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${_net_xpc_dir}/MacOS")
+else ()
+    POPULATE_LIBRARY_VERSION(WEBKIT2)
+    set_target_properties(WebKit2 PROPERTIES VERSION ${WEBKIT2_VERSION} SOVERSION ${WEBKIT2_VERSION_MAJOR})
+
     install(TARGETS WebKit2 WebProcess NetworkProcess
         LIBRARY DESTINATION "${LIB_INSTALL_DIR}"
         RUNTIME DESTINATION "${LIBEXEC_INSTALL_DIR}"

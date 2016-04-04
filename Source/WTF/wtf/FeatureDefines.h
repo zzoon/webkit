@@ -367,10 +367,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #define ENABLE_ES6_MODULES 0
 #endif
 
-#if !defined(ENABLE_ES6_TEMPLATE_LITERAL_SYNTAX)
-#define ENABLE_ES6_TEMPLATE_LITERAL_SYNTAX 1
-#endif
-
 #if !defined(ENABLE_CONTENT_EXTENSIONS)
 #define ENABLE_CONTENT_EXTENSIONS 0
 #endif
@@ -440,7 +436,7 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #endif
 
 #if !defined(ENABLE_DOWNLOAD_ATTRIBUTE)
-#define ENABLE_DOWNLOAD_ATTRIBUTE 0
+#define ENABLE_DOWNLOAD_ATTRIBUTE 1
 #endif
 
 #if !defined(ENABLE_DRAG_SUPPORT)
@@ -539,10 +535,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 #if !defined(ENABLE_DATE_AND_TIME_INPUT_TYPES)
 #define ENABLE_DATE_AND_TIME_INPUT_TYPES 1
 #endif
-#endif
-
-#if !defined(ENABLE_INSPECTOR)
-#define ENABLE_INSPECTOR 1
 #endif
 
 #if !defined(ENABLE_INSPECTOR_ALTERNATE_DISPATCHERS)
@@ -745,10 +737,6 @@ the public iOS SDK. We will also need to update the FeatureDefines.xcconfig file
 
 #if !defined(ENABLE_DATACUE_VALUE)
 #define ENABLE_DATACUE_VALUE 0
-#endif
-
-#if !defined(ENABLE_VIEWPORT)
-#define ENABLE_VIEWPORT 0
 #endif
 
 #if !defined(ENABLE_VIEW_MODE_CSS_MEDIA)

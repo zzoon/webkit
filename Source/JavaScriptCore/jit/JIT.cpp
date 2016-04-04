@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2012-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2012-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,7 +43,6 @@
 #include "PCToCodeOriginMap.h"
 #include "ProfilerDatabase.h"
 #include "ResultType.h"
-#include "SamplingTool.h"
 #include "SlowPathCall.h"
 #include "StackAlignment.h"
 #include "TypeProfilerLog.h"
@@ -186,7 +185,7 @@ void JIT::privateCompileMainPass()
             updateTopCallFrame();
 
         unsigned bytecodeOffset = m_bytecodeOffset;
-        
+
         switch (opcodeID) {
         DEFINE_SLOW_OP(del_by_val)
         DEFINE_SLOW_OP(in)
@@ -214,7 +213,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_to_this)
         DEFINE_OP(op_create_direct_arguments)
         DEFINE_OP(op_create_scoped_arguments)
-        DEFINE_OP(op_create_out_of_band_arguments)
+        DEFINE_OP(op_create_cloned_arguments)
         DEFINE_OP(op_copy_rest)
         DEFINE_OP(op_get_rest_length)
         DEFINE_OP(op_check_tdz)
@@ -298,6 +297,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_rshift)
         DEFINE_OP(op_unsigned)
         DEFINE_OP(op_urshift)
+        DEFINE_OP(op_set_function_name)
         DEFINE_OP(op_strcat)
         DEFINE_OP(op_stricteq)
         DEFINE_OP(op_sub)
@@ -515,7 +515,7 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
     if (m_vm->typeProfiler())
         m_vm->typeProfilerLog()->processLogEntries(ASCIILiteral("Preparing for JIT compilation."));
     
-    if (Options::dumpDisassembly() || m_vm->m_perBytecodeProfiler)
+    if (Options::dumpDisassembly() || (m_vm->m_perBytecodeProfiler && Options::disassembleBaselineForProfiler()))
         m_disassembler = std::make_unique<JITDisassembler>(m_codeBlock);
     if (m_vm->m_perBytecodeProfiler) {
         m_compilation = adoptRef(
@@ -716,7 +716,8 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
         patchBuffer.didAlreadyDisassemble();
     }
     if (m_compilation) {
-        m_disassembler->reportToProfiler(m_compilation.get(), patchBuffer);
+        if (Options::disassembleBaselineForProfiler())
+            m_disassembler->reportToProfiler(m_compilation.get(), patchBuffer);
         m_vm->m_perBytecodeProfiler->addCompilation(m_compilation);
     }
 

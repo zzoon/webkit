@@ -532,6 +532,9 @@ private:
         case ArithCeil:
             compileArithCeil();
             break;
+        case ArithTrunc:
+            compileArithTrunc();
+            break;
         case ArithSqrt:
             compileArithSqrt();
             break;
@@ -614,9 +617,6 @@ private:
             break;
         case GetButterfly:
             compileGetButterfly();
-            break;
-        case GetButterflyReadOnly:
-            compileGetButterflyReadOnly();
             break;
         case ConstantStoragePointer:
             compileConstantStoragePointer();
@@ -928,6 +928,9 @@ private:
             break;
         case NewRegexp:
             compileNewRegexp();
+            break;
+        case SetFunctionName:
+            compileSetFunctionName();
             break;
         case StringReplace:
             compileStringReplace();
@@ -1976,6 +1979,16 @@ private:
             setDouble(integerValue);
     }
 
+    void compileArithTrunc()
+    {
+        LValue value = lowDouble(m_node->child1());
+        LValue result = m_out.doubleTrunc(value);
+        if (producesInteger(m_node->arithRoundingMode()))
+            setInt32(convertDoubleToInt32(result, shouldCheckNegativeZero(m_node->arithRoundingMode())));
+        else
+            setDouble(result);
+    }
+
     void compileArithSqrt() { setDouble(m_out.doubleSqrt(lowDouble(m_node->child1()))); }
 
     void compileArithLog() { setDouble(m_out.doubleLog(lowDouble(m_node->child1()))); }
@@ -2394,14 +2407,9 @@ private:
     
     void compileGetButterfly()
     {
-        setStorage(loadButterflyWithBarrier(lowCell(m_node->child1())));
+        setStorage(m_out.loadPtr(lowCell(m_node->child1()), m_heaps.JSObject_butterfly));
     }
 
-    void compileGetButterflyReadOnly()
-    {
-        setStorage(loadButterflyReadOnly(lowCell(m_node->child1())));
-    }
-    
     void compileConstantStoragePointer()
     {
         setStorage(m_out.constIntPtr(m_node->storagePointer()));
@@ -2434,7 +2442,7 @@ private:
             return;
         }
         
-        setStorage(loadVectorWithBarrier(cell));
+        setStorage(m_out.loadPtr(cell, m_heaps.JSArrayBufferView_vector));
     }
     
     void compileCheckArray()
@@ -2471,8 +2479,8 @@ private:
 
         m_out.appendTo(wastefulCase, continuation);
 
-        LValue vectorPtr = loadVectorReadOnly(basePtr);
-        LValue butterflyPtr = loadButterflyReadOnly(basePtr);
+        LValue vectorPtr = m_out.loadPtr(basePtr, m_heaps.JSArrayBufferView_vector);
+        LValue butterflyPtr = m_out.loadPtr(basePtr, m_heaps.JSObject_butterfly);
         LValue arrayBufferPtr = m_out.loadPtr(butterflyPtr, m_heaps.Butterfly_arrayBuffer);
         LValue dataPtr = m_out.loadPtr(arrayBufferPtr, m_heaps.ArrayBuffer_data);
 
@@ -3500,7 +3508,7 @@ private:
         LValue result = vmCall(
             m_out.int64, m_out.operation(operationCreateClonedArguments), m_callFrame,
             weakPointer(
-                m_graph.globalObjectFor(m_node->origin.semantic)->outOfBandArgumentsStructure()),
+                m_graph.globalObjectFor(m_node->origin.semantic)->clonedArgumentsStructure()),
             getArgumentsStart(), getArgumentsLength().value, getCurrentCallee());
         
         setJSValue(result);
@@ -4342,7 +4350,7 @@ private:
                 else
                     propertyBase = weakPointer(method.prototype()->value().asCell());
                 if (!isInlineOffset(method.offset()))
-                    propertyBase = loadButterflyReadOnly(propertyBase);
+                    propertyBase = m_out.loadPtr(propertyBase, m_heaps.JSObject_butterfly);
                 result = loadProperty(
                     propertyBase, data.identifierNumber, method.offset());
                 break;
@@ -4410,7 +4418,7 @@ private:
                 if (isInlineOffset(variant.offset()))
                     storage = base;
                 else
-                    storage = loadButterflyWithBarrier(base);
+                    storage = m_out.loadPtr(base, m_heaps.JSObject_butterfly);
             } else {
                 m_graph.m_plan.transitions.addLazily(
                     codeBlock(), m_node->origin.semantic.codeOriginOwner(),
@@ -6182,7 +6190,7 @@ private:
         m_out.jump(continuation);
 
         m_out.appendTo(outOfLineLoad, slowCase);
-        LValue storage = loadButterflyReadOnly(base);
+        LValue storage = m_out.loadPtr(base, m_heaps.JSObject_butterfly);
         LValue realIndex = m_out.signExt32To64(
             m_out.neg(m_out.sub(index, m_out.load32(enumerator, m_heaps.JSPropertyNameEnumerator_cachedInlineCapacity))));
         int32_t offsetOfFirstProperty = static_cast<int32_t>(offsetInButterfly(firstOutOfLineOffset)) * sizeof(EncodedJSValue);
@@ -6556,6 +6564,12 @@ private:
         setJSValue(result);
     }
 
+    void compileSetFunctionName()
+    {
+        vmCall(m_out.voidType, m_out.operation(operationSetFunctionName), m_callFrame,
+            lowCell(m_node->child1()), lowJSValue(m_node->child2()));
+    }
+    
     void compileStringReplace()
     {
         if (m_node->child1().useKind() == StringUse
@@ -6955,14 +6969,14 @@ private:
             return object;
         
         if (previousStructure->outOfLineCapacity() == nextStructure->outOfLineCapacity())
-            return loadButterflyWithBarrier(object);
+            return m_out.loadPtr(object, m_heaps.JSObject_butterfly);
         
         LValue result;
         if (!previousStructure->outOfLineCapacity())
             result = allocatePropertyStorage(object, previousStructure);
         else {
             result = reallocatePropertyStorage(
-                object, loadButterflyWithBarrier(object),
+                object, m_out.loadPtr(object, m_heaps.JSObject_butterfly),
                 previousStructure, nextStructure);
         }
         
@@ -7123,110 +7137,6 @@ private:
             });
 
         return patchpoint;
-    }
-
-    LValue loadButterflyWithBarrier(LValue object)
-    {
-        return copyBarrier(
-            object, m_out.loadPtr(object, m_heaps.JSObject_butterfly), operationGetButterfly);
-    }
-    
-    LValue loadVectorWithBarrier(LValue object)
-    {
-        LValue fastResultValue = m_out.loadPtr(object, m_heaps.JSArrayBufferView_vector);
-        return copyBarrier(
-            fastResultValue,
-            [&] () -> LValue {
-                LBasicBlock slowPath = m_out.newBlock();
-                LBasicBlock continuation = m_out.newBlock();
-
-                ValueFromBlock fastResult = m_out.anchor(fastResultValue);
-                m_out.branch(isFastTypedArray(object), rarely(slowPath), usually(continuation));
-
-                LBasicBlock lastNext = m_out.appendTo(slowPath, continuation);
-
-                LValue slowResultValue = lazySlowPath(
-                    [=] (const Vector<Location>& locations) -> RefPtr<LazySlowPath::Generator> {
-                        return createLazyCallGenerator(
-                            operationGetArrayBufferVector, locations[0].directGPR(),
-                            locations[1].directGPR());
-                    }, object);
-                ValueFromBlock slowResult = m_out.anchor(slowResultValue);
-                m_out.jump(continuation);
-
-                m_out.appendTo(continuation, lastNext);
-                return m_out.phi(m_out.intPtr, fastResult, slowResult);
-            });
-    }
-
-    LValue copyBarrier(LValue object, LValue pointer, P_JITOperation_EC slowPathFunction)
-    {
-        return copyBarrier(
-            pointer,
-            [&] () -> LValue {
-                return lazySlowPath(
-                    [=] (const Vector<Location>& locations) -> RefPtr<LazySlowPath::Generator> {
-                        return createLazyCallGenerator(
-                            slowPathFunction, locations[0].directGPR(), locations[1].directGPR());
-                    }, object);
-            });
-    }
-
-    template<typename Functor>
-    LValue copyBarrier(LValue pointer, const Functor& functor)
-    {
-        LBasicBlock slowPath = m_out.newBlock();
-        LBasicBlock continuation = m_out.newBlock();
-
-        ValueFromBlock fastResult = m_out.anchor(pointer);
-        m_out.branch(isInToSpace(pointer), usually(continuation), rarely(slowPath));
-
-        LBasicBlock lastNext = m_out.appendTo(slowPath, continuation);
-
-        ValueFromBlock slowResult = m_out.anchor(functor());
-        m_out.jump(continuation);
-
-        m_out.appendTo(continuation, lastNext);
-        return m_out.phi(m_out.intPtr, fastResult, slowResult);
-    }
-
-    LValue isInToSpace(LValue pointer)
-    {
-        return m_out.testIsZeroPtr(pointer, m_out.constIntPtr(CopyBarrierBase::spaceBits));
-    }
-
-    LValue loadButterflyReadOnly(LValue object)
-    {
-        return removeSpaceBits(m_out.loadPtr(object, m_heaps.JSObject_butterfly));
-    }
-
-    LValue loadVectorReadOnly(LValue object)
-    {
-        LValue fastResultValue = m_out.loadPtr(object, m_heaps.JSArrayBufferView_vector);
-
-        LBasicBlock possiblyFromSpace = m_out.newBlock();
-        LBasicBlock continuation = m_out.newBlock();
-
-        ValueFromBlock fastResult = m_out.anchor(fastResultValue);
-
-        m_out.branch(isInToSpace(fastResultValue), usually(continuation), rarely(possiblyFromSpace));
-
-        LBasicBlock lastNext = m_out.appendTo(possiblyFromSpace, continuation);
-
-        LValue slowResultValue = m_out.select(
-            isFastTypedArray(object), removeSpaceBits(fastResultValue), fastResultValue);
-        ValueFromBlock slowResult = m_out.anchor(slowResultValue);
-        m_out.jump(continuation);
-
-        m_out.appendTo(continuation, lastNext);
-        
-        return m_out.phi(m_out.intPtr, fastResult, slowResult);
-    }
-
-    LValue removeSpaceBits(LValue storage)
-    {
-        return m_out.bitAnd(
-            storage, m_out.constIntPtr(~static_cast<intptr_t>(CopyBarrierBase::spaceBits)));
     }
 
     LValue isFastTypedArray(LValue object)

@@ -421,7 +421,7 @@ void RenderDeprecatedFlexibleBox::layoutHorizontalBox(bool relayoutChildren)
             LayoutSize& childLayoutDelta = childLayoutDeltas[childIndex++];
             
             // Compute the child's vertical margins.
-            child->computeAndSetBlockDirectionMargins(this);
+            child->computeAndSetBlockDirectionMargins(*this);
 
             child->markForPaginationRelayoutIfNeeded();
             
@@ -733,7 +733,7 @@ void RenderDeprecatedFlexibleBox::layoutVerticalBox(bool relayoutChildren)
             }
 
             // Compute the child's vertical margins.
-            child->computeAndSetBlockDirectionMargins(this);
+            child->computeAndSetBlockDirectionMargins(*this);
 
             // Add in the child's marginTop to our height.
             setHeight(height() + child->marginTop());
@@ -996,10 +996,10 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
         LayoutUnit totalWidth;
         InlineBox* anchorBox = lastLine->lastChild();
         if (anchorBox && anchorBox->renderer().style().isLink())
-            totalWidth = anchorBox->logicalWidth() + font.width(constructTextRun(this, font, ellipsisAndSpace, 2, style()));
+            totalWidth = anchorBox->logicalWidth() + font.width(constructTextRun(ellipsisAndSpace, 2, style()));
         else {
             anchorBox = nullptr;
-            totalWidth = font.width(constructTextRun(this, font, &horizontalEllipsis, 1, style()));
+            totalWidth = font.width(constructTextRun(&horizontalEllipsis, 1, style()));
         }
 
         // See if this width can be accommodated on the last visible line
