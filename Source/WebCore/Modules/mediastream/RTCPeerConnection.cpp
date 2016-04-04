@@ -142,13 +142,13 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
     for (auto stream : streams)
         mediaStreamIds.append(stream->id());
 
-    RefPtr<RTCRtpTransceiver> transceiver;
+    RTCRtpTransceiver* transceiver = nullptr;
 
     for (auto& existingTransceiver : m_transceiverSet) {
         // Reuse an existing sender if it has never been used to send before.
         if (existingTransceiver->sendStatus() == RTCRtpTransceiver::DirectionalityStatus::Disabled &&
                 existingTransceiver->sender()->trackId().isNull()) {
-            transceiver = existingTransceiver;
+            transceiver = existingTransceiver.get();
             transceiver->setSendStatus(RTCRtpTransceiver::DirectionalityStatus::Enabled);
             transceiver->sender()->setTrack(WTFMove(track));
             // FIXME: Spec does not mention how the streams parameter should be used in this case.
@@ -159,9 +159,10 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
     if (!transceiver) {
         RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), WTFMove(mediaStreamIds), *this);
         RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create();
-        transceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
+        RefPtr<RTCRtpTransceiver> newTransceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
 
-        m_transceiverSet.append(transceiver.copyRef());
+        transceiver = newTransceiver.get();
+        m_transceiverSet.append(WTFMove(newTransceiver));
     }
 
     m_backend->markAsNeedingNegotiation();
