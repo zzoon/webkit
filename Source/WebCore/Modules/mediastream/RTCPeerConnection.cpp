@@ -151,7 +151,7 @@ RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& trac
             transceiver = existingTransceiver.get();
             transceiver->setSendStatus(RTCRtpTransceiver::DirectionalityStatus::Enabled);
             transceiver->sender()->setTrack(WTFMove(track));
-            // FIXME: Spec does not mention how the streams parameter should be used in this case.
+            transceiver->sender()->setMediaStreamIds(WTFMove(mediaStreamIds));
             break;
         }
     }

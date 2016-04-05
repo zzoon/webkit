@@ -53,7 +53,9 @@ public:
 
     const String& trackId() const { return m_trackId; }
     const String& trackKind() const { return m_trackKind; }
+
     const Vector<String>& mediaStreamIds() const { return m_mediaStreamIds; }
+    void setMediaStreamIds(Vector<String>&& mediaStreamIds) { m_mediaStreamIds = WTFMove(mediaStreamIds); }
 
     void stop() { m_client = nullptr; }
     void setTrack(RefPtr<MediaStreamTrack>&&);
