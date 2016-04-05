@@ -136,15 +136,6 @@ MediaEndpointPeerConnection::~MediaEndpointPeerConnection()
 {
 }
 
-static size_t indexOfSenderWithTrackId(const RtpSenderVector& senders, const String& trackId)
-{
-    for (size_t i = 0; i < senders.size(); ++i) {
-        if (senders[i]->trackId() == trackId)
-            return i;
-    }
-    return notFound;
-}
-
 static RTCRtpTransceiver* matchTransceiver(const RtpTransceiverVector& transceivers, const std::function<bool (RTCRtpTransceiver&)>& matchFunction)
 {
     for (auto& transceiver : transceivers) {
@@ -161,52 +152,6 @@ static size_t indexOfMediaDescriptionWithTrackId(const MediaDescriptionVector& m
             return i;
     }
     return notFound;
-}
-
-static RefPtr<RTCRtpSender> takeFirstSenderOfType(RtpSenderVector& senders, const String& type)
-{
-    for (unsigned i = 0; i < senders.size(); ++i) {
-        if (senders[i]->track()->kind() == type) {
-            RefPtr<RTCRtpSender> sender = senders[i];
-            senders.remove(i);
-            return sender;
-        }
-    }
-    return nullptr;
-}
-
-static void updateMediaDescriptionsWithSenders(const MediaDescriptionVector& mediaDescriptions, RtpSenderVector& senders)
-{
-    // Remove any sender(s) from the senders list that already have their tracks represented by a media
-    // description. Mark media descriptions that don't have a sender/track (anymore) as "available".
-    for (auto& mdesc : mediaDescriptions) {
-        const String& mdescTrackId = mdesc->mediaStreamTrackId();
-        size_t index = indexOfSenderWithTrackId(senders, mdescTrackId);
-        if (index != notFound)
-            senders.remove(index);
-        else {
-            mdesc->setMediaStreamId(emptyString());
-            mdesc->setMediaStreamTrackId(emptyString());
-            mdesc->clearSsrcs();
-        }
-    }
-
-    // Remove any sender(s) from the senders list that can be matched (by track type) to an "available"
-    // media description. Mark media descriptions that don't get matched with a sender as receive only.
-    for (auto& mdesc : mediaDescriptions) {
-        if (mdesc->mediaStreamTrackId() != emptyString())
-            continue;
-
-        RefPtr<RTCRtpSender> sender = takeFirstSenderOfType(senders, mdesc->type());
-        if (sender) {
-            // FIXME: what else needs to be updated to reuse a media description?
-            mdesc->setMediaStreamId(sender->mediaStreamIds()[0]);
-            mdesc->setMediaStreamTrackId(sender->trackId());
-            mdesc->addSsrc(cryptographicallyRandomNumber());
-            mdesc->setMode("sendrecv");
-        } else
-            mdesc->setMode("recvonly");
-    }
 }
 
 void MediaEndpointPeerConnection::runTask(std::function<void()> task)
@@ -322,12 +267,32 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
 
     configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
 
+    RtpTransceiverVector transceivers = RtpTransceiverVector(m_client->getTransceivers());
     const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
+
     for (unsigned i = 0; i < remoteMediaDescriptions.size(); ++i) {
         PeerMediaDescription& remoteMediaDescription = *remoteMediaDescriptions[i];
 
+        RTCRtpTransceiver* transceiver = matchTransceiver(transceivers, [&remoteMediaDescription] (RTCRtpTransceiver& current) {
+            return current.mid() == remoteMediaDescription.mid();
+        });
+        if (!transceiver) {
+            LOG_ERROR("Could not find a matching transceiver for remote description while creating answer");
+            continue;
+        }
+
         if (i >= configurationSnapshot->mediaDescriptions().size()) {
             RefPtr<PeerMediaDescription> newMediaDescription = PeerMediaDescription::create();
+
+            RTCRtpSender& sender = *transceiver->sender();
+            if (sender.track()) {
+                if (sender.mediaStreamIds().size())
+                    newMediaDescription->setMediaStreamId(sender.mediaStreamIds()[0]);
+                newMediaDescription->setMediaStreamTrackId(sender.trackId());
+                newMediaDescription->addSsrc(cryptographicallyRandomNumber());
+                newMediaDescription->setMode("sendrecv");
+            } else
+                newMediaDescription->setMode("recvonly");
 
             newMediaDescription->setType(remoteMediaDescription.type());
             newMediaDescription->setMid(remoteMediaDescription.mid());
@@ -351,10 +316,12 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
 
         if (localMediaDescription.dtlsSetup() == "actpass")
             localMediaDescription.setDtlsSetup("passive");
+
+        transceivers.removeFirst(transceiver);
     }
 
-    RtpSenderVector senders = m_client->getSenders();
-    updateMediaDescriptionsWithSenders(configurationSnapshot->mediaDescriptions(), senders);
+    if (transceivers.size())
+        markAsNeedingNegotiation();
 
     Ref<SessionDescription> description = SessionDescription::create(SessionDescription::Type::Answer, WTFMove(configurationSnapshot));
     promise.resolve(description->toRTCSessionDescription(*m_sdpProcessor));
@@ -370,18 +337,21 @@ void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& des
     });
 }
 
-static void updateSendSources(const MediaDescriptionVector& localMediaDescriptions, const MediaDescriptionVector& remoteMediaDescriptions, const RtpSenderVector& senders)
+static void updateSendSources(const MediaDescriptionVector& remoteMediaDescriptions, unsigned localMediaDescriptionCount, const RtpTransceiverVector& transceivers)
 {
-    for (unsigned i = 0; i < remoteMediaDescriptions.size(); ++i) {
-        if (remoteMediaDescriptions[i]->type() != "audio" && remoteMediaDescriptions[i]->type() != "video")
+    for (unsigned i = 0; i < remoteMediaDescriptions.size() && i < localMediaDescriptionCount; ++i) {
+        PeerMediaDescription& remoteMediaDescription = *remoteMediaDescriptions[i];
+        if (remoteMediaDescription.type() != "audio" && remoteMediaDescription.type() != "video")
             continue;
 
-        if (localMediaDescriptions.size() <= i)
+        RTCRtpTransceiver* transceiver = matchTransceiver(transceivers, [&remoteMediaDescription] (RTCRtpTransceiver& current) {
+            return current.mid() == remoteMediaDescription.mid();
+        });
+        if (transceiver) {
+            if (transceiver->sendStatus() == RTCRtpTransceiver::DirectionalityStatus::Enabled && transceiver->sender()->track())
+                remoteMediaDescription.setSource(&transceiver->sender()->track()->source());
             return;
-
-        size_t index = indexOfSenderWithTrackId(senders, localMediaDescriptions[i]->mediaStreamTrackId());
-        if (index != notFound)
-            remoteMediaDescriptions[i]->setSource(&senders[index]->track()->source());
+        }
     }
 }
 
@@ -446,7 +416,8 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     }
 
     if (internalRemoteDescription()) {
-        updateSendSources(mediaDescriptions, internalRemoteDescription()->configuration()->mediaDescriptions(), m_client->getSenders());
+        const RtpTransceiverVector& transceivers = m_client->getTransceivers();
+        updateSendSources(internalRemoteDescription()->configuration()->mediaDescriptions(), mediaDescriptions.size(), transceivers);
 
         if (m_mediaEndpoint->updateSendConfiguration(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
             // FIXME: Error type?
@@ -570,7 +541,6 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
     }
 
     const MediaDescriptionVector& mediaDescriptions = newDescription->configuration()->mediaDescriptions();
-    RtpSenderVector senders = m_client->getSenders();
 
     for (auto& mediaDescription : mediaDescriptions) {
         if (mediaDescription->type() != "audio" && mediaDescription->type() != "video")
@@ -581,9 +551,10 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
     }
 
     bool isInitiator = newDescription->type() == SessionDescription::Type::Answer;
+    const RtpTransceiverVector& transceivers = m_client->getTransceivers();
 
     if (internalLocalDescription())
-        updateSendSources(internalLocalDescription()->configuration()->mediaDescriptions(), mediaDescriptions, senders);
+        updateSendSources(mediaDescriptions, internalLocalDescription()->configuration()->mediaDescriptions().size(), transceivers);
 
     if (m_mediaEndpoint->updateSendConfiguration(newDescription->configuration(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
         // FIXME: Error type?
@@ -591,7 +562,6 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
         return;
     }
 
-    const RtpTransceiverVector& transceivers = m_client->getTransceivers();
     for (unsigned i = 0; i < mediaDescriptions.size(); ++i) {
         PeerMediaDescription* mediaDescription = mediaDescriptions[i].get();
 
@@ -619,8 +589,9 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
                 RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create();
 
                 Ref<RTCRtpTransceiver> newTransceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
+                newTransceiver->setMid(mediaDescription->mid());
                 if (receiveOnlyFlag)
-                    transceiver->setSendStatus(RTCRtpTransceiver::DirectionalityStatus::Disabled);
+                    newTransceiver->setSendStatus(RTCRtpTransceiver::DirectionalityStatus::Disabled);
 
                 transceiver = newTransceiver.ptr();
                 m_client->addTransceiver(WTFMove(newTransceiver));
