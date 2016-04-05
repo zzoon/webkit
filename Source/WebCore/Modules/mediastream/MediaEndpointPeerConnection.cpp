@@ -145,6 +145,13 @@ static RTCRtpTransceiver* matchTransceiver(const RtpTransceiverVector& transceiv
     return nullptr;
 }
 
+static bool hasUnassociatedTransceivers(const RtpTransceiverVector& transceivers)
+{
+    return matchTransceiver(transceivers, [] (RTCRtpTransceiver& current) {
+        return current.mid().isNull() && !current.stopped();
+    });
+}
+
 static size_t indexOfMediaDescriptionWithTrackId(const MediaDescriptionVector& mediaDescriptions, const String& trackId)
 {
     for (size_t i = 0; i < mediaDescriptions.size(); ++i) {
@@ -320,12 +327,8 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
         transceivers.removeFirst(transceiver);
     }
 
-    // Check for non-stopped transceivers that could not be matched to a remote media description.
-    // These need to be part of a follow-up offer.
-    RTCRtpTransceiver* firstRemainingTranceiver = matchTransceiver(transceivers, [] (RTCRtpTransceiver& current) {
-        return current.mid().isNull() && !current.stopped();
-    });
-    if (firstRemainingTranceiver)
+    // Unassociated (non-stopped) transceivers need to be negotiated in a follow-up offer.
+    if (hasUnassociatedTransceivers(transceivers))
         markAsNeedingNegotiation();
 
     Ref<SessionDescription> description = SessionDescription::create(SessionDescription::Type::Answer, WTFMove(configurationSnapshot));
@@ -360,15 +363,6 @@ static void updateSendSources(const MediaDescriptionVector& remoteMediaDescripti
     }
 }
 
-static bool allSendersRepresented(const RtpSenderVector& senders, const MediaDescriptionVector& mediaDescriptions)
-{
-    for (auto& sender : senders) {
-        if (indexOfMediaDescriptionWithTrackId(mediaDescriptions, sender->trackId()) == notFound)
-            return false;
-    }
-    return true;
-}
-
 void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription& description, VoidPromise& promise)
 {
     RefPtr<DOMError> error;
@@ -383,6 +377,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
         return;
     }
 
+    const RtpTransceiverVector& transceivers = m_client->getTransceivers();
     const MediaDescriptionVector& mediaDescriptions = newDescription->configuration()->mediaDescriptions();
     unsigned previousNumberOfMediaDescriptions = internalLocalDescription() ?
         internalLocalDescription()->configuration()->mediaDescriptions().size() : 0;
@@ -408,7 +403,6 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
         }
 
         // Associate media descriptions with transceivers (set provisional mid to 'final' mid).
-        const RtpTransceiverVector& transceivers = m_client->getTransceivers();
         for (unsigned i = previousNumberOfMediaDescriptions; i < mediaDescriptions.size(); ++i) {
             PeerMediaDescription& mediaDescription = *mediaDescriptions[i];
 
@@ -421,7 +415,6 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     }
 
     if (internalRemoteDescription()) {
-        const RtpTransceiverVector& transceivers = m_client->getTransceivers();
         updateSendSources(internalRemoteDescription()->configuration()->mediaDescriptions(), mediaDescriptions.size(), transceivers);
 
         if (m_mediaEndpoint->updateSendConfiguration(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
@@ -431,7 +424,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
         }
     }
 
-    if (allSendersRepresented(m_client->getSenders(), mediaDescriptions))
+    if (!hasUnassociatedTransceivers(transceivers))
         clearNegotiationNeededState();
 
     SignalingState newSignalingState;
