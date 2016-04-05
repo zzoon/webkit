@@ -64,6 +64,7 @@
                     "msidsemantic": "^a=msid-semantic: *WMS .*$",
                     "mline": "^m=.*$",
                     "cname": "^a=ssrc:(\\d+) cname:([\\w+/\\-@\\.\\{\\}]+).*$",
+                    "mid": "^a=mid:([!#$%&'*+-.\\w]*).*$",
                     "msid": "^a=(ssrc:\\d+ )?msid:([\\w+/\\-=]+) +([\\w+/\\-=]+).*$",
                     "iceufrag": "^a=ice-ufrag:([\\w+/]*).*$",
                     "icepwd": "^a=ice-pwd:([\\w+/]*=*).*$",
@@ -88,6 +89,7 @@
                     } else {
                         // Media block (content lines)
                         var cname;
+                        var mid;
                         var msid;
                         var iceufrag;
                         var icepwd;
@@ -95,8 +97,9 @@
                         if (cname = match(line, regexp.cname)) {
                             line = line.replace(cname[1], verified("ssrc"));
                             line = line.replace(cname[2], verified("cname"));
-
-                        } else if (msid = match(line, regexp.msid)) {
+                        } else if (mid = match(line, regexp.mid))
+                            line = line.replace(mid[1], verified("mid"))
+                        else if (msid = match(line, regexp.msid)) {
                             if (msid[1])
                                 line = line.replace(msid[1], verified("ssrc"));
 
