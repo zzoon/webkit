@@ -356,7 +356,7 @@ static void updateSendSources(const MediaDescriptionVector& remoteMediaDescripti
             return current.mid() == remoteMediaDescription.mid();
         });
         if (transceiver) {
-            if (transceiver->sendStatus() == RTCRtpTransceiver::DirectionalityStatus::Enabled && transceiver->sender()->track())
+            if (transceiver->hasActiveSender() && transceiver->sender()->track())
                 remoteMediaDescription.setSource(&transceiver->sender()->track()->source());
             return;
         }
@@ -589,7 +589,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
                 Ref<RTCRtpTransceiver> newTransceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
                 newTransceiver->setMid(mediaDescription->mid());
                 if (receiveOnlyFlag)
-                    newTransceiver->setSendStatus(RTCRtpTransceiver::DirectionalityStatus::Disabled);
+                    newTransceiver->setSenderStatus(RTCRtpTransceiver::Status::Inactive);
 
                 transceiver = newTransceiver.ptr();
                 m_client->addTransceiver(WTFMove(newTransceiver));

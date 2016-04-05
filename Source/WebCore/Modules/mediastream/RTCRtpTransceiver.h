@@ -47,22 +47,21 @@ class MediaStreamTrack;
 
 class RTCRtpTransceiver : public RefCounted<RTCRtpTransceiver>, public ScriptWrappable {
 public:
-    enum class DirectionalityStatus {
-        Enabled,
-        Disabled
+    enum class Status {
+        Active,
+        Inactive
     };
 
     static Ref<RTCRtpTransceiver> create(RefPtr<RTCRtpSender>&&, RefPtr<RTCRtpReceiver>&&);
     virtual ~RTCRtpTransceiver() { }
 
-
     bool configureWithDictionary(const Dictionary&);
 
-    DirectionalityStatus sendStatus() const { return m_sendStatus; }
-    void setSendStatus(DirectionalityStatus status) { m_sendStatus = status; }
+    bool hasActiveSender() const { return m_hasActiveSender; }
+    void setSenderStatus(Status status) { m_hasActiveSender = status == Status::Active; }
 
-    DirectionalityStatus receiveStatus() const { return m_receiveStatus; }
-    void setReceiveStatus(DirectionalityStatus status) { m_receiveStatus = status; }
+    bool hasActiveReceiver() const { return m_hasActiveReceiver; }
+    void setReceiverStatus(Status status) { m_hasActiveReceiver = status == Status::Active; }
 
     const String& directionalityString() const;
 
@@ -81,8 +80,8 @@ private:
 
     static String getNextMid();
 
-    DirectionalityStatus m_sendStatus { DirectionalityStatus::Enabled };
-    DirectionalityStatus m_receiveStatus { DirectionalityStatus::Enabled };
+    bool m_hasActiveSender { true };
+    bool m_hasActiveReceiver { true };
 
     String m_provisionalMid { getNextMid() };
     String m_mid;

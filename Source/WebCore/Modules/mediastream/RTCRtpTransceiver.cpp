@@ -70,20 +70,20 @@ RTCRtpTransceiver::RTCRtpTransceiver(RefPtr<RTCRtpSender>&& sender, RefPtr<RTCRt
 {
 }
 
-static bool parseDirectionality(const String& string, RTCRtpTransceiver::DirectionalityStatus& sendStatus, RTCRtpTransceiver::DirectionalityStatus& receiveStatus)
+static bool parseDirectionality(const String& string, bool& hasActiveSender, bool& hasActiveReceiver)
 {
     if (string == sendrecvString()) {
-        sendStatus = RTCRtpTransceiver::DirectionalityStatus::Enabled;
-        receiveStatus = RTCRtpTransceiver::DirectionalityStatus::Enabled;
+        hasActiveSender = true;
+        hasActiveReceiver = true;
     } else if (string == sendonlyString()) {
-        sendStatus = RTCRtpTransceiver::DirectionalityStatus::Enabled;
-        receiveStatus = RTCRtpTransceiver::DirectionalityStatus::Disabled;
+        hasActiveSender = true;
+        hasActiveReceiver = false;
     } else if (string == recvonlyString()) {
-        sendStatus = RTCRtpTransceiver::DirectionalityStatus::Disabled;
-        receiveStatus = RTCRtpTransceiver::DirectionalityStatus::Enabled;
+        hasActiveSender = false;
+        hasActiveReceiver = true;
     } else if (string == inactiveString()) {
-        sendStatus = RTCRtpTransceiver::DirectionalityStatus::Disabled;
-        receiveStatus = RTCRtpTransceiver::DirectionalityStatus::Disabled;
+        hasActiveSender = false;
+        hasActiveReceiver = false;
     } else
         return false;
     return true;
@@ -93,7 +93,7 @@ bool RTCRtpTransceiver::configureWithDictionary(const Dictionary& dictionary)
 {
     String directionality;
     if (dictionary.get("directionality", directionality)) {
-        if (!parseDirectionality(directionality, m_sendStatus, m_receiveStatus))
+        if (!parseDirectionality(directionality, m_hasActiveSender, m_hasActiveReceiver))
             return false;
     }
 
@@ -103,9 +103,9 @@ bool RTCRtpTransceiver::configureWithDictionary(const Dictionary& dictionary)
 
 const String& RTCRtpTransceiver::directionalityString() const
 {
-    if (m_sendStatus == DirectionalityStatus::Enabled)
-        return m_receiveStatus == DirectionalityStatus::Enabled ? sendrecvString() : sendonlyString();
-    return m_receiveStatus == DirectionalityStatus::Enabled ? recvonlyString() : inactiveString();
+    if (m_hasActiveSender)
+        return m_hasActiveReceiver ? sendrecvString() : sendonlyString();
+    return m_hasActiveReceiver ? recvonlyString() : inactiveString();
 }
 
 } // namespace WebCore
