@@ -63,7 +63,7 @@ public:
     static RefPtr<RTCPeerConnection> create(ScriptExecutionContext&, const Dictionary& rtcConfiguration, ExceptionCode&);
     ~RTCPeerConnection();
 
-    Vector<RefPtr<RTCRtpSender>> getSenders() const override;
+    Vector<RefPtr<RTCRtpSender>> getSenders() const;
     Vector<RefPtr<RTCRtpReceiver>> getReceivers() const;
     const Vector<RefPtr<RTCRtpTransceiver>>& getTransceivers() const override { return m_transceiverSet; }
 
