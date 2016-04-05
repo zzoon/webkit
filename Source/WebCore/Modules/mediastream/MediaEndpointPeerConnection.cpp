@@ -297,10 +297,9 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
                     newMediaDescription->setMediaStreamId(sender.mediaStreamIds()[0]);
                 newMediaDescription->setMediaStreamTrackId(sender.trackId());
                 newMediaDescription->addSsrc(cryptographicallyRandomNumber());
-                newMediaDescription->setMode("sendrecv");
-            } else
-                newMediaDescription->setMode("recvonly");
+            }
 
+            newMediaDescription->setMode(transceiver->directionalityString());
             newMediaDescription->setType(remoteMediaDescription.type());
             newMediaDescription->setMid(remoteMediaDescription.mid());
             newMediaDescription->setDtlsSetup(remoteMediaDescription.dtlsSetup() == "active" ? "passive" : "active");
