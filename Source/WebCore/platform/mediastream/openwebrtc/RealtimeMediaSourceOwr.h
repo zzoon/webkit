@@ -60,7 +60,8 @@ RealtimeMediaSourceOwr(OwrMediaSource* mediaSource, const String& id, RealtimeMe
 
     virtual ~RealtimeMediaSourceOwr() { }
 
-    void swapOutShallowSource(OwrMediaSource& realSource) {
+    void swapOutShallowSource(OwrMediaSource& realSource)
+    {
         m_mediaSource = &realSource;
         setMuted(false);
     }

@@ -33,8 +33,8 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include "Dictionary.h"
 #include "DOMError.h"
+#include "Dictionary.h"
 #include "ExceptionCode.h"
 #include "JSDOMError.h"
 #include "MediaStreamTrack.h"

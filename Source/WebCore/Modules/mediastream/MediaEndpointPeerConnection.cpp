@@ -136,7 +136,7 @@ MediaEndpointPeerConnection::~MediaEndpointPeerConnection()
 {
 }
 
-static RTCRtpTransceiver* matchTransceiver(const RtpTransceiverVector& transceivers, const std::function<bool (RTCRtpTransceiver&)>& matchFunction)
+static RTCRtpTransceiver* matchTransceiver(const RtpTransceiverVector& transceivers, const std::function<bool(RTCRtpTransceiver&)>& matchFunction)
 {
     for (auto& transceiver : transceivers) {
         if (matchFunction(*transceiver))
@@ -196,7 +196,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
 
     // Remove any transceiver objects from transceivers that can be matched to an existing media description.
     for (auto& mediaDescription : configurationSnapshot->mediaDescriptions()) {
-        if (mediaDescription->port() == 0) {
+        if (!mediaDescription->port()) {
             // This media description should be recycled.
             continue;
         }
