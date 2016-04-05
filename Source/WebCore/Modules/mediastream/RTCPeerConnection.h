@@ -64,7 +64,7 @@ public:
     ~RTCPeerConnection();
 
     Vector<RefPtr<RTCRtpSender>> getSenders() const override;
-    Vector<RefPtr<RTCRtpReceiver>> getReceivers() const { return m_receiverSet; }
+    Vector<RefPtr<RTCRtpReceiver>> getReceivers() const;
     const Vector<RefPtr<RTCRtpTransceiver>>& getTransceivers() const override { return m_transceiverSet; }
 
     RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, Vector<MediaStream*>, ExceptionCode&);
@@ -145,9 +145,7 @@ private:
     PeerConnectionStates::IceGatheringState m_iceGatheringState;
     PeerConnectionStates::IceConnectionState m_iceConnectionState;
 
-    Vector<RefPtr<RTCRtpReceiver>> m_receiverSet;
     Vector<RefPtr<RTCRtpTransceiver>> m_transceiverSet;
-
     Vector<RefPtr<RTCDataChannel>> m_dataChannels;
 
     std::unique_ptr<PeerConnectionBackend> m_backend;

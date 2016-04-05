@@ -112,6 +112,17 @@ Vector<RefPtr<RTCRtpSender>> RTCPeerConnection::getSenders() const
     return senders;
 }
 
+Vector<RefPtr<RTCRtpReceiver>> RTCPeerConnection::getReceivers() const
+{
+    Vector<RefPtr<RTCRtpReceiver>> receivers;
+    receivers.reserveCapacity(m_transceiverSet.size());
+
+    for (auto& transceiver : m_transceiverSet)
+        receivers.append(transceiver->receiver());
+
+    return receivers;
+}
+
 RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, Vector<MediaStream*> streams, ExceptionCode& ec)
 {
     if (!track) {
