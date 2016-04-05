@@ -320,7 +320,12 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
         transceivers.removeFirst(transceiver);
     }
 
-    if (transceivers.size())
+    // Check for non-stopped transceivers that could not be matched to a remote media description.
+    // These need to be part of a follow-up offer.
+    RTCRtpTransceiver* firstRemainingTranceiver = matchTransceiver(transceivers, [] (RTCRtpTransceiver& current) {
+        return current.mid().isNull() && !current.stopped();
+    });
+    if (firstRemainingTranceiver)
         markAsNeedingNegotiation();
 
     Ref<SessionDescription> description = SessionDescription::create(SessionDescription::Type::Answer, WTFMove(configurationSnapshot));
