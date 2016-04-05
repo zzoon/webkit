@@ -31,7 +31,7 @@
 #include "config.h"
 #include "SessionDescription.h"
 
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(WEB_RTC)
 
 #include "DOMError.h"
 #include "SDPProcessor.h"
@@ -124,4 +124,4 @@ const String& SessionDescription::typeString() const
 
 } // namespace WebCore
 
-#endif // ENABLE(MEDIA_STREAM)
+#endif // ENABLE(WEB_RTC)

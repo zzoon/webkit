@@ -31,7 +31,7 @@
 #include "config.h"
 #include "RTCRtpTransceiver.h"
 
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(WEB_RTC)
 
 #include "DOMError.h"
 #include "Dictionary.h"
@@ -110,4 +110,4 @@ const String& RTCRtpTransceiver::directionalityString() const
 
 } // namespace WebCore
 
-#endif // ENABLE(MEDIA_STREAM)
+#endif // ENABLE(WEB_RTC)

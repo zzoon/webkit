@@ -31,7 +31,7 @@
 #ifndef SessionDescription_h
 #define SessionDescription_h
 
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(WEB_RTC)
 
 #include "MediaEndpointSessionConfiguration.h"
 #include "RTCSessionDescription.h"
@@ -77,6 +77,6 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(MEDIA_STREAM)
+#endif // ENABLE(WEB_RTC)
 
 #endif // SessionDescription_h

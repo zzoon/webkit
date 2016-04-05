@@ -31,7 +31,7 @@
 #ifndef MediaEndpointOwr_h
 #define MediaEndpointOwr_h
 
-#if ENABLE(MEDIA_STREAM)
+#if ENABLE(WEB_RTC)
 
 #include "MediaEndpoint.h"
 #include <owr/owr_media_session.h>
@@ -102,6 +102,6 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(MEDIA_STREAM)
+#endif // ENABLE(WEB_RTC)
 
 #endif // MediaEndpointOwr_h
