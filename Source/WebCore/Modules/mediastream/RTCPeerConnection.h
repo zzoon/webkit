@@ -67,7 +67,7 @@ public:
     Vector<RefPtr<RTCRtpReceiver>> getReceivers() const;
     const Vector<RefPtr<RTCRtpTransceiver>>& getTransceivers() const override { return m_transceiverSet; }
 
-    RefPtr<RTCRtpSender> addTrack(RefPtr<MediaStreamTrack>&&, Vector<MediaStream*>, ExceptionCode&);
+    RefPtr<RTCRtpSender> privateAddTrack(RefPtr<MediaStreamTrack>&&, Vector<MediaStream*>, ExceptionCode&);
     void removeTrack(RTCRtpSender*, ExceptionCode&);
 
     RefPtr<RTCRtpTransceiver> addTransceiver(RefPtr<MediaStreamTrack>&&, const Dictionary& init, ExceptionCode&);

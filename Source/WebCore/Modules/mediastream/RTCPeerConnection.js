@@ -44,6 +44,27 @@ function createAnswer()
     return @createOfferOrAnswer(this, this.@queuedCreateAnswer, "createAnswer", arguments);
 }
 
+function addTrack()
+{
+    "use strict";
+
+    return this.@privateAddTrack.@apply(this, arguments);
+}
+
+function addStream()
+{
+    "use strict";
+
+    if (arguments.length < 1)
+        throw new @TypeError("Not enough arguments");
+
+    var stream = arguments[0];
+    if (!(stream instanceof @MediaStream))
+        throw new @TypeError("Argument 1 ('stream') to RTCPeerConnection.addStream must be an instance of MediaStream");
+
+    stream.getTracks().forEach(track => this.@privateAddTrack(track, stream));
+}
+
 function setLocalDescription()
 {
     "use strict";

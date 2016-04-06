@@ -63,7 +63,11 @@
     sequence<RTCRtpReceiver> getReceivers();
     sequence<RTCRtpTransceiver> getTransceivers();
 
-    [StrictTypeChecking, RaisesException] RTCRtpSender addTrack(MediaStreamTrack track, MediaStream... streams);
+    [Private, StrictTypeChecking, RaisesException] RTCRtpSender privateAddTrack(MediaStreamTrack track, MediaStream... streams);
+    [JSBuiltin] RTCRtpSender addTrack(MediaStreamTrack track, MediaStream... streams);
+    // addStream is a widely adopted legacy alternative.
+    [JSBuiltin] void addStream(MediaStream stream);
+
     [StrictTypeChecking, RaisesException] void removeTrack(RTCRtpSender sender);
 
     [StrictTypeChecking, RaisesException] RTCRtpTransceiver addTransceiver(MediaStreamTrack track, optional Dictionary init);

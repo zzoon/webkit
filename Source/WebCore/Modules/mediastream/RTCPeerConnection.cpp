@@ -123,7 +123,7 @@ Vector<RefPtr<RTCRtpReceiver>> RTCPeerConnection::getReceivers() const
     return receivers;
 }
 
-RefPtr<RTCRtpSender> RTCPeerConnection::addTrack(RefPtr<MediaStreamTrack>&& track, Vector<MediaStream*> streams, ExceptionCode& ec)
+RefPtr<RTCRtpSender> RTCPeerConnection::privateAddTrack(RefPtr<MediaStreamTrack>&& track, Vector<MediaStream*> streams, ExceptionCode& ec)
 {
     if (!track) {
         ec = TypeError;

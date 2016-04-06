@@ -43,6 +43,7 @@ namespace WebCore {
     macro(initializeWith) \
     macro(operations) \
     macro(ownerReadableStream) \
+    macro(privateAddTrack) \
     macro(privateGetStats) \
     macro(pulling) \
     macro(pullAgain) \
@@ -69,6 +70,7 @@ namespace WebCore {
     macro(underlyingSink) \
     macro(underlyingSource) \
     macro(writing) \
+    macro(MediaStream) \
     macro(MediaStreamTrack) \
     macro(ReadableStream) \
     macro(ReadableStreamReader) \
