@@ -40,11 +40,6 @@ RTCRtpReceiver::RTCRtpReceiver()
 {
 }
 
-RTCRtpReceiver::RTCRtpReceiver(RefPtr<MediaStreamTrack>&& track)
-    : RTCRtpSenderReceiverBase(WTFMove(track))
-{
-}
-
 } // namespace WebCore
 
 #endif // ENABLE(WEB_RTC)

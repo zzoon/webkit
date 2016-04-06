@@ -52,10 +52,6 @@ protected:
     RTCRtpSenderReceiverBase()
     { }
 
-    RTCRtpSenderReceiverBase(RefPtr<MediaStreamTrack>&& track)
-        : m_track(track)
-    { }
-
     RefPtr<MediaStreamTrack> m_track;
 };
 
