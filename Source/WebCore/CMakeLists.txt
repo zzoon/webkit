@@ -214,6 +214,7 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/mediastream/MediaDeviceInfo.idl
     Modules/mediastream/MediaDevices.idl
     Modules/mediastream/MediaStream.idl
+    Modules/mediastream/MediaStreamEvent.idl
     Modules/mediastream/MediaStreamTrack.idl
     Modules/mediastream/MediaStreamTrackEvent.idl
     Modules/mediastream/MediaStreamTrackSourcesCallback.idl
@@ -911,6 +912,7 @@ set(WebCore_SOURCES
     Modules/mediastream/MediaEndpointPeerConnection.cpp
     Modules/mediastream/MediaSourceSettings.cpp
     Modules/mediastream/MediaStream.cpp
+    Modules/mediastream/MediaStreamEvent.cpp
     Modules/mediastream/MediaStreamRegistry.cpp
     Modules/mediastream/MediaStreamTrack.cpp
     Modules/mediastream/MediaStreamTrackEvent.cpp
