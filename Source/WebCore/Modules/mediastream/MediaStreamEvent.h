@@ -41,7 +41,7 @@ class MediaStreamEvent : public Event {
 public:
     virtual ~MediaStreamEvent();
 
-    static Ref<MediaStreamEvent> create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStream>);
+    static Ref<MediaStreamEvent> create(const AtomicString& type, bool canBubble, bool cancelable, RefPtr<MediaStream>&&);
     static Ref<MediaStreamEvent> createForBindings(const AtomicString& type, const MediaStreamEventInit& initializer);
 
     MediaStream* stream() const;
@@ -49,7 +49,7 @@ public:
     virtual EventInterface eventInterface() const;
 
 private:
-    MediaStreamEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<MediaStream>);
+    MediaStreamEvent(const AtomicString& type, bool canBubble, bool cancelable, RefPtr<MediaStream>&&);
     MediaStreamEvent(const AtomicString& type, const MediaStreamEventInit&);
 
     RefPtr<MediaStream> m_stream;
