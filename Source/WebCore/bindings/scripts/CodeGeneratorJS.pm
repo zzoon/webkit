@@ -1817,6 +1817,8 @@ sub GenerateImplementation
     my $visibleInterfaceName = $codeGenerator->GetVisibleInterfaceName($interface);
     my $eventTarget = $codeGenerator->InheritsInterface($interface, "EventTarget") && $interface->name ne "EventTarget";
     my $needsVisitChildren = InstanceNeedsVisitChildren($interface);
+    my $serializerFunctionName = "toJSON";
+    my $serializerNativeFunctionName = $codeGenerator->WK_lcfirst($className) . "Prototype" . "Function" . $codeGenerator->WK_ucfirst($serializerFunctionName);
 
     my $namedGetterFunction = GetNamedGetterFunction($interface);
     my $indexedGetterFunction = GetIndexedGetterFunction($interface);
@@ -1902,6 +1904,10 @@ sub GenerateImplementation
         push(@implContent, "bool ${constructorFunctionName}(JSC::ExecState*, JSC::EncodedJSValue, JSC::EncodedJSValue);\n");
 
         push(@implContent, "\n");
+    }
+
+    if ($interface->serializable) {
+        push(@implContent, "EncodedJSValue JSC_HOST_CALL ${serializerNativeFunctionName}(ExecState* state);\n\n");
     }
 
     # Add prototype declaration.
@@ -2066,6 +2072,15 @@ sub GenerateImplementation
     }
 
     my $justGenerateValueArray = !IsDOMGlobalObject($interface);
+
+    if ($interface->serializable) {
+        push(@hashKeys, $serializerFunctionName);
+        push(@hashValue1, $serializerNativeFunctionName);
+        push(@hashValue2, 0);
+        push(@hashSpecials, "JSC::Function");
+
+        $hashSize++;
+    }
 
     $object->GenerateHashTable($hashName, $hashSize,
                                \@hashKeys, \@hashSpecials,
@@ -3013,6 +3028,10 @@ END
 
     }
 
+    if ($interface->serializable) {
+        GenerateSerializerFunction($interface, $interfaceName, $className, $serializerFunctionName, $serializerNativeFunctionName);
+    }
+
     if ($interface->iterable) {
         GenerateImplementationIterableFunctions($interface);
     }
@@ -3248,6 +3267,40 @@ END
 
     my $conditionalString = $codeGenerator->GenerateConditionalString($interface);
     push(@implContent, "\n#endif // ${conditionalString}\n") if $conditionalString;
+}
+
+sub GenerateSerializerFunction
+{
+    my $interface = shift;
+    my $interfaceName = shift;
+    my $className = shift;
+    my $serializerFunctionName = shift;
+    my $serializerNativeFunctionName = shift;
+
+    AddToImplIncludes("ObjectConstructor.h");
+    push(@implContent, "EncodedJSValue JSC_HOST_CALL ${serializerNativeFunctionName}(ExecState* state)\n");
+    push(@implContent, "{\n");
+    push(@implContent, "    JSValue thisValue = state->thisValue();\n");
+    push(@implContent, "    auto castedThis = jsDynamicCast<JS$interfaceName*>(thisValue);\n");
+    push(@implContent, "    if (UNLIKELY(!castedThis))\n");
+    push(@implContent, "        return throwThisTypeError(*state, \"$interfaceName\", \"$serializerFunctionName\");\n");
+    push(@implContent, "    ASSERT_GC_OBJECT_INHERITS(castedThis, ${className}::info());\n\n") unless $interfaceName eq "EventTarget";
+    push(@implContent, "    JSObject* result = constructEmptyObject(state);\n");
+    push(@implContent, "    auto& impl = castedThis->wrapped();\n");
+    foreach my $attribute (@{$interface->attributes}) {
+        my $name = $attribute->signature->name;
+        if (grep $_ eq $name, @{$interface->serializable->attributes}) {
+            my $type = $attribute->signature->type;
+            if ($type eq "DOMString") {
+                push(@implContent, "    result->putDirect(state->vm(), Identifier::fromString(state, \"${name}\"), jsStringWithCache(state, impl.${name}()));\n");
+            } elsif ($type eq "unsigned short") {
+                push(@implContent, "    result->putDirect(state->vm(), Identifier::fromString(state, \"${name}\"), jsNumber(impl.${name}().value()).toString(state));\n");
+            }
+
+        }
+    }
+    push(@implContent, "\n    return JSValue::encode(result);\n");
+    push(@implContent, "}\n\n");
 }
 
 sub GenerateFunctionCastedThis
