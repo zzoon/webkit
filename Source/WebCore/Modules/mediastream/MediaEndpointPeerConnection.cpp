@@ -640,7 +640,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
             transceiver->receiver()->setTrack(WTFMove(remoteTrack));
 
             m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false,
-                *transceiver->receiver(), *transceiver->receiver()->track(), *transceiver));
+                transceiver->receiver(), transceiver->receiver()->track(), transceiver));
         }
     }
 
