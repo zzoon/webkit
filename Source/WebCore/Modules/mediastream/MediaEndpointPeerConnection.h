@@ -41,6 +41,7 @@
 
 namespace WebCore {
 
+class MediaStream;
 class MediaStreamTrack;
 class SDPProcessor;
 
@@ -130,6 +131,8 @@ private:
     RefPtr<SessionDescription> m_pendingRemoteDescription;
 
     RefPtr<RTCConfiguration> m_configuration;
+
+    HashMap<String, RefPtr<MediaStream>> m_remoteStreamMap;
 
     bool m_negotiationNeeded { false };
 };

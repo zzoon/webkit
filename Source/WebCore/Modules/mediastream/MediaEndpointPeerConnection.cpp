@@ -37,6 +37,7 @@
 #include "JSDOMError.h"
 #include "JSRTCSessionDescription.h"
 #include "MediaEndpointSessionConfiguration.h"
+#include "MediaStream.h"
 #include "MediaStreamTrack.h"
 #include "PeerConnectionBackend.h"
 #include "PeerMediaDescription.h"
@@ -610,6 +611,27 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
 
             RefPtr<MediaStreamTrackPrivate> remoteTrackPrivate = MediaStreamTrackPrivate::create(WTFMove(remoteSource), remoteTrackId);
             RefPtr<MediaStreamTrack> remoteTrack = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *remoteTrackPrivate);
+
+            // FIXME: PeerMediaDescription should have a mediaStreamIds vector.
+            Vector<String> mediaStreamIds;
+            if (!mediaDescription->mediaStreamId().isEmpty())
+                mediaStreamIds.append(mediaDescription->mediaStreamId());
+
+            // A remote track can be associated with 0..* MediaStreams. We create a new stream on
+            // an unrecognized stream id, and add the track if the stream has been created before.
+            HashMap<String, RefPtr<MediaStream>> trackEventMediaStreams;
+            for (auto& id : mediaStreamIds) {
+                if (m_remoteStreamMap.contains(id)) {
+                    RefPtr<MediaStream> stream = m_remoteStreamMap.get(id);
+                    stream->addTrack(remoteTrack.copyRef());
+                    trackEventMediaStreams.add(id, WTFMove(stream));
+                } else {
+                    Ref<MediaStream> newStream = MediaStream::create(*m_client->scriptExecutionContext(), MediaStreamTrackVector({ remoteTrack }));
+                    m_remoteStreamMap.add(id, newStream.copyRef());
+                    trackEventMediaStreams.add(id, WTFMove(newStream));
+                }
+            }
+
             transceiver->receiver()->setTrack(WTFMove(remoteTrack));
 
             m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false,
