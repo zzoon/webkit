@@ -214,8 +214,12 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         if (!transceiver)
             continue;
 
-        if (mediaDescription->mode() != transceiver->directionalityString())
-            mediaDescription->setMode(transceiver->directionalityString());
+        mediaDescription->setMode(transceiver->directionalityString());
+        if (transceiver->hasActiveSender()) {
+            RTCRtpSender* sender = transceiver->sender();
+            mediaDescription->setMediaStreamId(sender->mediaStreamIds()[0]);
+            mediaDescription->setMediaStreamTrackId(sender->trackId());
+        }
 
         transceivers.removeFirst(transceiver);
     }
