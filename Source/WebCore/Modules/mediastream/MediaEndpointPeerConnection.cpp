@@ -38,6 +38,7 @@
 #include "JSRTCSessionDescription.h"
 #include "MediaEndpointSessionConfiguration.h"
 #include "MediaStream.h"
+#include "MediaStreamEvent.h"
 #include "MediaStreamTrack.h"
 #include "PeerConnectionBackend.h"
 #include "PeerMediaDescription.h"
@@ -564,6 +565,9 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
         return;
     }
 
+    // One legacy MediaStreamEvent will be fired for every new MediaStream created as this remote description is set.
+    Vector<RefPtr<MediaStreamEvent>> legacyMediaStreamEvents;
+
     for (unsigned i = 0; i < mediaDescriptions.size(); ++i) {
         PeerMediaDescription* mediaDescription = mediaDescriptions[i].get();
 
@@ -628,6 +632,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
                 } else {
                     Ref<MediaStream> newStream = MediaStream::create(*m_client->scriptExecutionContext(), MediaStreamTrackVector({ remoteTrack }));
                     m_remoteStreamMap.add(id, newStream.copyRef());
+                    legacyMediaStreamEvents.append(MediaStreamEvent::create(eventNames().addstreamEvent, false, false, newStream.copyRef()));
                     trackEventMediaStreams.add(id, WTFMove(newStream));
                 }
             }
@@ -638,6 +643,10 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
                 *transceiver->receiver(), *transceiver->receiver()->track(), *transceiver));
         }
     }
+
+    // Fire legacy addstream events.
+    for (auto& event : legacyMediaStreamEvents)
+        m_client->fireEvent(*event);
 
     SignalingState newSignalingState;
 
