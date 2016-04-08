@@ -41,6 +41,7 @@ namespace WebCore {
     macro(fillFromJS) \
     macro(getUserMediaFromJS) \
     macro(initializeWith) \
+    macro(localStreams) \
     macro(operations) \
     macro(ownerReadableStream) \
     macro(privateAddTrack) \

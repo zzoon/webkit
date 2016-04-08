@@ -63,6 +63,9 @@
     sequence<RTCRtpReceiver> getReceivers();
     sequence<RTCRtpTransceiver> getTransceivers();
 
+    // Legacy
+    [JSBuiltin] sequence<MediaStream> getLocalStreams();
+
     [Private, StrictTypeChecking, RaisesException] RTCRtpSender privateAddTrack(MediaStreamTrack track, MediaStream... streams);
     [JSBuiltin] RTCRtpSender addTrack(MediaStreamTrack track, MediaStream... streams);
     // addStream is a widely adopted legacy alternative.
