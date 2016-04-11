@@ -66,6 +66,7 @@
     // Legacy
     [JSBuiltin] sequence<MediaStream> getLocalStreams();
     [JSBuiltin]sequence<MediaStream> getRemoteStreams();
+    [JSBuiltin] MediaStream getStreamById(DOMString streamId);
     [Private] sequence<MediaStream> privateGetRemoteStreams();
 
     [Private, StrictTypeChecking, RaisesException] RTCRtpSender privateAddTrack(MediaStreamTrack track, MediaStream... streams);

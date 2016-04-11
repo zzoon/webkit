@@ -92,6 +92,31 @@ function getRemoteStreams()
     return this.@privateGetRemoteStreams();
 }
 
+function getStreamById()
+{
+    "use strict";
+
+    if (arguments.length < 1)
+        throw new @TypeError("Not enough arguments");
+
+    const streamId = String(arguments[0]);
+
+    if (this.@localStreams) {
+        for (let i = 0; i < this.@localStreams.length; ++i) {
+            if (this.@localStreams[i].id === streamId)
+                return this.@localStreams[i];
+        }
+    }
+
+    const remoteStreams = this.@privateGetRemoteStreams();
+    for (let i = 0; i < remoteStreams.length; ++i) {
+        if (remoteStreams[i].id === streamId)
+            return remoteStreams[i];
+    }
+
+    return null;
+}
+
 function setLocalDescription()
 {
     "use strict";
