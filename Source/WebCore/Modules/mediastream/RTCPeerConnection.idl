@@ -69,14 +69,15 @@
     [JSBuiltin] MediaStream getStreamById(DOMString streamId);
     [Private] sequence<MediaStream> privateGetRemoteStreams();
 
-    [Private, StrictTypeChecking, RaisesException] RTCRtpSender privateAddTrack(MediaStreamTrack track, MediaStream... streams);
     [JSBuiltin] RTCRtpSender addTrack(MediaStreamTrack track, MediaStream... streams);
-    // addStream is a widely adopted legacy alternative.
-    [JSBuiltin] void addStream(MediaStream stream);
-
-    [Private, StrictTypeChecking, RaisesException] void privateRemoveTrack(RTCRtpSender sender);
     [JSBuiltin] void removeTrack(RTCRtpSender sender);
-    // removeStream is a widely adopted legacy alternative.
+
+    // Private functions used to implement both the supported add/removeTrack() API and the legacy add/removeStream() API.
+    [Private, StrictTypeChecking, RaisesException] RTCRtpSender privateAddTrack(MediaStreamTrack track, MediaStream... streams);
+    [Private, StrictTypeChecking, RaisesException] void privateRemoveTrack(RTCRtpSender sender);
+
+    // Legacy
+    [JSBuiltin] void addStream(MediaStream stream);
     [JSBuiltin] void removeStream(MediaStream stream);
 
     [StrictTypeChecking, RaisesException] RTCRtpTransceiver addTransceiver(MediaStreamTrack track, optional Dictionary init);
