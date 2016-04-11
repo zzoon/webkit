@@ -123,6 +123,11 @@ Vector<RefPtr<RTCRtpReceiver>> RTCPeerConnection::getReceivers() const
     return receivers;
 }
 
+Vector<RefPtr<MediaStream>> RTCPeerConnection::privateGetRemoteStreams() const
+{
+    return m_backend->getRemoteStreams();
+}
+
 RefPtr<RTCRtpSender> RTCPeerConnection::privateAddTrack(RefPtr<MediaStreamTrack>&& track, Vector<MediaStream*> streams, ExceptionCode& ec)
 {
     if (!track) {

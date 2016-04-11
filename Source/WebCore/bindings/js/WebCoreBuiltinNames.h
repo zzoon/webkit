@@ -45,6 +45,7 @@ namespace WebCore {
     macro(operations) \
     macro(ownerReadableStream) \
     macro(privateAddTrack) \
+    macro(privateGetRemoteStreams) \
     macro(privateGetStats) \
     macro(pulling) \
     macro(pullAgain) \

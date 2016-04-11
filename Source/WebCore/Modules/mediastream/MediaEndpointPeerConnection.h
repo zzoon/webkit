@@ -72,6 +72,8 @@ public:
 
     void getStats(MediaStreamTrack*, PeerConnection::StatsPromise&&) override;
 
+    Vector<RefPtr<MediaStream>> getRemoteStreams() const override;
+
     void replaceTrack(RTCRtpSender&, RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&&) override;
 
     void stop() override;

@@ -758,6 +758,13 @@ void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::St
     promise.reject(DOMError::create("Not implemented"));
 }
 
+Vector<RefPtr<MediaStream>> MediaEndpointPeerConnection::getRemoteStreams() const
+{
+    Vector<RefPtr<MediaStream>> remoteStreams;
+    copyValuesToVector(m_remoteStreamMap, remoteStreams);
+    return remoteStreams;
+}
+
 void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise&& promise)
 {
     size_t mdescIndex = notFound;

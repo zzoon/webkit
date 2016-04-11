@@ -85,6 +85,13 @@ function getLocalStreams()
     return this.@localStreams.slice();
 }
 
+function getRemoteStreams()
+{
+    "use strict";
+
+    return this.@privateGetRemoteStreams();
+}
+
 function setLocalDescription()
 {
     "use strict";
