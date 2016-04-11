@@ -51,6 +51,13 @@ function addTrack()
     return this.@privateAddTrack.@apply(this, arguments);
 }
 
+function removeTrack()
+{
+    "use strict";
+
+    return this.@privateRemoveTrack.@apply(this, arguments);
+}
+
 function addStream()
 {
     "use strict";
@@ -73,6 +80,40 @@ function addStream()
     this.@localStreams.push(stream);
 
     stream.getTracks().forEach(track => this.@privateAddTrack(track, stream));
+}
+
+function removeStream()
+{
+    "use strict";
+
+    if (arguments.length < 1)
+        throw new @TypeError("Not enough arguments");
+
+    var stream = arguments[0];
+    if (!(stream instanceof @MediaStream))
+        throw new @TypeError("Argument 1 ('stream') to RTCPeerConnection.removeStream must be an instance of MediaStream");
+
+    if (!this.@localStreams)
+        return;
+
+    const senders = this.getSenders();
+    for (let i = 0; i < this.@localStreams.length; ++i) {
+        if (this.@localStreams[i].id === stream.id) {
+            this.@localStreams[i].getTracks().forEach(track => {
+                // Find track's sender and call removeTrack with it.
+                for (let j = 0; j < senders.length; ++j) {
+                    let sender = senders[j];
+                    if (sender.track && sender.track.id === track.id) {
+                        this.@privateRemoveTrack(sender);
+                        break;
+                    }
+                }
+            });
+
+            this.@localStreams.splice(i, 1);
+            break;
+        }
+    }
 }
 
 function getLocalStreams()

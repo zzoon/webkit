@@ -71,7 +71,7 @@ public:
     Vector<RefPtr<MediaStream>> privateGetRemoteStreams() const;
 
     RefPtr<RTCRtpSender> privateAddTrack(RefPtr<MediaStreamTrack>&&, Vector<MediaStream*>, ExceptionCode&);
-    void removeTrack(RTCRtpSender*, ExceptionCode&);
+    void privateRemoveTrack(RTCRtpSender*, ExceptionCode&);
 
     RefPtr<RTCRtpTransceiver> addTransceiver(RefPtr<MediaStreamTrack>&&, const Dictionary& init, ExceptionCode&);
     RefPtr<RTCRtpTransceiver> addTransceiver(const String& kind, const Dictionary& init, ExceptionCode&);

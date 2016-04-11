@@ -47,6 +47,7 @@ namespace WebCore {
     macro(privateAddTrack) \
     macro(privateGetRemoteStreams) \
     macro(privateGetStats) \
+    macro(privateRemoveTrack) \
     macro(pulling) \
     macro(pullAgain) \
     macro(queue) \

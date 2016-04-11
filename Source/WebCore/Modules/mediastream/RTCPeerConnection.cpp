@@ -185,7 +185,7 @@ RefPtr<RTCRtpSender> RTCPeerConnection::privateAddTrack(RefPtr<MediaStreamTrack>
     return transceiver->sender();
 }
 
-void RTCPeerConnection::removeTrack(RTCRtpSender* sender, ExceptionCode& ec)
+void RTCPeerConnection::privateRemoveTrack(RTCRtpSender* sender, ExceptionCode& ec)
 {
     if (!sender) {
         ec = TypeError;

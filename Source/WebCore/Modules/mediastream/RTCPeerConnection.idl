@@ -74,7 +74,10 @@
     // addStream is a widely adopted legacy alternative.
     [JSBuiltin] void addStream(MediaStream stream);
 
-    [StrictTypeChecking, RaisesException] void removeTrack(RTCRtpSender sender);
+    [Private, StrictTypeChecking, RaisesException] void privateRemoveTrack(RTCRtpSender sender);
+    [JSBuiltin] void removeTrack(RTCRtpSender sender);
+    // removeStream is a widely adopted legacy alternative.
+    [JSBuiltin] void removeStream(MediaStream stream);
 
     [StrictTypeChecking, RaisesException] RTCRtpTransceiver addTransceiver(MediaStreamTrack track, optional Dictionary init);
     [StrictTypeChecking, RaisesException] RTCRtpTransceiver addTransceiver(DOMString kind, optional Dictionary init);
