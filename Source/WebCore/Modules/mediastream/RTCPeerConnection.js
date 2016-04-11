@@ -62,7 +62,12 @@ function addStream()
     if (!(stream instanceof @MediaStream))
         throw new @TypeError("Argument 1 ('stream') to RTCPeerConnection.addStream must be an instance of MediaStream");
 
-    if (!this.@localStreams)
+    if (this.@localStreams) {
+        for (let i = 0; i < this.@localStreams.length; ++i) {
+            if (this.@localStreams[i].id === stream.id)
+                return
+        }
+    } else
         this.@localStreams = [];
 
     this.@localStreams.push(stream);
