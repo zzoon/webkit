@@ -340,16 +340,6 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
     promise.resolve(description->toRTCSessionDescription(*m_sdpProcessor));
 }
 
-void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& description, VoidPromise&& promise)
-{
-    RefPtr<RTCSessionDescription> protectedDescription = &description;
-    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
-
-    runTask([this, protectedDescription, wrappedPromise]() {
-        setLocalDescriptionTask(*protectedDescription, wrappedPromise->promise());
-    });
-}
-
 static void updateSendSources(const MediaDescriptionVector& remoteMediaDescriptions, unsigned localMediaDescriptionCount, const RtpTransceiverVector& transceivers)
 {
     for (unsigned i = 0; i < remoteMediaDescriptions.size() && i < localMediaDescriptionCount; ++i) {
@@ -366,6 +356,16 @@ static void updateSendSources(const MediaDescriptionVector& remoteMediaDescripti
             return;
         }
     }
+}
+
+void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& description, VoidPromise&& promise)
+{
+    RefPtr<RTCSessionDescription> protectedDescription = &description;
+    RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
+
+    runTask([this, protectedDescription, wrappedPromise]() {
+        setLocalDescriptionTask(*protectedDescription, wrappedPromise->promise());
+    });
 }
 
 void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription& description, VoidPromise& promise)
