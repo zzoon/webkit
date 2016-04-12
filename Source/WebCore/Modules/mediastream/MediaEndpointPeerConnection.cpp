@@ -199,7 +199,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
     RefPtr<MediaEndpointSessionConfiguration> configurationSnapshot = internalLocalDescription() ?
         internalLocalDescription()->configuration()->clone() : MediaEndpointSessionConfiguration::create();
 
-    configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
+    configurationSnapshot->setSessionVersion(m_sdpOfferSessionVersion++);
 
     RtpTransceiverVector transceivers = RtpTransceiverVector(m_client->getTransceivers());
 
@@ -278,7 +278,7 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
     RefPtr<MediaEndpointSessionConfiguration> configurationSnapshot = internalLocalDescription() ?
         internalLocalDescription()->configuration()->clone() : MediaEndpointSessionConfiguration::create();
 
-    configurationSnapshot->setSessionVersion(m_sdpSessionVersion++);
+    configurationSnapshot->setSessionVersion(m_sdpAnswerSessionVersion++);
 
     RtpTransceiverVector transceivers = RtpTransceiverVector(m_client->getTransceivers());
     const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();

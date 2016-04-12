@@ -124,7 +124,8 @@ private:
     String m_icePassword;
     String m_dtlsFingerprint;
     String m_dtlsFingerprintFunction;
-    unsigned m_sdpSessionVersion { 0 };
+    unsigned m_sdpOfferSessionVersion { 0 };
+    unsigned m_sdpAnswerSessionVersion { 0 };
 
     RefPtr<SessionDescription> m_currentLocalDescription;
     RefPtr<SessionDescription> m_pendingLocalDescription;
