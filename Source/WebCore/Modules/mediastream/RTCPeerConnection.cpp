@@ -176,6 +176,11 @@ RefPtr<RTCRtpSender> RTCPeerConnection::privateAddTrack(RefPtr<MediaStreamTrack>
         RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create();
         RefPtr<RTCRtpTransceiver> newTransceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
 
+        // This transceiver is not yet associated with an m-line (null mid), but we need a
+        // provisional mid if the transceiver is used to create an offer.
+        String transceiverMid = RTCRtpTransceiver::getNextMid();
+        newTransceiver->setProvisionalMid(transceiverMid);
+
         transceiver = newTransceiver.get();
         m_transceiverSet.append(WTFMove(newTransceiver));
     }

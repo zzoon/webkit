@@ -66,6 +66,8 @@ public:
     const String& directionalityString() const;
 
     const String& provisionalMid() const { return m_provisionalMid; }
+    void setProvisionalMid(const String& provisionalMid) { m_provisionalMid = provisionalMid; }
+
     const String& mid() const { return m_mid; }
     void setMid(const String& mid) { m_mid = mid; }
 
@@ -75,15 +77,15 @@ public:
     bool stopped() const { return m_stopped; }
     void stop() { m_stopped = true; }
 
+    static String getNextMid();
+
 private:
     RTCRtpTransceiver(RefPtr<RTCRtpSender>&&, RefPtr<RTCRtpReceiver>&&);
-
-    static String getNextMid();
 
     bool m_hasActiveSender { true };
     bool m_hasActiveReceiver { true };
 
-    String m_provisionalMid { getNextMid() };
+    String m_provisionalMid;
     String m_mid;
     RefPtr<RTCRtpSender> m_sender;
     RefPtr<RTCRtpReceiver> m_receiver;
