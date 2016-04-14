@@ -437,11 +437,8 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription&
     // Update state and local descriptions according to setLocal/RemoteDescription processing model
     switch (newDescription->type()) {
     case SessionDescription::Type::Offer:
-        if (newDescription->isLaterThan(m_currentLocalDescription.get())) {
-            m_pendingLocalDescription = newDescription;
-            newSignalingState = SignalingState::HaveLocalOffer;
-        }
-
+        m_pendingLocalDescription = newDescription;
+        newSignalingState = SignalingState::HaveLocalOffer;
         break;
 
     case SessionDescription::Type::Answer:
@@ -653,10 +650,8 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
     // Update state and local descriptions according to setLocal/RemoteDescription processing model
     switch (newDescription->type()) {
     case SessionDescription::Type::Offer:
-        if (newDescription->isLaterThan(m_currentRemoteDescription.get())) {
-            m_pendingRemoteDescription = newDescription;
-            newSignalingState = SignalingState::HaveRemoteOffer;
-        }
+        m_pendingRemoteDescription = newDescription;
+        newSignalingState = SignalingState::HaveRemoteOffer;
         break;
 
     case SessionDescription::Type::Answer:
