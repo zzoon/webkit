@@ -759,10 +759,7 @@ RefPtr<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String&
     RefPtr<MediaStreamTrackPrivate> remoteTrackPrivate = MediaStreamTrackPrivate::create(WTFMove(remoteSource));
     RefPtr<MediaStreamTrack> remoteTrack = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *remoteTrackPrivate);
 
-    RefPtr<RTCRtpReceiver> receiver = RTCRtpReceiver::create();
-    receiver->setTrack(WTFMove(remoteTrack));
-
-    return receiver;
+    return RTCRtpReceiver::create(WTFMove(remoteTrack));
 }
 
 void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise&& promise)
