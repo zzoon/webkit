@@ -269,7 +269,7 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
-    if (!remoteDescription()) {
+    if (!internalRemoteDescription()) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidStateError (no remote description)"));
         return;
@@ -703,7 +703,7 @@ void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate& rtcCandidate,
 
 void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandidate, PeerConnection::VoidPromise& promise)
 {
-    if (!remoteDescription()) {
+    if (!internalRemoteDescription()) {
         // FIXME: Error type?
         promise.reject(DOMError::create("InvalidStateError (no remote description)"));
         return;
