@@ -214,6 +214,18 @@ void RTCPeerConnection::privateRemoveTrack(RTCRtpSender* sender, ExceptionCode& 
 
 RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(RefPtr<MediaStreamTrack>&& track, const Dictionary& init, ExceptionCode& ec)
 {
+    if (!track) {
+        ec = TypeError;
+        return nullptr;
+    }
+
+    if (m_signalingState == SignalingState::Closed) {
+        ec = INVALID_STATE_ERR;
+        return nullptr;
+    }
+
+    // FIXME: Check if there is a sender with track already (has github issue)?
+
     String transceiverMid = RTCRtpTransceiver::getNextMid();
     const String& trackKind = track->kind();
 
@@ -227,6 +239,16 @@ RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(RefPtr<MediaStreamTr
 
 RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(const String& kind, const Dictionary& init, ExceptionCode& ec)
 {
+    if (m_signalingState == SignalingState::Closed) {
+        ec = INVALID_STATE_ERR;
+        return nullptr;
+    }
+
+    if (kind != "audio" && kind != "video") {
+        ec = INVALID_ACCESS_ERR;
+        return nullptr;
+    }
+
     String transceiverMid = RTCRtpTransceiver::getNextMid();
 
     RefPtr<RTCRtpSender> sender = RTCRtpSender::create(kind, Vector<String>(), *this);
