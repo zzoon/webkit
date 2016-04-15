@@ -59,17 +59,18 @@ public:
 
     virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
 
-    RefPtr<RealtimeMediaSource> createMutedRemoteSource(PeerMediaDescription&, unsigned mdescIndex) override;
+    RefPtr<RealtimeMediaSource> createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type) override;
     virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) override;
 
     virtual void stop() override;
 
     unsigned sessionIndex(OwrSession*) const;
+    const String& sessionMid(OwrSession*) const;
 
     void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&);
     void dispatchGatheringDone(unsigned sessionIndex);
     void dispatchDtlsFingerprint(gchar* privateKey, gchar* certificate, const String& fingerprint, const String& fingerprintFunction);
-    void unmuteRemoteSource(unsigned sessionIndex, OwrMediaSource*);
+    void unmuteRemoteSource(const String& mid, OwrMediaSource*);
 
 private:
     enum SessionType { SessionTypeMedia };
@@ -77,6 +78,7 @@ private:
     struct SessionConfig {
         SessionType type;
         bool isDtlsClient;
+        String mid;
     };
 
     void prepareSession(OwrSession*, PeerMediaDescription*);
@@ -88,8 +90,9 @@ private:
     RefPtr<MediaEndpointConfiguration> m_configuration;
 
     OwrTransportAgent* m_transportAgent;
+    Vector<String> m_sessionMids;
     Vector<OwrSession*> m_sessions;
-    HashMap<unsigned, RefPtr<RealtimeMediaSourceOwr>> m_mutedRemoteSources;
+    HashMap<String, RefPtr<RealtimeMediaSourceOwr>> m_mutedRemoteSources;
 
     MediaEndpointClient& m_client;
 

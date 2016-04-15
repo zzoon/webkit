@@ -163,6 +163,7 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateReceiveConfiguration(MediaEn
         SessionConfig config;
         config.type = SessionTypeMedia;
         config.isDtlsClient = configuration->mediaDescriptions()[i]->dtlsSetup() == "active";
+        config.mid = configuration->mediaDescriptions()[i]->mid();
         sessionConfigs.append(WTFMove(config));
     }
 
@@ -196,6 +197,7 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpo
         SessionConfig config;
         config.type = SessionTypeMedia;
         config.isDtlsClient = configuration->mediaDescriptions()[i]->dtlsSetup() != "active";
+        config.mid = configuration->mediaDescriptions()[i]->mid();
         sessionConfigs.append(WTFMove(config));
     }
 
@@ -264,23 +266,20 @@ void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, unsigned mdes
     internalAddRemoteCandidate(m_sessions[mdescIndex], candidate, ufrag, password);
 }
 
-RefPtr<RealtimeMediaSource> MediaEndpointOwr::createMutedRemoteSource(PeerMediaDescription& mediaDescription, unsigned mdescIndex)
+RefPtr<RealtimeMediaSource> MediaEndpointOwr::createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type type)
 {
     String name;
     String id("not used");
-    RealtimeMediaSource::Type sourceType;
 
-    if (mediaDescription.type() == "audio") {
-        name = "remote audio";
-        sourceType = RealtimeMediaSource::Audio;
-    } else if (mediaDescription.type() == "video") {
-        name = "remote video";
-        sourceType = RealtimeMediaSource::Video;
-    } else
+    switch (type) {
+    case RealtimeMediaSource::Audio: name = "remote audio"; break;
+    case RealtimeMediaSource::Video: name = "remote video"; break;
+    case RealtimeMediaSource::None:
         ASSERT_NOT_REACHED();
+    }
 
-    RefPtr<RealtimeMediaSourceOwr> source = adoptRef(new RealtimeMediaSourceOwr(nullptr, id, sourceType, name));
-    m_mutedRemoteSources.set(mdescIndex, source);
+    RefPtr<RealtimeMediaSourceOwr> source = adoptRef(new RealtimeMediaSourceOwr(nullptr, id, type, name));
+    m_mutedRemoteSources.set(mid, source);
 
     return source;
 }
@@ -311,6 +310,12 @@ unsigned MediaEndpointOwr::sessionIndex(OwrSession* session) const
     return index;
 }
 
+const String& MediaEndpointOwr::sessionMid(OwrSession* session) const
+{
+    unsigned index = sessionIndex(session);
+    return m_sessionMids[index];
+}
+
 void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate)
 {
     m_client.gotIceCandidate(sessionIndex, WTFMove(iceCandidate));
@@ -329,9 +334,9 @@ void MediaEndpointOwr::dispatchDtlsFingerprint(gchar* privateKey, gchar* certifi
     m_client.gotDtlsFingerprint(fingerprint, fingerprintFunction);
 }
 
-void MediaEndpointOwr::unmuteRemoteSource(unsigned sessionIndex, OwrMediaSource* realSource)
+void MediaEndpointOwr::unmuteRemoteSource(const String& mid, OwrMediaSource* realSource)
 {
-    RefPtr<RealtimeMediaSourceOwr> remoteSource = m_mutedRemoteSources.get(sessionIndex);
+    RefPtr<RealtimeMediaSourceOwr> remoteSource = m_mutedRemoteSources.take(mid);
     if (!remoteSource) {
         LOG_ERROR("Unable to find muted remote source.");
         return;
@@ -424,6 +429,7 @@ void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const V
             "dtls-key", m_dtlsPrivateKey,
             nullptr);
 
+        m_sessionMids.append(config.mid);
         m_sessions.append(session);
     }
 }
@@ -528,7 +534,7 @@ static void candidateGatheringDone(OwrSession* session, MediaEndpointOwr* mediaE
 
 static void gotIncomingSource(OwrMediaSession* mediaSession, OwrMediaSource* source, MediaEndpointOwr* mediaEndpoint)
 {
-    mediaEndpoint->unmuteRemoteSource(mediaEndpoint->sessionIndex(OWR_SESSION(mediaSession)), source);
+    mediaEndpoint->unmuteRemoteSource(mediaEndpoint->sessionMid(OWR_SESSION(mediaSession)), source);
 }
 
 } // namespace WebCore

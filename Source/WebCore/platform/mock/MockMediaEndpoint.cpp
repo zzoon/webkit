@@ -154,10 +154,10 @@ void MockMediaEndpoint::addRemoteCandidate(IceCandidate& candidate, unsigned mde
     UNUSED_PARAM(password);
 }
 
-RefPtr<RealtimeMediaSource> MockMediaEndpoint::createMutedRemoteSource(PeerMediaDescription& mediaDescription, unsigned mdescIndex)
+RefPtr<RealtimeMediaSource> MockMediaEndpoint::createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type type)
 {
-    UNUSED_PARAM(mediaDescription);
-    UNUSED_PARAM(mdescIndex);
+    UNUSED_PARAM(mid);
+    UNUSED_PARAM(type);
 
     return nullptr;
 }

@@ -37,8 +37,6 @@
 
 namespace WebCore {
 
-class RealtimeMediaSource;
-
 class MockMediaEndpoint : public MediaEndpoint {
 public:
     WEBCORE_EXPORT static std::unique_ptr<MediaEndpoint> create(MediaEndpointClient&);
@@ -57,7 +55,7 @@ public:
 
     void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
 
-    RefPtr<RealtimeMediaSource> createMutedRemoteSource(PeerMediaDescription&, unsigned mdescIndex) override;
+    RefPtr<RealtimeMediaSource> createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type) override;
     void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) override;
 
     void stop() override;
