@@ -38,6 +38,7 @@
 
 namespace WebCore {
 
+class MediaStream;
 class MediaStreamTrack;
 class RTCRtpReceiver;
 class RTCRtpTransceiver;
@@ -50,21 +51,24 @@ struct RTCTrackEventInit : public EventInit {
 
 class RTCTrackEvent : public Event {
 public:
-    static Ref<RTCTrackEvent> create(const AtomicString& type, bool canBubble, bool cancelable, RefPtr<RTCRtpReceiver>&&, RefPtr<MediaStreamTrack>&&, RefPtr<RTCRtpTransceiver>&&);
+    static Ref<RTCTrackEvent> create(const AtomicString& type, bool canBubble, bool cancelable, RefPtr<RTCRtpReceiver>&&, RefPtr<MediaStreamTrack>&&, Vector<RefPtr<MediaStream>>&&, RefPtr<RTCRtpTransceiver>&&);
     static Ref<RTCTrackEvent> createForBindings(const AtomicString& type, const RTCTrackEventInit&);
 
     RTCRtpReceiver* receiver() const { return m_receiver.get(); }
     MediaStreamTrack* track() const  { return m_track.get(); }
+    const Vector<RefPtr<MediaStream>>& streams() const  { return m_streams; }
     RTCRtpTransceiver* transceiver() const  { return m_transceiver.get(); }
 
     virtual EventInterface eventInterface() const { return RTCTrackEventInterfaceType; }
 
 private:
-    RTCTrackEvent(const AtomicString& type, bool canBubble, bool cancelable, RefPtr<RTCRtpReceiver>&&, RefPtr<MediaStreamTrack>&&, RefPtr<RTCRtpTransceiver>&&);
+    RTCTrackEvent(const AtomicString& type, bool canBubble, bool cancelable, RefPtr<RTCRtpReceiver>&&, RefPtr<MediaStreamTrack>&&, Vector<RefPtr<MediaStream>>&&, RefPtr<RTCRtpTransceiver>&&);
     RTCTrackEvent(const AtomicString& type, const RTCTrackEventInit&);
 
     RefPtr<RTCRtpReceiver> m_receiver;
     RefPtr<MediaStreamTrack> m_track;
+    // FIXME: Not part of RTCTrackInit yet.
+    Vector<RefPtr<MediaStream>> m_streams;
     RefPtr<RTCRtpTransceiver> m_transceiver;
 };
 

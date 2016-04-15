@@ -625,8 +625,11 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
                 }
             }
 
+            Vector<RefPtr<MediaStream>> streams;
+            copyValuesToVector(trackEventMediaStreams, streams);
+
             m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false,
-                transceiver->receiver(), &remoteTrack, transceiver));
+                transceiver->receiver(), &remoteTrack, WTFMove(streams), transceiver));
         }
     }
 
