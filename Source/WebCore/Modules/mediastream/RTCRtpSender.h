@@ -57,6 +57,7 @@ public:
     const Vector<String>& mediaStreamIds() const { return m_mediaStreamIds; }
     void setMediaStreamIds(Vector<String>&& mediaStreamIds) { m_mediaStreamIds = WTFMove(mediaStreamIds); }
 
+    bool isStopped() const { return m_client == nullptr; }
     void stop() { m_client = nullptr; }
     void setTrack(RefPtr<MediaStreamTrack>&&);
 
