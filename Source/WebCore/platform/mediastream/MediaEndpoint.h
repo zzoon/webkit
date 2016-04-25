@@ -90,7 +90,7 @@ public:
 class MediaEndpointClient {
 public:
     virtual void gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction) = 0;
-    virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) = 0;
+    virtual void gotIceCandidate(const String& mid, RefPtr<IceCandidate>&&) = 0;
     virtual void doneGatheringCandidates(const String& mid) = 0;
     virtual void iceTransportStateChanged(const String& mid, MediaEndpoint::IceTransportState) = 0;
 

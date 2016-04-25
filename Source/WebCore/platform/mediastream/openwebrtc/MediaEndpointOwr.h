@@ -99,7 +99,7 @@ public:
     unsigned transceiverIndexForSession(OwrSession*) const;
     const String& sessionMid(OwrSession*) const;
 
-    void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&);
+    void dispatchNewIceCandidate(const String& mid, RefPtr<IceCandidate>&&);
     void dispatchGatheringDone(const String& mid);
     void processIceTransportStateChange(OwrSession*);
     void dispatchDtlsFingerprint(gchar* privateKey, gchar* certificate, const String& fingerprint, const String& fingerprintFunction);

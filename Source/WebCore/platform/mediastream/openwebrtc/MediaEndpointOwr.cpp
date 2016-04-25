@@ -327,9 +327,9 @@ const String& MediaEndpointOwr::sessionMid(OwrSession* session) const
     return m_transceivers[index]->mid();
 }
 
-void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate)
+void MediaEndpointOwr::dispatchNewIceCandidate(const String& mid, RefPtr<IceCandidate>&& iceCandidate)
 {
-    m_client.gotIceCandidate(sessionIndex, WTFMove(iceCandidate));
+    m_client.gotIceCandidate(mid, WTFMove(iceCandidate));
 }
 
   void MediaEndpointOwr::dispatchGatheringDone(const String& mid)
@@ -567,7 +567,7 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
         "password", g_object_get_data(G_OBJECT(session), "ice-password"),
         nullptr);
 
-    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->transceiverIndexForSession(session), WTFMove(iceCandidate));
+    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionMid(session), WTFMove(iceCandidate));
 
     g_free(foundation);
     g_free(address);

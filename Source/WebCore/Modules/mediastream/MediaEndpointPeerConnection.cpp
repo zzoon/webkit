@@ -893,27 +893,38 @@ void MediaEndpointPeerConnection::gotDtlsFingerprint(const String& fingerprint, 
     startRunningTasks();
 }
 
-void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&& candidate)
+void MediaEndpointPeerConnection::gotIceCandidate(const String& mid, RefPtr<IceCandidate>&& candidate)
 {
     ASSERT(isMainThread());
 
-    PeerMediaDescription& mdesc = *internalLocalDescription()->configuration()->mediaDescriptions()[mdescIndex];
-    mdesc.addIceCandidate(candidate.copyRef());
+    const MediaDescriptionVector& mediaDescriptions = internalLocalDescription()->configuration()->mediaDescriptions();
+    size_t mediaDescriptionIndex = notFound;
+
+    for (size_t i = 0; i < mediaDescriptions.size(); ++i) {
+        if (mediaDescriptions[i]->mid() == mid) {
+            mediaDescriptionIndex = i;
+            break;
+        }
+    }
+    ASSERT(mediaDescriptionIndex != notFound);
+
+    PeerMediaDescription& mediaDescription = *mediaDescriptions[mediaDescriptionIndex];
+    mediaDescription.addIceCandidate(candidate.copyRef());
 
     // FIXME: should we still do this?
     if (!candidate->address().contains(':')) {
         // Not IPv6
         if (candidate->componentId() == 1) {
             // RTP
-            if (mdesc.address().isEmpty() || mdesc.address() == "0.0.0.0") {
-                mdesc.setAddress(candidate->address());
-                mdesc.setPort(candidate->port());
+            if (mediaDescription.address().isEmpty() || mediaDescription.address() == "0.0.0.0") {
+                mediaDescription.setAddress(candidate->address());
+                mediaDescription.setPort(candidate->port());
             }
         } else {
             // RTCP
-            if (mdesc.rtcpAddress().isEmpty() || !mdesc.rtcpPort()) {
-                mdesc.setRtcpAddress(candidate->address());
-                mdesc.setRtcpPort(candidate->port());
+            if (mediaDescription.rtcpAddress().isEmpty() || !mediaDescription.rtcpPort()) {
+                mediaDescription.setRtcpAddress(candidate->address());
+                mediaDescription.setRtcpPort(candidate->port());
             }
         }
     }
@@ -925,7 +936,7 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
         return;
     }
 
-    RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateLine, String(), mdescIndex);
+    RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateLine, mid, mediaDescriptionIndex);
 
     m_client->fireEvent(RTCIceCandidateEvent::create(false, false, WTFMove(iceCandidate)));
 }
