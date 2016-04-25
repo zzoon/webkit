@@ -47,6 +47,7 @@ namespace WebCore {
 
 static void gotCandidate(OwrSession*, OwrCandidate*, MediaEndpointOwr*);
 static void candidateGatheringDone(OwrSession*, MediaEndpointOwr*);
+static void iceConnectionStateChange(OwrSession*, GParamSpec*, MediaEndpointOwr*);
 static void gotIncomingSource(OwrMediaSession*, OwrMediaSource*, MediaEndpointOwr*);
 
 static const Vector<String> candidateTypes = { "host", "srflx", "prflx", "relay" };
@@ -321,9 +322,45 @@ void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<Ice
     m_client.gotIceCandidate(sessionIndex, WTFMove(iceCandidate));
 }
 
-void MediaEndpointOwr::dispatchGatheringDone(unsigned sessionIndex)
+  void MediaEndpointOwr::dispatchGatheringDone(const String& mid)
 {
-    m_client.doneGatheringCandidates(sessionIndex);
+    m_client.doneGatheringCandidates(mid);
+}
+
+void MediaEndpointOwr::processIceTransportStateChange(OwrSession* session)
+{
+    OwrIceState owrIceState;
+    g_object_get(session, "ice-connection-state", &owrIceState, nullptr);
+
+    SessionBundle& sessionBundle = *m_sessionBundles[sessionIndex(session)];
+    if (owrIceState < sessionBundle.owrIceState())
+        return;
+
+    sessionBundle.setOwrIceState(owrIceState);
+
+    // We cannot go to Completed if there may be more remote candidates.
+    if (owrIceState == OWR_ICE_STATE_READY && !sessionBundle.gotEndOfRemoteCandidates())
+        return;
+
+    MediaEndpoint::IceTransportState transportState;
+    switch (owrIceState) {
+    case OWR_ICE_STATE_CONNECTING:
+        transportState = MediaEndpoint::IceTransportState::Checking;
+        break;
+    case OWR_ICE_STATE_CONNECTED:
+        transportState = MediaEndpoint::IceTransportState::Connected;
+        break;
+    case OWR_ICE_STATE_READY:
+        transportState = MediaEndpoint::IceTransportState::Completed;
+        break;
+    case OWR_ICE_STATE_FAILED:
+        transportState = MediaEndpoint::IceTransportState::Failed;
+        break;
+    default:
+        return;
+    }
+
+    m_client.iceTransportStateChanged(sessionMid(session), transportState);
 }
 
 void MediaEndpointOwr::dispatchDtlsFingerprint(gchar* privateKey, gchar* certificate, const String& fingerprint, const String& fingerprintFunction)
@@ -353,6 +390,7 @@ void MediaEndpointOwr::prepareSession(OwrSession* session, PeerMediaDescription*
 
     g_signal_connect(session, "on-new-candidate", G_CALLBACK(gotCandidate), this);
     g_signal_connect(session, "on-candidate-gathering-done", G_CALLBACK(candidateGatheringDone), this);
+    g_signal_connect(session, "notify::ice-connection-state", G_CALLBACK(iceConnectionStateChange), this);
 }
 
 void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMediaDescription* mediaDescription, bool isInitiator)
@@ -431,6 +469,7 @@ void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const V
 
         m_sessionMids.append(config.mid);
         m_sessions.append(session);
+        m_sessionBundles.append(SessionBundle::create());
     }
 }
 
@@ -529,7 +568,12 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
 
 static void candidateGatheringDone(OwrSession* session, MediaEndpointOwr* mediaEndpoint)
 {
-    mediaEndpoint->dispatchGatheringDone(mediaEndpoint->sessionIndex(session));
+    mediaEndpoint->dispatchGatheringDone(mediaEndpoint->sessionMid(session));
+}
+
+static void iceConnectionStateChange(OwrSession* session, GParamSpec*, MediaEndpointOwr* mediaEndpoint)
+{
+    mediaEndpoint->processIceTransportStateChange(session);
 }
 
 static void gotIncomingSource(OwrMediaSession* mediaSession, OwrMediaSource* source, MediaEndpointOwr* mediaEndpoint)

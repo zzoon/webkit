@@ -36,12 +36,36 @@
 #include "MediaEndpoint.h"
 #include <owr/owr_media_session.h>
 #include <owr/owr_transport_agent.h>
+#include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 
 namespace WebCore {
 
 class PeerMediaDescription;
 class RealtimeMediaSourceOwr;
 class RTCConfigurationPrivate;
+
+class SessionBundle : public RefCounted<SessionBundle> {
+public:
+    static Ref<SessionBundle> create()
+    {
+        return adoptRef(*new SessionBundle());
+    }
+    virtual ~SessionBundle() { }
+
+
+    OwrIceState owrIceState() const { return m_owrIceState; }
+    void setOwrIceState(OwrIceState state) { m_owrIceState = state; }
+
+    bool gotEndOfRemoteCandidates() const { return m_gotEndOfRemoteCandidates; }
+    void markGotEndOfRemoteCandidates() { m_gotEndOfRemoteCandidates = true; }
+
+private:
+    SessionBundle() { }
+
+    OwrIceState m_owrIceState { OWR_ICE_STATE_DISCONNECTED };
+    bool m_gotEndOfRemoteCandidates { false };
+};
 
 class MediaEndpointOwr : public MediaEndpoint {
 public:
@@ -68,7 +92,8 @@ public:
     const String& sessionMid(OwrSession*) const;
 
     void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&);
-    void dispatchGatheringDone(unsigned sessionIndex);
+    void dispatchGatheringDone(const String& mid);
+    void processIceTransportStateChange(OwrSession*);
     void dispatchDtlsFingerprint(gchar* privateKey, gchar* certificate, const String& fingerprint, const String& fingerprintFunction);
     void unmuteRemoteSource(const String& mid, OwrMediaSource*);
 
@@ -92,6 +117,7 @@ private:
     OwrTransportAgent* m_transportAgent;
     Vector<String> m_sessionMids;
     Vector<OwrSession*> m_sessions;
+    Vector<RefPtr<SessionBundle>> m_sessionBundles;
     HashMap<String, RefPtr<RealtimeMediaSourceOwr>> m_mutedRemoteSources;
 
     MediaEndpointClient& m_client;

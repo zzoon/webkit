@@ -67,6 +67,7 @@ String RTCRtpTransceiver::getNextMid()
 RTCRtpTransceiver::RTCRtpTransceiver(RefPtr<RTCRtpSender>&& sender, RefPtr<RTCRtpReceiver>&& receiver)
     : m_sender(sender)
     , m_receiver(receiver)
+    , m_iceTransport(RTCIceTransport::create())
 {
 }
 

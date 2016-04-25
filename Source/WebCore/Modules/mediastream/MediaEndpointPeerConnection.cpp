@@ -912,12 +912,94 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
     m_client->fireEvent(RTCIceCandidateEvent::create(false, false, WTFMove(iceCandidate)));
 }
 
-void MediaEndpointPeerConnection::doneGatheringCandidates(unsigned)
+void MediaEndpointPeerConnection::doneGatheringCandidates(const String& mid)
 {
     ASSERT(isMainThread());
 
-    // FIXME: Fire event when all media descriptions that are currently gathering have recevied
-    // this signal. Old broken implementation was removed.
+    RtpTransceiverVector transceivers = RtpTransceiverVector(m_client->getTransceivers());
+
+    RTCRtpTransceiver* notifyingTransceiver = matchTransceiver(transceivers, [&mid] (RTCRtpTransceiver& current) {
+        return current.mid() == mid;
+    });
+    ASSERT(notifyingTransceiver);
+    notifyingTransceiver->iceTransport().setGatheringState(RTCIceTransport::GatheringState::Complete);
+
+    // Determine if the script needs to be notified.
+    RTCRtpTransceiver* stillGatheringTransceiver = matchTransceiver(transceivers, [] (RTCRtpTransceiver& current) {
+        return !current.stopped() && !current.mid().isNull()
+            && current.iceTransport().gatheringState() != RTCIceTransport::GatheringState::Complete;
+    });
+    if (!stillGatheringTransceiver)
+        m_client->updateIceGatheringState(IceGatheringState::Complete);
+}
+
+static RTCIceTransport::TransportState deriveAggregatedIceConnectionState(Vector<RTCIceTransport::TransportState>& states)
+{
+    unsigned newCount = 0;
+    unsigned checkingCount = 0;
+    unsigned connectedCount = 0;
+    unsigned completedCount = 0;
+    unsigned failedCount = 0;
+    unsigned disconnectedCount = 0;
+    unsigned closedCount = 0;
+
+    for (auto& state : states) {
+        switch (state) {
+        case RTCIceTransport::TransportState::New: ++newCount; break;
+        case RTCIceTransport::TransportState::Checking: ++checkingCount; break;
+        case RTCIceTransport::TransportState::Connected: ++connectedCount; break;
+        case RTCIceTransport::TransportState::Completed: ++completedCount; break;
+        case RTCIceTransport::TransportState::Failed: ++failedCount; break;
+        case RTCIceTransport::TransportState::Disconnected: ++disconnectedCount; break;
+        case RTCIceTransport::TransportState::Closed: ++closedCount; break;
+        }
+    }
+
+    // The aggregated RTCIceConnectionState is derived from the RTCIceTransportState of all RTCIceTransports.
+    if (newCount > 0 && !checkingCount && !failedCount && !disconnectedCount)
+        return RTCIceTransport::TransportState::New;
+
+    if (checkingCount > 0 && !failedCount && !disconnectedCount)
+        return RTCIceTransport::TransportState::Checking;
+
+    if ((connectedCount + completedCount + closedCount) == states.size() && connectedCount > 0)
+        return RTCIceTransport::TransportState::Connected;
+
+    if ((completedCount + closedCount) == states.size() && completedCount > 0)
+        return RTCIceTransport::TransportState::Completed;
+
+    if (failedCount > 0)
+        return RTCIceTransport::TransportState::Failed;
+
+    if (disconnectedCount > 0) // Any failed caught above.
+        return RTCIceTransport::TransportState::Disconnected;
+
+    if (closedCount == states.size())
+        return RTCIceTransport::TransportState::Closed;
+
+    ASSERT_NOT_REACHED();
+    return RTCIceTransport::TransportState::New;
+}
+
+void MediaEndpointPeerConnection::iceTransportStateChanged(const String& mid, MediaEndpoint::IceTransportState mediaEndpointIceTransportState)
+{
+    ASSERT(isMainThread());
+
+    RTCRtpTransceiver* transceiver = matchTransceiver(m_client->getTransceivers(), [&mid] (RTCRtpTransceiver& current) {
+        return current.mid() == mid;
+    });
+    ASSERT(transceiver);
+
+    RTCIceTransport::TransportState transportState = static_cast<RTCIceTransport::TransportState>(mediaEndpointIceTransportState);
+    transceiver->iceTransport().setTransportState(transportState);
+
+    // Determine if the script needs to be notified.
+    Vector<RTCIceTransport::TransportState> transportStates;
+    for (auto& transceiver : m_client->getTransceivers())
+        transportStates.append(transceiver->iceTransport().transportState());
+
+    RTCIceTransport::TransportState derivedState = deriveAggregatedIceConnectionState(transportStates);
+    m_client->updateIceConnectionState(static_cast<IceConnectionState>(derivedState));
 }
 
 } // namespace WebCore

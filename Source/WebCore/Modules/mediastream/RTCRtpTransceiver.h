@@ -33,6 +33,7 @@
 
 #if ENABLE(WEB_RTC)
 
+#include "RTCIceTransport.h"
 #include "RTCRtpReceiver.h"
 #include "RTCRtpSender.h"
 #include "ScriptWrappable.h"
@@ -77,6 +78,11 @@ public:
     bool stopped() const { return m_stopped; }
     void stop() { m_stopped = true; }
 
+    // FIXME: Temporary solution to keep track of ICE states for this transceiver. Later, each
+    // sender and receiver will have up to two DTLS transports, which in turn will have an ICE
+    // transport each.
+    RTCIceTransport& iceTransport() const { return *m_iceTransport; }
+
     static String getNextMid();
 
 private:
@@ -90,6 +96,8 @@ private:
     RefPtr<RTCRtpSender> m_sender;
     RefPtr<RTCRtpReceiver> m_receiver;
     bool m_stopped { false };
+
+    RefPtr<RTCIceTransport> m_iceTransport;
 };
 
 } // namespace WebCore
