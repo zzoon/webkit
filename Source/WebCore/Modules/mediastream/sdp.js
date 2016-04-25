@@ -42,7 +42,7 @@ if (typeof(SDP) == "undefined")
         "mode": "^a=(sendrecv|sendonly|recvonly|inactive).*$",
         "mid": "^a=mid:([!#$%&'*+-.\\w]*).*$",
         "rtpmap": "^a=rtpmap:${type} ([\\w\\-]+)/([\\d]+)/?([\\d]+)?.*$",
-        "fmtp": "^a=fmtp:${type} ([\\w\\-=;]+).*$",
+        "fmtp": "^a=fmtp:${type} ([\\w\\-=; ]+).*$",
         "param": "([\\w\\-]+)=([\\w\\-]+);?",
         "nack": "^a=rtcp-fb:${type} nack$",
         "nackpli": "^a=rtcp-fb:${type} nack pli$",
