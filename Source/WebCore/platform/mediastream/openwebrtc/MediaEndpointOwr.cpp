@@ -159,24 +159,25 @@ Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultVideoPayloads()
 
 MediaEndpoint::UpdateResult MediaEndpointOwr::updateReceiveConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
-    Vector<SessionConfig> sessionConfigs;
-    for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {
-        SessionConfig config;
+    Vector<TransceiverConfig> transceiverConfigs;
+    for (unsigned i = m_transceivers.size(); i < configuration->mediaDescriptions().size(); ++i) {
+        TransceiverConfig config;
         config.type = SessionTypeMedia;
         config.isDtlsClient = configuration->mediaDescriptions()[i]->dtlsSetup() == "active";
         config.mid = configuration->mediaDescriptions()[i]->mid();
-        sessionConfigs.append(WTFMove(config));
+        transceiverConfigs.append(WTFMove(config));
     }
 
-    ensureTransportAgentAndSessions(isInitiator, sessionConfigs);
+    ensureTransportAgentAndTransceivers(isInitiator, transceiverConfigs);
 
     // Prepare the new sessions.
-    for (unsigned i = m_numberOfReceivePreparedSessions; i < m_sessions.size(); ++i) {
-        prepareMediaSession(OWR_MEDIA_SESSION(m_sessions[i]), configuration->mediaDescriptions()[i].get(), isInitiator);
-        owr_transport_agent_add_session(m_transportAgent, m_sessions[i]);
+    for (unsigned i = m_numberOfReceivePreparedSessions; i < m_transceivers.size(); ++i) {
+        OwrSession* session = m_transceivers[i]->session();
+        prepareMediaSession(OWR_MEDIA_SESSION(session), configuration->mediaDescriptions()[i].get(), isInitiator);
+        owr_transport_agent_add_session(m_transportAgent, session);
     }
 
-    m_numberOfReceivePreparedSessions = m_sessions.size();
+    m_numberOfReceivePreparedSessions = m_transceivers.size();
 
     return UpdateResult::Success;
 }
@@ -193,22 +194,22 @@ static RefPtr<MediaPayload> findRtxPayload(Vector<RefPtr<MediaPayload>> payloads
 
 MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
-    Vector<SessionConfig> sessionConfigs;
-    for (unsigned i = m_sessions.size(); i < configuration->mediaDescriptions().size(); ++i) {
-        SessionConfig config;
+    Vector<TransceiverConfig> transceiverConfigs;
+    for (unsigned i = m_transceivers.size(); i < configuration->mediaDescriptions().size(); ++i) {
+        TransceiverConfig config;
         config.type = SessionTypeMedia;
         config.isDtlsClient = configuration->mediaDescriptions()[i]->dtlsSetup() != "active";
         config.mid = configuration->mediaDescriptions()[i]->mid();
-        sessionConfigs.append(WTFMove(config));
+        transceiverConfigs.append(WTFMove(config));
     }
 
-    ensureTransportAgentAndSessions(isInitiator, sessionConfigs);
+    ensureTransportAgentAndTransceivers(isInitiator, transceiverConfigs);
 
-    for (unsigned i = 0; i < m_sessions.size(); ++i) {
+    for (unsigned i = 0; i < m_transceivers.size(); ++i) {
         if (i >= configuration->mediaDescriptions().size())
             printf("updateSendConfiguration: BAD missing configuration element for %d\n", i);
 
-        OwrSession* session = m_sessions[i];
+        OwrSession* session = m_transceivers[i]->session();
         PeerMediaDescription& mdesc = *configuration->mediaDescriptions()[i];
 
         if (mdesc.type() == "audio" || mdesc.type() == "video")
@@ -264,7 +265,7 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpo
 
 void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, unsigned mdescIndex, const String& ufrag, const String& password)
 {
-    internalAddRemoteCandidate(m_sessions[mdescIndex], candidate, ufrag, password);
+    internalAddRemoteCandidate(m_transceivers[mdescIndex]->session(), candidate, ufrag, password);
 }
 
 RefPtr<RealtimeMediaSource> MediaEndpointOwr::createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type type)
@@ -289,7 +290,7 @@ void MediaEndpointOwr::replaceSendSource(RealtimeMediaSource& newSource, unsigne
 {
     RealtimeMediaSourceOwr& owrSource = static_cast<RealtimeMediaSourceOwr&>(newSource);
     // FIXME: An OWR bug prevents this from succeeding
-    owr_media_session_set_send_source(OWR_MEDIA_SESSION(m_sessions[mdescIndex]), owrSource.mediaSource());
+    owr_media_session_set_send_source(OWR_MEDIA_SESSION(m_transceivers[mdescIndex]->session()), owrSource.mediaSource());
 }
 
 void MediaEndpointOwr::stop()
@@ -297,24 +298,28 @@ void MediaEndpointOwr::stop()
     if (!m_transportAgent)
         return;
 
-    for (auto session : m_sessions)
-        owr_media_session_set_send_source(OWR_MEDIA_SESSION(session), nullptr);
+    for (auto& transceiver : m_transceivers)
+        owr_media_session_set_send_source(OWR_MEDIA_SESSION(transceiver->session()), nullptr);
 
     g_object_unref(m_transportAgent);
     m_transportAgent = nullptr;
 }
 
-unsigned MediaEndpointOwr::sessionIndex(OwrSession* session) const
+unsigned MediaEndpointOwr::transceiverIndexForSession(OwrSession* session) const
 {
-    unsigned index = m_sessions.find(session);
-    ASSERT(index != notFound);
-    return index;
+    for (unsigned i = 0; i < m_transceivers.size(); ++i) {
+        if (m_transceivers[i]->session() == session)
+            return i;
+    }
+
+    ASSERT_NOT_REACHED();
+    return notFound;
 }
 
 const String& MediaEndpointOwr::sessionMid(OwrSession* session) const
 {
-    unsigned index = sessionIndex(session);
-    return m_sessionMids[index];
+    unsigned index = transceiverIndexForSession(session);
+    return m_transceivers[index]->mid();
 }
 
 void MediaEndpointOwr::dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&& iceCandidate)
@@ -332,14 +337,14 @@ void MediaEndpointOwr::processIceTransportStateChange(OwrSession* session)
     OwrIceState owrIceState;
     g_object_get(session, "ice-connection-state", &owrIceState, nullptr);
 
-    SessionBundle& sessionBundle = *m_sessionBundles[sessionIndex(session)];
-    if (owrIceState < sessionBundle.owrIceState())
+    OwrTransceiver& transceiver = *m_transceivers[transceiverIndexForSession(session)];
+    if (owrIceState < transceiver.owrIceState())
         return;
 
-    sessionBundle.setOwrIceState(owrIceState);
+    transceiver.setOwrIceState(owrIceState);
 
     // We cannot go to Completed if there may be more remote candidates.
-    if (owrIceState == OWR_ICE_STATE_READY && !sessionBundle.gotEndOfRemoteCandidates())
+    if (owrIceState == OWR_ICE_STATE_READY && !transceiver.gotEndOfRemoteCandidates())
         return;
 
     MediaEndpoint::IceTransportState transportState;
@@ -360,7 +365,7 @@ void MediaEndpointOwr::processIceTransportStateChange(OwrSession* session)
         return;
     }
 
-    m_client.iceTransportStateChanged(sessionMid(session), transportState);
+    m_client.iceTransportStateChanged(transceiver.mid(), transportState);
 }
 
 void MediaEndpointOwr::dispatchDtlsFingerprint(gchar* privateKey, gchar* certificate, const String& fingerprint, const String& fingerprintFunction)
@@ -430,7 +435,7 @@ void MediaEndpointOwr::prepareMediaSession(OwrMediaSession* mediaSession, PeerMe
     }
 }
 
-void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs)
+void MediaEndpointOwr::ensureTransportAgentAndTransceivers(bool isInitiator, const Vector<TransceiverConfig>& transceiverConfigs)
 {
     ASSERT(m_dtlsPrivateKey);
     ASSERT(m_dtlsCertificate);
@@ -461,15 +466,13 @@ void MediaEndpointOwr::ensureTransportAgentAndSessions(bool isInitiator, const V
 
     g_object_set(m_transportAgent, "ice-controlling-mode", isInitiator, nullptr);
 
-    for (auto& config : sessionConfigs) {
+    for (auto& config : transceiverConfigs) {
         OwrSession* session = OWR_SESSION(owr_media_session_new(config.isDtlsClient));
         g_object_set(session, "dtls-certificate", m_dtlsCertificate,
             "dtls-key", m_dtlsPrivateKey,
             nullptr);
 
-        m_sessionMids.append(config.mid);
-        m_sessions.append(session);
-        m_sessionBundles.append(SessionBundle::create());
+        m_transceivers.append(OwrTransceiver::create(config.mid, session));
     }
 }
 
@@ -559,7 +562,7 @@ static void gotCandidate(OwrSession* session, OwrCandidate* candidate, MediaEndp
         "password", g_object_get_data(G_OBJECT(session), "ice-password"),
         nullptr);
 
-    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->sessionIndex(session), WTFMove(iceCandidate));
+    mediaEndpoint->dispatchNewIceCandidate(mediaEndpoint->transceiverIndexForSession(session), WTFMove(iceCandidate));
 
     g_free(foundation);
     g_free(address);

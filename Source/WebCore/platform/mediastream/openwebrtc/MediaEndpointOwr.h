@@ -45,14 +45,16 @@ class PeerMediaDescription;
 class RealtimeMediaSourceOwr;
 class RTCConfigurationPrivate;
 
-class SessionBundle : public RefCounted<SessionBundle> {
+class OwrTransceiver : public RefCounted<OwrTransceiver> {
 public:
-    static Ref<SessionBundle> create()
+    static Ref<OwrTransceiver> create(const String& mid, OwrSession* session)
     {
-        return adoptRef(*new SessionBundle());
+        return adoptRef(*new OwrTransceiver(mid, session));
     }
-    virtual ~SessionBundle() { }
+    virtual ~OwrTransceiver() { }
 
+    const String& mid() const { return m_mid; }
+    OwrSession* session() const { return m_session; }
 
     OwrIceState owrIceState() const { return m_owrIceState; }
     void setOwrIceState(OwrIceState state) { m_owrIceState = state; }
@@ -61,7 +63,13 @@ public:
     void markGotEndOfRemoteCandidates() { m_gotEndOfRemoteCandidates = true; }
 
 private:
-    SessionBundle() { }
+    OwrTransceiver(const String& mid, OwrSession* session)
+        : m_mid(mid)
+        , m_session(session)
+    { }
+
+    String m_mid;
+    OwrSession* m_session;
 
     OwrIceState m_owrIceState { OWR_ICE_STATE_DISCONNECTED };
     bool m_gotEndOfRemoteCandidates { false };
@@ -88,7 +96,7 @@ public:
 
     virtual void stop() override;
 
-    unsigned sessionIndex(OwrSession*) const;
+    unsigned transceiverIndexForSession(OwrSession*) const;
     const String& sessionMid(OwrSession*) const;
 
     void dispatchNewIceCandidate(unsigned sessionIndex, RefPtr<IceCandidate>&&);
@@ -100,7 +108,7 @@ public:
 private:
     enum SessionType { SessionTypeMedia };
 
-    struct SessionConfig {
+    struct TransceiverConfig {
         SessionType type;
         bool isDtlsClient;
         String mid;
@@ -109,15 +117,13 @@ private:
     void prepareSession(OwrSession*, PeerMediaDescription*);
     void prepareMediaSession(OwrMediaSession*, PeerMediaDescription*, bool isInitiator);
 
-    void ensureTransportAgentAndSessions(bool isInitiator, const Vector<SessionConfig>& sessionConfigs);
+    void ensureTransportAgentAndTransceivers(bool isInitiator, const Vector<TransceiverConfig>& transceiverConfigs);
     void internalAddRemoteCandidate(OwrSession*, IceCandidate&, const String& ufrag, const String& password);
 
     RefPtr<MediaEndpointConfiguration> m_configuration;
 
     OwrTransportAgent* m_transportAgent;
-    Vector<String> m_sessionMids;
-    Vector<OwrSession*> m_sessions;
-    Vector<RefPtr<SessionBundle>> m_sessionBundles;
+    Vector<RefPtr<OwrTransceiver>> m_transceivers;
     HashMap<String, RefPtr<RealtimeMediaSourceOwr>> m_mutedRemoteSources;
 
     MediaEndpointClient& m_client;
