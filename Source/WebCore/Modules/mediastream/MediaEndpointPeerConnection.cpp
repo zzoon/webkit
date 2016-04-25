@@ -147,6 +147,13 @@ static RTCRtpTransceiver* matchTransceiver(const RtpTransceiverVector& transceiv
     return nullptr;
 }
 
+static RTCRtpTransceiver* matchTransceiverByMid(const RtpTransceiverVector& transceivers, const String& mid)
+{
+    return matchTransceiver(transceivers, [&mid] (RTCRtpTransceiver& current) {
+        return current.mid() == mid;
+    });
+}
+
 static bool hasUnassociatedTransceivers(const RtpTransceiverVector& transceivers)
 {
     return matchTransceiver(transceivers, [] (RTCRtpTransceiver& current) {
@@ -210,9 +217,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
             continue;
         }
 
-        RTCRtpTransceiver* transceiver = matchTransceiver(transceivers, [&mediaDescription] (RTCRtpTransceiver& current) {
-            return current.mid() == mediaDescription->mid();
-        });
+        RTCRtpTransceiver* transceiver = matchTransceiverByMid(transceivers, mediaDescription->mid());
         if (!transceiver)
             continue;
 
@@ -286,9 +291,7 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
     for (unsigned i = 0; i < remoteMediaDescriptions.size(); ++i) {
         PeerMediaDescription& remoteMediaDescription = *remoteMediaDescriptions[i];
 
-        RTCRtpTransceiver* transceiver = matchTransceiver(transceivers, [&remoteMediaDescription] (RTCRtpTransceiver& current) {
-            return current.mid() == remoteMediaDescription.mid();
-        });
+        RTCRtpTransceiver* transceiver = matchTransceiverByMid(transceivers, remoteMediaDescription.mid());
         if (!transceiver) {
             LOG_ERROR("Could not find a matching transceiver for remote description while creating answer");
             continue;
@@ -347,9 +350,7 @@ static void updateSendSources(const MediaDescriptionVector& remoteMediaDescripti
         if (remoteMediaDescription.type() != "audio" && remoteMediaDescription.type() != "video")
             continue;
 
-        RTCRtpTransceiver* transceiver = matchTransceiver(transceivers, [&remoteMediaDescription] (RTCRtpTransceiver& current) {
-            return current.mid() == remoteMediaDescription.mid();
-        });
+        RTCRtpTransceiver* transceiver = matchTransceiverByMid(transceivers, remoteMediaDescription.mid());
         if (transceiver) {
             if (transceiver->hasActiveSender() && transceiver->sender()->track())
                 remoteMediaDescription.setSource(&transceiver->sender()->track()->source());
@@ -568,10 +569,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription
     for (unsigned i = 0; i < mediaDescriptions.size(); ++i) {
         PeerMediaDescription* mediaDescription = mediaDescriptions[i].get();
 
-        RTCRtpTransceiver* transceiver = matchTransceiver(transceivers, [&mediaDescription] (RTCRtpTransceiver& current) {
-            return current.mid() == mediaDescription->mid();
-        });
-
+        RTCRtpTransceiver* transceiver = matchTransceiverByMid(transceivers, mediaDescription->mid());
         if (!transceiver) {
             bool receiveOnlyFlag = false;
 
@@ -918,9 +916,7 @@ void MediaEndpointPeerConnection::doneGatheringCandidates(const String& mid)
 
     RtpTransceiverVector transceivers = RtpTransceiverVector(m_client->getTransceivers());
 
-    RTCRtpTransceiver* notifyingTransceiver = matchTransceiver(transceivers, [&mid] (RTCRtpTransceiver& current) {
-        return current.mid() == mid;
-    });
+    RTCRtpTransceiver* notifyingTransceiver = matchTransceiverByMid(transceivers, mid);
     ASSERT(notifyingTransceiver);
     notifyingTransceiver->iceTransport().setGatheringState(RTCIceTransport::GatheringState::Complete);
 
@@ -985,9 +981,7 @@ void MediaEndpointPeerConnection::iceTransportStateChanged(const String& mid, Me
 {
     ASSERT(isMainThread());
 
-    RTCRtpTransceiver* transceiver = matchTransceiver(m_client->getTransceivers(), [&mid] (RTCRtpTransceiver& current) {
-        return current.mid() == mid;
-    });
+    RTCRtpTransceiver* transceiver = matchTransceiverByMid(m_client->getTransceivers(), mid);
     ASSERT(transceiver);
 
     RTCIceTransport::TransportState transportState = static_cast<RTCIceTransport::TransportState>(mediaEndpointIceTransportState);
