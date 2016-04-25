@@ -89,7 +89,7 @@ public:
     virtual UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
     virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
 
-    virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
+    virtual void addRemoteCandidate(IceCandidate&, const String& mid, const String& ufrag, const String& password) override;
 
     RefPtr<RealtimeMediaSource> createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type) override;
     virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) override;

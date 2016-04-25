@@ -263,9 +263,14 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpo
     return UpdateResult::Success;
 }
 
-void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, unsigned mdescIndex, const String& ufrag, const String& password)
+void MediaEndpointOwr::addRemoteCandidate(IceCandidate& candidate, const String& mid, const String& ufrag, const String& password)
 {
-    internalAddRemoteCandidate(m_transceivers[mdescIndex]->session(), candidate, ufrag, password);
+    for (auto& transceiver : m_transceivers) {
+        if (transceiver->mid() == mid) {
+            internalAddRemoteCandidate(transceiver->session(), candidate, ufrag, password);
+            break;
+        }
+    }
 }
 
 RefPtr<RealtimeMediaSource> MediaEndpointOwr::createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type type)

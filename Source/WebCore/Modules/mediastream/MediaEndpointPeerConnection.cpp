@@ -710,6 +710,36 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
         return;
     }
 
+    const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
+    PeerMediaDescription* targetMediaDescription = nullptr;
+
+    // When identifying the target media description, sdpMid takes precedence over sdpMLineIndex
+    // if both are present.
+    if (!rtcCandidate.sdpMid().isNull()) {
+        const String& mid = rtcCandidate.sdpMid();
+        for (auto& description : remoteMediaDescriptions) {
+            if (description->mid() == mid) {
+                targetMediaDescription = description.get();
+                break;
+            }
+        }
+
+        if (!targetMediaDescription) {
+            promise.reject(DOMError::create("OperationError (sdpMid did not match any media description)"));
+            return;
+        }
+    } else if (rtcCandidate.sdpMLineIndex()) {
+        unsigned short sdpMLineIndex = rtcCandidate.sdpMLineIndex().value();
+        if (sdpMLineIndex >= remoteMediaDescriptions.size()) {
+            promise.reject(DOMError::create("OperationError (sdpMLineIndex is out of range)"));
+            return;
+        }
+        targetMediaDescription = remoteMediaDescriptions[sdpMLineIndex].get();
+    } else {
+        ASSERT_NOT_REACHED();
+        return;
+    }
+
     RefPtr<IceCandidate> candidate;
     SDPProcessor::Result result = m_sdpProcessor->parseCandidateLine(rtcCandidate.candidate(), candidate);
     if (result != SDPProcessor::Result::Success) {
@@ -720,20 +750,10 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
         return;
     }
 
-    const MediaDescriptionVector& remoteMediaDescriptions = internalRemoteDescription()->configuration()->mediaDescriptions();
-    // Optional<unsigned short> sdpMLineIndex = ;
-    unsigned mdescIndex = rtcCandidate.sdpMLineIndex().valueOr(0);
+    targetMediaDescription->addIceCandidate(candidate.copyRef());
 
-    if (mdescIndex >= remoteMediaDescriptions.size()) {
-        // FIXME: Error type?
-        promise.reject(DOMError::create("InvalidSdpMlineIndex (sdpMLineIndex out of range"));
-        return;
-    }
-
-    PeerMediaDescription& mdesc = *remoteMediaDescriptions[mdescIndex];
-    mdesc.addIceCandidate(candidate.copyRef());
-
-    m_mediaEndpoint->addRemoteCandidate(*candidate, mdescIndex, mdesc.iceUfrag(), mdesc.icePassword());
+    m_mediaEndpoint->addRemoteCandidate(*candidate, targetMediaDescription->mid(), targetMediaDescription->iceUfrag(),
+        targetMediaDescription->icePassword());
 
     promise.resolve(nullptr);
 }
@@ -905,7 +925,7 @@ void MediaEndpointPeerConnection::gotIceCandidate(unsigned mdescIndex, RefPtr<Ic
         return;
     }
 
-    RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateLine, "", mdescIndex);
+    RefPtr<RTCIceCandidate> iceCandidate = RTCIceCandidate::create(candidateLine, String(), mdescIndex);
 
     m_client->fireEvent(RTCIceCandidateEvent::create(false, false, WTFMove(iceCandidate)));
 }
