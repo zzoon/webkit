@@ -82,7 +82,7 @@ public:
     virtual void addRemoteCandidate(IceCandidate&, const String& mid, const String& ufrag, const String& password) = 0;
 
     virtual RefPtr<RealtimeMediaSource> createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type) = 0;
-    virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) = 0;
+    virtual void replaceSendSource(RealtimeMediaSource&, const String& mid) = 0;
 
     virtual void stop() = 0;
 };

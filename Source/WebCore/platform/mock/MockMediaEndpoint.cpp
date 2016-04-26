@@ -170,10 +170,10 @@ RefPtr<RealtimeMediaSource> MockMediaEndpoint::createMutedRemoteSource(const Str
     return nullptr;
 }
 
-void MockMediaEndpoint::replaceSendSource(RealtimeMediaSource& newSource, unsigned mdescIndex)
+void MockMediaEndpoint::replaceSendSource(RealtimeMediaSource& newSource, const String& mid)
 {
     UNUSED_PARAM(newSource);
-    UNUSED_PARAM(mdescIndex);
+    UNUSED_PARAM(mid);
 }
 
 void MockMediaEndpoint::stop()

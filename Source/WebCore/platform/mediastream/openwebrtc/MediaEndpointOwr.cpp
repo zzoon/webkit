@@ -291,11 +291,14 @@ RefPtr<RealtimeMediaSource> MediaEndpointOwr::createMutedRemoteSource(const Stri
     return source;
 }
 
-void MediaEndpointOwr::replaceSendSource(RealtimeMediaSource& newSource, unsigned mdescIndex)
+void MediaEndpointOwr::replaceSendSource(RealtimeMediaSource& newSource, const String& mid)
 {
     RealtimeMediaSourceOwr& owrSource = static_cast<RealtimeMediaSourceOwr&>(newSource);
+    OwrTransceiver* transceiver = matchTransceiverByMid(mid);
+    ASSERT(transceiver);
+
     // FIXME: An OWR bug prevents this from succeeding
-    owr_media_session_set_send_source(OWR_MEDIA_SESSION(m_transceivers[mdescIndex]->session()), owrSource.mediaSource());
+    owr_media_session_set_send_source(OWR_MEDIA_SESSION(transceiver->session()), owrSource.mediaSource());
 }
 
 void MediaEndpointOwr::stop()
@@ -325,6 +328,15 @@ const String& MediaEndpointOwr::sessionMid(OwrSession* session) const
 {
     unsigned index = transceiverIndexForSession(session);
     return m_transceivers[index]->mid();
+}
+
+OwrTransceiver* MediaEndpointOwr::matchTransceiverByMid(const String& mid) const
+{
+    for (auto& transceiver : m_transceivers) {
+        if (transceiver->mid() == mid)
+            return transceiver.get();
+    }
+    return nullptr;
 }
 
 void MediaEndpointOwr::dispatchNewIceCandidate(const String& mid, RefPtr<IceCandidate>&& iceCandidate)

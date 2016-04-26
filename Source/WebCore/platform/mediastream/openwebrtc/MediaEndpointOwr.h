@@ -92,12 +92,13 @@ public:
     virtual void addRemoteCandidate(IceCandidate&, const String& mid, const String& ufrag, const String& password) override;
 
     RefPtr<RealtimeMediaSource> createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type) override;
-    virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) override;
+    virtual void replaceSendSource(RealtimeMediaSource&, const String& mid) override;
 
     virtual void stop() override;
 
     unsigned transceiverIndexForSession(OwrSession*) const;
     const String& sessionMid(OwrSession*) const;
+    OwrTransceiver* matchTransceiverByMid(const String& mid) const;
 
     void dispatchNewIceCandidate(const String& mid, RefPtr<IceCandidate>&&);
     void dispatchGatheringDone(const String& mid);

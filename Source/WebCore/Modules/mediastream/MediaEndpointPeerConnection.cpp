@@ -161,15 +161,6 @@ static bool hasUnassociatedTransceivers(const RtpTransceiverVector& transceivers
     });
 }
 
-static size_t indexOfMediaDescriptionWithTrackId(const MediaDescriptionVector& mediaDescriptions, const String& trackId)
-{
-    for (size_t i = 0; i < mediaDescriptions.size(); ++i) {
-        if (mediaDescriptions[i]->mediaStreamTrackId() == trackId)
-            return i;
-    }
-    return notFound;
-}
-
 void MediaEndpointPeerConnection::runTask(std::function<void()> task)
 {
     if (m_dtlsFingerprint.isNull()) {
@@ -785,13 +776,18 @@ RefPtr<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String&
 
 void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise&& promise)
 {
-    size_t mdescIndex = notFound;
-    SessionDescription* localDescription = internalLocalDescription();
+    if (sender.isStopped()) {
+        promise.reject(DOMError::create("InvalidStateError (sender is stopped)"));
+        return;
+    }
 
-    if (localDescription)
-        mdescIndex = indexOfMediaDescriptionWithTrackId(localDescription->configuration()->mediaDescriptions(), sender.trackId());
+    RTCRtpTransceiver* transceiver = matchTransceiver(m_client->getTransceivers(), [&sender] (RTCRtpTransceiver& current) {
+        return current.sender() == &sender;
+    });
 
-    if (mdescIndex == notFound) {
+    const String& mid = transceiver->mid();
+    if (mid.isNull()) {
+        // Transceiver is not associated with a media description yet.
         sender.setTrack(WTFMove(withTrack));
         promise.resolve(nullptr);
         return;
@@ -801,14 +797,14 @@ void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<Medi
     RefPtr<MediaStreamTrack> protectedTrack = withTrack;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
 
-    runTask([this, protectedSender, mdescIndex, protectedTrack, wrappedPromise]() mutable {
-        replaceTrackTask(*protectedSender, mdescIndex, WTFMove(protectedTrack), wrappedPromise->promise());
+    runTask([this, protectedSender, mid, protectedTrack, wrappedPromise]() mutable {
+        replaceTrackTask(*protectedSender, mid, WTFMove(protectedTrack), wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, size_t mdescIndex, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise& promise)
+void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, const String& mid, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise& promise)
 {
-    m_mediaEndpoint->replaceSendSource(withTrack->source(), mdescIndex);
+    m_mediaEndpoint->replaceSendSource(withTrack->source(), mid);
 
     sender.setTrack(WTFMove(withTrack));
     promise.resolve(nullptr);
