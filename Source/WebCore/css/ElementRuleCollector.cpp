@@ -107,9 +107,14 @@ const Vector<RefPtr<StyleRule>>& ElementRuleCollector::matchedRuleList() const
     return m_matchedRuleList;
 }
 
-inline void ElementRuleCollector::addMatchedRule(const MatchedRule& matchedRule)
+inline void ElementRuleCollector::addMatchedRule(const RuleData& ruleData, unsigned specificity, StyleResolver::RuleRange& ruleRange)
 {
-    m_matchedRules.append(matchedRule);
+    // Update our first/last rule indices in the matched rules array.
+    ++ruleRange.lastRuleIndex;
+    if (ruleRange.firstRuleIndex == -1)
+        ruleRange.firstRuleIndex = ruleRange.lastRuleIndex;
+
+    m_matchedRules.append({ &ruleData, specificity });
 }
 
 void ElementRuleCollector::clearMatchedRules()
@@ -148,8 +153,9 @@ void ElementRuleCollector::collectMatchingRules(const MatchRequest& matchRequest
 
     // We need to collect the rules for id, class, tag, and everything else into a buffer and
     // then sort the buffer.
-    if (m_element.hasID())
-        collectMatchingRulesForList(matchRequest.ruleSet->idRules(m_element.idForStyleResolution().impl()), matchRequest, ruleRange);
+    auto& id = m_element.idForStyleResolution();
+    if (!id.isNull())
+        collectMatchingRulesForList(matchRequest.ruleSet->idRules(*id.impl()), matchRequest, ruleRange);
     if (m_element.hasClass()) {
         for (size_t i = 0; i < m_element.classNames().size(); ++i)
             collectMatchingRulesForList(matchRequest.ruleSet->classRules(m_element.classNames()[i].impl()), matchRequest, ruleRange);
@@ -232,9 +238,19 @@ void ElementRuleCollector::matchHostPseudoClassRules(bool includeEmptyRules)
     clearMatchedRules();
     m_result.ranges.lastAuthorRule = m_result.matchedProperties().size() - 1;
 
+    SelectorChecker::CheckingContext context(m_mode);
+    SelectorChecker selectorChecker(m_element.document());
+
     auto ruleRange = m_result.ranges.authorRuleRange();
-    MatchRequest matchRequest(&shadowAuthorStyle, includeEmptyRules);
-    collectMatchingRulesForList(&shadowHostRules, matchRequest, ruleRange);
+    for (auto& ruleData : shadowHostRules) {
+        if (ruleData.rule()->properties().isEmpty() && !includeEmptyRules)
+            continue;
+        auto& selector = *ruleData.selector();
+        unsigned specificity = 0;
+        if (!selectorChecker.matchHostPseudoClass(selector, m_element, context, specificity))
+            continue;
+        addMatchedRule(ruleData, specificity, ruleRange);
+    }
 
     // We just sort the host rules before other author rules. This matches the current vague spec language
     // but is not necessarily exactly what is needed.
@@ -486,15 +502,8 @@ void ElementRuleCollector::collectMatchingRulesForList(const RuleSet::RuleDataVe
             continue;
 
         unsigned specificity;
-        if (ruleMatches(ruleData, specificity)) {
-            // Update our first/last rule indices in the matched rules array.
-            ++ruleRange.lastRuleIndex;
-            if (ruleRange.firstRuleIndex == -1)
-                ruleRange.firstRuleIndex = ruleRange.lastRuleIndex;
-
-            // Add this rule to our list of matched rules.
-            addMatchedRule({&ruleData, specificity});
-        }
+        if (ruleMatches(ruleData, specificity))
+            addMatchedRule(ruleData, specificity, ruleRange);
     }
 }
 

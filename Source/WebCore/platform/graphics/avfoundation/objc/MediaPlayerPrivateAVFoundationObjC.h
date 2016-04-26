@@ -87,6 +87,10 @@ public:
 
     static void registerMediaEngine(MediaEngineRegistrar);
 
+    static HashSet<RefPtr<SecurityOrigin>> originsInMediaCache(const String&);
+    static void clearMediaCache(const String&, std::chrono::system_clock::time_point modifiedSince);
+    static void clearMediaCacheForOrigins(const String&, const HashSet<RefPtr<SecurityOrigin>>&);
+
     void setAsset(RetainPtr<id>);
     void tracksChanged() override;
 
@@ -95,6 +99,7 @@ public:
     void processCue(NSArray *, NSArray *, const MediaTime&);
     void flushCues();
 #endif
+    AVPlayer *avPlayer() const { return m_avPlayer.get(); }
     
 #if HAVE(AVFOUNDATION_LOADER_DELEGATE)
     bool shouldWaitForLoadingOfResource(AVAssetResourceLoadingRequest*);

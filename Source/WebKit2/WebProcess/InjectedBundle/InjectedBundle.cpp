@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -203,6 +203,21 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
         RuntimeEnabledFeatures::sharedFeatures().setCustomElementsEnabled(enabled);
 #endif
 
+#if ENABLE(WEBGL2)
+    if (preference == "WebKitWebGL2Enabled")
+        RuntimeEnabledFeatures::sharedFeatures().setWebGL2Enabled(enabled);
+#endif
+
+#if ENABLE(FETCH_API)
+    if (preference == "WebKitFetchAPIEnabled")
+        RuntimeEnabledFeatures::sharedFeatures().setFetchAPIEnabled(enabled);
+#endif
+
+#if ENABLE(DOWNLOAD_ATTRIBUTE)
+    if (preference == "WebKitDownloadAttributeEnabled")
+        RuntimeEnabledFeatures::sharedFeatures().setDownloadAttributeEnabled(enabled);
+#endif
+    
     // Map the names used in LayoutTests with the names used in WebCore::Settings and WebPreferencesStore.
 #define FOR_EACH_OVERRIDE_BOOL_PREFERENCE(macro) \
     macro(WebKitAcceleratedCompositingEnabled, AcceleratedCompositingEnabled, acceleratedCompositingEnabled) \

@@ -36,6 +36,8 @@ else ()
     )
 endif ()
 
+list(APPEND WebKit_LIBRARIES PRIVATE WTF${DEBUG_SUFFIX})
+
 add_custom_command(
     OUTPUT ${DERIVED_SOURCES_WEBKIT_DIR}/WebKitVersion.h
     MAIN_DEPENDENCY ${WEBKIT_DIR}/scripts/generate-webkitversion.pl
@@ -81,6 +83,7 @@ list(APPEND WebKit_INCLUDES
     win/MemoryStream.h
     win/ProgIDMacros.h
     win/WebActionPropertyBag.h
+    win/WebApplicationCache.h
     win/WebArchive.h
     win/WebBackForwardList.h
     win/WebCache.h
@@ -152,6 +155,7 @@ list(APPEND WebKit_SOURCES_Classes
     win/MarshallingHelpers.cpp
     win/MemoryStream.cpp
     win/WebActionPropertyBag.cpp
+    win/WebApplicationCache.cpp
     win/WebArchive.cpp
     win/WebBackForwardList.cpp
     win/WebCache.cpp
@@ -213,6 +217,8 @@ list(APPEND WebKit_SOURCES_Classes
     win/plugins/PluginView.cpp
     win/plugins/PluginViewWin.cpp
     win/plugins/npapi.cpp
+
+    win/storage/WebDatabaseProvider.cpp
 )
 
 list(APPEND WebKit_SOURCES_WebCoreSupport
@@ -366,11 +372,11 @@ set(WEBKIT_IDL_DEPENDENCIES
     win/Interfaces/Accessible2/AccessibleText.idl
     win/Interfaces/Accessible2/AccessibleText2.idl
     win/Interfaces/Accessible2/IA2CommonTypes.idl
-    "${DERIVED_SOURCES_WEBKIT_DIR}/autoversion.h"
+    "${DERIVED_SOURCES_WEBKIT_DIR}/include/autoversion.h"
 )
 
 add_custom_command(
-    OUTPUT ${DERIVED_SOURCES_WEBKIT_DIR}/autoversion.h
+    OUTPUT ${DERIVED_SOURCES_WEBKIT_DIR}/include/autoversion.h
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMAND ${PERL_EXECUTABLE} ${WEBKIT_LIBRARIES_DIR}/tools/scripts/auto-version.pl ${DERIVED_SOURCES_WEBKIT_DIR}
     VERBATIM)
@@ -407,7 +413,6 @@ add_library(WebKitGUID STATIC
     "${DERIVED_SOURCES_WEBKIT_DIR}/Interfaces/AccessibleText2_i.c"
 )
 set_target_properties(WebKitGUID PROPERTIES OUTPUT_NAME WebKitGUID${DEBUG_SUFFIX})
-set_target_properties(WebKitGUID PROPERTIES FOLDER "WebKit")
 
 list(APPEND WebKit_LIBRARIES
     PRIVATE Comctl32

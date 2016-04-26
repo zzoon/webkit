@@ -84,7 +84,7 @@ void WebInspectorUI::windowObjectCleared()
         m_frontendHost->disconnectClient();
 
     m_frontendHost = InspectorFrontendHost::create(this, m_page.corePage());
-    ScriptGlobalObject::set(execStateFromPage(mainThreadNormalWorld(), m_page.corePage()), ASCIILiteral("InspectorFrontendHost"), m_frontendHost.get());
+    ScriptGlobalObject::set(*execStateFromPage(mainThreadNormalWorld(), m_page.corePage()), ASCIILiteral("InspectorFrontendHost"), *m_frontendHost);
 }
 
 void WebInspectorUI::frontendLoaded()
@@ -231,6 +231,16 @@ void WebInspectorUI::startPageProfiling()
 void WebInspectorUI::stopPageProfiling()
 {
     m_frontendAPIDispatcher.dispatchCommand(ASCIILiteral("setTimelineProfilingEnabled"), false);
+}
+
+void WebInspectorUI::startElementSelection()
+{
+    m_frontendAPIDispatcher.dispatchCommand(ASCIILiteral("setElementSelectionEnabled"), true);
+}
+
+void WebInspectorUI::stopElementSelection()
+{
+    m_frontendAPIDispatcher.dispatchCommand(ASCIILiteral("setElementSelectionEnabled"), false);
 }
 
 void WebInspectorUI::didSave(const String& url)

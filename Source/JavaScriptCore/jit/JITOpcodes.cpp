@@ -1297,7 +1297,7 @@ void JIT::emit_op_profile_type(Instruction* currentInstruction)
         move(regT0, regT1);
         and64(TrustedImm32(~1), regT1);
         jumpToEnd.append(branch64(Equal, regT1, TrustedImm64(ValueFalse)));
-    } else if (cachedTypeLocation->m_lastSeenType == TypeMachineInt)
+    } else if (cachedTypeLocation->m_lastSeenType == TypeAnyInt)
         jumpToEnd.append(emitJumpIfInt(regT0));
     else if (cachedTypeLocation->m_lastSeenType == TypeNumber)
         jumpToEnd.append(emitJumpIfNumber(regT0));
@@ -1448,6 +1448,18 @@ void JIT::emit_op_resume(Instruction* currentInstruction)
 {
     JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_resume);
     slowPathCall.call();
+}
+
+void JIT::emit_op_log_shadow_chicken_prologue(Instruction*)
+{
+    updateTopCallFrame();
+    logShadowChickenProloguePacket();
+}
+
+void JIT::emit_op_log_shadow_chicken_tail(Instruction*)
+{
+    updateTopCallFrame();
+    logShadowChickenTailPacket();
 }
 
 } // namespace JSC

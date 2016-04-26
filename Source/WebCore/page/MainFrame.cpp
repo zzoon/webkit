@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -55,7 +55,6 @@ inline MainFrame::MainFrame(Page& page, PageConfiguration& configuration)
 #endif
     , m_recentWheelEventDeltaFilter(WheelEventDeltaFilter::create())
     , m_pageOverlayController(std::make_unique<PageOverlayController>(*this))
-    , m_diagnosticLoggingClient(configuration.diagnosticLoggingClient)
 {
 #if USE(APPLE_INTERNAL_SDK)
 #include <WebKitAdditions/MainFrameInitialization.cpp>
@@ -64,8 +63,10 @@ inline MainFrame::MainFrame(Page& page, PageConfiguration& configuration)
 
 MainFrame::~MainFrame()
 {
-    if (m_diagnosticLoggingClient)
-        m_diagnosticLoggingClient->mainFrameDestroyed();
+    m_recentWheelEventDeltaFilter = nullptr;
+    m_eventHandler = nullptr;
+
+    setMainFrameWasDestroyed();
 }
 
 Ref<MainFrame> MainFrame::create(Page& page, PageConfiguration& configuration)
@@ -91,15 +92,6 @@ void MainFrame::selfOnlyDeref()
         dropChildren();
 
     deref();
-}
-
-DiagnosticLoggingClient& MainFrame::diagnosticLoggingClient() const
-{
-    static NeverDestroyed<EmptyDiagnosticLoggingClient> dummyClient;
-    if (!settings().diagnosticLoggingEnabled() || !m_diagnosticLoggingClient)
-        return dummyClient;
-
-    return *m_diagnosticLoggingClient;
 }
 
 void MainFrame::dropChildren()

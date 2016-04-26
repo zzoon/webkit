@@ -20,18 +20,17 @@
  * Boston, MA 02110-1301, USA.
  */
 
-// TODO: no css::ViewCSS available!
-// TODO: Fix SVGSVGElement inheritance (css::DocumentCSS)! 
-// TODO: no events::DocumentEvent available!
-[
-    UsePointersEvenForNonNullableObjectArguments,
-] interface SVGSVGElement : SVGGraphicsElement {
+// FIXME: no css::ViewCSS available!
+// FIXME: Fix SVGSVGElement inheritance (css::DocumentCSS)!
+// FIXME: no events::DocumentEvent available!
+
+interface SVGSVGElement : SVGGraphicsElement {
     readonly attribute SVGAnimatedLength x;
     readonly attribute SVGAnimatedLength y;
     readonly attribute SVGAnimatedLength width;
     readonly attribute SVGAnimatedLength height;
-             attribute DOMString contentScriptType;
-             attribute DOMString contentStyleType;
+    attribute DOMString contentScriptType;
+    attribute DOMString contentStyleType;
     readonly attribute SVGRect viewport;
     readonly attribute unrestricted float pixelUnitToMillimeterX;
     readonly attribute unrestricted float pixelUnitToMillimeterY;
@@ -39,26 +38,22 @@
     readonly attribute unrestricted float screenPixelToMillimeterY;
     readonly attribute boolean useCurrentView;
     readonly attribute SVGViewSpec currentView;
-             attribute unrestricted float currentScale;
+    attribute unrestricted float currentScale;
     readonly attribute SVGPoint currentTranslate;
 
-    unsigned long suspendRedraw([Default=Undefined] optional unsigned long maxWaitMilliseconds);
-    void unsuspendRedraw([Default=Undefined] optional unsigned long suspendHandleId);
+    unsigned long suspendRedraw(optional unsigned long maxWaitMilliseconds = 0);
+    void unsuspendRedraw(optional unsigned long suspendHandleId = 0);
     void unsuspendRedrawAll();
     void forceRedraw();
     void pauseAnimations();
     void unpauseAnimations();
     boolean animationsPaused();
     unrestricted float getCurrentTime();
-    void setCurrentTime([Default=Undefined] optional unrestricted float seconds);
-    NodeList getIntersectionList([Default=Undefined] optional SVGRect rect, 
-                                 [Default=Undefined] optional SVGElement referenceElement);
-    NodeList getEnclosureList([Default=Undefined] optional SVGRect rect, 
-                              [Default=Undefined] optional SVGElement referenceElement);
-    boolean checkIntersection([Default=Undefined] optional SVGElement element, 
-                              [Default=Undefined] optional SVGRect rect);
-    boolean checkEnclosure([Default=Undefined] optional SVGElement element, 
-                           [Default=Undefined] optional SVGRect rect);
+    void setCurrentTime(optional unrestricted float seconds = NaN);
+    NodeList getIntersectionList(optional SVGRect rect = null, optional SVGElement? referenceElement = null);
+    NodeList getEnclosureList(optional SVGRect rect = null, optional SVGElement? referenceElement = null);
+    boolean checkIntersection(optional SVGElement? element = null, optional SVGRect rect = null);
+    boolean checkEnclosure(optional SVGElement? element = null, optional SVGRect rect = null);
     void deselectAll();
 
     SVGNumber createSVGNumber();
@@ -68,9 +63,10 @@
     SVGMatrix createSVGMatrix();
     SVGRect createSVGRect();
     SVGTransform createSVGTransform();
-    SVGTransform createSVGTransformFromMatrix([Default=Undefined] optional SVGMatrix matrix);
+    SVGTransform createSVGTransformFromMatrix(optional SVGMatrix matrix = null);
 
-    Element getElementById([Default=Undefined, RequiresExistingAtomicString] optional DOMString elementId);
+    // FIXME: Using "undefined" as default parameter value is wrong.
+    Element getElementById([RequiresExistingAtomicString] optional DOMString elementId = "undefined");
 };
 
 SVGSVGElement implements SVGExternalResourcesRequired;

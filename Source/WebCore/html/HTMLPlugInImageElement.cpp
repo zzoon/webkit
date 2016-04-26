@@ -43,6 +43,7 @@
 #include "RenderEmbeddedObject.h"
 #include "RenderImage.h"
 #include "RenderSnapshottedPlugIn.h"
+#include "RenderTreeUpdater.h"
 #include "SchemeRegistry.h"
 #include "ScriptController.h"
 #include "SecurityOrigin.h"
@@ -193,7 +194,7 @@ bool HTMLPlugInImageElement::wouldLoadAsNetscapePlugin(const String& url, const 
     return false;
 }
 
-RenderPtr<RenderElement> HTMLPlugInImageElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition& insertionPosition)
+RenderPtr<RenderElement> HTMLPlugInImageElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition& insertionPosition)
 {
     ASSERT(!document().inPageCache());
 
@@ -322,7 +323,7 @@ void HTMLPlugInImageElement::didMoveToNewDocument(Document* oldDocument)
 void HTMLPlugInImageElement::prepareForDocumentSuspension()
 {
     if (renderer())
-        Style::detachRenderTree(*this);
+        RenderTreeUpdater::tearDownRenderers(*this);
 
     HTMLPlugInElement::prepareForDocumentSuspension();
 }

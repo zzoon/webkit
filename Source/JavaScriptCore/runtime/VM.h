@@ -29,6 +29,7 @@
 #ifndef VM_h
 #define VM_h
 
+#include "ConcurrentJITLock.h"
 #include "ControlFlowProfiler.h"
 #include "DateInstanceCache.h"
 #include "ExecutableAllocator.h"
@@ -101,6 +102,7 @@ class RegisterAtOffsetList;
 #if ENABLE(SAMPLING_PROFILER)
 class SamplingProfiler;
 #endif
+class ShadowChicken;
 class ScriptExecutable;
 class SourceProvider;
 class SourceProviderCache;
@@ -397,7 +399,6 @@ public:
     {
         return jitStubs->ctiStub(this, generator);
     }
-    NativeExecutable* getHostFunction(NativeFunction, Intrinsic, const String& name);
     
     std::unique_ptr<RegisterAtOffsetList> allCalleeSaveRegisterOffsets;
     
@@ -409,6 +410,7 @@ public:
     std::unique_ptr<FTL::Thunks> ftlThunks;
 #endif
     NativeExecutable* getHostFunction(NativeFunction, NativeFunction constructor, const String& name);
+    NativeExecutable* getHostFunction(NativeFunction, Intrinsic intrinsic, NativeFunction constructor, const String& name);
 
     static ptrdiff_t exceptionOffset()
     {
@@ -541,6 +543,7 @@ public:
     RefPtr<TypedArrayController> m_typedArrayController;
     RegExpCache* m_regExpCache;
     BumpPointerAllocator m_regExpAllocator;
+    ConcurrentJITLock m_regExpAllocatorLock;
 
 #if ENABLE(REGEXP_TRACING)
     typedef ListHashSet<RegExp*> RTTraceList;
@@ -577,6 +580,7 @@ public:
     JS_EXPORT_PRIVATE void deleteAllLinkedCode();
     JS_EXPORT_PRIVATE void deleteAllRegExpCode();
 
+    WatchpointSet* ensureWatchpointSetForImpureProperty(const Identifier&);
     void registerWatchpointForImpureProperty(const Identifier&, Watchpoint*);
     
     // FIXME: Use AtomicString once it got merged with Identifier.
@@ -605,6 +609,8 @@ public:
     bool shouldBuilderPCToCodeOriginMapping() const { return m_shouldBuildPCToCodeOriginMapping; }
 
     BytecodeIntrinsicRegistry& bytecodeIntrinsicRegistry() { return *m_bytecodeIntrinsicRegistry; }
+    
+    ShadowChicken& shadowChicken() { return *m_shadowChicken; }
 
 private:
     friend class LLIntOffsetsExtractor;
@@ -674,6 +680,7 @@ private:
 #if ENABLE(SAMPLING_PROFILER)
     RefPtr<SamplingProfiler> m_samplingProfiler;
 #endif
+    std::unique_ptr<ShadowChicken> m_shadowChicken;
     std::unique_ptr<BytecodeIntrinsicRegistry> m_bytecodeIntrinsicRegistry;
 };
 

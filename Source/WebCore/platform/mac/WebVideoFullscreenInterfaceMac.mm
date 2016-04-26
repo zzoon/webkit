@@ -29,128 +29,29 @@
 #if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
 
 #import "AVKitSPI.h"
-#import "CoreMediaSoftLink.h"
 #import "IntRect.h"
 #import "MediaTimeAVFoundation.h"
 #import "TimeRanges.h"
+#import "WebPlaybackSessionInterfaceMac.h"
 #import "WebVideoFullscreenChangeObserver.h"
 #import "WebVideoFullscreenModel.h"
 #import <AVFoundation/AVTime.h>
 
-#import "SoftLinking.h"
+#import "CoreMediaSoftLink.h"
 
-SOFT_LINK_FRAMEWORK(AVKit)
-SOFT_LINK_CLASS(AVKit, AVValueTiming)
+SOFT_LINK_FRAMEWORK_OPTIONAL(AVKit)
+SOFT_LINK_CLASS_OPTIONAL(AVKit, AVValueTiming)
 
 #if USE(APPLE_INTERNAL_SDK)
 #include <WebKitAdditions/WebVideoFullscreenInterfaceMacAdditions.mm>
 #endif
 
-using namespace WebCore;
-
-@interface WebPlaybackControlsManager : NSObject {
-    NSTimeInterval _contentDuration;
-    AVValueTiming *_timing;
-    NSTimeInterval _seekToTime;
-    NSArray *_seekableTimeRanges;
-    BOOL _hasEnabledAudio;
-    BOOL _hasEnabledVideo;
-    float _rate;
-
-@private
-    WebCore::WebVideoFullscreenInterfaceMac* _webVideoFullscreenInterfaceMac;
-}
-
-@property (readwrite) NSTimeInterval contentDuration;
-@property (nonatomic, retain, readwrite) AVValueTiming *timing;
-@property NSTimeInterval seekToTime;
-@property (nonatomic, retain, readwrite) NSArray *seekableTimeRanges;
-@property (readwrite) BOOL hasEnabledAudio;
-@property (readwrite) BOOL hasEnabledVideo;
-
-@property (nonatomic) float rate;
-
-- (instancetype)initWithWebVideoFullscreenInterfaceMac:(WebCore::WebVideoFullscreenInterfaceMac*)webVideoFullscreenInterfaceMac;
-
-@end
-
-#if USE(APPLE_INTERNAL_SDK)
-#import <WebKitAdditions/WebPlaybackControlsControllerAdditions.mm>
-#endif
-
-@implementation WebPlaybackControlsManager
-
-@synthesize contentDuration=_contentDuration;
-@synthesize timing=_timing;
-@synthesize seekToTime=_seekToTime;
-@synthesize seekableTimeRanges=_seekableTimeRanges;
-@synthesize hasEnabledAudio=_hasEnabledAudio;
-@synthesize hasEnabledVideo=_hasEnabledVideo;
-@synthesize rate=_rate;
-
-- (instancetype)initWithWebVideoFullscreenInterfaceMac:(WebCore::WebVideoFullscreenInterfaceMac*)webVideoFullscreenInterfaceMac
-{
-    if (!(self = [super init]))
-        return nil;
-
-    _webVideoFullscreenInterfaceMac = webVideoFullscreenInterfaceMac;
-
-    return self;
-}
-
-- (BOOL)isSeeking
-{
-    return NO;
-}
-
-- (void)seekToTime:(NSTimeInterval)time toleranceBefore:(NSTimeInterval)toleranceBefore toleranceAfter:(NSTimeInterval)toleranceAfter
-{
-    UNUSED_PARAM(toleranceBefore);
-    UNUSED_PARAM(toleranceAfter);
-    _webVideoFullscreenInterfaceMac->webVideoFullscreenModel()->seekToTime(time);
-}
-
-- (NSArray *)audioMediaSelectionOptions
-{
-    return @[];
-}
-
-- (AVMediaSelectionOption *)currentAudioMediaSelectionOption
-{
-    return nil;
-}
-
-- (void)setCurrentAudioMediaSelectionOption:(AVMediaSelectionOption *)audioMediaSelectionOption
-{
-    UNUSED_PARAM(audioMediaSelectionOption);
-}
-
-- (NSArray *)legibleMediaSelectionOptions
-{
-    return @[];
-}
-
-- (AVMediaSelectionOption *)currentLegibleMediaSelectionOption
-{
-    return nil;
-}
-
-- (void)setCurrentLegibleMediaSelectionOption:(AVMediaSelectionOption *)legibleMediaSelectionOption
-{
-    UNUSED_PARAM(legibleMediaSelectionOption);
-}
-
-- (void)cancelThumbnailAndAudioAmplitudeSampleGeneration
-{
-}
-
-#if USE(APPLE_INTERNAL_SDK)
-#import <WebKitAdditions/WebPlaybackControlsControllerThumbnailAdditions.mm>
-#endif
-
-@end
-
 namespace WebCore {
+
+WebVideoFullscreenInterfaceMac::WebVideoFullscreenInterfaceMac(WebPlaybackSessionInterfaceMac& playbackSessionInterface)
+    : m_playbackSessionInterface(playbackSessionInterface)
+{
+}
 
 WebVideoFullscreenInterfaceMac::~WebVideoFullscreenInterfaceMac()
 {
@@ -159,6 +60,7 @@ WebVideoFullscreenInterfaceMac::~WebVideoFullscreenInterfaceMac()
 void WebVideoFullscreenInterfaceMac::setWebVideoFullscreenModel(WebVideoFullscreenModel* model)
 {
     m_videoFullscreenModel = model;
+    m_playbackSessionInterface->setWebPlaybackSessionModel(model);
 }
 
 void WebVideoFullscreenInterfaceMac::setWebVideoFullscreenChangeObserver(WebVideoFullscreenChangeObserver* observer)
@@ -190,31 +92,17 @@ void WebVideoFullscreenInterfaceMac::clearMode(HTMLMediaElementEnums::VideoFulls
 
 void WebVideoFullscreenInterfaceMac::setDuration(double duration)
 {
-    WebPlaybackControlsManager* controlsManager = playBackControlsManager();
-
-    controlsManager.contentDuration = duration;
-
-    // FIXME: We take this as an indication that playback is ready, but that is not necessarily true.
-    controlsManager.hasEnabledAudio = YES;
-    controlsManager.hasEnabledVideo = YES;
+    m_playbackSessionInterface->setDuration(duration);
 }
 
 void WebVideoFullscreenInterfaceMac::setCurrentTime(double currentTime, double anchorTime)
 {
-    WebPlaybackControlsManager* controlsManager = playBackControlsManager();
-
-    NSTimeInterval anchorTimeStamp = ![controlsManager rate] ? NAN : anchorTime;
-    AVValueTiming *timing = [getAVValueTimingClass() valueTimingWithAnchorValue:currentTime
-        anchorTimeStamp:anchorTimeStamp rate:0];
-    
-    [controlsManager setTiming:timing];
+    m_playbackSessionInterface->setCurrentTime(currentTime, anchorTime);
 }
 
 void WebVideoFullscreenInterfaceMac::setRate(bool isPlaying, float playbackRate)
 {
-    WebPlaybackControlsManager* controlsManager = playBackControlsManager();
-
-    [controlsManager setRate:isPlaying ? playbackRate : 0.];
+    m_playbackSessionInterface->setRate(isPlaying, playbackRate);
 
 #if USE(APPLE_INTERNAL_SDK)
     [videoFullscreenInterfaceObjC() setRate:isPlaying ? playbackRate : 0.];
@@ -223,33 +111,22 @@ void WebVideoFullscreenInterfaceMac::setRate(bool isPlaying, float playbackRate)
 
 void WebVideoFullscreenInterfaceMac::setSeekableRanges(const TimeRanges& timeRanges)
 {
-    WebPlaybackControlsManager* controlsManager = playBackControlsManager();
+    m_playbackSessionInterface->setSeekableRanges(timeRanges);
+}
 
-    RetainPtr<NSMutableArray> seekableRanges = adoptNS([[NSMutableArray alloc] init]);
+void WebVideoFullscreenInterfaceMac::setAudioMediaSelectionOptions(const Vector<WTF::String>& options, uint64_t selectedIndex)
+{
+    m_playbackSessionInterface->setAudioMediaSelectionOptions(options, selectedIndex);
+}
 
-    for (unsigned i = 0; i < timeRanges.length(); i++) {
-        const PlatformTimeRanges& ranges = timeRanges.ranges();
-        CMTimeRange range = CMTimeRangeMake(toCMTime(ranges.start(i)), toCMTime(ranges.end(i)));
-        [seekableRanges addObject:[NSValue valueWithCMTimeRange:range]];
-    }
-    
-    [controlsManager setSeekableTimeRanges:seekableRanges.get()];
+void WebVideoFullscreenInterfaceMac::setLegibleMediaSelectionOptions(const Vector<WTF::String>& options, uint64_t selectedIndex)
+{
+    m_playbackSessionInterface->setLegibleMediaSelectionOptions(options, selectedIndex);
 }
 
 void WebVideoFullscreenInterfaceMac::ensureControlsManager()
 {
-    playBackControlsManager();
-}
-
-WebPlaybackControlsManager *WebVideoFullscreenInterfaceMac::playBackControlsManager()
-{
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-    if (!m_playbackControlsManager)
-        m_playbackControlsManager = adoptNS([[WebPlaybackControlsManager alloc] initWithWebVideoFullscreenInterfaceMac:this]);
-    return m_playbackControlsManager.get();
-#else
-    return nil;
-#endif
+    m_playbackSessionInterface->ensureControlsManager();
 }
 
 #if !USE(APPLE_INTERNAL_SDK)
@@ -278,10 +155,6 @@ void WebVideoFullscreenInterfaceMac::invalidate()
 }
 
 void WebVideoFullscreenInterfaceMac::preparedToReturnToInline(bool, const IntRect&, NSWindow *)
-{
-}
-
-void WebVideoFullscreenInterfaceMac::setExternalPlayback(bool, ExternalPlaybackTargetType, WTF::String)
 {
 }
 

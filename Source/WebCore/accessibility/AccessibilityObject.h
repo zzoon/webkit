@@ -146,7 +146,6 @@ enum AccessibilityRole {
     ImageMapLinkRole,
     IncrementorRole,
     LabelRole,
-    LandmarkApplicationRole,
     LandmarkBannerRole,
     LandmarkComplementaryRole,
     LandmarkContentInfoRole,
@@ -223,6 +222,7 @@ enum AccessibilityRole {
     UserInterfaceTooltipRole,
     ValueIndicatorRole,
     VideoRole,
+    WebApplicationRole,
     WebAreaRole,
     WebCoreLinkRole,
     WindowRole,
@@ -392,6 +392,11 @@ struct VisiblePositionRange {
     VisiblePositionRange(const VisiblePosition& s, const VisiblePosition& e)
         : start(s)
         , end(e)
+    { }
+
+    VisiblePositionRange(const VisibleSelection& selection)
+        : start(selection.start())
+        , end(selection.end())
     { }
 
     bool isNull() const { return start.isNull() || end.isNull(); }
@@ -843,7 +848,7 @@ public:
     
     RefPtr<Range> rangeForPlainTextRange(const PlainTextRange&) const;
 
-    String stringForVisiblePositionRange(const VisiblePositionRange&) const;
+    static String stringForVisiblePositionRange(const VisiblePositionRange&);
     String stringForRange(RefPtr<Range>) const;
     virtual IntRect boundsForVisiblePositionRange(const VisiblePositionRange&) const { return IntRect(); }
     virtual IntRect boundsForRange(const RefPtr<Range>) const { return IntRect(); }
@@ -881,7 +886,7 @@ public:
     virtual String doAXStringForRange(const PlainTextRange&) const { return String(); }
     virtual IntRect doAXBoundsForRange(const PlainTextRange&) const { return IntRect(); }
     virtual IntRect doAXBoundsForRangeUsingCharacterOffset(const PlainTextRange&) const { return IntRect(); }
-    String listMarkerTextForNodeAndPosition(Node*, const VisiblePosition&) const;
+    static String listMarkerTextForNodeAndPosition(Node*, const VisiblePosition&);
 
     unsigned doAXLineForIndex(unsigned);
 

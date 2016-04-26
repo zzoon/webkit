@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2012, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -58,6 +58,7 @@ private:
     String cookieRequestHeaderFieldValue(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&) override;
     bool getRawCookies(const WebCore::NetworkStorageSession&, const WebCore::URL& firstParty, const WebCore::URL&, Vector<WebCore::Cookie>&) override;
     void deleteCookie(const WebCore::NetworkStorageSession&, const WebCore::URL&, const String&) override;
+    void addCookie(const WebCore::NetworkStorageSession&, const WebCore::URL&, const WebCore::Cookie&) override;
 
     // WebCore::PluginStrategy
     void refreshPlugins() override;
@@ -69,6 +70,7 @@ private:
     typedef HashMap<String, PluginLoadClientPoliciesByBundleVersion> PluginPolicyMapsByIdentifier;
 
     void setPluginLoadClientPolicy(WebCore::PluginLoadClientPolicy, const String& host, const String& bundleIdentifier, const String& versionString) override;
+    void setPrivateBrowsingPluginLoadClientPolicy(WebCore::PluginLoadClientPolicy, const String& host, const String& bundleIdentifier, const String& versionString) override;
     void clearPluginClientPolicies() override;
 #endif
 
@@ -111,9 +113,12 @@ private:
 
 #if PLATFORM(MAC)
     HashMap<String, PluginPolicyMapsByIdentifier> m_hostsToPluginIdentifierData;
-    bool pluginLoadClientPolicyForHost(const String&, const WebCore::PluginInfo&, WebCore::PluginLoadClientPolicy&) const;
-    String longestMatchedWildcardHostForHost(const String& host) const;
-    bool replaceHostWithMatchedWildcardHost(String& host, const String& identifier) const;
+    HashMap<String, PluginPolicyMapsByIdentifier> m_hostsToPluginIdentifierDataInPrivateBrowsing;
+    enum class PrivateBrowsing { Yes, No };
+    String longestMatchedWildcardHostForHost(const String& host, PrivateBrowsing) const;
+    bool pluginLoadClientPolicyForHostForPrivateBrowsing(PrivateBrowsing, const String&, const WebCore::PluginInfo&, WebCore::PluginLoadClientPolicy&) const;
+    bool replaceHostWithMatchedWildcardHost(String& host, const String& identifier, PrivateBrowsing) const;
+    void setPluginLoadClientPolicyForPrivateBrowsing(PrivateBrowsing, WebCore::PluginLoadClientPolicy, const String& host, const String& bundleIdentifier, const String& versionString);
 #endif // PLATFORM(MAC)
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 };

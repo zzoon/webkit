@@ -31,8 +31,8 @@
 #include "IDBKey.h"
 #include "IDBKeyData.h"
 #include "IDBKeyPath.h"
+#include "IDBValue.h"
 #include "SharedBuffer.h"
-#include "ThreadSafeDataBuffer.h"
 
 namespace WebCore {
 
@@ -43,14 +43,19 @@ public:
     {
     }
 
-    IDBGetResult(SharedBuffer* buffer)
+    IDBGetResult(const IDBValue& value, const IDBKeyData& currentPrimaryKey)
+        : m_value(value)
+        , m_primaryKeyData(currentPrimaryKey)
     {
-        if (buffer)
-            dataFromBuffer(*buffer);
     }
 
     IDBGetResult(const ThreadSafeDataBuffer& buffer)
-        : m_valueBuffer(buffer)
+        : m_value(buffer)
+    {
+    }
+
+    IDBGetResult(IDBValue&& buffer)
+        : m_value(WTFMove(buffer))
     {
     }
 
@@ -78,8 +83,15 @@ public:
     {
     }
 
-    IDBGetResult(const IDBKeyData& keyData, const IDBKeyData& primaryKeyData, const ThreadSafeDataBuffer& valueBuffer)
-        : m_valueBuffer(valueBuffer)
+    IDBGetResult(const IDBKeyData& keyData, const IDBKeyData& primaryKeyData, IDBValue&& value)
+        : m_value(WTFMove(value))
+        , m_keyData(keyData)
+        , m_primaryKeyData(primaryKeyData)
+    {
+    }
+
+    IDBGetResult(const IDBKeyData& keyData, const IDBKeyData& primaryKeyData, const IDBValue& value)
+        : m_value(value)
         , m_keyData(keyData)
         , m_primaryKeyData(primaryKeyData)
     {
@@ -87,7 +99,7 @@ public:
 
     IDBGetResult isolatedCopy() const;
 
-    const ThreadSafeDataBuffer& valueBuffer() const { return m_valueBuffer; }
+    const IDBValue& value() const { return m_value; }
     const IDBKeyData& keyData() const { return m_keyData; }
     const IDBKeyData& primaryKeyData() const { return m_primaryKeyData; }
     const IDBKeyPath& keyPath() const { return m_keyPath; }
@@ -96,18 +108,10 @@ public:
     template<class Encoder> void encode(Encoder&) const;
     template<class Decoder> static bool decode(Decoder&, IDBGetResult&);
 
-    // FIXME: When removing LegacyIDB, remove these setters.
-    // https://bugs.webkit.org/show_bug.cgi?id=150854
-
-    void setValueBuffer(const ThreadSafeDataBuffer& valueBuffer) { m_valueBuffer = valueBuffer; }
-    void setKeyData(const IDBKeyData& keyData) { m_keyData = keyData; }
-    void setPrimaryKeyData(const IDBKeyData& keyData) { m_primaryKeyData = keyData; }
-    void setKeyPath(const IDBKeyPath& keyPath) { m_keyPath = keyPath; }
-
 private:
-    WEBCORE_EXPORT void dataFromBuffer(SharedBuffer&);
+    void dataFromBuffer(SharedBuffer&);
 
-    ThreadSafeDataBuffer m_valueBuffer;
+    IDBValue m_value;
     IDBKeyData m_keyData;
     IDBKeyData m_primaryKeyData;
     IDBKeyPath m_keyPath;
@@ -117,11 +121,7 @@ private:
 template<class Encoder>
 void IDBGetResult::encode(Encoder& encoder) const
 {
-    encoder << m_keyData << m_primaryKeyData << m_keyPath << m_isDefined;
-
-    encoder << !!m_valueBuffer.data();
-    if (m_valueBuffer.data())
-        encoder << *m_valueBuffer.data();
+    encoder << m_keyData << m_primaryKeyData << m_keyPath << m_isDefined << m_value;
 }
 
 template<class Decoder>
@@ -139,16 +139,8 @@ bool IDBGetResult::decode(Decoder& decoder, IDBGetResult& result)
     if (!decoder.decode(result.m_isDefined))
         return false;
 
-    bool hasObject;
-    if (!decoder.decode(hasObject))
+    if (!decoder.decode(result.m_value))
         return false;
-
-    if (hasObject) {
-        Vector<uint8_t> value;
-        if (!decoder.decode(value))
-            return false;
-        result.m_valueBuffer = ThreadSafeDataBuffer::adoptVector(value);
-    }
 
     return true;
 }

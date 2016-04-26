@@ -109,7 +109,8 @@ void WebSocketChannel::connect(const URL& url, const String& protocol)
     if (Frame* frame = m_document->frame()) {
         if (NetworkingContext* networkingContext = frame->loader().networkingContext()) {
             ref();
-            m_handle = SocketStreamHandle::create(m_handshake->url(), this, *networkingContext);
+            Page* page = frame->page();
+            m_handle = SocketStreamHandle::create(m_handshake->url(), this, *networkingContext, (page ? page->usesEphemeralSession() : false));
         }
     }
 }
@@ -749,9 +750,10 @@ void WebSocketChannel::processOutgoingFrameQueue()
             case BlobLoaderNotStarted:
                 ref(); // Will be derefed after didFinishLoading() or didFail().
                 ASSERT(!m_blobLoader);
+                ASSERT(frame->blobData);
                 m_blobLoader = std::make_unique<FileReaderLoader>(FileReaderLoader::ReadAsArrayBuffer, this);
                 m_blobLoaderStatus = BlobLoaderStarted;
-                m_blobLoader->start(m_document, frame->blobData.get());
+                m_blobLoader->start(m_document, *frame->blobData);
                 m_outgoingFrameQueue.prepend(frame.release());
                 return;
 

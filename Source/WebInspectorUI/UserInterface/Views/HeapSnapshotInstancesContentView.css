@@ -31,6 +31,10 @@
     bottom: 0;
 }
 
+.heap-snapshot > .data-grid td .sub-retained {
+    color: hsl(0, 0%, 60%);
+}
+
 .heap-snapshot > .data-grid td .percentage {
     width: 45px;
     margin-left: 4px;
@@ -65,7 +69,6 @@
     position: relative;
     width: 16px;
     height: 16px;
-    margin-top: 1px;
     margin-left: 2px;
 }
 
@@ -78,7 +81,6 @@
     position: relative;
     width: 16px;
     height: 16px;
-    margin-top: 1px;
     margin-right: 4px;
     content: url(../Images/TypeUndefined.svg);
 }
@@ -122,13 +124,25 @@
 .heap-snapshot > .data-grid td .formatted-node-preview,
 .heap-snapshot > .data-grid td .object-preview {
     text-indent: 0; /* Do not inherit the DataGrid's indent. */
-    display: inline-block;
-    height: 16px;
+    line-height: initial;
+}
+
+.heap-snapshot-instance-popover-content > .title {
+    font-family: -apple-system, sans-serif;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 5px 2px 5px;
+    margin-bottom: 3px;
 }
 
 .heap-snapshot-instance-popover-content {
     white-space: pre;
-    padding: 5px 10px;
+    padding: 5px 0px;
+}
+
+.heap-snapshot-instance-popover-content > .table-container {
+    padding-left: 10px;
+    padding-right: 10px;
 }
 
 .heap-snapshot-instance-popover-content table {

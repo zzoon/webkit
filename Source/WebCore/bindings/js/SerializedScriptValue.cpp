@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2013, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 #include "SerializedScriptValue.h"
 
 #include "Blob.h"
+#include "BlobRegistry.h"
 #include "CryptoKeyAES.h"
 #include "CryptoKeyDataOctetSequence.h"
 #include "CryptoKeyDataRSAComponents.h"
@@ -36,6 +37,7 @@
 #include "ExceptionCode.h"
 #include "File.h"
 #include "FileList.h"
+#include "IDBValue.h"
 #include "ImageData.h"
 #include "JSBlob.h"
 #include "JSCryptoKey.h"
@@ -47,6 +49,7 @@
 #include "JSMessagePort.h"
 #include "JSNavigator.h"
 #include "ScriptExecutionContext.h"
+#include "ScriptState.h"
 #include "SharedBuffer.h"
 #include "WebCoreJSClientData.h"
 #include <limits>
@@ -75,6 +78,7 @@
 #include <runtime/TypedArrayInlines.h>
 #include <runtime/TypedArrays.h>
 #include <wtf/HashTraits.h>
+#include <wtf/MainThread.h>
 #include <wtf/Vector.h>
 
 using namespace JSC;
@@ -1479,13 +1483,11 @@ public:
         return str;
     }
 
-    static DeserializationResult deserialize(ExecState* exec, JSGlobalObject* globalObject,
-                                             MessagePortArray* messagePorts, ArrayBufferContentsArray* arrayBufferContentsArray,
-                                             const Vector<uint8_t>& buffer)
+    static DeserializationResult deserialize(ExecState* exec, JSGlobalObject* globalObject, MessagePortArray* messagePorts, ArrayBufferContentsArray* arrayBufferContentsArray, const Vector<uint8_t>& buffer, const Vector<String>& blobURLs, const Vector<String> blobFilePaths)
     {
         if (!buffer.size())
             return std::make_pair(jsNull(), UnspecifiedError);
-        CloneDeserializer deserializer(exec, globalObject, messagePorts, arrayBufferContentsArray, buffer);
+        CloneDeserializer deserializer(exec, globalObject, messagePorts, arrayBufferContentsArray, buffer, blobURLs, blobFilePaths);
         if (!deserializer.isValid())
             return std::make_pair(JSValue(), ValidationError);
         return deserializer.deserialize();
@@ -1530,9 +1532,7 @@ private:
         size_t m_index;
     };
 
-    CloneDeserializer(ExecState* exec, JSGlobalObject* globalObject, 
-                      MessagePortArray* messagePorts, ArrayBufferContentsArray* arrayBufferContents,
-                      const Vector<uint8_t>& buffer)
+    CloneDeserializer(ExecState* exec, JSGlobalObject* globalObject, MessagePortArray* messagePorts, ArrayBufferContentsArray* arrayBufferContents, const Vector<uint8_t>& buffer)
         : CloneBase(exec)
         , m_globalObject(globalObject)
         , m_isDOMGlobalObject(globalObject->inherits(JSDOMGlobalObject::info()))
@@ -1542,6 +1542,23 @@ private:
         , m_messagePorts(messagePorts)
         , m_arrayBufferContents(arrayBufferContents)
         , m_arrayBuffers(arrayBufferContents ? arrayBufferContents->size() : 0)
+    {
+        if (!read(m_version))
+            m_version = 0xFFFFFFFF;
+    }
+
+    CloneDeserializer(ExecState* exec, JSGlobalObject* globalObject, MessagePortArray* messagePorts, ArrayBufferContentsArray* arrayBufferContents, const Vector<uint8_t>& buffer, const Vector<String>& blobURLs, const Vector<String> blobFilePaths)
+        : CloneBase(exec)
+        , m_globalObject(globalObject)
+        , m_isDOMGlobalObject(globalObject->inherits(JSDOMGlobalObject::info()))
+        , m_ptr(buffer.data())
+        , m_end(buffer.data() + buffer.size())
+        , m_version(0xFFFFFFFF)
+        , m_messagePorts(messagePorts)
+        , m_arrayBufferContents(arrayBufferContents)
+        , m_arrayBuffers(arrayBufferContents ? arrayBufferContents->size() : 0)
+        , m_blobURLs(blobURLs)
+        , m_blobFilePaths(blobFilePaths)
     {
         if (!read(m_version))
             m_version = 0xFFFFFFFF;
@@ -1770,8 +1787,14 @@ private:
         CachedStringRef name;
         if (!readStringData(name))
             return 0;
+
+        // If the blob URL for this file has an associated blob file path, prefer that one over the "built-in" path.
+        String filePath = blobFilePathForBlobURL(url->string());
+        if (filePath.isEmpty())
+            filePath = path->string();
+
         if (m_isDOMGlobalObject)
-            file = File::deserialize(path->string(), URL(URL(), url->string()), type->string(), name->string());
+            file = File::deserialize(filePath, URL(URL(), url->string()), type->string(), name->string());
         return true;
     }
 
@@ -2270,7 +2293,7 @@ private:
                 return JSValue();
             if (!m_isDOMGlobalObject)
                 return jsNull();
-            return getJSValue(Blob::deserialize(URL(URL(), url->string()), type->string(), size).get());
+            return getJSValue(Blob::deserialize(URL(URL(), url->string()), type->string(), size, blobFilePathForBlobURL(url->string())).get());
         }
         case StringTag: {
             CachedStringRef cachedString;
@@ -2402,6 +2425,19 @@ private:
     MessagePortArray* m_messagePorts;
     ArrayBufferContentsArray* m_arrayBufferContents;
     ArrayBufferArray m_arrayBuffers;
+    Vector<String> m_blobURLs;
+    Vector<String> m_blobFilePaths;
+
+    String blobFilePathForBlobURL(const String& blobURL)
+    {
+        size_t i = 0;
+        for (; i < m_blobURLs.size(); ++i) {
+            if (m_blobURLs[i] == blobURL)
+                break;
+        }
+
+        return i < m_blobURLs.size() ? m_blobFilePaths[i] : String();
+    }
 };
 
 DeserializationResult CloneDeserializer::deserialize()
@@ -2582,15 +2618,6 @@ error:
     return std::make_pair(JSValue(), ValidationError);
 }
 
-void SerializedScriptValue::addBlobURL(const String& string)
-{
-    m_blobURLs.append(Vector<uint16_t>());
-    m_blobURLs.last().reserveCapacity(string.length());
-    for (size_t i = 0; i < string.length(); i++)
-        m_blobURLs.last().append(string.characterAt(i));
-    m_blobURLs.last().resize(m_blobURLs.last().size());
-}
-
 SerializedScriptValue::~SerializedScriptValue()
 {
 }
@@ -2600,19 +2627,15 @@ SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>&& buffer)
 {
 }
 
-SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>&& buffer, const Vector<String>& blobURLs)
-    : m_data(WTFMove(buffer))
-{
-    for (auto& string : blobURLs)
-        addBlobURL(string);
-}
-
 SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>&& buffer, const Vector<String>& blobURLs, std::unique_ptr<ArrayBufferContentsArray>&& arrayBufferContentsArray)
     : m_data(WTFMove(buffer))
     , m_arrayBufferContentsArray(WTFMove(arrayBufferContentsArray))
 {
-    for (auto& string : blobURLs)
-        addBlobURL(string);
+    // Since this SerializedScriptValue is meant to be passed between threads, its String data members
+    // need to be isolatedCopies so we don't run into thread safety issues for the StringImpls.
+    m_blobURLs.reserveInitialCapacity(blobURLs.size());
+    for (auto& url : blobURLs)
+        m_blobURLs.append(url.isolatedCopy());
 }
 
 std::unique_ptr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValue::transferArrayBuffers(
@@ -2693,11 +2716,15 @@ String SerializedScriptValue::toString()
     return CloneDeserializer::deserializeString(m_data);
 }
 
-JSValue SerializedScriptValue::deserialize(ExecState* exec, JSGlobalObject* globalObject,
-                                           MessagePortArray* messagePorts, SerializationErrorMode throwExceptions)
+JSValue SerializedScriptValue::deserialize(ExecState* exec, JSGlobalObject* globalObject, MessagePortArray* messagePorts, SerializationErrorMode throwExceptions)
 {
-    DeserializationResult result = CloneDeserializer::deserialize(exec, globalObject, messagePorts,
-                                                                  m_arrayBufferContentsArray.get(), m_data);
+    Vector<String> dummyBlobs, dummyPaths;
+    return deserialize(exec, globalObject, messagePorts, throwExceptions, dummyBlobs, dummyPaths);
+}
+
+JSValue SerializedScriptValue::deserialize(ExecState* exec, JSGlobalObject* globalObject, MessagePortArray* messagePorts, SerializationErrorMode throwExceptions, const Vector<String>& blobURLs, const Vector<String>& blobFilePaths)
+{
+    DeserializationResult result = CloneDeserializer::deserialize(exec, globalObject, messagePorts, m_arrayBufferContentsArray.get(), m_data, blobURLs, blobFilePaths);
     if (throwExceptions == Throwing)
         maybeThrowExceptionIfSerializationFailed(exec, result.second);
     return result.first ? result.first : jsNull();
@@ -2757,4 +2784,38 @@ uint32_t SerializedScriptValue::wireFormatVersion()
     return CurrentVersion;
 }
 
+#if ENABLE(INDEXED_DATABASE)
+Vector<String> SerializedScriptValue::blobURLsIsolatedCopy() const
+{
+    Vector<String> result;
+    result.reserveInitialCapacity(m_blobURLs.size());
+    for (auto& url : m_blobURLs)
+        result.uncheckedAppend(url.isolatedCopy());
+
+    return result;
 }
+
+void SerializedScriptValue::writeBlobsToDiskForIndexedDB(std::function<void (const IDBValue&)> completionHandler)
+{
+    ASSERT(isMainThread());
+    ASSERT(hasBlobURLs());
+
+    RefPtr<SerializedScriptValue> protector(this);
+    blobRegistry().writeBlobsToTemporaryFiles(m_blobURLs, [completionHandler, this, protector](const Vector<String>& blobFilePaths) {
+        ASSERT(isMainThread());
+
+        if (blobFilePaths.isEmpty()) {
+            // We should have successfully written blobs to temporary files.
+            // If we failed, then we can't successfully store this record.
+            completionHandler({ });
+            return;
+        }
+
+        ASSERT(m_blobURLs.size() == blobFilePaths.size());
+        
+        completionHandler({ *this, m_blobURLs, blobFilePaths });
+    });
+}
+#endif // ENABLE(INDEXED_DATABASE)
+
+} // namespace WebCore

@@ -941,7 +941,6 @@ bool Node::containsIncludingShadowDOM(const Node* node) const
 
 bool Node::containsIncludingHostElements(const Node* node) const
 {
-#if ENABLE(TEMPLATE_ELEMENT)
     while (node) {
         if (node == this)
             return true;
@@ -951,9 +950,6 @@ bool Node::containsIncludingHostElements(const Node* node) const
             node = node->parentOrShadowHostNode();
     }
     return false;
-#else
-    return containsIncludingShadowDOM(node);
-#endif
 }
 
 Node* Node::pseudoAwarePreviousSibling() const
@@ -2314,7 +2310,7 @@ void Node::removedLastRef()
 void Node::textRects(Vector<IntRect>& rects) const
 {
     RefPtr<Range> range = Range::create(document());
-    range->selectNodeContents(const_cast<Node*>(this), IGNORE_EXCEPTION);
+    range->selectNodeContents(const_cast<Node&>(*this), IGNORE_EXCEPTION);
     range->absoluteTextRects(rects);
 }
 

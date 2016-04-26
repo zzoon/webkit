@@ -29,6 +29,7 @@
 #if ENABLE(INDEXED_DATABASE)
 
 #include "MessageSender.h"
+#include "SandboxExtension.h"
 #include <WebCore/IDBConnectionToServer.h>
 
 namespace WebKit {
@@ -54,7 +55,7 @@ public:
     void clearObjectStore(const WebCore::IDBRequestData&, uint64_t objectStoreIdentifier) final;
     void createIndex(const WebCore::IDBRequestData&, const WebCore::IDBIndexInfo&) final;
     void deleteIndex(const WebCore::IDBRequestData&, uint64_t objectStoreIdentifier, const String& indexName) final;
-    void putOrAdd(const WebCore::IDBRequestData&, WebCore::IDBKey*, WebCore::SerializedScriptValue&, const WebCore::IndexedDB::ObjectStoreOverwriteMode) final;
+    void putOrAdd(const WebCore::IDBRequestData&, WebCore::IDBKey*, const WebCore::IDBValue&, const WebCore::IndexedDB::ObjectStoreOverwriteMode) final;
     void getRecord(const WebCore::IDBRequestData&, const WebCore::IDBKeyRangeData&) final;
     void getCount(const WebCore::IDBRequestData&, const WebCore::IDBKeyRangeData&) final;
     void deleteRecord(const WebCore::IDBRequestData&, const WebCore::IDBKeyRangeData&) final;
@@ -80,6 +81,7 @@ public:
     void didDeleteIndex(const WebCore::IDBResultData&);
     void didPutOrAdd(const WebCore::IDBResultData&);
     void didGetRecord(const WebCore::IDBResultData&);
+    void didGetRecordWithSandboxExtensions(const WebCore::IDBResultData&, const SandboxExtension::HandleArray&);
     void didGetCount(const WebCore::IDBResultData&);
     void didDeleteRecord(const WebCore::IDBResultData&);
     void didOpenCursor(const WebCore::IDBResultData&);

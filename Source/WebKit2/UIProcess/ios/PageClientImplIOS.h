@@ -119,7 +119,7 @@ private:
 
     void dynamicViewportUpdateChangedTarget(double newScale, const WebCore::FloatPoint& newScrollPosition, uint64_t transactionID) override;
     void couldNotRestorePageState() override;
-    void restorePageState(const WebCore::FloatRect&, const WebCore::IntPoint&, double) override;
+    void restorePageState(const WebCore::FloatPoint&, const WebCore::FloatPoint&, const WebCore::FloatSize&, double) override;
     void restorePageCenterAndScale(const WebCore::FloatPoint&, double) override;
 
     void startAssistingNode(const AssistedNodeInformation&, bool userIsInteracting, bool blurPreviousNode, API::Object* userData) override;
@@ -132,7 +132,7 @@ private:
     void didUpdateBlockSelectionWithTouch(uint32_t touch, uint32_t flags, float growThreshold, float shrinkThreshold) override;
     void showPlaybackTargetPicker(bool hasVideo, const WebCore::IntRect& elementRect) override;
 
-    bool handleRunOpenPanel(WebPageProxy*, WebFrameProxy*, WebOpenPanelParameters*, WebOpenPanelResultListenerProxy*) override;
+    bool handleRunOpenPanel(WebPageProxy*, WebFrameProxy*, API::OpenPanelParameters*, WebOpenPanelResultListenerProxy*) override;
     void disableDoubleTapGesturesDuringTapIfNecessary(uint64_t requestID) override;
     double minimumZoomScale() const override;
     WebCore::FloatRect documentRect() const override;
@@ -192,6 +192,8 @@ private:
     void derefView() override;
 
     void didRestoreScrollPosition() override;
+
+    UserInterfaceLayoutDirection userInterfaceLayoutDirection() override;
 
     WKContentView *m_contentView;
     WKWebView *m_webView;

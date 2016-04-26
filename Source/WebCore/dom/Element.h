@@ -170,9 +170,9 @@ public:
 
     RefPtr<Attr> getAttributeNode(const AtomicString& name);
     RefPtr<Attr> getAttributeNodeNS(const AtomicString& namespaceURI, const AtomicString& localName);
-    RefPtr<Attr> setAttributeNode(Attr*, ExceptionCode&);
-    RefPtr<Attr> setAttributeNodeNS(Attr*, ExceptionCode&);
-    RefPtr<Attr> removeAttributeNode(Attr*, ExceptionCode&);
+    RefPtr<Attr> setAttributeNode(Attr&, ExceptionCode&);
+    RefPtr<Attr> setAttributeNodeNS(Attr&, ExceptionCode&);
+    RefPtr<Attr> removeAttributeNode(Attr&, ExceptionCode&);
 
     RefPtr<Attr> attrIfExists(const QualifiedName&);
     RefPtr<Attr> attrIfExists(const AtomicString& localName, bool shouldIgnoreAttributeCase);
@@ -243,7 +243,7 @@ public:
 
     virtual void copyNonAttributePropertiesFromElement(const Element&) { }
 
-    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&);
+    virtual RenderPtr<RenderElement> createElementRenderer(RenderStyle&&, const RenderTreePosition&);
     virtual bool rendererIsNeeded(const RenderStyle&);
 
     WEBCORE_EXPORT ShadowRoot* shadowRoot() const;
@@ -501,6 +501,9 @@ public:
     StyleResolver& styleResolver();
     ElementStyle resolveStyle(RenderStyle* parentStyle);
 
+    bool hasDisplayContents() const;
+    void setHasDisplayContents(bool);
+
     virtual void isVisibleInViewportChanged() { }
 
     using ContainerNode::setAttributeEventListener;
@@ -661,8 +664,7 @@ inline bool Element::hasAttributesWithoutUpdate() const
 
 inline const AtomicString& Element::idForStyleResolution() const
 {
-    ASSERT(hasID());
-    return elementData()->idForStyleResolution();
+    return hasID() ? elementData()->idForStyleResolution() : nullAtom;
 }
 
 inline const AtomicString& Element::getIdAttribute() const

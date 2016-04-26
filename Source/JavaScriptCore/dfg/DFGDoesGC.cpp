@@ -96,6 +96,7 @@ bool doesGC(Graph& graph, Node* node)
     case ArithCos:
     case ArithLog:
     case ValueAdd:
+    case TryGetById:
     case GetById:
     case GetByIdFlush:
     case PutById:
@@ -106,6 +107,7 @@ bool doesGC(Graph& graph, Node* node)
     case PutGetterSetterById:
     case PutGetterByVal:
     case PutSetterByVal:
+    case DeleteById:
     case CheckStructure:
     case GetExecutable:
     case GetButterfly:
@@ -117,6 +119,7 @@ bool doesGC(Graph& graph, Node* node)
     case PutClosureVar:
     case GetRegExpObjectLastIndex:
     case SetRegExpObjectLastIndex:
+    case RecordRegExpCachedResult:
     case GetGlobalVar:
     case GetGlobalLexicalVariable:
     case PutGlobalVariable:
@@ -150,6 +153,9 @@ bool doesGC(Graph& graph, Node* node)
     case OverridesHasInstance:
     case InstanceOf:
     case InstanceOfCustom:
+    case IsArrayObject:
+    case IsJSArray:
+    case IsArrayConstructor:
     case IsUndefined:
     case IsBoolean:
     case IsNumber:
@@ -157,6 +163,7 @@ bool doesGC(Graph& graph, Node* node)
     case IsObject:
     case IsObjectOrNull:
     case IsFunction:
+    case IsRegExpObject:
     case TypeOf:
     case LogicalNot:
     case ToPrimitive:
@@ -224,6 +231,7 @@ bool doesGC(Graph& graph, Node* node)
     case PhantomDirectArguments:
     case PhantomClonedArguments:
     case GetMyArgumentByVal:
+    case GetMyArgumentByValOutOfBounds:
     case ForwardVarargs:
     case PutHint:
     case CheckStructureImmediate:
@@ -233,12 +241,18 @@ bool doesGC(Graph& graph, Node* node)
     case GetFromArguments:
     case PutToArguments:
     case CopyRest:
+    case LogShadowChickenPrologue:
+    case LogShadowChickenTail:
+    case GetDynamicVar:
+    case PutDynamicVar:
+    case ResolveScope:
         return false;
 
     case CreateActivation:
     case CreateDirectArguments:
     case CreateScopedArguments:
     case CreateClonedArguments:
+    case CallObjectConstructor:
     case ToThis:
     case CreateThis:
     case AllocatePropertyStorage:
@@ -252,7 +266,6 @@ bool doesGC(Graph& graph, Node* node)
     case NewRegexp:
     case NewStringObject:
     case MakeRope:
-    case NewArrowFunction:
     case NewFunction:
     case NewGeneratorFunction:
     case NewTypedArray:

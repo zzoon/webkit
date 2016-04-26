@@ -53,7 +53,7 @@ Controller = Utilities.createClass(
         // Length of subsequent intervals; a value of 0 means use no intervals
         this.intervalSamplingLength = 100;
 
-        this.initialComplexity = 0;
+        this.initialComplexity = 1;
     }, {
 
     set isFrameLengthEstimatorEnabled(enabled) {
@@ -327,8 +327,8 @@ RampController = Utilities.createSubclass(Controller,
         this._tier = -.5;
         // The timestamp is first set after the first interval completes
         this._tierStartTimestamp = 0;
-        this._minimumComplexity = 0;
-        this._maximumComplexity = 0;
+        this._minimumComplexity = 1;
+        this._maximumComplexity = 1;
 
         // After the tier range is determined, figure out the number of ramp iterations
         var minimumRampLength = 2500;
@@ -409,14 +409,15 @@ RampController = Utilities.createSubclass(Controller,
             this._endTimestamp += timestamp;
             this.mark(Strings.json.samplingStartTimeOffset, timestamp);
 
-            this._minimumComplexity = 0;
+            this._minimumComplexity = 1;
             this._possibleMinimumComplexity = this._minimumComplexity;
             this._minimumComplexityEstimator.sample(this._minimumComplexity);
 
-            // Sometimes this last tier will drop the frame length well below the threshold
-            // Avoid going down that far since it means fewer measurements are taken in the 60 fps area
-            // Interpolate a maximum complexity that gets us around the lowest threshold
-            if (this._lastTierComplexity != currentComplexity)
+            // Sometimes this last tier will drop the frame length well below the threshold.
+            // Avoid going down that far since it means fewer measurements are taken in the 60 fps area.
+            // Interpolate a maximum complexity that gets us around the lowest threshold.
+            // Avoid doing this calculation if we never get out of the first tier (where this._lastTierComplexity is undefined).
+            if (this._lastTierComplexity && this._lastTierComplexity != currentComplexity)
                 this._maximumComplexity = Math.floor(Utilities.lerp(Utilities.progressValue(this.frameLengthSlowestThreshold, this._lastTierFrameLength, currentFrameLength), this._lastTierComplexity, currentComplexity));
             else {
                 // If the browser is capable of handling the most complex version of the test, use that
@@ -468,7 +469,7 @@ RampController = Utilities.createSubclass(Controller,
         } else if (intervalFrameLengthStandardDeviation > 2) {
             // In the case where we might have found a previous interval where 60fps was reached. We hit a significant blip,
             // so we should resample this area in the next ramp.
-            this._possibleMinimumComplexity = 0;
+            this._possibleMinimumComplexity = 1;
         }
         if (intervalFrameLengthMean - intervalFrameLengthStandardDeviation > this.frameLengthRampLowerThreshold)
             this._possibleMaximumComplexity = Math.min(this._possibleMaximumComplexity, currentComplexity);
@@ -505,7 +506,7 @@ RampController = Utilities.createSubclass(Controller,
         this._rampDidWarmup = false;
         // Start timestamp represents start of ramp iteration and warm up
         this._rampStartTimestamp = timestamp;
-        this._possibleMinimumComplexity = 0;
+        this._possibleMinimumComplexity = 1;
         this._possibleMaximumComplexity = this._maximumComplexity;
     },
 

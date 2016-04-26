@@ -62,9 +62,14 @@ public:
     const WTF::String& applicationCacheDirectory() const { return m_applicationCacheDirectory; }
     void setApplicationCacheDirectory(const WTF::String& applicationCacheDirectory) { m_applicationCacheDirectory = applicationCacheDirectory; }
 
+    const WTF::String& applicationCacheFlatFileSubdirectoryName() const { return m_applicationCacheFlatFileSubdirectoryName; }
+
     const WTF::String& diskCacheDirectory() const { return m_diskCacheDirectory; }
     void setDiskCacheDirectory(const WTF::String& diskCacheDirectory) { m_diskCacheDirectory = diskCacheDirectory; }
 
+    const WTF::String& mediaCacheDirectory() const { return m_mediaCacheDirectory; }
+    void setMediaCacheDirectory(const WTF::String& mediaCacheDirectory) { m_mediaCacheDirectory = mediaCacheDirectory; }
+    
     const WTF::String& indexedDBDatabaseDirectory() const { return m_indexedDBDatabaseDirectory; }
     void setIndexedDBDatabaseDirectory(const WTF::String& indexedDBDatabaseDirectory) { m_indexedDBDatabaseDirectory = indexedDBDatabaseDirectory; }
 
@@ -101,7 +106,9 @@ private:
     int64_t m_diskCacheSizeOverride { -1 };
 
     WTF::String m_applicationCacheDirectory;
+    WTF::String m_applicationCacheFlatFileSubdirectoryName;
     WTF::String m_diskCacheDirectory;
+    WTF::String m_mediaCacheDirectory;
     WTF::String m_indexedDBDatabaseDirectory;
     WTF::String m_injectedBundlePath;
     WTF::String m_localStorageDirectory;

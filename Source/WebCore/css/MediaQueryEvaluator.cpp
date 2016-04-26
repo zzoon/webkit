@@ -75,16 +75,12 @@ static FunctionMap* gFunctionMap;
  */
 
 MediaQueryEvaluator::MediaQueryEvaluator(bool mediaFeatureResult)
-    : m_frame(0)
-    , m_style(0)
-    , m_expResult(mediaFeatureResult)
+    : m_expResult(mediaFeatureResult)
 {
 }
 
 MediaQueryEvaluator::MediaQueryEvaluator(const String& acceptedMediaType, bool mediaFeatureResult)
     : m_mediaType(acceptedMediaType)
-    , m_frame(0)
-    , m_style(0)
     , m_expResult(mediaFeatureResult)
 {
 }
@@ -92,7 +88,7 @@ MediaQueryEvaluator::MediaQueryEvaluator(const String& acceptedMediaType, bool m
 MediaQueryEvaluator::MediaQueryEvaluator(const String& acceptedMediaType, Frame* frame, RenderStyle* style)
     : m_mediaType(acceptedMediaType)
     , m_frame(frame)
-    , m_style(style)
+    , m_style(WTFMove(style))
     , m_expResult(false) // doesn't matter when we have m_frame and m_style
 {
 }
@@ -248,6 +244,28 @@ static bool color_indexMediaFeatureEval(CSSValue* value, const CSSToLengthConver
 
     float number;
     return numberValue(value, number) && compareValue(0, static_cast<int>(number), op);
+}
+
+static bool color_gamutMediaFeatureEval(CSSValue* value, const CSSToLengthConversionData&, Frame*, MediaFeaturePrefix)
+{
+    if (!value)
+        return true;
+
+    switch (downcast<CSSPrimitiveValue>(*value).getValueID()) {
+    case CSSValueSrgb:
+        return true;
+    case CSSValueP3:
+        // FIXME: For the moment we'll just assume an "extended
+        // color" display is at least as good as P3.
+        return screenSupportsExtendedColor();
+    case CSSValueRec2020:
+        // FIXME: At some point we should start detecting displays that
+        // support more colors.
+        return false;
+    default:
+        ASSERT_NOT_REACHED();
+        return true;
+    }
 }
 
 static bool monochromeMediaFeatureEval(CSSValue* value, const CSSToLengthConversionData& conversionData, Frame* frame, MediaFeaturePrefix op)
@@ -731,7 +749,7 @@ bool MediaQueryEvaluator::eval(const MediaQueryExp* expr) const
     // used
     EvalFunc func = gFunctionMap->get(expr->mediaFeature().impl());
     if (func) {
-        CSSToLengthConversionData conversionData(m_style.get(),
+        CSSToLengthConversionData conversionData(m_style,
             m_frame->document()->documentElement()->renderStyle(),
             m_frame->document()->renderView(), 1, false);
         return func(expr->value(), conversionData, m_frame, NoPrefix);

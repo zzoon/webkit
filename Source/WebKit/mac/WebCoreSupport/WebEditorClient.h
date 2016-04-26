@@ -170,7 +170,7 @@ private:
     void requestCheckingOfString(PassRefPtr<WebCore::TextCheckingRequest>, const WebCore::VisibleSelection& currentSelection) override;
 
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-    void requestCandidatesForSelection(const WebCore::VisibleSelection&);
+    void requestCandidatesForSelection(const WebCore::VisibleSelection&) override;
     void handleRequestedCandidates(NSInteger, NSArray<NSTextCheckingResult *> *);
     void handleAcceptedCandidate(NSTextCheckingResult *);
 #endif
@@ -187,6 +187,10 @@ private:
 #endif
 
     WebCore::VisibleSelection m_lastSelectionForRequestedCandidates;
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
+    RetainPtr<NSString> m_paragraphContextForCandidateRequest;
+    NSRange m_rangeForCandidates;
+#endif
 
     WeakPtrFactory<WebEditorClient> m_weakPtrFactory;
 };

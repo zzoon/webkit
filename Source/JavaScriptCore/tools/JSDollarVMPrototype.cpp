@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,7 @@
 #include "JSFunction.h"
 #include "StackVisitor.h"
 #include <wtf/DataLog.h>
+#include <wtf/StringPrintStream.h>
 
 namespace JSC {
 
@@ -77,7 +78,7 @@ public:
     {
     }
 
-    StackVisitor::Status operator()(StackVisitor& visitor)
+    StackVisitor::Status operator()(StackVisitor& visitor) const
     {
         if (m_currentFrame++ > 1) {
             m_jitType = visitor->codeBlock()->jitType();
@@ -89,8 +90,8 @@ public:
     JITCode::JITType jitType() { return m_jitType; }
 
 private:
-    unsigned m_currentFrame;
-    JITCode::JITType m_jitType;
+    mutable unsigned m_currentFrame;
+    mutable JITCode::JITType m_jitType;
 };
 
 static EncodedJSValue JSC_HOST_CALL functionLLintTrue(ExecState* exec)
@@ -160,7 +161,7 @@ struct CellAddressCheckFunctor : MarkedBlock::CountFunctor {
     {
     }
 
-    IterationStatus operator()(JSCell* cell)
+    IterationStatus operator()(JSCell* cell) const
     {
         if (cell == candidate) {
             found = true;
@@ -170,7 +171,7 @@ struct CellAddressCheckFunctor : MarkedBlock::CountFunctor {
     }
 
     JSCell* candidate;
-    bool found { false };
+    mutable bool found { false };
 };
 
 bool JSDollarVMPrototype::isValidCell(Heap* heap, JSCell* candidate)
@@ -192,7 +193,7 @@ bool JSDollarVMPrototype::isValidCodeBlock(ExecState* exec, CodeBlock* candidate
         {
         }
         
-        bool operator()(CodeBlock* codeBlock)
+        bool operator()(CodeBlock* codeBlock) const
         {
             if (codeBlock == candidate)
                 found = true;
@@ -200,7 +201,7 @@ bool JSDollarVMPrototype::isValidCodeBlock(ExecState* exec, CodeBlock* candidate
         }
         
         CodeBlock* candidate;
-        bool found { false };
+        mutable bool found { false };
     };
     
     VM& vm = exec->vm();
@@ -224,7 +225,7 @@ CodeBlock* JSDollarVMPrototype::codeBlockForFrame(CallFrame* topCallFrame, unsig
         {
         }
         
-        StackVisitor::Status operator()(StackVisitor& visitor)
+        StackVisitor::Status operator()(StackVisitor& visitor) const
         {
             currentFrame++;
             if (currentFrame == targetFrame) {
@@ -235,8 +236,8 @@ CodeBlock* JSDollarVMPrototype::codeBlockForFrame(CallFrame* topCallFrame, unsig
         }
         
         unsigned targetFrame;
-        unsigned currentFrame { 0 };
-        CodeBlock* codeBlock { nullptr };
+        mutable unsigned currentFrame { 0 };
+        mutable CodeBlock* codeBlock { nullptr };
     };
     
     FetchCodeBlockFunctor functor(frameNumber);
@@ -322,7 +323,7 @@ public:
     {
     }
     
-    StackVisitor::Status operator()(StackVisitor& visitor)
+    StackVisitor::Status operator()(StackVisitor& visitor) const
     {
         m_currentFrame++;
         if (m_currentFrame > m_framesToSkip)
@@ -336,7 +337,7 @@ public:
 private:
     Action m_action;
     unsigned m_framesToSkip;
-    unsigned m_currentFrame { 0 };
+    mutable unsigned m_currentFrame { 0 };
 };
 
 static void printCallFrame(CallFrame* callFrame, unsigned framesToSkip)
@@ -388,14 +389,16 @@ void JSDollarVMPrototype::printValue(JSValue value)
     dataLog(value);
 }
 
-static EncodedJSValue JSC_HOST_CALL functionPrintValue(ExecState* exec)
+static EncodedJSValue JSC_HOST_CALL functionValue(ExecState* exec)
 {
+    WTF::StringPrintStream stream;
     for (unsigned i = 0; i < exec->argumentCount(); ++i) {
         if (i)
-            dataLog(" ");
-        dataLog(exec->uncheckedArgument(i));
+            stream.print(", ");
+        stream.print(exec->uncheckedArgument(i));
     }
-    return JSValue::encode(jsUndefined());
+    
+    return JSValue::encode(jsString(exec, stream.toString()));
 }
 
 void JSDollarVMPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
@@ -420,7 +423,7 @@ void JSDollarVMPrototype::finishCreation(VM& vm, JSGlobalObject* globalObject)
     addFunction(vm, globalObject, "printCallFrame", functionPrintCallFrame, 0);
     addFunction(vm, globalObject, "printStack", functionPrintStack, 0);
 
-    addFunction(vm, globalObject, "printValue", functionPrintValue, 1);
+    addFunction(vm, globalObject, "value", functionValue, 1);
 }
 
 } // namespace JSC

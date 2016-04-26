@@ -1,3 +1,71 @@
+2016-04-26  Per Arne Vollan  <peavo@outlook.com>
+
+        [WinCairo][WebGL] Enable ESSL and GLSL translators.
+        https://bugs.webkit.org/show_bug.cgi?id=157002
+
+        Reviewed by Darin Adler.
+
+        Enable support for ESSL and GLSL translators, and add missing files.
+
+        * CMakeLists.txt:
+
+2016-04-22  Joonghun Park  <jh718.park@samsung.com>
+
+        [ANGLE] Remove deprecated auto_ptr warning. Unreviewed.
+        https://bugs.webkit.org/show_bug.cgi?id=156894
+
+        * src/compiler/preprocessor/MacroExpander.h: Use std::unique_ptr instead of std::auto_ptr.
+
+2016-04-19  Alex Christensen  <achristensen@webkit.org>
+
+        Build fix after r199738
+
+        * CMakeLists.txt:
+
+2016-04-19  Alex Christensen  <achristensen@webkit.org>
+
+        Build fix after r199738
+
+        * CMakeLists.txt:
+
+2016-04-19  Alex Christensen  <achristensen@webkit.org>
+
+        Build fix.
+
+        * src/compiler/translator/Intermediate.h: Added.
+        (TIntermediate::TIntermediate):
+        * src/compiler/translator/intermediate.h: Removed.
+        Changed case of Intermediate.h file name for case sensitive file systems.
+
+2016-04-19  Alex Christensen  <achristensen@webkit.org>
+
+        Update ANGLE
+        https://bugs.webkit.org/show_bug.cgi?id=156755
+
+        Reviewed by Dean Jackson.
+
+        Huge list of changed files omitted.
+
+2016-04-12  Alex Christensen  <achristensen@webkit.org>
+
+        Remove failing assertion in ANGLE
+        https://bugs.webkit.org/show_bug.cgi?id=156485
+
+        Reviewed by Dean Jackson.
+
+        * src/compiler/translator/glslang.l:
+        * src/compiler/translator/glslang_lex.cpp:
+
+2016-04-11  Fujii Hironori  <Hironori.Fujii@jp.sony.com>
+
+        [CMake] Make FOLDER property INHERITED
+        https://bugs.webkit.org/show_bug.cgi?id=156460
+
+        Reviewed by Brent Fulgham.
+
+        * CMakeLists.txt:
+        Set FOLDER property as a directory property not a target property
+
 2016-03-22  Alberto Garcia  <berto@igalia.com>
 
         Unreviewed typo fix.

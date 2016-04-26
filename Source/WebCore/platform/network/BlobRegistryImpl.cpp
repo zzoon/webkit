@@ -41,8 +41,11 @@
 #include "ResourceHandle.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
+#include "ScopeGuard.h"
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
+#include <wtf/WorkQueue.h>
 
 namespace WebCore {
 
@@ -157,13 +160,27 @@ void BlobRegistryImpl::registerBlobURL(const URL& url, Vector<BlobPart> blobPart
 
 void BlobRegistryImpl::registerBlobURL(const URL& url, const URL& srcURL)
 {
+    registerBlobURLOptionallyFileBacked(url, srcURL, nullptr);
+}
+
+void BlobRegistryImpl::registerBlobURLOptionallyFileBacked(const URL& url, const URL& srcURL, RefPtr<BlobDataFileReference>&& file)
+{
     ASSERT(isMainThread());
+    registerBlobResourceHandleConstructor();
 
     BlobData* src = getBlobDataFromURL(srcURL);
-    if (!src)
+    if (src) {
+        m_blobs.set(url.string(), src);
+        return;
+    }
+
+    if (file == nullptr || file->path().isEmpty())
         return;
 
-    m_blobs.set(url.string(), src);
+    RefPtr<BlobData> backingFile = BlobData::create({ });
+    backingFile->appendFile(WTFMove(file));
+
+    m_blobs.set(url.string(), backingFile.release());
 }
 
 void BlobRegistryImpl::registerBlobURLForSlice(const URL& url, const URL& srcURL, long long start, long long end)
@@ -226,6 +243,95 @@ unsigned long long BlobRegistryImpl::blobSize(const URL& url)
         result += item.length();
 
     return result;
+}
+
+static WorkQueue& blobUtilityQueue()
+{
+    static NeverDestroyed<Ref<WorkQueue>> queue(WorkQueue::create("org.webkit.BlobUtility", WorkQueue::Type::Serial, WorkQueue::QOS::Background));
+    return queue.get();
+}
+
+struct BlobForFileWriting {
+    String blobURL;
+    Vector<std::pair<String, ThreadSafeDataBuffer>> filePathsOrDataBuffers;
+};
+
+void BlobRegistryImpl::writeBlobsToTemporaryFiles(const Vector<String>& blobURLs, std::function<void (const Vector<String>& filePaths)> completionHandler)
+{
+    Vector<BlobForFileWriting> blobsForWriting;
+    for (auto& url : blobURLs) {
+        blobsForWriting.append({ });
+        blobsForWriting.last().blobURL = url.isolatedCopy();
+
+        auto* blobData = getBlobDataFromURL({ ParsedURLString, url });
+        if (!blobData) {
+            Vector<String> filePaths;
+            completionHandler(filePaths);
+            return;
+        }
+
+        for (auto& item : blobData->items()) {
+            switch (item.type()) {
+            case BlobDataItem::Type::Data:
+                blobsForWriting.last().filePathsOrDataBuffers.append({ { }, item.data() });
+                break;
+            case BlobDataItem::Type::File:
+                blobsForWriting.last().filePathsOrDataBuffers.append({ item.file()->path().isolatedCopy(), { } });
+                break;
+            default:
+                ASSERT_NOT_REACHED();
+            }
+        }
+    }
+
+    blobUtilityQueue().dispatch([blobsForWriting, completionHandler]() {
+        Vector<String> filePaths;
+
+        ScopeGuard completionCaller([completionHandler]() {
+            callOnMainThread([completionHandler]() {
+                Vector<String> filePaths;
+                completionHandler(filePaths);
+            });
+        });
+
+        for (auto& blob : blobsForWriting) {
+            PlatformFileHandle file;
+            String tempFilePath = openTemporaryFile(ASCIILiteral("Blob"), file);
+
+            ScopeGuard fileCloser([file]() {
+                PlatformFileHandle handle = file;
+                closeFile(handle);
+            });
+            
+            if (tempFilePath.isEmpty() || !isHandleValid(file)) {
+                LOG_ERROR("Failed to open temporary file for writing a Blob to IndexedDB");
+                return;
+            }
+
+            for (auto& part : blob.filePathsOrDataBuffers) {
+                if (part.second.data()) {
+                    int length = part.second.data()->size();
+                    if (writeToFile(file, reinterpret_cast<const char*>(part.second.data()->data()), length) != length) {
+                        LOG_ERROR("Failed writing a Blob to temporary file for storage in IndexedDB");
+                        return;
+                    }
+                } else {
+                    ASSERT(!part.first.isEmpty());
+                    if (!appendFileContentsToFileHandle(part.first, file)) {
+                        LOG_ERROR("Failed copying File contents to a Blob temporary file for storage in IndexedDB (%s to %s)", part.first.utf8().data(), tempFilePath.utf8().data());
+                        return;
+                    }
+                }
+            }
+
+            filePaths.append(tempFilePath.isolatedCopy());
+        }
+
+        completionCaller.disable();
+        callOnMainThread([completionHandler, filePaths]() {
+            completionHandler(filePaths);
+        });
+    });
 }
 
 } // namespace WebCore

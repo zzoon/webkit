@@ -43,12 +43,12 @@ namespace WebCore {
     
 using namespace MathMLNames;
     
-RenderMathMLBlock::RenderMathMLBlock(Element& container, Ref<RenderStyle>&& style)
+RenderMathMLBlock::RenderMathMLBlock(Element& container, RenderStyle&& style)
     : RenderFlexibleBox(container, WTFMove(style))
 {
 }
 
-RenderMathMLBlock::RenderMathMLBlock(Document& document, Ref<RenderStyle>&& style)
+RenderMathMLBlock::RenderMathMLBlock(Document& document, RenderStyle&& style)
     : RenderFlexibleBox(document, WTFMove(style))
 {
 }
@@ -60,9 +60,18 @@ bool RenderMathMLBlock::isChildAllowed(const RenderObject& child, const RenderSt
 
 RenderPtr<RenderMathMLBlock> RenderMathMLBlock::createAnonymousMathMLBlock()
 {
-    RenderPtr<RenderMathMLBlock> newBlock = createRenderer<RenderMathMLBlock>(document(), RenderStyle::createAnonymousStyleWithDisplay(&style(), FLEX));
+    RenderPtr<RenderMathMLBlock> newBlock = createRenderer<RenderMathMLBlock>(document(), RenderStyle::createAnonymousStyleWithDisplay(style(), FLEX));
     newBlock->initializeStyle();
     return newBlock;
+}
+
+LayoutUnit RenderMathMLBlock::mathAxisHeight() const
+{
+    const auto& primaryFont = style().fontCascade().primaryFont();
+    if (auto* mathData = primaryFont.mathData())
+        return mathData->getMathConstant(primaryFont, OpenTypeMathData::AxisHeight);
+
+    return style().fontMetrics().xHeight() / 2;
 }
 
 int RenderMathMLBlock::baselinePosition(FontBaseline baselineType, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const

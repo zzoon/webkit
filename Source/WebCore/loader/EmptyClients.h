@@ -294,7 +294,6 @@ public:
     void dispatchDidReceiveIcon() override { }
     void dispatchDidStartProvisionalLoad() override { }
     void dispatchDidReceiveTitle(const StringWithDirection&) override { }
-    void dispatchDidChangeIcons(IconType) override { }
     void dispatchDidCommitLoad() override { }
     void dispatchDidFailProvisionalLoad(const ResourceError&) override { }
     void dispatchDidFailLoad(const ResourceError&) override { }
@@ -468,6 +467,7 @@ public:
     void willWriteSelectionToPasteboard(Range*) override { }
     void didWriteSelectionToPasteboard() override { }
     void getClientPasteboardDataForRange(Range*, Vector<String>&, Vector<RefPtr<SharedBuffer>>&) override { }
+    void requestCandidatesForSelection(const VisibleSelection&) override { }
 
     void registerUndoStep(PassRefPtr<UndoStep>) override;
     void registerRedoStep(PassRefPtr<UndoStep>) override;
@@ -640,8 +640,6 @@ class EmptyDiagnosticLoggingClient final : public DiagnosticLoggingClient {
     void logDiagnosticMessage(const String&, const String&, ShouldSample) override { }
     void logDiagnosticMessageWithResult(const String&, const String&, DiagnosticLoggingResultType, ShouldSample) override { }
     void logDiagnosticMessageWithValue(const String&, const String&, const String&, ShouldSample) override { }
-
-    void mainFrameDestroyed() override { }
 };
 
 void fillWithEmptyClients(PageConfiguration&);

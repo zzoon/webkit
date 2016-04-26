@@ -103,20 +103,6 @@
 #define USE_ARENA_ALLOC_ALIGNMENT_INTEGER 1
 #endif /* MIPS */
 
-/* CPU(PPC) - PowerPC 32-bit */
-#if (  defined(__ppc__)        \
-    || defined(__PPC__)        \
-    || defined(__powerpc__)    \
-    || defined(__powerpc)      \
-    || defined(__POWERPC__)    \
-    || defined(_M_PPC)         \
-    || defined(__PPC))         \
-    && defined(__BYTE_ORDER__) \
-    && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
-#define WTF_CPU_PPC 1
-#define WTF_CPU_BIG_ENDIAN 1
-#endif
-
 /* CPU(PPC64) - PowerPC 64-bit Big Endian */
 #if (  defined(__ppc64__)      \
     || defined(__PPC64__))     \
@@ -136,6 +122,21 @@
 #define WTF_CPU_PPC64LE 1
 #endif
 
+/* CPU(PPC) - PowerPC 32-bit */
+#if (  defined(__ppc__)        \
+    || defined(__PPC__)        \
+    || defined(__powerpc__)    \
+    || defined(__powerpc)      \
+    || defined(__POWERPC__)    \
+    || defined(_M_PPC)         \
+    || defined(__PPC))         \
+    && !CPU(PPC64)             \
+    && defined(__BYTE_ORDER__) \
+    && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+#define WTF_CPU_PPC 1
+#define WTF_CPU_BIG_ENDIAN 1
+#endif
+
 /* CPU(SH4) - SuperH SH-4 */
 #if defined(__SH4__)
 #define WTF_CPU_SH4 1
@@ -148,7 +149,8 @@
 #endif
 
 /* CPU(S390) - S390 32-bit */
-#if defined(__s390__)
+#if (  defined(__s390__)        \
+    && !CPU(S390X))
 #define WTF_CPU_S390 1
 #define WTF_CPU_BIG_ENDIAN 1
 #endif
@@ -764,7 +766,7 @@
    values get stored to atomically. This is trivially true on 64-bit platforms,
    but not true at all on 32-bit platforms where values are composed of two
    separate sub-values. */
-#if (OS(DARWIN) || PLATFORM(EFL) || PLATFORM(GTK) || PLATFORM(WIN)) && ENABLE(DFG_JIT) && USE(JSVALUE64)
+#if ENABLE(DFG_JIT) && USE(JSVALUE64)
 #define ENABLE_CONCURRENT_JIT 1
 #endif
 
@@ -1142,9 +1144,33 @@
 #endif
 #endif
 
-#if defined(ENABLE_SEPARATED_WX_HEAP)
-#if !(CPU(ARM64) && ((PLATFORM(IOS) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000)))
-#undef ENABLE_SEPARATED_WX_HEAP
+
+#if !defined(WTF_DEFAULT_EVENT_LOOP)
+#define WTF_DEFAULT_EVENT_LOOP 1
+#endif
+
+#if WTF_DEFAULT_EVENT_LOOP
+#if PLATFORM(WIN)
+/* Use Windows message pump abstraction.
+ * Even if the port is AppleWin, we use the Windows message pump system for the event loop,
+ * so that USE(WINDOWS_EVENT_LOOP) && USE(CF) can be true.
+ * And PLATFORM(WIN), PLATFORM(EFL) and PLATFORM(GTK) are exclusive. If the port is GTK,
+ * PLATFORM(WIN) should be false. And in that case, GLib's event loop is used.
+ */
+#define USE_WINDOWS_EVENT_LOOP 1
+#elif PLATFORM(COCOA)
+/* OS X and IOS. Use CoreFoundation & GCD abstraction. */
+#define USE_COCOA_EVENT_LOOP 1
+#elif PLATFORM(EFL)
+/* EFL port uses GLib. But it uses its own event loop abstraction.
+ * Thus, USE(EFL_EVENT_LOOP) && USE(GLIB) can be true.
+ */
+#define USE_EFL_EVENT_LOOP 1
+#elif USE(GLIB)
+/* Use GLib's event loop abstraction. Primarily GTK port uses it. */
+#define USE_GLIB_EVENT_LOOP 1
+#else
+#define USE_GENERIC_EVENT_LOOP 1
 #endif
 #endif
 

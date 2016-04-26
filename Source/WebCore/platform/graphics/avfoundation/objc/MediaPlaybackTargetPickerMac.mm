@@ -43,8 +43,8 @@ typedef AVOutputDeviceMenuController AVOutputDeviceMenuControllerType;
 SOFT_LINK_FRAMEWORK_OPTIONAL(AVFoundation)
 SOFT_LINK_FRAMEWORK_OPTIONAL(AVKit)
 
-SOFT_LINK_CLASS(AVFoundation, AVOutputContext)
-SOFT_LINK_CLASS(AVKit, AVOutputDeviceMenuController)
+SOFT_LINK_CLASS_OPTIONAL(AVFoundation, AVOutputContext)
+SOFT_LINK_CLASS_OPTIONAL(AVKit, AVOutputDeviceMenuController)
 
 using namespace WebCore;
 
@@ -109,48 +109,22 @@ AVOutputDeviceMenuControllerType *MediaPlaybackTargetPickerMac::devicePicker()
     return m_outputDeviceMenuController.get();
 }
 
-void MediaPlaybackTargetPickerMac::showPlaybackTargetPicker(const FloatRect& location, bool checkActiveRoute, const String& customMenuItemTitle)
+void MediaPlaybackTargetPickerMac::showPlaybackTargetPicker(const FloatRect& location, bool checkActiveRoute)
 {
-#if !PLATFORM(MAC) || __MAC_OS_X_VERSION_MIN_REQUIRED < 101200
-    UNUSED_PARAM(customMenuItemTitle);
-#endif
-
     if (!client() || m_showingMenu)
         return;
 
     LOG(Media, "MediaPlaybackTargetPickerMac::showPlaybackTargetPicker - checkActiveRoute = %i", (int)checkActiveRoute);
 
     AVOutputDeviceMenuControllerType *picker = devicePicker();
-    if (![picker respondsToSelector:@selector(showMenuForRect:appearanceName:allowReselectionOfSelectedOutputDevice:)]
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-        && ![picker respondsToSelector:@selector(showMenuForRect:appearanceName:allowReselectionOfSelectedOutputDevice:customMenuItemTitle:customMenuItemEnabled:)]
-#endif
-        )
+    if (![picker respondsToSelector:@selector(showMenuForRect:appearanceName:allowReselectionOfSelectedOutputDevice:)])
         return;
 
     m_showingMenu = true;
-
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
-    if ([picker respondsToSelector:@selector(showMenuForRect:appearanceName:allowReselectionOfSelectedOutputDevice:customMenuItemTitle:customMenuItemEnabled:)]) {
-        NSString *customMenuItemTitleNSString = customMenuItemTitle.isEmpty() ? nil : (NSString *)customMenuItemTitle;
-        switch ([picker showMenuForRect:location appearanceName:NSAppearanceNameVibrantLight allowReselectionOfSelectedOutputDevice:!checkActiveRoute customMenuItemTitle:customMenuItemTitleNSString customMenuItemEnabled:YES]) {
-        case AVOutputDeviceMenuControllerSelectionCustomMenuItem:
-            customPlaybackActionSelected();
-            break;
-        case AVOutputDeviceMenuControllerSelectionOutputDevice:
-            if (!checkActiveRoute)
-                currentDeviceDidChange();
-            break;
-        case AVOutputDeviceMenuControllerSelectionNone:
-            break;
-        }
-    } else
-#endif
     if ([picker showMenuForRect:location appearanceName:NSAppearanceNameVibrantLight allowReselectionOfSelectedOutputDevice:!checkActiveRoute]) {
         if (!checkActiveRoute)
             currentDeviceDidChange();
     }
-
     m_showingMenu = false;
 }
 

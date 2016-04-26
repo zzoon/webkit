@@ -33,7 +33,7 @@ WebInspector.NavigationSidebarPanel = class NavigationSidebarPanel extends WebIn
 
         this._visibleContentTreeOutlines = new Set;
 
-        this.contentView.element.addEventListener("scroll", this._updateContentOverflowShadowVisibility.bind(this));
+        this.contentView.element.addEventListener("scroll", this.soon._updateContentOverflowShadowVisibility);
 
         this._contentTreeOutline = this.createContentTreeOutline(true);
         this._selectedContentTreeOutline = null;
@@ -53,7 +53,7 @@ WebInspector.NavigationSidebarPanel = class NavigationSidebarPanel extends WebIn
             this.element.appendChild(this._topOverflowShadowElement);
         }
 
-        this._boundUpdateContentOverflowShadowVisibility = this._updateContentOverflowShadowVisibility.bind(this);
+        this._boundUpdateContentOverflowShadowVisibility = this.soon._updateContentOverflowShadowVisibility;
         window.addEventListener("resize", this._boundUpdateContentOverflowShadowVisibility);
 
         this._filtersSetting = new WebInspector.Setting(identifier + "-navigation-sidebar-filters", {});
@@ -202,10 +202,14 @@ WebInspector.NavigationSidebarPanel = class NavigationSidebarPanel extends WebIn
         console.assert(treeElement);
         console.assert(treeElement.representedObject);
         if (!treeElement || !treeElement.representedObject)
-            return;
+            return false;
 
-        this.contentBrowser.showContentViewForRepresentedObject(treeElement.representedObject);
+        let contentView = this.contentBrowser.showContentViewForRepresentedObject(treeElement.representedObject);
+        if (!contentView)
+            return false;
+
         treeElement.revealAndSelect(true, false, true, true);
+        return true;
     }
 
     saveStateToCookie(cookie)
@@ -482,18 +486,10 @@ WebInspector.NavigationSidebarPanel = class NavigationSidebarPanel extends WebIn
     }
 
     // Private
-    
-    _updateContentOverflowShadowVisibilitySoon()
-    {
-        if (this._updateContentOverflowShadowVisibilityIdentifier)
-            return;
-
-        this._updateContentOverflowShadowVisibilityIdentifier = setTimeout(this._updateContentOverflowShadowVisibility.bind(this), 0);
-    }
 
     _updateContentOverflowShadowVisibility()
     {
-        this._updateContentOverflowShadowVisibilityIdentifier = undefined;
+        this._updateContentOverflowShadowVisibility.cancelDebounce();
 
         let scrollHeight = this.contentView.element.scrollHeight;
         let offsetHeight = this.contentView.element.offsetHeight;
@@ -632,7 +628,7 @@ WebInspector.NavigationSidebarPanel = class NavigationSidebarPanel extends WebIn
         }
 
         this._checkForEmptyFilterResults();
-        this._updateContentOverflowShadowVisibilitySoon();
+        this.soon._updateContentOverflowShadowVisibility();
 
         if (this.selected)
             this._checkElementsForPendingViewStateCookie([treeElement]);
@@ -642,7 +638,7 @@ WebInspector.NavigationSidebarPanel = class NavigationSidebarPanel extends WebIn
 
     _treeElementDisclosureDidChange(event)
     {
-        this._updateContentOverflowShadowVisibility();
+        this.soon._updateContentOverflowShadowVisibility();
     }
 
     _treeSelectionDidChange(event)
@@ -674,6 +670,7 @@ WebInspector.NavigationSidebarPanel = class NavigationSidebarPanel extends WebIn
         return treeElement instanceof WebInspector.FolderTreeElement
             || treeElement instanceof WebInspector.DatabaseHostTreeElement
             || treeElement instanceof WebInspector.IndexedDatabaseHostTreeElement
+            || treeElement instanceof WebInspector.ApplicationCacheManifestTreeElement
             || typeof treeElement.representedObject === "string"
             || treeElement.representedObject instanceof String;
     }
@@ -739,7 +736,9 @@ WebInspector.NavigationSidebarPanel = class NavigationSidebarPanel extends WebIn
         }, this);
 
         if (matchedElement) {
-            this.showDefaultContentViewForTreeElement(matchedElement);
+            let didShowContentView = this.showDefaultContentViewForTreeElement(matchedElement);
+            if (!didShowContentView)
+                return;
 
             this._pendingViewStateCookie = null;
 

@@ -46,26 +46,30 @@ class Text;
 namespace Style {
 
 struct ElementUpdate {
-    RefPtr<RenderStyle> style;
+    std::unique_ptr<RenderStyle> style;
     Change change { NoChange };
     bool isSynthetic { false };
 };
 
 class Update {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     Update(Document&);
 
     const ListHashSet<ContainerNode*>& roots() const { return m_roots; }
 
     const ElementUpdate* elementUpdate(const Element&) const;
+    ElementUpdate* elementUpdate(const Element&);
+
     bool textUpdate(const Text&) const;
 
     RenderStyle* elementStyle(const Element&) const;
 
     const Document& document() const { return m_document; }
 
-    void addElement(Element&, Element* parent, ElementUpdate&);
+    void addElement(Element&, Element* parent, ElementUpdate&&);
     void addText(Text&, Element* parent);
+    void addText(Text&);
 
 private:
     void addPossibleRoot(Element*);

@@ -183,11 +183,17 @@ void NetworkLoad::convertTaskToDownload(DownloadID downloadID, const ResourceReq
 
 void NetworkLoad::setPendingDownloadID(DownloadID downloadID)
 {
+    if (!m_task)
+        return;
+
     m_task->setPendingDownloadID(downloadID);
 }
 
 void NetworkLoad::setPendingDownload(PendingDownload& pendingDownload)
 {
+    if (!m_task)
+        return;
+
     m_task->setPendingDownload(pendingDownload);
 }
 
@@ -354,7 +360,7 @@ void NetworkLoad::continueCanAuthenticateAgainstProtectionSpace(bool result)
         return;
     }
     
-    if (!m_challenge.protectionSpace().isPasswordBased()) {
+    if (m_challenge.protectionSpace().authenticationScheme() == ProtectionSpaceAuthenticationSchemeServerTrustEvaluationRequested) {
         completionHandler(AuthenticationChallengeDisposition::UseCredential, serverTrustCredential(m_challenge));
         return;
     }

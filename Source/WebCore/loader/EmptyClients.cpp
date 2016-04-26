@@ -28,6 +28,7 @@
 #include "config.h"
 #include "EmptyClients.h"
 
+#include "ApplicationCacheStorage.h"
 #include "ColorChooser.h"
 #include "DOMWrapperWorld.h"
 #include "DatabaseProvider.h"
@@ -101,7 +102,7 @@ class EmptyUserContentProvider final : public UserContentProvider {
     void forEachUserScript(const std::function<void(DOMWrapperWorld&, const UserScript&)>&) const override { }
     void forEachUserStyleSheet(const std::function<void(const UserStyleSheet&)>&) const override { }
 #if ENABLE(USER_MESSAGE_HANDLERS)
-    const UserMessageHandlerDescriptorMap& userMessageHandlerDescriptors() const override { static NeverDestroyed<UserMessageHandlerDescriptorMap> map; return map.get(); }
+    void forEachUserMessageHandler(const std::function<void(const UserMessageHandlerDescriptor&)>&) const override { }
 #endif
 #if ENABLE(CONTENT_EXTENSIONS)
     ContentExtensions::ContentExtensionsBackend& userContentExtensionBackend() override { static NeverDestroyed<ContentExtensions::ContentExtensionsBackend> backend; return backend.get(); };
@@ -140,9 +141,9 @@ void fillWithEmptyClients(PageConfiguration& pageConfiguration)
     static NeverDestroyed<EmptyProgressTrackerClient> dummyProgressTrackerClient;
     pageConfiguration.progressTrackerClient = &dummyProgressTrackerClient.get();
 
-    static NeverDestroyed<EmptyDiagnosticLoggingClient> dummyDiagnosticLoggingClient;
-    pageConfiguration.diagnosticLoggingClient = &dummyDiagnosticLoggingClient.get();
+    pageConfiguration.diagnosticLoggingClient = std::make_unique<EmptyDiagnosticLoggingClient>();
 
+    pageConfiguration.applicationCacheStorage = ApplicationCacheStorage::create(String(), String());
     pageConfiguration.databaseProvider = adoptRef(new EmptyDatabaseProvider);
     pageConfiguration.storageNamespaceProvider = adoptRef(new EmptyStorageNamespaceProvider);
     pageConfiguration.userContentProvider = adoptRef(new EmptyUserContentProvider);

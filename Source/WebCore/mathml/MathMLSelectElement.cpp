@@ -33,9 +33,9 @@
 #include "HTMLNames.h"
 #include "MathMLNames.h"
 #include "RenderMathMLRow.h"
+#include "RenderTreeUpdater.h"
 #include "SVGElement.h"
 #include "SVGNames.h"
-#include "StyleTreeResolver.h"
 
 namespace WebCore {
 
@@ -52,7 +52,7 @@ Ref<MathMLSelectElement> MathMLSelectElement::create(const QualifiedName& tagNam
     return adoptRef(*new MathMLSelectElement(tagName, document));
 }
 
-RenderPtr<RenderElement> MathMLSelectElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> MathMLSelectElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderMathMLRow>(*this, WTFMove(style));
 }
@@ -202,7 +202,7 @@ void MathMLSelectElement::updateSelectedChild()
         return;
 
     if (m_selectedChild && m_selectedChild->renderer())
-        Style::detachRenderTree(*m_selectedChild);
+        RenderTreeUpdater::tearDownRenderers(*m_selectedChild);
 
     m_selectedChild = newSelectedChild;
     setNeedsStyleRecalc();

@@ -26,15 +26,18 @@
 #include "config.h"
 #include "NetworkConnectionToWebProcess.h"
 
+#include "BlobDataFileReferenceWithSandboxExtension.h"
 #include "NetworkBlobRegistry.h"
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "NetworkLoad.h"
 #include "NetworkProcess.h"
+#include "NetworkProcessConnectionMessages.h"
 #include "NetworkResourceLoadParameters.h"
 #include "NetworkResourceLoader.h"
 #include "NetworkResourceLoaderMessages.h"
 #include "RemoteNetworkingContext.h"
 #include "SessionTracker.h"
+#include "WebCoreArgumentCoders.h"
 #include <WebCore/NotImplemented.h>
 #include <WebCore/PingHandle.h>
 #include <WebCore/PlatformCookieJar.h>
@@ -247,6 +250,11 @@ void NetworkConnectionToWebProcess::deleteCookie(SessionID sessionID, const URL&
     WebCore::deleteCookie(storageSession(sessionID), url, cookieName);
 }
 
+void NetworkConnectionToWebProcess::addCookie(SessionID sessionID, const URL& url, const Cookie& cookie)
+{
+    WebCore::addCookie(storageSession(sessionID), url, cookie);
+}
+
 void NetworkConnectionToWebProcess::registerFileBlobURL(const URL& url, const String& path, const SandboxExtension::Handle& extensionHandle, const String& contentType)
 {
     RefPtr<SandboxExtension> extension = SandboxExtension::create(extensionHandle);
@@ -264,6 +272,25 @@ void NetworkConnectionToWebProcess::registerBlobURLFromURL(const URL& url, const
     NetworkBlobRegistry::singleton().registerBlobURL(this, url, srcURL);
 }
 
+void NetworkConnectionToWebProcess::preregisterSandboxExtensionsForOptionallyFileBackedBlob(const Vector<String>& filePaths, const SandboxExtension::HandleArray& handles)
+{
+    ASSERT(filePaths.size() == handles.size());
+
+    for (size_t i = 0; i < filePaths.size(); ++i)
+        m_blobDataFileReferences.add(filePaths[i], BlobDataFileReferenceWithSandboxExtension::create(filePaths[i], SandboxExtension::create(handles[i])));
+}
+
+RefPtr<WebCore::BlobDataFileReference> NetworkConnectionToWebProcess::getBlobDataFileReferenceForPath(const String& path)
+{
+    ASSERT(m_blobDataFileReferences.contains(path));
+    return m_blobDataFileReferences.get(path);
+}
+
+void NetworkConnectionToWebProcess::registerBlobURLOptionallyFileBacked(const URL& url, const URL& srcURL, const String& fileBackedPath)
+{
+    NetworkBlobRegistry::singleton().registerBlobURLOptionallyFileBacked(this, url, srcURL, fileBackedPath);
+}
+
 void NetworkConnectionToWebProcess::registerBlobURLForSlice(const URL& url, const URL& srcURL, int64_t start, int64_t end)
 {
     NetworkBlobRegistry::singleton().registerBlobURLForSlice(this, url, srcURL, start, end);
@@ -277,6 +304,30 @@ void NetworkConnectionToWebProcess::unregisterBlobURL(const URL& url)
 void NetworkConnectionToWebProcess::blobSize(const URL& url, uint64_t& resultSize)
 {
     resultSize = NetworkBlobRegistry::singleton().blobSize(this, url);
+}
+
+void NetworkConnectionToWebProcess::writeBlobsToTemporaryFiles(const Vector<String>& blobURLs, uint64_t requestIdentifier)
+{
+    RefPtr<NetworkConnectionToWebProcess> protector(this);
+
+    Vector<RefPtr<WebCore::BlobDataFileReference>> fileReferences;
+    for (auto& url : blobURLs)
+        fileReferences.appendVector(NetworkBlobRegistry::singleton().filesInBlob(*this, { ParsedURLString, url }));
+
+    for (auto& file : fileReferences)
+        file->prepareForFileAccess();
+
+    NetworkBlobRegistry::singleton().writeBlobsToTemporaryFiles(blobURLs, [this, protector, requestIdentifier, fileReferences](const Vector<String>& fileNames) {
+        for (auto& file : fileReferences)
+            file->revokeFileAccess();
+
+        NetworkProcess::singleton().grantSandboxExtensionsToDatabaseProcessForBlobs(fileNames, [this, protector, requestIdentifier, fileNames]() {
+            if (!m_connection || !m_connection->isValid())
+                return;
+
+            m_connection->send(Messages::NetworkProcessConnection::DidWriteBlobsToTemporaryFiles(requestIdentifier, fileNames), 0);
+        });
+    });
 }
 
 void NetworkConnectionToWebProcess::ensureLegacyPrivateBrowsingSession()

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,6 +34,10 @@
 #include <wtf/RefPtr.h>
 
 using namespace WebKit;
+
+#if USE(APPLE_INTERNAL_SDK)
+#include <WebKitAdditions/WKPreferencesAdditions.cpp>
+#endif
 
 WKTypeID WKPreferencesGetTypeID()
 {
@@ -457,6 +461,16 @@ void WKPreferencesSetWebGLEnabled(WKPreferencesRef preferencesRef, bool flag)
 bool WKPreferencesGetWebGLEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->webGLEnabled();
+}
+
+void WKPreferencesSetWebGL2Enabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setWebGL2Enabled(flag);
+}
+
+bool WKPreferencesGetWebGL2Enabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->webGL2Enabled();
 }
 
 void WKPreferencesSetForceSoftwareWebGLRendering(WKPreferencesRef preferencesRef, bool flag)
@@ -1505,4 +1519,24 @@ void WKPreferencesSetCustomElementsEnabled(WKPreferencesRef preferencesRef, bool
 bool WKPreferencesGetCustomElementsEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->shadowDOMEnabled();
+}
+
+void WKPreferencesSetFetchAPIEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setFetchAPIEnabled(flag);
+}
+
+bool WKPreferencesGetFetchAPIEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->fetchAPIEnabled();
+}
+
+void WKPreferencesSetDownloadAttributeEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setDownloadAttributeEnabled(flag);
+}
+
+bool WKPreferencesGetDownloadAttributeEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->downloadAttributeEnabled();
 }

@@ -1789,6 +1789,10 @@ class CppStyleTest(CppStyleTestBase):
             '    } @catch (NSException *exception) {\n'
             '    }\n',
             '')
+        self.assert_multi_line_lint(
+            '    @synchronized (self) {\n'
+            '    }\n',
+            '')
 
     def test_mismatching_spaces_in_parens(self):
         self.assert_lint('if (foo ) {', 'Extra space before ) in if'
@@ -3581,6 +3585,22 @@ class NoNonVirtualDestructorsTest(CppStyleTestBase):
                 };''',
             ['enum members should use InterCaps with an initial capital letter or initial \'k\' for C-style enums.  [readability/enum_casing] [4]'] * 5)
 
+        # Allow all-caps enum for JSTokenType
+        self.assert_multi_line_lint(
+            '''\
+                enum JSTokenType {
+                    NULLTOKEN = KeywordTokenFlag,
+                    TRUETOKEN,
+                    FALSETOKEN,
+                    // ...
+                };''',
+            '')
+
+        self.assert_multi_line_lint(
+            '''\
+                enum JSTokenType { NULLTOKEN = KeywordTokenFlag, TRUETOKEN, FALSETOKEN };''',
+            '')
+
         self.assert_multi_line_lint(
             '''\
                 enum Foo {
@@ -4243,6 +4263,19 @@ class WebKitStyleTest(CppStyleTestBase):
         self.assert_multi_line_lint(
             'WTF_MAKE_NONCOPYABLE(ClassName); WTF_MAKE_FAST_ALLOCATED;\n',
             '')
+        self.assert_multi_line_lint(
+            '#define MyMacro(name, status) \\\n'
+            '    if (strstr(arg, #name) { \\\n'
+            '        name##_ = !status; \\\n'
+            '        continue; \\\n'
+            '    }\n',
+            '')
+        self.assert_multi_line_lint(
+            '#define MyMacro(name, status) \\\n'
+            '    if (strstr(arg, #name) \\\n'
+            '        name##_ = !status; \\\n'
+            '        continue;\n',
+            'Multi line control clauses should use braces.  [whitespace/braces] [4]')
         self.assert_multi_line_lint(
             'if (condition) {\n'
             '    doSomething();\n'

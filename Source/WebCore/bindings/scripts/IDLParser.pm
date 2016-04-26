@@ -694,6 +694,7 @@ sub parseDefault
         $self->assertTokenValue($self->getToken(), "=", __LINE__);
         return $self->parseDefaultValue();
     }
+    return undef;
 }
 
 sub parseDefaultValue
@@ -705,6 +706,11 @@ sub parseDefaultValue
     }
     if ($next->type() == StringToken) {
         return $self->getToken()->value();
+    }
+    if ($next->value() eq "[") {
+        $self->assertTokenValue($self->getToken(), "[", __LINE__);
+        $self->assertTokenValue($self->getToken(), "]", __LINE__);
+        return "[]";
     }
     $self->assertUnexpectedToken($next->value(), __LINE__);
 }
@@ -1068,6 +1074,19 @@ sub parseSerializationAttributes
     push(@attributes, $token->value());
     push(@attributes, @{$self->parseIdentifiers()});
     return \@attributes;
+}
+
+sub parseIdentifierList
+{
+    my $self = shift;
+    my $next = $self->nextToken();
+
+    my @identifiers = ();
+    if ($next->type == IdentifierToken) {
+        push(@identifiers, $self->getToken()->value());
+        push(@identifiers, @{$self->parseIdentifiers()});
+    }
+    return @identifiers;
 }
 
 sub parseIdentifiers
@@ -1687,6 +1706,12 @@ sub parseExtendedAttributeRest2
 {
     my $self = shift;
     my $next = $self->nextToken();
+    if ($next->value() eq "(") {
+        $self->assertTokenValue($self->getToken(), "(", __LINE__);
+        my @arguments = $self->parseIdentifierList();
+        $self->assertTokenValue($self->getToken(), ")", __LINE__);
+        return @arguments;
+    }
     if ($next->type() == IdentifierToken || $next->value() eq "::") {
         my $scopedName = $self->parseScopedName();
         return $self->parseExtendedAttributeRest3($scopedName);

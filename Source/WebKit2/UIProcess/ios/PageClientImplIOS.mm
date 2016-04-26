@@ -511,9 +511,9 @@ void PageClientImpl::couldNotRestorePageState()
     [m_webView _couldNotRestorePageState];
 }
 
-void PageClientImpl::restorePageState(const WebCore::FloatRect& exposedContentRect, const WebCore::IntPoint& scrollOrigin, double scale)
+void PageClientImpl::restorePageState(const WebCore::FloatPoint& scrollPosition, const WebCore::FloatPoint& scrollOrigin, const WebCore::FloatSize& obscuredInsetOnSave, double scale)
 {
-    [m_webView _restorePageStateToExposedRect:exposedContentRect scrollOrigin:scrollOrigin scale:scale];
+    [m_webView _restorePageScrollPosition:scrollPosition scrollOrigin:scrollOrigin previousObscuredInset:obscuredInsetOnSave scale:scale];
 }
 
 void PageClientImpl::restorePageCenterAndScale(const WebCore::FloatPoint& center, double scale)
@@ -560,7 +560,7 @@ void PageClientImpl::showPlaybackTargetPicker(bool hasVideo, const IntRect& elem
     [m_contentView _showPlaybackTargetPicker:hasVideo fromRect:elementRect];
 }
 
-bool PageClientImpl::handleRunOpenPanel(WebPageProxy*, WebFrameProxy*, WebOpenPanelParameters* parameters, WebOpenPanelResultListenerProxy* listener)
+bool PageClientImpl::handleRunOpenPanel(WebPageProxy*, WebFrameProxy*, API::OpenPanelParameters* parameters, WebOpenPanelResultListenerProxy* listener)
 {
     [m_contentView _showRunOpenPanel:parameters resultListener:listener];
     return true;
@@ -745,6 +745,13 @@ void PageClientImpl::derefView()
 
 void PageClientImpl::didRestoreScrollPosition()
 {
+}
+
+UserInterfaceLayoutDirection PageClientImpl::userInterfaceLayoutDirection()
+{
+    if (!m_webView)
+        return UserInterfaceLayoutDirection::LTR;
+    return ([UIView userInterfaceLayoutDirectionForSemanticContentAttribute:[m_webView semanticContentAttribute]] == UIUserInterfaceLayoutDirectionLeftToRight) ? UserInterfaceLayoutDirection::LTR : UserInterfaceLayoutDirection::RTL;
 }
 
 } // namespace WebKit

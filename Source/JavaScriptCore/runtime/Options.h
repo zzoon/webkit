@@ -118,13 +118,14 @@ typedef const char* optionString;
     \
     v(bool, crashIfCantAllocateJITMemory, false, nullptr) \
     v(unsigned, jitMemoryReservationSize, 0, "Set this number to change the executable allocation size in ExecutableAllocatorFixedVMPool. (In bytes.)") \
-    v(bool, useSeparatedWXHeap, true, nullptr) \
+    v(bool, useSeparatedWXHeap, false, nullptr) \
     \
     v(bool, forceCodeBlockLiveness, false, nullptr) \
     v(bool, forceICFailure, false, nullptr) \
     \
     v(unsigned, repatchCountForCoolDown, 10, nullptr) \
     v(unsigned, initialCoolDownCount, 20, nullptr) \
+    v(unsigned, repatchBufferingCountdown, 10, nullptr) \
     \
     v(bool, dumpGeneratedBytecodes, false, nullptr) \
     v(bool, dumpBytecodeLivenessResults, false, nullptr) \
@@ -134,6 +135,9 @@ typedef const char* optionString;
     \
     v(bool, useFunctionDotArguments, true, nullptr) \
     v(bool, useTailCalls, true, nullptr) \
+    v(bool, alwaysUseShadowChicken, false, nullptr) \
+    v(unsigned, shadowChickenLogSize, 1000, nullptr) \
+    v(unsigned, shadowChickenStackSizeLimit, 100000, nullptr) \
     \
     /* dumpDisassembly implies dumpDFGDisassembly. */ \
     v(bool, dumpDisassembly, false, "dumps disassembly of all JIT compiled code upon compilation") \
@@ -187,10 +191,12 @@ typedef const char* optionString;
     v(bool, ftlCrashes, false, nullptr) /* fool-proof way of checking that you ended up in the FTL. ;-) */\
     v(bool, clobberAllRegsInFTLICSlowPath, !ASSERT_DISABLED, nullptr) \
     v(bool, useAccessInlining, true, nullptr) \
-    v(unsigned, maxAccessVariantListSize, 8, nullptr) \
+    v(unsigned, maxAccessVariantListSize, 13, nullptr) \
+    v(unsigned, megamorphicLoadCost, 999, nullptr) /* This used to be 10, but we're temporarily testing what happens when the feature is disabled. */\
     v(bool, usePolyvariantDevirtualization, true, nullptr) \
     v(bool, usePolymorphicAccessInlining, true, nullptr) \
     v(bool, usePolymorphicCallInlining, true, nullptr) \
+    v(bool, usePolymorphicCallInliningForNonStubStatus, false, nullptr) \
     v(unsigned, maxPolymorphicCallVariantListSize, 15, nullptr) \
     v(unsigned, maxPolymorphicCallVariantListSizeForTopTier, 5, nullptr) \
     v(unsigned, maxPolymorphicCallVariantsForInlining, 5, nullptr) \
@@ -273,9 +279,6 @@ typedef const char* optionString;
     \
     v(unsigned, reoptimizationRetryCounterMax, 0, nullptr)  \
     \
-    v(bool, assertICSizing, false, "crash if estimated IC sizes are inadequate")  \
-    v(bool, dumpFailedICSizing, false, "dumps a log entry if estimated IC sizes are inadequate")  \
-    \
     v(unsigned, minimumOptimizationDelay, 1, nullptr) \
     v(unsigned, maximumOptimizationDelay, 5, nullptr) \
     v(double, desiredProfileLivenessRate, 0.75, nullptr) \
@@ -312,9 +315,14 @@ typedef const char* optionString;
     v(unsigned, forceRAMSize, 0, nullptr) \
     v(bool, recordGCPauseTimes, false, nullptr) \
     v(bool, logHeapStatisticsAtExit, false, nullptr) \
+    \
     v(bool, useTypeProfiler, false, nullptr) \
     v(bool, useControlFlowProfiler, false, nullptr) \
+    \
     v(bool, useSamplingProfiler, false, nullptr) \
+    v(unsigned, sampleInterval, 1000, "Time between stack traces in microseconds.") \
+    v(bool, collectSamplingProfilerDataForJSCShell, false, "This corresponds to the JSC shell's --sample option.") \
+    \
     v(bool, alwaysGeneratePCToCodeOriginMap, false, "This will make sure we always generate a PCToCodeOriginMap for JITed code.") \
     \
     v(bool, verifyHeap, false, nullptr) \
@@ -345,6 +353,8 @@ typedef const char* optionString;
     v(optionString, functionOverrides, nullptr, "file with debugging overrides for function bodies") \
     \
     v(unsigned, watchdog, 0, "watchdog timeout (0 = Disabled, N = a timeout period of N milliseconds)") \
+    \
+    v(bool, useICStats, false, nullptr) \
     \
     v(bool, dumpModuleRecord, false, nullptr) \
     v(bool, dumpModuleLoadingState, false, nullptr) \

@@ -159,6 +159,7 @@
 #include "JSDocumentFragment.cpp"
 #include "JSDocumentType.cpp"
 #include "JSDOMApplicationCache.cpp"
+#include "JSDOMCSSNamespace.cpp"
 #include "JSDOMCoreException.cpp"
 #include "JSDOMError.cpp"
 #include "JSDOMFormData.cpp"
@@ -178,7 +179,6 @@
 #include "JSDOMURLMediaSource.cpp"
 #include "JSDOMURLMediaStream.cpp"
 #include "JSDOMWindow.cpp"
-#include "JSDOMWindowCSS.cpp"
 #include "JSDOMWindowFetch.cpp"
 #include "JSDOMWindowIndexedDatabase.cpp"
 #include "JSDOMWindowNotifications.cpp"
@@ -288,9 +288,7 @@
 #include "JSHTMLTableHeaderCellElement.cpp"
 #include "JSHTMLTableRowElement.cpp"
 #include "JSHTMLTableSectionElement.cpp"
-#if ENABLE(TEMPLATE_ELEMENT)
 #include "JSHTMLTemplateElement.cpp"
-#endif
 #include "JSHTMLTextAreaElement.cpp"
 #include "JSHTMLTimeElement.cpp"
 #include "JSHTMLTitleElement.cpp"
@@ -298,7 +296,6 @@
 #include "JSHTMLUListElement.cpp"
 #include "JSHTMLVideoElement.cpp"
 #if ENABLE(INDEXED_DATABASE)
-#include "JSIDBAny.cpp"
 #include "JSIDBCursor.cpp"
 #include "JSIDBCursorWithValue.cpp"
 #include "JSIDBDatabase.cpp"

@@ -530,7 +530,7 @@ inline bool isInt52(double number)
     return tryConvertToInt52(number) != JSValue::notInt52;
 }
 
-inline bool JSValue::isMachineInt() const
+inline bool JSValue::isAnyInt() const
 {
     if (isInt32())
         return true;
@@ -539,9 +539,9 @@ inline bool JSValue::isMachineInt() const
     return isInt52(asDouble());
 }
 
-inline int64_t JSValue::asMachineInt() const
+inline int64_t JSValue::asAnyInt() const
 {
-    ASSERT(isMachineInt());
+    ASSERT(isAnyInt());
     if (isInt32())
         return asInt32();
     return static_cast<int64_t>(asDouble());
@@ -746,6 +746,11 @@ inline bool JSValue::inherits(const ClassInfo* classInfo) const
     return isCell() && asCell()->inherits(classInfo);
 }
 
+inline const ClassInfo* JSValue::classInfoOrNull() const
+{
+    return isCell() ? asCell()->classInfo() : nullptr;
+}
+
 inline JSValue JSValue::toThis(ExecState* exec, ECMAMode ecmaMode) const
 {
     return isCell() ? asCell()->methodTable(exec->vm())->toThis(asCell(), exec, ecmaMode) : toThisSlowCase(exec, ecmaMode);
@@ -842,6 +847,13 @@ inline bool JSValue::putByIndex(ExecState* exec, unsigned propertyName, JSValue 
         return putToPrimitiveByIndex(exec, propertyName, value, shouldThrow);
 
     return asCell()->methodTable(exec->vm())->putByIndex(asCell(), exec, propertyName, value, shouldThrow);
+}
+
+inline Structure* JSValue::structureOrNull() const
+{
+    if (isCell())
+        return asCell()->structure();
+    return nullptr;
 }
 
 inline JSValue JSValue::structureOrUndefined() const

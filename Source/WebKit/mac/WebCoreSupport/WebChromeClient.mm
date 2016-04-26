@@ -909,7 +909,6 @@ void WebChromeClient::scheduleCompositingLayerFlush()
 }
 
 #if ENABLE(VIDEO)
-
 bool WebChromeClient::supportsVideoFullscreen(HTMLMediaElementEnums::VideoFullscreenMode)
 {
 #if PLATFORM(IOS)
@@ -934,7 +933,18 @@ void WebChromeClient::exitVideoFullscreenForVideoElement(WebCore::HTMLVideoEleme
     END_BLOCK_OBJC_EXCEPTIONS;    
 }
 
-#endif
+#if PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE)
+void WebChromeClient::setUpPlaybackControlsManager(HTMLMediaElement& element)
+{
+    [m_webView _setUpPlaybackControlsManagerForMediaElement:element];
+}
+
+void WebChromeClient::clearPlaybackControlsManager(HTMLMediaElement& element)
+{
+    [m_webView _clearPlaybackControlsManagerForMediaElement:element];
+}
+#endif // PLATFORM(MAC)
+#endif // ENABLE(VIDEO)
 
 #if ENABLE(FULLSCREEN_API)
 
@@ -1032,7 +1042,7 @@ void WebChromeClient::removePlaybackTargetPickerClient(uint64_t contextId)
     [m_webView _removePlaybackTargetPickerClient:contextId];
 }
 
-void WebChromeClient::showPlaybackTargetPicker(uint64_t contextId, const WebCore::IntPoint& location, bool hasVideo, const String&)
+void WebChromeClient::showPlaybackTargetPicker(uint64_t contextId, const WebCore::IntPoint& location, bool hasVideo)
 {
     [m_webView _showPlaybackTargetPicker:contextId location:location hasVideo:hasVideo];
 }

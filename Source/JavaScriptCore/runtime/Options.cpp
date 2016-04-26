@@ -294,9 +294,7 @@ static void recomputeDependentOptions()
 #if !ENABLE(FTL_JIT)
     Options::useFTLJIT() = false;
 #endif
-#if !ENABLE(SEPARATED_WX_HEAP)
-    Options::useSeparatedWXHeap() = false;
-#endif
+    
 #if OS(WINDOWS) && CPU(X86) 
     // Disable JIT on Windows if SSE2 is not present 
     if (!MacroAssemblerX86::supportsFloatingPoint())
@@ -342,6 +340,13 @@ static void recomputeDependentOptions()
         Options::useOSREntryToDFG() = false;
         Options::useOSREntryToFTL() = false;
     }
+
+#if PLATFORM(IOS) && !PLATFORM(IOS_SIMULATOR) && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000
+    // Override globally for now. Longer term we'll just make the default
+    // be to have this option enabled, and have platforms that don't support
+    // it just silently use a single mapping.
+    Options::useSeparatedWXHeap() = true;
+#endif
 
     // Compute the maximum value of the reoptimization retry counter. This is simply
     // the largest value at which we don't overflow the execute counter, when using it

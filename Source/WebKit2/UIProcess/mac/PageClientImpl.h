@@ -211,7 +211,7 @@ private:
 
     void didHandleAcceptedCandidate() override;
 
-    void isPlayingMediaDidChange() override;
+    void videoControlsManagerDidChange() override;
 
     void showPlatformContextMenu(NSMenu *, WebCore::IntPoint) override;
 
@@ -219,6 +219,8 @@ private:
 
     void startWindowDrag() override;
     NSWindow *platformWindow() override;
+
+    UserInterfaceLayoutDirection userInterfaceLayoutDirection() override;
 
 #if WK_API_ENABLED
     NSView *inspectorAttachmentView() override;

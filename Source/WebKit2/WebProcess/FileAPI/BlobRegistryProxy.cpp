@@ -57,6 +57,12 @@ void BlobRegistryProxy::registerBlobURL(const URL& url, const URL& srcURL)
     WebProcess::singleton().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::RegisterBlobURLFromURL(url, srcURL), 0);
 }
 
+void BlobRegistryProxy::registerBlobURLOptionallyFileBacked(const URL& url, const URL& srcURL, RefPtr<WebCore::BlobDataFileReference>&& file)
+{
+    ASSERT(file);
+    WebProcess::singleton().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::RegisterBlobURLOptionallyFileBacked(url, srcURL, file->path()), 0);
+}
+
 void BlobRegistryProxy::unregisterBlobURL(const URL& url)
 {
     WebProcess::singleton().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::UnregisterBlobURL(url), 0);
@@ -73,6 +79,11 @@ unsigned long long BlobRegistryProxy::blobSize(const URL& url)
     if (!WebProcess::singleton().networkConnection()->connection()->sendSync(Messages::NetworkConnectionToWebProcess::BlobSize(url), Messages::NetworkConnectionToWebProcess::BlobSize::Reply(resultSize), 0))
         return 0;
     return resultSize;
+}
+
+void BlobRegistryProxy::writeBlobsToTemporaryFiles(const Vector<String>& blobURLs, std::function<void (const Vector<String>& filePaths)> completionHandler)
+{
+    WebProcess::singleton().networkConnection()->writeBlobsToTemporaryFiles(blobURLs, completionHandler);
 }
 
 }

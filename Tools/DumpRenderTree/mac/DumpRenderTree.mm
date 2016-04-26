@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005-2009, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2005-2016 Apple Inc. All rights reserved.
  *           (C) 2007 Graham Dennis (graham.dennis@gmail.com)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -986,6 +986,12 @@ static void resetWebPreferencesToConsistentValues()
 
     [preferences setShadowDOMEnabled:YES];
     [preferences setCustomElementsEnabled:YES];
+
+    [preferences setWebGL2Enabled:YES];
+
+    [preferences setFetchAPIEnabled:YES];
+
+    [preferences setDownloadAttributeEnabled:YES];
 
     [preferences setHiddenPageDOMTimerThrottlingEnabled:NO];
     [preferences setHiddenPageCSSAnimationSuspensionEnabled:NO];

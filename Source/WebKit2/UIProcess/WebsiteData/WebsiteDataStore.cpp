@@ -37,6 +37,7 @@
 #include "WebsiteData.h"
 #include <WebCore/ApplicationCacheStorage.h>
 #include <WebCore/DatabaseTracker.h>
+#include <WebCore/HTMLMediaElement.h>
 #include <WebCore/OriginLock.h>
 #include <WebCore/SecurityOrigin.h>
 #include <wtf/RunLoop.h>
@@ -77,6 +78,8 @@ WebsiteDataStore::WebsiteDataStore(Configuration configuration)
     , m_sessionID(WebCore::SessionID::defaultSessionID())
     , m_networkCacheDirectory(WTFMove(configuration.networkCacheDirectory))
     , m_applicationCacheDirectory(WTFMove(configuration.applicationCacheDirectory))
+    , m_applicationCacheFlatFileSubdirectoryName(WTFMove(configuration.applicationCacheFlatFileSubdirectoryName))
+    , m_mediaCacheDirectory(WTFMove(configuration.mediaCacheDirectory))
     , m_webSQLDatabaseDirectory(WTFMove(configuration.webSQLDatabaseDirectory))
     , m_mediaKeysStorageDirectory(WTFMove(configuration.mediaKeysStorageDirectory))
     , m_storageManager(StorageManager::create(WTFMove(configuration.localStorageDirectory)))
@@ -255,6 +258,27 @@ void WebsiteDataStore::fetchData(OptionSet<WebsiteDataType> dataTypes, OptionSet
 
     RefPtr<CallbackAggregator> callbackAggregator = adoptRef(new CallbackAggregator(fetchOptions, WTFMove(completionHandler)));
 
+    if (dataTypes.contains(WebsiteDataType::DiskCache)) {
+        StringCapture mediaCacheDirectory { m_mediaCacheDirectory };
+        
+        callbackAggregator->addPendingCallback();
+        m_queue->dispatch([fetchOptions, mediaCacheDirectory, callbackAggregator] {
+            HashSet<RefPtr<WebCore::SecurityOrigin>> origins = WebCore::HTMLMediaElement::originsInMediaCache(mediaCacheDirectory.string());
+            WebsiteData* websiteData = new WebsiteData;
+            
+            for (auto& origin : origins) {
+                WebsiteData::Entry entry { origin, WebsiteDataType::DiskCache, 0 };
+                websiteData->entries.append(WTFMove(entry));
+            }
+            
+            WTF::RunLoop::main().dispatch([callbackAggregator, origins, websiteData] {
+                callbackAggregator->removePendingCallback(WTFMove(*websiteData));
+                
+                delete websiteData;
+            });
+        });
+    }
+
     auto networkProcessAccessType = computeNetworkProcessAccessTypeForDataFetch(dataTypes, !isPersistent());
     if (networkProcessAccessType != ProcessAccessType::None) {
         for (auto& processPool : processPools()) {
@@ -332,11 +356,12 @@ void WebsiteDataStore::fetchData(OptionSet<WebsiteDataType> dataTypes, OptionSet
 
     if (dataTypes.contains(WebsiteDataType::OfflineWebApplicationCache) && isPersistent()) {
         StringCapture applicationCacheDirectory { m_applicationCacheDirectory };
+        StringCapture applicationCacheFlatFileSubdirectoryName { m_applicationCacheFlatFileSubdirectoryName };
 
         callbackAggregator->addPendingCallback();
 
-        m_queue->dispatch([fetchOptions, applicationCacheDirectory, callbackAggregator] {
-            auto storage = WebCore::ApplicationCacheStorage::create(applicationCacheDirectory.string(), "Files");
+        m_queue->dispatch([fetchOptions, applicationCacheDirectory, applicationCacheFlatFileSubdirectoryName, callbackAggregator] {
+            auto storage = WebCore::ApplicationCacheStorage::create(applicationCacheDirectory.string(), applicationCacheFlatFileSubdirectoryName.string());
 
             WebsiteData* websiteData = new WebsiteData;
 
@@ -529,6 +554,19 @@ void WebsiteDataStore::removeData(OptionSet<WebsiteDataType> dataTypes, std::chr
 
     RefPtr<CallbackAggregator> callbackAggregator = adoptRef(new CallbackAggregator(WTFMove(completionHandler)));
 
+    if (dataTypes.contains(WebsiteDataType::DiskCache)) {
+        StringCapture mediaCacheDirectory { m_mediaCacheDirectory };
+
+        callbackAggregator->addPendingCallback();
+        m_queue->dispatch([modifiedSince, mediaCacheDirectory, callbackAggregator] {
+            WebCore::HTMLMediaElement::clearMediaCache(mediaCacheDirectory.string(), modifiedSince);
+            
+            WTF::RunLoop::main().dispatch([callbackAggregator] {
+                callbackAggregator->removePendingCallback();
+            });
+        });
+    }
+
     auto networkProcessAccessType = computeNetworkProcessAccessTypeForDataRemoval(dataTypes, !isPersistent());
     if (networkProcessAccessType != ProcessAccessType::None) {
         for (auto& processPool : processPools()) {
@@ -596,13 +634,14 @@ void WebsiteDataStore::removeData(OptionSet<WebsiteDataType> dataTypes, std::chr
 
     if (dataTypes.contains(WebsiteDataType::OfflineWebApplicationCache) && isPersistent()) {
         StringCapture applicationCacheDirectory { m_applicationCacheDirectory };
+        StringCapture applicationCacheFlatFileSubdirectoryName { m_applicationCacheFlatFileSubdirectoryName };
 
         callbackAggregator->addPendingCallback();
 
-        m_queue->dispatch([applicationCacheDirectory, callbackAggregator] {
-            auto storage = WebCore::ApplicationCacheStorage::create(applicationCacheDirectory.string(), "Files");
+        m_queue->dispatch([applicationCacheDirectory, applicationCacheFlatFileSubdirectoryName, callbackAggregator] {
+            auto storage = WebCore::ApplicationCacheStorage::create(applicationCacheDirectory.string(), applicationCacheFlatFileSubdirectoryName.string());
 
-            storage->deleteAllEntries();
+            storage->deleteAllCaches();
 
             WTF::RunLoop::main().dispatch([callbackAggregator] {
                 callbackAggregator->removePendingCallback();
@@ -755,7 +794,25 @@ void WebsiteDataStore::removeData(OptionSet<WebsiteDataType> dataTypes, const Ve
     };
 
     RefPtr<CallbackAggregator> callbackAggregator = adoptRef(new CallbackAggregator(WTFMove(completionHandler)));
-
+    
+    if (dataTypes.contains(WebsiteDataType::DiskCache)) {
+        StringCapture mediaCacheDirectory { m_mediaCacheDirectory };
+        HashSet<RefPtr<WebCore::SecurityOrigin>> origins;
+        for (const auto& dataRecord : dataRecords) {
+            for (const auto& origin : dataRecord.origins)
+                origins.add(origin);
+        }
+        
+        callbackAggregator->addPendingCallback();
+        m_queue->dispatch([origins, mediaCacheDirectory, callbackAggregator] {
+            WebCore::HTMLMediaElement::clearMediaCacheForOrigins(mediaCacheDirectory.string(), origins);
+            
+            WTF::RunLoop::main().dispatch([callbackAggregator] {
+                callbackAggregator->removePendingCallback();
+            });
+        });
+    }
+    
     auto networkProcessAccessType = computeNetworkProcessAccessTypeForDataRemoval(dataTypes, !isPersistent());
     if (networkProcessAccessType != ProcessAccessType::None) {
         for (auto& processPool : processPools()) {
@@ -830,6 +887,7 @@ void WebsiteDataStore::removeData(OptionSet<WebsiteDataType> dataTypes, const Ve
 
     if (dataTypes.contains(WebsiteDataType::OfflineWebApplicationCache) && isPersistent()) {
         StringCapture applicationCacheDirectory { m_applicationCacheDirectory };
+        StringCapture applicationCacheFlatFileSubdirectoryName { m_applicationCacheFlatFileSubdirectoryName };
 
         HashSet<RefPtr<WebCore::SecurityOrigin>> origins;
         for (const auto& dataRecord : dataRecords) {
@@ -838,8 +896,8 @@ void WebsiteDataStore::removeData(OptionSet<WebsiteDataType> dataTypes, const Ve
         }
 
         callbackAggregator->addPendingCallback();
-        m_queue->dispatch([origins, applicationCacheDirectory, callbackAggregator] {
-            auto storage = WebCore::ApplicationCacheStorage::create(applicationCacheDirectory.string(), "Files");
+        m_queue->dispatch([origins, applicationCacheDirectory, applicationCacheFlatFileSubdirectoryName, callbackAggregator] {
+            auto storage = WebCore::ApplicationCacheStorage::create(applicationCacheDirectory.string(), applicationCacheFlatFileSubdirectoryName.string());
 
             for (const auto& origin : origins)
                 storage->deleteCacheForOrigin(*origin);

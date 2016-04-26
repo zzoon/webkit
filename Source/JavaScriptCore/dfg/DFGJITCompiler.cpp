@@ -39,10 +39,11 @@
 #include "DFGSlowPathGenerator.h"
 #include "DFGSpeculativeJIT.h"
 #include "DFGThunks.h"
+#include "JSCInlines.h"
 #include "JSCJSValueInlines.h"
 #include "LinkBuffer.h"
 #include "MaxFrameExtentForSlowPathCall.h"
-#include "JSCInlines.h"
+#include "StructureStubInfo.h"
 #include "VM.h"
 
 namespace JSC { namespace DFG {
@@ -541,7 +542,7 @@ void JITCompiler::noticeOSREntry(BasicBlock& basicBlock, JITCompiler::Label bloc
                 entry->m_localsForcedDouble.set(local);
                 break;
             case FlushedInt52:
-                entry->m_localsForcedMachineInt.set(local);
+                entry->m_localsForcedAnyInt.set(local);
                 break;
             default:
                 break;

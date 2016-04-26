@@ -1209,11 +1209,9 @@ summary::-webkit-details-marker {
     margin-right: 0.4em;
 }
 
-#if defined(ENABLE_TEMPLATE_ELEMENT) && ENABLE_TEMPLATE_ELEMENT
 template {
     display: none;
 }
-#endif
 
 bdi, output {
     unicode-bidi: -webkit-isolate;
@@ -1221,6 +1219,10 @@ bdi, output {
 
 bdo {
     unicode-bidi: bidi-override;
+}
+
+slot {
+    display: contents;
 }
 
 #if defined(WTF_PLATFORM_IOS) && WTF_PLATFORM_IOS

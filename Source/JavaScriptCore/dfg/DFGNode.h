@@ -42,6 +42,7 @@
 #include "DFGNodeOrigin.h"
 #include "DFGNodeType.h"
 #include "DFGObjectMaterializationData.h"
+#include "DFGOpInfo.h"
 #include "DFGTransition.h"
 #include "DFGUseKind.h"
 #include "DFGVariableAccessData.h"
@@ -217,20 +218,6 @@ struct StackAccessData {
     FlushFormat format;
     
     FlushedAt flushedAt() { return FlushedAt(format, machineLocal); }
-};
-
-// This type used in passing an immediate argument to Node constructor;
-// distinguishes an immediate value (typically an index into a CodeBlock data structure - 
-// a constant index, argument, or identifier) from a Node*.
-struct OpInfo {
-    OpInfo() : m_value(0) { }
-    explicit OpInfo(int32_t value) : m_value(static_cast<uintptr_t>(value)) { }
-    explicit OpInfo(uint32_t value) : m_value(static_cast<uintptr_t>(value)) { }
-#if OS(DARWIN) || USE(JSVALUE64)
-    explicit OpInfo(size_t value) : m_value(static_cast<uintptr_t>(value)) { }
-#endif
-    explicit OpInfo(void* value) : m_value(reinterpret_cast<uintptr_t>(value)) { }
-    uintptr_t m_value;
 };
 
 // === Node ===
@@ -587,7 +574,7 @@ struct Node {
 
     void convertToPhantomNewFunction()
     {
-        ASSERT(m_op == NewFunction || m_op == NewArrowFunction || m_op == NewGeneratorFunction);
+        ASSERT(m_op == NewFunction || m_op == NewGeneratorFunction);
         m_op = PhantomNewFunction;
         m_flags |= NodeMustGenerate;
         m_opInfo = 0;
@@ -694,14 +681,14 @@ struct Node {
         return asJSValue().asNumber();
     }
      
-    bool isMachineIntConstant()
+    bool isAnyIntConstant()
     {
-        return isConstant() && constant()->value().isMachineInt();
+        return isConstant() && constant()->value().isAnyInt();
     }
      
-    int64_t asMachineInt()
+    int64_t asAnyInt()
     {
-        return asJSValue().asMachineInt();
+        return asJSValue().asAnyInt();
     }
      
     bool isBooleanConstant()
@@ -879,6 +866,7 @@ struct Node {
     bool hasIdentifier()
     {
         switch (op()) {
+        case TryGetById:
         case GetById:
         case GetByIdFlush:
         case PutById:
@@ -887,6 +875,10 @@ struct Node {
         case PutGetterById:
         case PutSetterById:
         case PutGetterSetterById:
+        case DeleteById:
+        case GetDynamicVar:
+        case PutDynamicVar:
+        case ResolveScope:
             return true;
         default:
             return false;
@@ -897,6 +889,23 @@ struct Node {
     {
         ASSERT(hasIdentifier());
         return m_opInfo;
+    }
+
+    bool hasGetPutInfo()
+    {
+        switch (op()) {
+        case GetDynamicVar:
+        case PutDynamicVar:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    unsigned getPutInfo()
+    {
+        ASSERT(hasGetPutInfo());
+        return m_opInfo2;
     }
 
     bool hasAccessorAttributes()
@@ -1399,7 +1408,6 @@ struct Node {
         case CheckCell:
         case OverridesHasInstance:
         case NewFunction:
-        case NewArrowFunction:
         case NewGeneratorFunction:
         case CreateActivation:
         case MaterializeCreateActivation:
@@ -1628,7 +1636,6 @@ struct Node {
     bool isFunctionAllocation()
     {
         switch (op()) {
-        case NewArrowFunction:
         case NewFunction:
         case NewGeneratorFunction:
             return true;
@@ -1913,9 +1920,9 @@ struct Node {
         return isInt32OrBooleanSpeculationExpectingDefined(prediction());
     }
     
-    bool shouldSpeculateMachineInt()
+    bool shouldSpeculateAnyInt()
     {
-        return isMachineIntSpeculation(prediction());
+        return isAnyIntSpeculation(prediction());
     }
     
     bool shouldSpeculateDouble()
@@ -2146,9 +2153,9 @@ struct Node {
             && op2->shouldSpeculateInt32OrBooleanExpectingDefined();
     }
     
-    static bool shouldSpeculateMachineInt(Node* op1, Node* op2)
+    static bool shouldSpeculateAnyInt(Node* op1, Node* op2)
     {
-        return op1->shouldSpeculateMachineInt() && op2->shouldSpeculateMachineInt();
+        return op1->shouldSpeculateAnyInt() && op2->shouldSpeculateAnyInt();
     }
     
     static bool shouldSpeculateNumber(Node* op1, Node* op2)
@@ -2342,17 +2349,14 @@ CString nodeMapDump(const T& nodeMap, DumpContext* context = 0)
     return out.toCString();
 }
 
-template<typename IteratorType>
-inline bool nodeValuePairComparator(IteratorType a, IteratorType b)
-{
-    return nodeComparator(a.node, b.node);
-}
-
 template<typename T>
 CString nodeValuePairListDump(const T& nodeValuePairList, DumpContext* context = 0)
 {
+    using V = typename T::ValueType;
     T sortedList = nodeValuePairList;
-    std::sort(sortedList.begin(), sortedList.end(), nodeValuePairComparator<decltype(*sortedList.begin())>);
+    std::sort(sortedList.begin(), sortedList.end(), [](const V& a, const V& b) {
+        return nodeComparator(a.node, b.node);
+    });
 
     StringPrintStream out;
     CommaPrinter comma;

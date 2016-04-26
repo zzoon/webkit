@@ -35,7 +35,6 @@
 #include <wtf/text/WTFString.h>
 
 OBJC_CLASS NSWindow;
-OBJC_CLASS WebPlaybackControlsManager;
 
 #if USE(APPLE_INTERNAL_SDK)
 OBJC_CLASS WebVideoFullscreenInterfaceMacObjC;
@@ -43,6 +42,7 @@ OBJC_CLASS WebVideoFullscreenInterfaceMacObjC;
 
 namespace WebCore {
 class IntRect;
+class WebPlaybackSessionInterfaceMac;
 class WebVideoFullscreenChangeObserver;
 class WebVideoFullscreenModel;
 
@@ -51,9 +51,9 @@ class WEBCORE_EXPORT WebVideoFullscreenInterfaceMac
     , public RefCounted<WebVideoFullscreenInterfaceMac> {
 
 public:
-    static Ref<WebVideoFullscreenInterfaceMac> create()
+    static Ref<WebVideoFullscreenInterfaceMac> create(WebPlaybackSessionInterfaceMac& playbackSessionInterface)
     {
-        return adoptRef(*new WebVideoFullscreenInterfaceMac());
+        return adoptRef(*new WebVideoFullscreenInterfaceMac(playbackSessionInterface));
     }
     virtual ~WebVideoFullscreenInterfaceMac();
     WebVideoFullscreenModel* webVideoFullscreenModel() const { return m_videoFullscreenModel; }
@@ -69,9 +69,9 @@ public:
     WEBCORE_EXPORT void setVideoDimensions(bool hasVideo, float width, float height) final;
     WEBCORE_EXPORT void setSeekableRanges(const TimeRanges&) override;
     WEBCORE_EXPORT void setCanPlayFastReverse(bool) override { }
-    WEBCORE_EXPORT void setAudioMediaSelectionOptions(const Vector<WTF::String>& /*options*/, uint64_t /*selectedIndex*/) override { }
-    WEBCORE_EXPORT void setLegibleMediaSelectionOptions(const Vector<WTF::String>& /*options*/, uint64_t /*selectedIndex*/) override { }
-    WEBCORE_EXPORT void setExternalPlayback(bool enabled, ExternalPlaybackTargetType, WTF::String localizedDeviceName) override;
+    WEBCORE_EXPORT void setAudioMediaSelectionOptions(const Vector<String>& /*options*/, uint64_t /*selectedIndex*/) override;
+    WEBCORE_EXPORT void setLegibleMediaSelectionOptions(const Vector<String>& /*options*/, uint64_t /*selectedIndex*/) override;
+    WEBCORE_EXPORT void setExternalPlayback(bool enabled, ExternalPlaybackTargetType, String localizedDeviceName) override;
     WEBCORE_EXPORT void setWirelessVideoPlaybackDisabled(bool) override { }
 
     WEBCORE_EXPORT void setupFullscreen(NSView& layerHostedView, const IntRect& initialRect, NSWindow *parentWindow, HTMLMediaElementEnums::VideoFullscreenMode, bool allowsPictureInPicturePlayback);
@@ -93,12 +93,13 @@ public:
     WEBCORE_EXPORT bool mayAutomaticallyShowVideoPictureInPicture() const { return false; }
     void applicationDidBecomeActive() { }
 
-    WEBCORE_EXPORT WebPlaybackControlsManager *playBackControlsManager();
 #if USE(APPLE_INTERNAL_SDK)
     WEBCORE_EXPORT WebVideoFullscreenInterfaceMacObjC *videoFullscreenInterfaceObjC();
 #endif
 
 private:
+    WebVideoFullscreenInterfaceMac(WebPlaybackSessionInterfaceMac&);
+    Ref<WebPlaybackSessionInterfaceMac> m_playbackSessionInterface;
     WebVideoFullscreenModel* m_videoFullscreenModel { nullptr };
     WebVideoFullscreenChangeObserver* m_fullscreenChangeObserver { nullptr };
     HTMLMediaElementEnums::VideoFullscreenMode m_mode { HTMLMediaElementEnums::VideoFullscreenModeNone };
@@ -106,7 +107,6 @@ private:
 #if USE(APPLE_INTERNAL_SDK)
     RetainPtr<WebVideoFullscreenInterfaceMacObjC> m_webVideoFullscreenInterfaceObjC;
 #endif
-    RetainPtr<WebPlaybackControlsManager> m_playbackControlsManager;
 };
 
 }

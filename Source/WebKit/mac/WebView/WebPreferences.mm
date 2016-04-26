@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006, 2007, 2011, 2012, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2005-2016 Apple Inc. All rights reserved.
  *           (C) 2006 Graham Dennis (graham.dennis@gmail.com)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -609,6 +609,15 @@ public:
 #endif
 #if ENABLE(CUSTOM_ELEMENTS)
         [NSNumber numberWithBool:NO], WebKitCustomElementsEnabledPreferenceKey,
+#endif
+#if ENABLE(WEBGL2)
+        [NSNumber numberWithBool:NO], WebKitWebGL2EnabledPreferenceKey,
+#endif
+#if ENABLE(FETCH_API)
+        [NSNumber numberWithBool:NO], WebKitFetchAPIEnabledPreferenceKey,
+#endif
+#if ENABLE(DOWNLOAD_ATTRIBUTE)
+        [NSNumber numberWithBool:NO], WebKitDownloadAttributeEnabledPreferenceKey,
 #endif
         nil];
 
@@ -1948,6 +1957,16 @@ static NSString *classIBCreatorID = nil;
     [self _setBoolValue:enabled forKey:WebKitWebGLEnabledPreferenceKey];
 }
 
+- (BOOL)webGL2Enabled
+{
+    return [self _boolValueForKey:WebKitWebGL2EnabledPreferenceKey];
+}
+
+- (void)setWebGL2Enabled:(BOOL)enabled
+{
+    [self _setBoolValue:enabled forKey:WebKitWebGL2EnabledPreferenceKey];
+}
+
 - (BOOL)forceSoftwareWebGLRendering
 {
     return [self _boolValueForKey:WebKitForceSoftwareWebGLRenderingPreferenceKey];
@@ -2698,6 +2717,26 @@ static NSString *classIBCreatorID = nil;
 - (void)setCustomElementsEnabled:(BOOL)flag
 {
     [self _setBoolValue:flag forKey:WebKitCustomElementsEnabledPreferenceKey];
+}
+
+- (BOOL)fetchAPIEnabled
+{
+    return [self _boolValueForKey:WebKitFetchAPIEnabledPreferenceKey];
+}
+
+- (void)setFetchAPIEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitFetchAPIEnabledPreferenceKey];
+}
+
+- (BOOL)downloadAttributeEnabled
+{
+    return [self _boolValueForKey:WebKitDownloadAttributeEnabledPreferenceKey];
+}
+
+- (void)setDownloadAttributeEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitDownloadAttributeEnabledPreferenceKey];
 }
 
 @end

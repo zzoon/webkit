@@ -62,9 +62,12 @@ void WebProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << injectedBundlePathExtensionHandle;
     encoder << initializationUserData;
     encoder << applicationCacheDirectory;
+    encoder << applicationCacheFlatFileSubdirectoryName;
     encoder << applicationCacheDirectoryExtensionHandle;
     encoder << webSQLDatabaseDirectory;
     encoder << webSQLDatabaseDirectoryExtensionHandle;
+    encoder << mediaCacheDirectory;
+    encoder << mediaCacheDirectoryExtensionHandle;
 #if ENABLE(SECCOMP_FILTERS)
     encoder << cookieStorageDirectory;
 #endif
@@ -136,6 +139,7 @@ void WebProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     encoder << pluginLoadClientPolicies;
+    encoder << pluginLoadClientPoliciesForPrivateBrowsing;
 #endif
 
 #if TARGET_OS_IPHONE || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
@@ -153,11 +157,17 @@ bool WebProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebProc
         return false;
     if (!decoder.decode(parameters.applicationCacheDirectory))
         return false;
+    if (!decoder.decode(parameters.applicationCacheFlatFileSubdirectoryName))
+        return false;
     if (!decoder.decode(parameters.applicationCacheDirectoryExtensionHandle))
         return false;
     if (!decoder.decode(parameters.webSQLDatabaseDirectory))
         return false;
     if (!decoder.decode(parameters.webSQLDatabaseDirectoryExtensionHandle))
+        return false;
+    if (!decoder.decode(parameters.mediaCacheDirectory))
+        return false;
+    if (!decoder.decode(parameters.mediaCacheDirectoryExtensionHandle))
         return false;
 #if ENABLE(SECCOMP_FILTERS)
     if (!decoder.decode(parameters.cookieStorageDirectory))
@@ -286,6 +296,8 @@ bool WebProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebProc
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     if (!decoder.decode(parameters.pluginLoadClientPolicies))
+        return false;
+    if (!decoder.decode(parameters.pluginLoadClientPoliciesForPrivateBrowsing))
         return false;
 #endif
 

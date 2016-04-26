@@ -34,6 +34,7 @@
 #include "EditorClient.h"
 #include "Element.h"
 #include "ElementIterator.h"
+#include "Event.h"
 #include "EventHandler.h"
 #include "ExceptionCode.h"
 #include "FloatQuad.h"
@@ -46,8 +47,8 @@
 #include "HTMLFormElement.h"
 #include "HTMLFrameElementBase.h"
 #include "HTMLInputElement.h"
-#include "HTMLSelectElement.h"
 #include "HTMLNames.h"
+#include "HTMLSelectElement.h"
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
 #include "InlineTextBox.h"
@@ -473,7 +474,7 @@ void FrameSelection::respondToNodeModification(Node& node, bool baseRemoved, boo
             m_selection.setWithoutValidation(m_selection.end(), m_selection.start());
     } else if (RefPtr<Range> range = m_selection.firstRange()) {
         ExceptionCode ec = 0;
-        Range::CompareResults compareResult = range->compareNode(&node, ec);
+        Range::CompareResults compareResult = range->compareNode(node, ec);
         if (!ec && (compareResult == Range::NODE_BEFORE_AND_AFTER || compareResult == Range::NODE_INSIDE)) {
             // If we did nothing here, when this node's renderer was destroyed, the rect that it 
             // occupied would be invalidated, but, selection gaps that change as a result of 
@@ -2604,7 +2605,7 @@ PassRefPtr<Range> FrameSelection::rangeByExtendingCurrentSelection(int amount) c
     return rangeByAlteringCurrentSelection(AlterationExtend, amount);
 }
 
-void FrameSelection::selectRangeOnElement(unsigned location, unsigned length, Node* node)
+void FrameSelection::selectRangeOnElement(unsigned location, unsigned length, Node& node)
 {
     RefPtr<Range> resultRange = m_frame->document()->createRange();
     ExceptionCode ec = 0;

@@ -30,8 +30,9 @@ enum ResponseType { "basic", "cors", "default", "error", "opaque", "opaqueredire
 [
     ActiveDOMObject,
     Conditional=FETCH_API,
+    EnabledAtRuntime=FetchAPI,
     ConstructorCallWith=ScriptExecutionContext,
-    GlobalContext=DOMWindow&WorkerGlobalScope,
+    Exposed=(Window,Worker),
     InterfaceName=Response,
     JSBuiltinConstructor
 ]
@@ -49,7 +50,7 @@ interface FetchResponse {
     readonly attribute DOMString statusText;
     // FIXME: Add support for SameObject keyword for headers
     readonly attribute FetchHeaders headers;
-    [Custom, RaisesException] readonly attribute ReadableStream? body;
+    [Custom, CachedAttribute] readonly attribute ReadableStream? body;
 
     [NewObject, CallWith=ScriptExecutionContext, RaisesException] FetchResponse clone();
 

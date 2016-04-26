@@ -125,12 +125,12 @@ public:
 };
 
 struct ElementStyle {
-    ElementStyle(Ref<RenderStyle>&& renderStyle, std::unique_ptr<Style::Relations> relations = { })
+    ElementStyle(std::unique_ptr<RenderStyle> renderStyle, std::unique_ptr<Style::Relations> relations = { })
         : renderStyle(WTFMove(renderStyle))
         , relations(WTFMove(relations))
     { }
 
-    Ref<RenderStyle> renderStyle;
+    std::unique_ptr<RenderStyle> renderStyle;
     std::unique_ptr<Style::Relations> relations;
 };
 
@@ -141,19 +141,19 @@ public:
     StyleResolver(Document&);
     ~StyleResolver();
 
-    ElementStyle styleForElement(Element&, RenderStyle* parentStyle, RuleMatchingBehavior = MatchAllRules, const RenderRegion* regionForStyling = nullptr, const SelectorFilter* = nullptr);
+    ElementStyle styleForElement(const Element&, RenderStyle* parentStyle, RuleMatchingBehavior = MatchAllRules, const RenderRegion* regionForStyling = nullptr, const SelectorFilter* = nullptr);
 
-    void keyframeStylesForAnimation(Element&, const RenderStyle*, KeyframeList&);
+    void keyframeStylesForAnimation(const Element&, const RenderStyle*, KeyframeList&);
 
-    PassRefPtr<RenderStyle> pseudoStyleForElement(Element&, const PseudoStyleRequest&, RenderStyle& parentStyle);
+    std::unique_ptr<RenderStyle> pseudoStyleForElement(const Element&, const PseudoStyleRequest&, RenderStyle& parentStyle);
 
-    Ref<RenderStyle> styleForPage(int pageIndex);
-    Ref<RenderStyle> defaultStyleForElement();
+    std::unique_ptr<RenderStyle> styleForPage(int pageIndex);
+    std::unique_ptr<RenderStyle> defaultStyleForElement();
 
     RenderStyle* style() const { return m_state.style(); }
     RenderStyle* parentStyle() const { return m_state.parentStyle(); }
     RenderStyle* rootElementStyle() const { return m_state.rootElementStyle(); }
-    Element* element() { return m_state.element(); }
+    const Element* element() { return m_state.element(); }
     Document& document() { return m_document; }
     Settings* documentSettings() { return m_document.settings(); }
 
@@ -167,7 +167,7 @@ public:
     void setOverrideDocumentElementStyle(RenderStyle* style) { m_overrideDocumentElementStyle = style; }
 
 private:
-    Ref<RenderStyle> styleForKeyframe(const RenderStyle*, const StyleKeyframe*, KeyframeValue&);
+    std::unique_ptr<RenderStyle> styleForKeyframe(const RenderStyle*, const StyleKeyframe*, KeyframeValue&);
 
 public:
     // These methods will give back the set of rules that matched for a given element (or a pseudo-element).
@@ -179,14 +179,13 @@ public:
         AllButEmptyCSSRules = UAAndUserCSSRules | AuthorCSSRules | CrossOriginCSSRules,
         AllCSSRules         = AllButEmptyCSSRules | EmptyCSSRules,
     };
-    Vector<RefPtr<StyleRule>> styleRulesForElement(Element*, unsigned rulesToInclude = AllButEmptyCSSRules);
-    Vector<RefPtr<StyleRule>> pseudoStyleRulesForElement(Element*, PseudoId, unsigned rulesToInclude = AllButEmptyCSSRules);
+    Vector<RefPtr<StyleRule>> styleRulesForElement(const Element*, unsigned rulesToInclude = AllButEmptyCSSRules);
+    Vector<RefPtr<StyleRule>> pseudoStyleRulesForElement(const Element*, PseudoId, unsigned rulesToInclude = AllButEmptyCSSRules);
 
 public:
     struct MatchResult;
 
-    void applyPropertyToStyle(CSSPropertyID, CSSValue*, RenderStyle*);
-
+    void applyPropertyToStyle(CSSPropertyID, CSSValue*, std::unique_ptr<RenderStyle>);
     void applyPropertyToCurrentStyle(CSSPropertyID, CSSValue*);
 
     void updateFont();
@@ -215,7 +214,7 @@ public:
 
     void addKeyframeStyle(PassRefPtr<StyleRuleKeyframes>);
 
-    bool checkRegionStyle(Element* regionElement);
+    bool checkRegionStyle(const Element* regionElement);
 
     bool usesFirstLineRules() const { return m_ruleSets.features().usesFirstLineRules; }
     bool usesFirstLetterRules() const { return m_ruleSets.features().usesFirstLetterRules; }
@@ -277,6 +276,7 @@ public:
     };
     
     class CascadedProperties {
+        WTF_MAKE_FAST_ALLOCATED;
     public:
         CascadedProperties(TextDirection, WritingMode);
 
@@ -323,7 +323,7 @@ private:
     void checkForTextSizeAdjust(RenderStyle*);
 #endif
 
-    void adjustRenderStyle(RenderStyle& styleToAdjust, const RenderStyle& parentStyle, Element*);
+    void adjustRenderStyle(RenderStyle& styleToAdjust, const RenderStyle& parentStyle, const Element*);
 #if ENABLE(CSS_GRID_LAYOUT)
     std::unique_ptr<GridPosition> adjustNamedGridItemPosition(const NamedGridAreaMap&, const NamedGridLinesMap&, const GridPosition&, GridPositionSide) const;
 #endif
@@ -361,20 +361,20 @@ public:
     class State {
     public:
         State() { }
-        State(Element&, RenderStyle* parentStyle, RenderStyle* documentElementStyle = nullptr, const RenderRegion* regionForStyling = nullptr, const SelectorFilter* = nullptr);
+        State(const Element&, RenderStyle* parentStyle, RenderStyle* documentElementStyle = nullptr, const RenderRegion* regionForStyling = nullptr, const SelectorFilter* = nullptr);
 
     public:
         void clear();
 
         Document& document() const { return m_element->document(); }
-        Element* element() const { return m_element; }
+        const Element* element() const { return m_element; }
 
-        void setStyle(Ref<RenderStyle>&&);
+        void setStyle(std::unique_ptr<RenderStyle>);
         RenderStyle* style() const { return m_style.get(); }
-        Ref<RenderStyle> takeStyle() { return m_style.releaseNonNull(); }
+        std::unique_ptr<RenderStyle> takeStyle() { return WTFMove(m_style); }
 
-        void setParentStyle(Ref<RenderStyle>&& parentStyle) { m_parentStyle = WTFMove(parentStyle); }
-        RenderStyle* parentStyle() const { return m_parentStyle.get(); }
+        void setParentStyle(std::unique_ptr<RenderStyle>);
+        RenderStyle* parentStyle() const { return m_parentStyle; }
         RenderStyle* rootElementStyle() const { return m_rootElementStyle; }
 
         const RenderRegion* regionForStyling() const { return m_regionForStyling; }
@@ -425,9 +425,10 @@ public:
     private:
         void updateConversionData();
 
-        Element* m_element { nullptr };
-        RefPtr<RenderStyle> m_style;
-        RefPtr<RenderStyle> m_parentStyle;
+        const Element* m_element { nullptr };
+        std::unique_ptr<RenderStyle> m_style;
+        RenderStyle* m_parentStyle { nullptr };
+        std::unique_ptr<RenderStyle> m_ownedParentStyle;
         RenderStyle* m_rootElementStyle { nullptr };
 
         const RenderRegion* m_regionForStyling { nullptr };
@@ -502,8 +503,8 @@ private:
     struct MatchedPropertiesCacheItem {
         Vector<MatchedProperties> matchedProperties;
         MatchRanges ranges;
-        RefPtr<RenderStyle> renderStyle;
-        RefPtr<RenderStyle> parentRenderStyle;
+        std::unique_ptr<RenderStyle> renderStyle;
+        std::unique_ptr<RenderStyle> parentRenderStyle;
     };
     const MatchedPropertiesCacheItem* findFromMatchedPropertiesCache(unsigned hash, const MatchResult&);
     void addToMatchedPropertiesCache(const RenderStyle*, const RenderStyle* parentStyle, unsigned hash, const MatchResult&);
@@ -520,13 +521,13 @@ private:
     Timer m_matchedPropertiesCacheSweepTimer;
 
     std::unique_ptr<MediaQueryEvaluator> m_medium;
-    RefPtr<RenderStyle> m_rootDefaultStyle;
+    std::unique_ptr<RenderStyle> m_rootDefaultStyle;
 
     Document& m_document;
 
     bool m_matchAuthorAndUserStyles;
 
-    RefPtr<RenderStyle> m_overrideDocumentElementStyle;
+    RenderStyle* m_overrideDocumentElementStyle { nullptr };
 
     Vector<std::unique_ptr<MediaQueryResult>> m_viewportDependentMediaQueryResults;
 
@@ -568,7 +569,7 @@ inline bool StyleResolver::hasSelectorForId(const AtomicString& idValue) const
     return m_ruleSets.features().idsInRules.contains(idValue.impl());
 }
 
-inline bool checkRegionSelector(const CSSSelector* regionSelector, Element* regionElement)
+inline bool checkRegionSelector(const CSSSelector* regionSelector, const Element* regionElement)
 {
     if (!regionSelector || !regionElement)
         return false;

@@ -71,6 +71,7 @@ public:
     void waitUntilDone();
     void notifyDone();
     double preciseTime();
+    double timeout() { return m_timeout; }
 
     // Other dumping.
     void dumpBackForwardList() { m_shouldDumpBackForwardListsForAllWindows = true; }
@@ -101,6 +102,8 @@ public:
     void setXSSAuditorEnabled(bool);
     void setShadowDOMEnabled(bool);
     void setCustomElementsEnabled(bool);
+    void setWebGL2Enabled(bool);
+    void setFetchAPIEnabled(bool);
     void setAllowUniversalAccessFromFileURLs(bool);
     void setAllowFileAccessFromFileURLs(bool);
     void setPluginsEnabled(bool);
@@ -119,6 +122,7 @@ public:
     void dispatchPendingLoadRequests();
     void setCacheModel(int);
     void setAsynchronousSpellCheckingEnabled(bool);
+    void setDownloadAttributeEnabled(bool);
 
     // Special DOM functions.
     void clearBackForwardList();
@@ -243,6 +247,8 @@ public:
     void setBackingScaleFactor(double, JSValueRef);
 
     void setWindowIsKey(bool);
+
+    void setViewSize(double width, double height);
 
     void callAddChromeInputFieldCallback();
     void callRemoveChromeInputFieldCallback();

@@ -28,6 +28,7 @@
 
 #if ENABLE(INDEXED_DATABASE)
 
+#include "IDBConnectionProxy.h"
 #include "IDBDatabase.h"
 #include "IDBKeyRangeData.h"
 #include "IDBOpenDBRequest.h"
@@ -46,6 +47,7 @@ Ref<IDBConnectionToServer> IDBConnectionToServer::create(IDBConnectionToServerDe
 
 IDBConnectionToServer::IDBConnectionToServer(IDBConnectionToServerDelegate& delegate)
     : m_delegate(delegate)
+    , m_proxy(std::make_unique<IDBConnectionProxy>(*this))
 {
 }
 
@@ -54,13 +56,19 @@ uint64_t IDBConnectionToServer::identifier() const
     return m_delegate->identifier();
 }
 
+IDBConnectionProxy& IDBConnectionToServer::proxy()
+{
+    ASSERT(m_proxy);
+    return *m_proxy;
+}
+
 void IDBConnectionToServer::deleteDatabase(IDBOpenDBRequest& request)
 {
     LOG(IndexedDB, "IDBConnectionToServer::deleteDatabase - %s", request.databaseIdentifier().debugString().utf8().data());
 
     ASSERT(!m_openDBRequestMap.contains(request.resourceIdentifier()));
     m_openDBRequestMap.set(request.resourceIdentifier(), &request);
-    
+
     IDBRequestData requestData(*this, request);
     m_delegate->deleteDatabase(requestData);
 }
@@ -171,12 +179,12 @@ void IDBConnectionToServer::didDeleteIndex(const IDBResultData& resultData)
     completeOperation(resultData);
 }
 
-void IDBConnectionToServer::putOrAdd(TransactionOperation& operation, RefPtr<IDBKey>& key, RefPtr<SerializedScriptValue>& value, const IndexedDB::ObjectStoreOverwriteMode overwriteMode)
+void IDBConnectionToServer::putOrAdd(TransactionOperation& operation, IDBKey* key, const IDBValue& value, const IndexedDB::ObjectStoreOverwriteMode overwriteMode)
 {
     LOG(IndexedDB, "IDBConnectionToServer::putOrAdd");
 
     saveOperation(operation);
-    m_delegate->putOrAdd(IDBRequestData(operation), key.get(), *value, overwriteMode);
+    m_delegate->putOrAdd(IDBRequestData(operation), key, value, overwriteMode);
 }
 
 void IDBConnectionToServer::didPutOrAdd(const IDBResultData& resultData)

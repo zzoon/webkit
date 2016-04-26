@@ -4153,6 +4153,265 @@ void testSqrtArgWithEffectfulDoubleConversion(float a)
     CHECK(isIdentical(effect, sqrt(a)));
 }
 
+void testCompareTwoFloatToDouble(float a, float b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+
+    Value* arg1As32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* arg1Float = root->appendNew<Value>(proc, BitwiseCast, Origin(), arg1As32);
+    Value* arg1AsDouble = root->appendNew<Value>(proc, FloatToDouble, Origin(), arg1Float);
+
+    Value* arg2As32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    Value* arg2Float = root->appendNew<Value>(proc, BitwiseCast, Origin(), arg2As32);
+    Value* arg2AsDouble = root->appendNew<Value>(proc, FloatToDouble, Origin(), arg2Float);
+    Value* equal = root->appendNew<Value>(proc, Equal, Origin(), arg1AsDouble, arg2AsDouble);
+
+    root->appendNew<ControlValue>(proc, Return, Origin(), equal);
+
+    CHECK(compileAndRun<int64_t>(proc, bitwise_cast<int32_t>(a), bitwise_cast<int32_t>(b)) == (a == b));
+}
+
+void testCompareOneFloatToDouble(float a, double b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+
+    Value* arg1As32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* arg1Float = root->appendNew<Value>(proc, BitwiseCast, Origin(), arg1As32);
+    Value* arg1AsDouble = root->appendNew<Value>(proc, FloatToDouble, Origin(), arg1Float);
+
+    Value* arg2AsDouble = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* equal = root->appendNew<Value>(proc, Equal, Origin(), arg1AsDouble, arg2AsDouble);
+
+    root->appendNew<ControlValue>(proc, Return, Origin(), equal);
+
+    CHECK(compileAndRun<int64_t>(proc, bitwise_cast<int32_t>(a), b) == (a == b));
+}
+
+void testCompareFloatToDoubleThroughPhi(float a, float b)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    BasicBlock* thenCase = proc.addBlock();
+    BasicBlock* elseCase = proc.addBlock();
+    BasicBlock* tail = proc.addBlock();
+
+    Value* condition = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+
+    Value* arg1As32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    Value* arg1Float = root->appendNew<Value>(proc, BitwiseCast, Origin(), arg1As32);
+    Value* arg1AsDouble = root->appendNew<Value>(proc, FloatToDouble, Origin(), arg1Float);
+
+    Value* arg2AsDouble = root->appendNew<ArgumentRegValue>(proc, Origin(), FPRInfo::argumentFPR0);
+    Value* arg2AsFloat = root->appendNew<Value>(proc, DoubleToFloat, Origin(), arg2AsDouble);
+    Value* arg2AsFRoundedDouble = root->appendNew<Value>(proc, FloatToDouble, Origin(), arg2AsFloat);
+
+    root->appendNew<ControlValue>(
+        proc, Branch, Origin(),
+        condition,
+        FrequentedBlock(thenCase), FrequentedBlock(elseCase));
+
+    UpsilonValue* thenValue = thenCase->appendNew<UpsilonValue>(proc, Origin(), arg1AsDouble);
+    thenCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* elseConst = elseCase->appendNew<ConstDoubleValue>(proc, Origin(), 0.);
+    UpsilonValue* elseValue = elseCase->appendNew<UpsilonValue>(proc, Origin(), elseConst);
+    elseCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* doubleInput = tail->appendNew<Value>(proc, Phi, Double, Origin());
+    thenValue->setPhi(doubleInput);
+    elseValue->setPhi(doubleInput);
+    Value* equal = tail->appendNew<Value>(proc, Equal, Origin(), doubleInput, arg2AsFRoundedDouble);
+    tail->appendNew<ControlValue>(proc, Return, Origin(), equal);
+
+    auto code = compile(proc);
+    int32_t integerA = bitwise_cast<int32_t>(a);
+    double doubleB = b;
+    CHECK(invoke<int64_t>(*code, 1, integerA, doubleB) == (a == b));
+    CHECK(invoke<int64_t>(*code, 0, integerA, doubleB) == (b == 0));
+}
+
+void testDoubleToFloatThroughPhi(float value)
+{
+    // Simple case of:
+    //     if (a) {
+    //         x = DoubleAdd(a, b)
+    //     else
+    //         x = DoubleAdd(a, c)
+    //     DoubleToFloat(x)
+    //
+    // Both Adds can be converted to float add.
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    BasicBlock* thenCase = proc.addBlock();
+    BasicBlock* elseCase = proc.addBlock();
+    BasicBlock* tail = proc.addBlock();
+
+    Value* condition = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* argument32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    Value* floatValue = root->appendNew<Value>(proc, BitwiseCast, Origin(), argument32);
+    Value* argAsDouble = root->appendNew<Value>(proc, FloatToDouble, Origin(), floatValue);
+
+    root->appendNew<ControlValue>(
+        proc, Branch, Origin(),
+        condition,
+        FrequentedBlock(thenCase), FrequentedBlock(elseCase));
+
+    Value* postitiveConst = thenCase->appendNew<ConstDoubleValue>(proc, Origin(), 42.5f);
+    Value* thenAdd = thenCase->appendNew<Value>(proc, Add, Origin(), argAsDouble, postitiveConst);
+    UpsilonValue* thenValue = thenCase->appendNew<UpsilonValue>(proc, Origin(), thenAdd);
+    thenCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* elseConst = elseCase->appendNew<ConstDoubleValue>(proc, Origin(), M_PI);
+    UpsilonValue* elseValue = elseCase->appendNew<UpsilonValue>(proc, Origin(), elseConst);
+    elseCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* doubleInput = tail->appendNew<Value>(proc, Phi, Double, Origin());
+    thenValue->setPhi(doubleInput);
+    elseValue->setPhi(doubleInput);
+    Value* floatResult = tail->appendNew<Value>(proc, DoubleToFloat, Origin(), doubleInput);
+    tail->appendNew<ControlValue>(proc, Return, Origin(), floatResult);
+
+    auto code = compile(proc);
+    CHECK(isIdentical(invoke<float>(*code, 1, bitwise_cast<int32_t>(value)), value + 42.5f));
+    CHECK(isIdentical(invoke<float>(*code, 0, bitwise_cast<int32_t>(value)), static_cast<float>(M_PI)));
+}
+
+void testDoubleProducerPhiToFloatConversion(float value)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    BasicBlock* thenCase = proc.addBlock();
+    BasicBlock* elseCase = proc.addBlock();
+    BasicBlock* tail = proc.addBlock();
+
+    Value* condition = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* argument32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    Value* floatValue = root->appendNew<Value>(proc, BitwiseCast, Origin(), argument32);
+
+    root->appendNew<ControlValue>(
+        proc, Branch, Origin(),
+        condition,
+        FrequentedBlock(thenCase), FrequentedBlock(elseCase));
+
+    Value* asDouble = thenCase->appendNew<Value>(proc, FloatToDouble, Origin(), floatValue);
+    UpsilonValue* thenValue = thenCase->appendNew<UpsilonValue>(proc, Origin(), asDouble);
+    thenCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* constDouble = elseCase->appendNew<ConstDoubleValue>(proc, Origin(), 42.5);
+    UpsilonValue* elseValue = elseCase->appendNew<UpsilonValue>(proc, Origin(), constDouble);
+    elseCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* doubleInput = tail->appendNew<Value>(proc, Phi, Double, Origin());
+    thenValue->setPhi(doubleInput);
+    elseValue->setPhi(doubleInput);
+
+    Value* argAsDoubleAgain = tail->appendNew<Value>(proc, FloatToDouble, Origin(), floatValue);
+    Value* finalAdd = tail->appendNew<Value>(proc, Add, Origin(), doubleInput, argAsDoubleAgain);
+    Value* floatResult = tail->appendNew<Value>(proc, DoubleToFloat, Origin(), finalAdd);
+    tail->appendNew<ControlValue>(proc, Return, Origin(), floatResult);
+
+    auto code = compile(proc);
+    CHECK(isIdentical(invoke<float>(*code, 1, bitwise_cast<int32_t>(value)), value + value));
+    CHECK(isIdentical(invoke<float>(*code, 0, bitwise_cast<int32_t>(value)), 42.5f + value));
+}
+
+void testDoubleProducerPhiToFloatConversionWithDoubleConsumer(float value)
+{
+    // In this case, the Upsilon-Phi effectively contains a Float value, but it is used
+    // as a Float and as a Double.
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    BasicBlock* thenCase = proc.addBlock();
+    BasicBlock* elseCase = proc.addBlock();
+    BasicBlock* tail = proc.addBlock();
+
+    Value* condition = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* argument32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    Value* floatValue = root->appendNew<Value>(proc, BitwiseCast, Origin(), argument32);
+
+    root->appendNew<ControlValue>(
+        proc, Branch, Origin(),
+        condition,
+        FrequentedBlock(thenCase), FrequentedBlock(elseCase));
+
+    Value* asDouble = thenCase->appendNew<Value>(proc, FloatToDouble, Origin(), floatValue);
+    UpsilonValue* thenValue = thenCase->appendNew<UpsilonValue>(proc, Origin(), asDouble);
+    thenCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* constDouble = elseCase->appendNew<ConstDoubleValue>(proc, Origin(), 42.5);
+    UpsilonValue* elseValue = elseCase->appendNew<UpsilonValue>(proc, Origin(), constDouble);
+    elseCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* doubleInput = tail->appendNew<Value>(proc, Phi, Double, Origin());
+    thenValue->setPhi(doubleInput);
+    elseValue->setPhi(doubleInput);
+
+    Value* argAsDoubleAgain = tail->appendNew<Value>(proc, FloatToDouble, Origin(), floatValue);
+    Value* floatAdd = tail->appendNew<Value>(proc, Add, Origin(), doubleInput, argAsDoubleAgain);
+
+    // FRound.
+    Value* floatResult = tail->appendNew<Value>(proc, DoubleToFloat, Origin(), floatAdd);
+    Value* doubleResult = tail->appendNew<Value>(proc, FloatToDouble, Origin(), floatResult);
+
+    // This one *cannot* be eliminated
+    Value* doubleAdd = tail->appendNew<Value>(proc, Add, Origin(), doubleInput, doubleResult);
+
+    tail->appendNew<ControlValue>(proc, Return, Origin(), doubleAdd);
+
+    auto code = compile(proc);
+    CHECK(isIdentical(invoke<double>(*code, 1, bitwise_cast<int32_t>(value)), (value + value) + static_cast<double>(value)));
+    CHECK(isIdentical(invoke<double>(*code, 0, bitwise_cast<int32_t>(value)), (42.5f + value) + 42.5f));
+}
+
+void testDoubleProducerPhiWithNonFloatConst(float value, double constValue)
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    BasicBlock* thenCase = proc.addBlock();
+    BasicBlock* elseCase = proc.addBlock();
+    BasicBlock* tail = proc.addBlock();
+
+    Value* condition = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* argument32 = root->appendNew<Value>(proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1));
+    Value* floatValue = root->appendNew<Value>(proc, BitwiseCast, Origin(), argument32);
+
+    root->appendNew<ControlValue>(
+        proc, Branch, Origin(),
+        condition,
+        FrequentedBlock(thenCase), FrequentedBlock(elseCase));
+
+    Value* asDouble = thenCase->appendNew<Value>(proc, FloatToDouble, Origin(), floatValue);
+    UpsilonValue* thenValue = thenCase->appendNew<UpsilonValue>(proc, Origin(), asDouble);
+    thenCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* constDouble = elseCase->appendNew<ConstDoubleValue>(proc, Origin(), constValue);
+    UpsilonValue* elseValue = elseCase->appendNew<UpsilonValue>(proc, Origin(), constDouble);
+    elseCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    Value* doubleInput = tail->appendNew<Value>(proc, Phi, Double, Origin());
+    thenValue->setPhi(doubleInput);
+    elseValue->setPhi(doubleInput);
+
+    Value* argAsDoubleAgain = tail->appendNew<Value>(proc, FloatToDouble, Origin(), floatValue);
+    Value* finalAdd = tail->appendNew<Value>(proc, Add, Origin(), doubleInput, argAsDoubleAgain);
+    Value* floatResult = tail->appendNew<Value>(proc, DoubleToFloat, Origin(), finalAdd);
+    tail->appendNew<ControlValue>(proc, Return, Origin(), floatResult);
+
+    auto code = compile(proc);
+    CHECK(isIdentical(invoke<float>(*code, 1, bitwise_cast<int32_t>(value)), value + value));
+    CHECK(isIdentical(invoke<float>(*code, 0, bitwise_cast<int32_t>(value)), static_cast<float>(constValue + value)));
+}
+
 void testDoubleArgToInt64BitwiseCast(double value)
 {
     Procedure proc;
@@ -5792,6 +6051,25 @@ void testStoreFloat(double input)
         CHECK(!compileAndRun<int64_t>(proc, input, &output - 1, 1));
         CHECK(isIdentical(static_cast<float>(input), output));
     }
+}
+
+void testStoreDoubleConstantAsFloat(double input)
+{
+    // Simple store from an address in a register.
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    Value* value = root->appendNew<ConstDoubleValue>(proc, Origin(), input);
+    Value* valueAsFloat = root->appendNew<Value>(proc, DoubleToFloat, Origin(), value);
+
+    Value* destinationAddress = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+
+    root->appendNew<MemoryValue>(proc, Store, Origin(), valueAsFloat, destinationAddress);
+
+    root->appendNew<ControlValue>(proc, Return, Origin(), root->appendNew<Const32Value>(proc, Origin(), 0));
+
+    float output = 0.;
+    CHECK(!compileAndRun<int64_t>(proc, input, &output));
+    CHECK(isIdentical(static_cast<float>(input), output));
 }
 
 void testSpillGP()
@@ -11408,6 +11686,97 @@ void testPatchpointDoubleRegs()
     CHECK(invoke<double>(*code, 42.5) == 42.5);
 }
 
+void testSpillDefSmallerThanUse()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+
+    // Move32.
+    Value* arg32 = root->appendNew<Value>(
+        proc, Trunc, Origin(),
+        root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0));
+    Value* arg64 = root->appendNew<Value>(proc, ZExt32, Origin(), arg32);
+
+    // Make sure arg64 is on the stack.
+    PatchpointValue* forceSpill = root->appendNew<PatchpointValue>(proc, Int64, Origin());
+    RegisterSet clobberSet = RegisterSet::allGPRs();
+    clobberSet.exclude(RegisterSet::stackRegisters());
+    clobberSet.exclude(RegisterSet::reservedHardwareRegisters());
+    clobberSet.clear(GPRInfo::returnValueGPR); // Force the return value for aliasing below.
+    forceSpill->clobberLate(clobberSet);
+    forceSpill->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams& params) {
+            AllowMacroScratchRegisterUsage allowScratch(jit);
+            jit.xor64(params[0].gpr(), params[0].gpr());
+        });
+
+    // On x86, Sub admit an address for any operand. If it uses the stack, the top bits must be zero.
+    Value* result = root->appendNew<Value>(proc, Sub, Origin(), forceSpill, arg64);
+    root->appendNew<ControlValue>(proc, Return, Origin(), result);
+
+    auto code = compile(proc);
+    CHECK(invoke<int64_t>(*code, 0xffffffff00000000) == 0);
+}
+
+void testSpillUseLargerThanDef()
+{
+    Procedure proc;
+    BasicBlock* root = proc.addBlock();
+    BasicBlock* thenCase = proc.addBlock();
+    BasicBlock* elseCase = proc.addBlock();
+    BasicBlock* tail = proc.addBlock();
+
+    RegisterSet clobberSet = RegisterSet::allGPRs();
+    clobberSet.exclude(RegisterSet::stackRegisters());
+    clobberSet.exclude(RegisterSet::reservedHardwareRegisters());
+
+    Value* condition = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR0);
+    Value* argument = root->appendNew<ArgumentRegValue>(proc, Origin(), GPRInfo::argumentGPR1);
+    root->appendNew<ControlValue>(
+        proc, Branch, Origin(),
+        root->appendNew<Value>(
+            proc, Trunc, Origin(),
+            condition),
+        FrequentedBlock(thenCase), FrequentedBlock(elseCase));
+
+    Value* truncated = thenCase->appendNew<Value>(proc, ZExt32, Origin(),
+        thenCase->appendNew<Value>(proc, Trunc, Origin(), argument));
+    UpsilonValue* thenResult = thenCase->appendNew<UpsilonValue>(proc, Origin(), truncated);
+    thenCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    UpsilonValue* elseResult = elseCase->appendNew<UpsilonValue>(proc, Origin(), argument);
+    elseCase->appendNew<ControlValue>(proc, Jump, Origin(), FrequentedBlock(tail));
+
+    for (unsigned i = 0; i < 100; ++i) {
+        PatchpointValue* preventTailDuplication = tail->appendNew<PatchpointValue>(proc, Void, Origin());
+        preventTailDuplication->clobberLate(clobberSet);
+        preventTailDuplication->setGenerator([] (CCallHelpers&, const StackmapGenerationParams&) { });
+    }
+
+    PatchpointValue* forceSpill = tail->appendNew<PatchpointValue>(proc, Void, Origin());
+    forceSpill->clobberLate(clobberSet);
+    forceSpill->setGenerator(
+        [&] (CCallHelpers& jit, const StackmapGenerationParams&) {
+            AllowMacroScratchRegisterUsage allowScratch(jit);
+            clobberSet.forEach([&] (Reg reg) {
+                jit.move(CCallHelpers::TrustedImm64(0xffffffffffffffff), reg.gpr());
+            });
+        });
+
+    Value* phi = tail->appendNew<Value>(proc, Phi, Int64, Origin());
+    thenResult->setPhi(phi);
+    elseResult->setPhi(phi);
+    tail->appendNew<ControlValue>(proc, Return, Origin(), phi);
+
+    auto code = compile(proc);
+    CHECK(invoke<uint64_t>(*code, 1, 0xffffffff00000000) == 0);
+    CHECK(invoke<uint64_t>(*code, 0, 0xffffffff00000000) == 0xffffffff00000000);
+
+    // A second time since the previous run is still on the stack.
+    CHECK(invoke<uint64_t>(*code, 1, 0xffffffff00000000) == 0);
+
+}
+
 // Make sure the compiler does not try to optimize anything out.
 NEVER_INLINE double zero()
 {
@@ -12056,6 +12425,14 @@ void run(const char* filter)
     RUN_UNARY(testSqrtArgWithUselessDoubleConversion, floatingPointOperands<float>());
     RUN_UNARY(testSqrtArgWithEffectfulDoubleConversion, floatingPointOperands<float>());
 
+    RUN_BINARY(testCompareTwoFloatToDouble, floatingPointOperands<float>(), floatingPointOperands<float>());
+    RUN_BINARY(testCompareOneFloatToDouble, floatingPointOperands<float>(), floatingPointOperands<double>());
+    RUN_BINARY(testCompareFloatToDoubleThroughPhi, floatingPointOperands<float>(), floatingPointOperands<float>());
+    RUN_UNARY(testDoubleToFloatThroughPhi, floatingPointOperands<float>());
+    RUN_UNARY(testDoubleProducerPhiToFloatConversion, floatingPointOperands<float>());
+    RUN_UNARY(testDoubleProducerPhiToFloatConversionWithDoubleConsumer, floatingPointOperands<float>());
+    RUN_BINARY(testDoubleProducerPhiWithNonFloatConst, floatingPointOperands<float>(), floatingPointOperands<double>());
+
     RUN_UNARY(testDoubleArgToInt64BitwiseCast, floatingPointOperands<double>());
     RUN_UNARY(testDoubleImmToInt64BitwiseCast, floatingPointOperands<double>());
     RUN_UNARY(testTwoBitwiseCastOnDouble, floatingPointOperands<double>());
@@ -12081,6 +12458,7 @@ void run(const char* filter)
     RUN_UNARY(testConvertFloatToDoubleMem, floatingPointOperands<float>());
     RUN_UNARY(testConvertDoubleToFloatToDoubleToFloat, floatingPointOperands<double>());
     RUN_UNARY(testStoreFloat, floatingPointOperands<double>());
+    RUN_UNARY(testStoreDoubleConstantAsFloat, floatingPointOperands<double>());
     RUN_UNARY(testLoadFloatConvertDoubleConvertFloatStoreFloat, floatingPointOperands<float>());
     RUN_UNARY(testFroundArg, floatingPointOperands<double>());
     RUN_UNARY(testFroundMem, floatingPointOperands<double>());
@@ -12783,6 +13161,9 @@ void run(const char* filter)
     RUN(testLShiftSelf64());
 
     RUN(testPatchpointDoubleRegs());
+
+    RUN(testSpillDefSmallerThanUse());
+    RUN(testSpillUseLargerThanDef());
 
     if (tasks.isEmpty())
         usage();

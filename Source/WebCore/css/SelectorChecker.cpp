@@ -89,6 +89,14 @@ static inline void addStyleRelation(SelectorChecker::CheckingContext& checkingCo
     ASSERT(value == 1 || type == Style::Relation::NthChildIndex || type == Style::Relation::AffectedByEmpty);
     if (checkingContext.resolvingMode != SelectorChecker::Mode::ResolvingStyle)
         return;
+    if (type == Style::Relation::AffectsNextSibling && !checkingContext.styleRelations.isEmpty()) {
+        auto& last = checkingContext.styleRelations.last();
+        if (last.type == Style::Relation::AffectsNextSibling && last.element == element.nextElementSibling()) {
+            ++last.value;
+            last.element = &element;
+            return;
+        }
+    }
     checkingContext.styleRelations.append({ element, type, value });
 }
 
@@ -198,6 +206,33 @@ bool SelectorChecker::match(const CSSSelector& selector, const Element& element,
     }
     return true;
 }
+
+#if ENABLE(SHADOW_DOM)
+bool SelectorChecker::matchHostPseudoClass(const CSSSelector& selector, const Element& element, CheckingContext& checkingContext, unsigned& specificity) const
+{
+    ASSERT(element.shadowRoot());
+    ASSERT(selector.match() == CSSSelector::PseudoClass && selector.pseudoClassType() == CSSSelector::PseudoClassHost);
+    ASSERT(checkingContext.resolvingMode != SelectorChecker::Mode::QueryingRules);
+
+    specificity = selector.simpleSelectorSpecificity();
+
+    // :host doesn't combine with any other selectors.
+    if (selector.tagHistory())
+        return false;
+    
+    if (auto* selectorList = selector.selectorList()) {
+        LocalContext context(*selectorList->first(), element, VisitedMatchType::Enabled, NOPSEUDO);
+        context.inFunctionalPseudoClass = true;
+        context.pseudoElementEffective = false;
+        PseudoIdSet ignoreDynamicPseudo;
+        unsigned subselectorSpecificity = 0;
+        if (matchRecursively(checkingContext, context, ignoreDynamicPseudo, subselectorSpecificity).match != Match::SelectorMatches)
+            return false;
+        specificity = CSSSelector::addSpecificities(specificity, subselectorSpecificity);
+    }
+    return true;
+}
+#endif
 
 inline static bool hasScrollbarPseudoElement(const PseudoIdSet& dynamicPseudoIdSet)
 {
@@ -617,8 +652,10 @@ bool SelectorChecker::checkOne(CheckingContext& checkingContext, const LocalCont
     if (selector.match() == CSSSelector::Class)
         return element.hasClass() && element.classNames().contains(selector.value());
 
-    if (selector.match() == CSSSelector::Id)
-        return element.hasID() && element.idForStyleResolution() == selector.value();
+    if (selector.match() == CSSSelector::Id) {
+        ASSERT(!selector.value().isNull());
+        return element.idForStyleResolution() == selector.value();
+    }
 
     if (selector.isAttributeSelector()) {
         if (!element.hasAttributes())

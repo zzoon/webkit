@@ -61,11 +61,14 @@ private:
     void registerFileBlobURL(const URL&, RefPtr<BlobDataFileReference>&&, const String& contentType) override;
     void registerBlobURL(const URL&, Vector<BlobPart>, const String& contentType) override;
     void registerBlobURL(const URL&, const URL& srcURL) override;
+    void registerBlobURLOptionallyFileBacked(const URL&, const URL& srcURL, RefPtr<BlobDataFileReference>&&) override;
     void registerBlobURLForSlice(const URL&, const URL& srcURL, long long start, long long end) override;
     void unregisterBlobURL(const URL&) override;
     bool isBlobRegistryImpl() const override { return true; }
 
     unsigned long long blobSize(const URL&) override;
+
+    void writeBlobsToTemporaryFiles(const Vector<String>& blobURLs, std::function<void (const Vector<String>& filePaths)> completionHandler) override;
 
     HashMap<String, RefPtr<BlobData>> m_blobs;
 };

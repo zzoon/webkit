@@ -779,9 +779,9 @@ void PageClientImpl::didHandleAcceptedCandidate()
     m_impl->didHandleAcceptedCandidate();
 }
 
-void PageClientImpl::isPlayingMediaDidChange()
+void PageClientImpl::videoControlsManagerDidChange()
 {
-    m_impl->isPlayingMediaDidChange();
+    m_impl->videoControlsManagerDidChange();
 }
 
 void PageClientImpl::showPlatformContextMenu(NSMenu *menu, IntPoint location)
@@ -838,6 +838,13 @@ void PageClientImpl::didRestoreScrollPosition()
 bool PageClientImpl::windowIsFrontWindowUnderMouse(const NativeWebMouseEvent& event)
 {
     return m_impl->windowIsFrontWindowUnderMouse(event.nativeEvent());
+}
+
+UserInterfaceLayoutDirection PageClientImpl::userInterfaceLayoutDirection()
+{
+    if (!m_view)
+        return UserInterfaceLayoutDirection::LTR;
+    return (m_view.userInterfaceLayoutDirection == NSUserInterfaceLayoutDirectionLeftToRight) ? UserInterfaceLayoutDirection::LTR : UserInterfaceLayoutDirection::RTL;
 }
 
 } // namespace WebKit

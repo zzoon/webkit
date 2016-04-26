@@ -89,6 +89,7 @@ public:
     void queueReload();
     void removeAllVisitedLinks();
     void setAcceptsEditing(bool);
+    void setFetchAPIEnabled(bool);
     void setAllowUniversalAccessFromFileURLs(bool);
     void setAllowFileAccessFromFileURLs(bool);
     void setAppCacheMaximumSize(unsigned long long quota);
@@ -209,9 +210,6 @@ public:
     bool dumpTitleChanges() const { return m_dumpTitleChanges; }
     void setDumpTitleChanges(bool dumpTitleChanges) { m_dumpTitleChanges = dumpTitleChanges; }
 
-    bool dumpIconChanges() const { return m_dumpIconChanges; }
-    void setDumpIconChanges(bool dumpIconChanges) { m_dumpIconChanges = dumpIconChanges; }
-
     bool dumpVisitedLinksCallback() const { return m_dumpVisitedLinksCallback; }
     void setDumpVisitedLinksCallback(bool dumpVisitedLinksCallback) { m_dumpVisitedLinksCallback = dumpVisitedLinksCallback; }
     
@@ -257,6 +255,8 @@ public:
 
     bool windowIsKey() const { return m_windowIsKey; }
     void setWindowIsKey(bool);
+
+    void setViewSize(double width, double height);
 
     bool alwaysAcceptCookies() const { return m_alwaysAcceptCookies; }
     void setAlwaysAcceptCookies(bool);
@@ -355,6 +355,7 @@ public:
     bool hasPendingWebNotificationClick() const { return m_hasPendingWebNotificationClick; }
 
     void setCustomTimeout(int duration) { m_timeout = duration; }
+    double timeout() { return m_timeout; }
 
 private:
     TestRunner(const std::string& testURL, const std::string& expectedPixelHash);
@@ -382,7 +383,6 @@ private:
     bool m_dumpSourceAsWebArchive;
     bool m_dumpStatusCallbacks;
     bool m_dumpTitleChanges;
-    bool m_dumpIconChanges;
     bool m_dumpVisitedLinksCallback;
     bool m_dumpWillCacheResponse;
     bool m_generatePixelResults;

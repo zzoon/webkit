@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2015 Andy VanWagoner <thetalecrafter@gmail.com>.
  * Copyright (C) 2016 Yusuke Suzuki <utatane.tea@gmail.com>
+ * Copyright (C) 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -41,29 +42,8 @@ function match(regexp)
     }
 
     let thisString = @toString(this);
-    let createdRegExp = new @RegExp(regexp, @undefined);
+    let createdRegExp = @regExpCreate(regexp, @undefined);
     return createdRegExp[@symbolMatch](thisString);
-}
-
-function search(regexp)
-{
-    "use strict";
-
-    if (this == null) {
-        if (this === null)
-            throw new @TypeError("String.prototype.search requires that |this| not be null");
-        throw new @TypeError("String.prototype.search requires that |this| not be undefined");
-    }
-
-    if (regexp != null) {
-         var searcher = regexp[@symbolSearch];
-         if (searcher != @undefined)
-            return searcher.@call(regexp, this);
-    }
-
-    var thisString = @toString(this);
-    var createdRegExp = new @RegExp(regexp, @undefined);
-    return createdRegExp[@symbolSearch](thisString);
 }
 
 function repeatSlowPath(string, count)
@@ -123,4 +103,78 @@ function repeat(count)
     }
 
     return @repeatSlowPath(string, count);
+}
+
+function localeCompare(that/*, locales, options */)
+{
+    "use strict";
+
+    // 13.1.1 String.prototype.localeCompare (that [, locales [, options ]]) (ECMA-402 2.0)
+    // http://ecma-international.org/publications/standards/Ecma-402.htm
+
+    // 1. Let O be RequireObjectCoercible(this value).
+    if (this === null)
+        throw new @TypeError("String.prototype.localeCompare requires that |this| not be null");
+    
+    if (this === @undefined)
+        throw new @TypeError("String.prototype.localeCompare requires that |this| not be undefined");
+
+    // 2. Let S be ToString(O).
+    // 3. ReturnIfAbrupt(S).
+    var thisString = @toString(this);
+
+    // 4. Let That be ToString(that).
+    // 5. ReturnIfAbrupt(That).
+    var thatString = @toString(that);
+
+    // Avoid creating a collator for defaults.
+    if (arguments[1] === @undefined && arguments[2] === @undefined)
+        return @Collator.prototype.compare(thisString, thatString);
+
+    // 6. Let collator be Construct(%Collator%, «locales, options»).
+    // 7. ReturnIfAbrupt(collator).
+    var collator = new @Collator(arguments[1], arguments[2]);
+
+    // 8. Return CompareStrings(collator, S, That).
+    return collator.compare(thisString, thatString);
+}
+
+function search(regexp)
+{
+    "use strict";
+
+    if (this == null) {
+        if (this === null)
+            throw new @TypeError("String.prototype.search requires that |this| not be null");
+        throw new @TypeError("String.prototype.search requires that |this| not be undefined");
+    }
+
+    if (regexp != null) {
+        var searcher = regexp[@symbolSearch];
+        if (searcher != @undefined)
+            return searcher.@call(regexp, this);
+    }
+
+    var thisString = @toString(this);
+    var createdRegExp = @regExpCreate(regexp, @undefined);
+    return createdRegExp[@symbolSearch](thisString);
+}
+
+function split(separator, limit)
+{
+    "use strict";
+    
+    if (this == null) {
+        if (this === null)
+            throw new @TypeError("String.prototype.split requires that |this| not be null");
+        throw new @TypeError("String.prototype.split requires that |this| not be undefined");
+    }
+    
+    if (separator != null) {
+        var splitter = separator[@symbolSplit];
+        if (splitter != @undefined)
+            return splitter.@call(separator, this, limit);
+    }
+    
+    return @stringSplitFast.@call(this, separator, limit);
 }

@@ -144,9 +144,9 @@ void Data::performAssertions(VM& vm)
     
     STATIC_ASSERT(StringType == 6);
     STATIC_ASSERT(SymbolType == 7);
-    STATIC_ASSERT(ObjectType == 21);
-    STATIC_ASSERT(FinalObjectType == 22);
-    STATIC_ASSERT(JSFunctionType == 24);
+    STATIC_ASSERT(ObjectType == 20);
+    STATIC_ASSERT(FinalObjectType == 21);
+    STATIC_ASSERT(JSFunctionType == 23);
     STATIC_ASSERT(MasqueradesAsUndefined == 1);
     STATIC_ASSERT(ImplementsDefaultHasInstance == 2);
     STATIC_ASSERT(FirstConstantRegisterIndex == 0x40000000);
@@ -183,7 +183,7 @@ void Data::performAssertions(VM& vm)
     static_assert(GlobalLexicalVarWithVarInjectionChecks == 8, "LLInt assumes GlobalLexicalVarWithVarInjectionChecks ResultType is == 8");
     static_assert(ClosureVarWithVarInjectionChecks == 9, "LLInt assumes ClosureVarWithVarInjectionChecks ResultType is == 9");
 
-    static_assert(InitializationMode::Initialization == 0, "LLInt assumes that InitializationMode::Initialization is 0");
+    static_assert(static_cast<unsigned>(InitializationMode::NotInitialization) == 2, "LLInt assumes that InitializationMode::NotInitialization is 0");
     
     STATIC_ASSERT(GetPutInfo::typeBits == 0x3ff);
     STATIC_ASSERT(GetPutInfo::initializationShift == 10);

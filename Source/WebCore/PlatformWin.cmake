@@ -45,6 +45,7 @@ list(APPEND WebCore_SOURCES
     accessibility/win/AccessibilityObjectWin.cpp
     accessibility/win/AccessibilityObjectWrapperWin.cpp
 
+    editing/SmartReplaceCF.cpp
     editing/win/EditorWin.cpp
 
     html/HTMLSelectElementWin.cpp
@@ -58,15 +59,16 @@ list(APPEND WebCore_SOURCES
     platform/Cursor.cpp
     platform/KillRingNone.cpp
     platform/LocalizedStrings.cpp
-    platform/PlatformStrategies.cpp
     platform/VNodeTracker.cpp
 
     platform/audio/PlatformMediaSessionManager.cpp
 
+    platform/cf/CFURLExtras.cpp
     platform/cf/FileSystemCF.cpp
     platform/cf/KeyedDecoderCF.cpp
     platform/cf/KeyedEncoderCF.cpp
     platform/cf/SharedBufferCF.cpp
+    platform/cf/URLCF.cpp
 
     platform/cf/win/CertificateCFWin.cpp
 
@@ -74,7 +76,6 @@ list(APPEND WebCore_SOURCES
 
     platform/graphics/FontPlatformData.cpp
     platform/graphics/GraphicsContext3DPrivate.cpp
-    platform/graphics/WOFFFileFormat.cpp
 
     platform/graphics/egl/GLContextEGL.cpp
 
@@ -185,7 +186,10 @@ set(WebCore_FORWARDING_HEADERS_DIRECTORIES
 
     Modules/geolocation
     Modules/indexeddb
+
+    Modules/indexeddb/client
     Modules/indexeddb/legacy
+    Modules/indexeddb/server
     Modules/indexeddb/shared
     Modules/notifications
     Modules/webdatabase
@@ -307,3 +311,6 @@ file(WRITE "${WebCore_POST_BUILD_COMMAND}" "@xcopy /y /s /d /f \"${DERIVED_SOURC
 set(WebCore_OUTPUT_NAME
     WebCore${DEBUG_SUFFIX}
 )
+
+list(APPEND WebCore_LIBRARIES WTF${DEBUG_SUFFIX})
+list(APPEND WebCoreTestSupport_LIBRARIES WTF${DEBUG_SUFFIX})

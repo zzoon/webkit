@@ -30,6 +30,8 @@
 
 #include "DataReference.h"
 #include "DatabaseToWebProcessConnectionMessages.h"
+#include "NetworkConnectionToWebProcessMessages.h"
+#include "NetworkProcessConnection.h"
 #include "WebIDBConnectionToClientMessages.h"
 #include "WebProcess.h"
 #include "WebToDatabaseProcessConnection.h"
@@ -44,6 +46,7 @@
 #include <WebCore/IDBResourceIdentifier.h>
 #include <WebCore/IDBResultData.h>
 #include <WebCore/IDBTransactionInfo.h>
+#include <WebCore/IDBValue.h>
 
 using namespace WebCore;
 
@@ -57,9 +60,9 @@ Ref<WebIDBConnectionToServer> WebIDBConnectionToServer::create()
 WebIDBConnectionToServer::WebIDBConnectionToServer()
 {
     relaxAdoptionRequirement();
-    m_connectionToServer = IDBClient::IDBConnectionToServer::create(*this);
 
     m_isOpenInServer = sendSync(Messages::DatabaseToWebProcessConnection::EstablishIDBConnectionToServer(), m_identifier);
+    m_connectionToServer = IDBClient::IDBConnectionToServer::create(*this);
 }
 
 WebIDBConnectionToServer::~WebIDBConnectionToServer()
@@ -128,11 +131,10 @@ void WebIDBConnectionToServer::deleteIndex(const IDBRequestData& requestData, ui
     send(Messages::WebIDBConnectionToClient::DeleteIndex(requestData, objectStoreIdentifier, indexName));
 }
 
-void WebIDBConnectionToServer::putOrAdd(const IDBRequestData& requestData, IDBKey* key, SerializedScriptValue& value, const IndexedDB::ObjectStoreOverwriteMode mode)
+void WebIDBConnectionToServer::putOrAdd(const IDBRequestData& requestData, IDBKey* key, const IDBValue& value, const IndexedDB::ObjectStoreOverwriteMode mode)
 {
     IDBKeyData keyData(key);
-    IPC::DataReference valueData(value.data());
-    send(Messages::WebIDBConnectionToClient::PutOrAdd(requestData, keyData, valueData, static_cast<unsigned>(mode)));
+    send(Messages::WebIDBConnectionToClient::PutOrAdd(requestData, keyData, value, static_cast<unsigned>(mode)));
 }
 
 void WebIDBConnectionToServer::getRecord(const IDBRequestData& requestData, const IDBKeyRangeData& range)
@@ -232,6 +234,17 @@ void WebIDBConnectionToServer::didPutOrAdd(const IDBResultData& result)
 
 void WebIDBConnectionToServer::didGetRecord(const IDBResultData& result)
 {
+    m_connectionToServer->didGetRecord(result);
+}
+
+void WebIDBConnectionToServer::didGetRecordWithSandboxExtensions(const WebCore::IDBResultData& result, const SandboxExtension::HandleArray& handles)
+{
+    const auto& filePaths = result.getResult().value().blobFilePaths();
+
+    ASSERT(filePaths.size() == handles.size());
+
+    WebProcess::singleton().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::PreregisterSandboxExtensionsForOptionallyFileBackedBlob(filePaths, handles), 0);
+
     m_connectionToServer->didGetRecord(result);
 }
 

@@ -81,38 +81,38 @@ void RenderBlockFlow::appendRunsForObject(BidiRunList<BidiRun>* runs, int start,
     if (start > end || shouldSkipCreatingRunsForObject(obj))
         return;
 
-    LineMidpointState& lineMidpointState = resolver.midpointState();
-    bool haveNextMidpoint = (lineMidpointState.currentMidpoint() < lineMidpointState.numMidpoints());
-    InlineIterator nextMidpoint;
-    if (haveNextMidpoint)
-        nextMidpoint = lineMidpointState.midpoints()[lineMidpointState.currentMidpoint()];
-    if (lineMidpointState.betweenMidpoints()) {
-        if (!haveNextMidpoint || (&obj != nextMidpoint.renderer()))
+    LineWhitespaceCollapsingState& lineWhitespaceCollapsingState = resolver.whitespaceCollapsingState();
+    bool haveNextTransition = (lineWhitespaceCollapsingState.currentTransition() < lineWhitespaceCollapsingState.numTransitions());
+    InlineIterator nextTransition;
+    if (haveNextTransition)
+        nextTransition = lineWhitespaceCollapsingState.transitions()[lineWhitespaceCollapsingState.currentTransition()];
+    if (lineWhitespaceCollapsingState.betweenTransitions()) {
+        if (!haveNextTransition || (&obj != nextTransition.renderer()))
             return;
         // This is a new start point. Stop ignoring objects and
         // adjust our start.
-        start = nextMidpoint.offset();
-        lineMidpointState.incrementCurrentMidpoint();
+        start = nextTransition.offset();
+        lineWhitespaceCollapsingState.incrementCurrentTransition();
         if (start < end) {
             appendRunsForObject(runs, start, end, obj, resolver);
             return;
         }
     } else {
-        if (!haveNextMidpoint || (&obj != nextMidpoint.renderer())) {
+        if (!haveNextTransition || (&obj != nextTransition.renderer())) {
             if (runs)
                 runs->appendRun(createRun(start, end, obj, resolver));
             return;
         }
 
-        // An end midpoint has been encountered within our object. We need to append a run with our endpoint.
-        if (static_cast<int>(nextMidpoint.offset() + 1) <= end) {
-            lineMidpointState.incrementCurrentMidpoint();
+        // An end transition has been encountered within our object. We need to append a run with our endpoint.
+        if (static_cast<int>(nextTransition.offset() + 1) <= end) {
+            lineWhitespaceCollapsingState.incrementCurrentTransition();
             // The end of the line is before the object we're inspecting. Skip everything and return
-            if (nextMidpoint.refersToEndOfPreviousNode())
+            if (nextTransition.refersToEndOfPreviousNode())
                 return;
-            if (static_cast<int>(nextMidpoint.offset() + 1) > start && runs)
-                runs->appendRun(createRun(start, nextMidpoint.offset() + 1, obj, resolver));
-            appendRunsForObject(runs, nextMidpoint.offset() + 1, end, obj, resolver);
+            if (static_cast<int>(nextTransition.offset() + 1) > start && runs)
+                runs->appendRun(createRun(start, nextTransition.offset() + 1, obj, resolver));
+            appendRunsForObject(runs, nextTransition.offset() + 1, end, obj, resolver);
         } else if (runs)
             runs->appendRun(createRun(start, end, obj, resolver));
     }
@@ -1060,7 +1060,7 @@ inline BidiRun* RenderBlockFlow::handleTrailingSpaces(BidiRunList<BidiRun>& bidi
 
 void RenderBlockFlow::appendFloatingObjectToLastLine(FloatingObject* floatingObject)
 {
-    ASSERT(!floatingObject->originatingLine());
+    ASSERT_WITH_SECURITY_IMPLICATION(!floatingObject->originatingLine());
     floatingObject->setOriginatingLine(lastRootBox());
     lastRootBox()->appendFloat(floatingObject->renderer());
 }
@@ -1076,9 +1076,9 @@ static inline void notifyResolverToResumeInIsolate(InlineBidiResolver& resolver,
 
 static inline void setUpResolverToResumeInIsolate(InlineBidiResolver& resolver, InlineBidiResolver& topResolver, BidiRun& isolatedRun, RenderObject* root, RenderObject* startObject)
 {
-    // Set up m_midpointState
-    resolver.midpointState() = topResolver.midpointState();
-    resolver.midpointState().setCurrentMidpoint(topResolver.midpointForIsolatedRun(isolatedRun));
+    // Set up m_whitespaceCollapsingState
+    resolver.whitespaceCollapsingState() = topResolver.whitespaceCollapsingState();
+    resolver.whitespaceCollapsingState().setCurrentTransition(topResolver.whitespaceCollapsingTransitionForIsolatedRun(isolatedRun));
 
     // Set up m_nestedIsolateCount
     notifyResolverToResumeInIsolate(resolver, root, startObject);
@@ -1145,7 +1145,7 @@ static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, 
         while (!isolatedResolver.isolatedRuns().isEmpty()) {
             auto runWithContext = WTFMove(isolatedResolver.isolatedRuns().last());
             isolatedResolver.isolatedRuns().removeLast();
-            topResolver.setMidpointForIsolatedRun(runWithContext.runToReplace, isolatedResolver.midpointForIsolatedRun(runWithContext.runToReplace));
+            topResolver.setWhitespaceCollapsingTransitionForIsolatedRun(runWithContext.runToReplace, isolatedResolver.whitespaceCollapsingTransitionForIsolatedRun(runWithContext.runToReplace));
             topResolver.isolatedRuns().append(WTFMove(runWithContext));
         }
     }
@@ -1286,7 +1286,7 @@ void RenderBlockFlow::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, I
 {
     const RenderStyle& styleToUse = style();
     bool paginated = view().layoutState() && view().layoutState()->isPaginated();
-    LineMidpointState& lineMidpointState = resolver.midpointState();
+    LineWhitespaceCollapsingState& lineWhitespaceCollapsingState = resolver.whitespaceCollapsingState();
     InlineIterator end = resolver.position();
     bool checkForEndLineMatch = layoutState.endLine();
     RenderTextInfo renderTextInfo;
@@ -1305,7 +1305,7 @@ void RenderBlockFlow::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, I
             }
         }
 
-        lineMidpointState.reset();
+        lineWhitespaceCollapsingState.reset();
 
         layoutState.lineInfo().setEmpty(true);
         layoutState.lineInfo().resetRunsFromLeadingWhitespace();
@@ -1455,7 +1455,7 @@ void RenderBlockFlow::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, I
             layoutState.setLastFloat(!floatingObjectSet.isEmpty() ? floatingObjectSet.last().get() : nullptr);
         }
 
-        lineMidpointState.reset();
+        lineWhitespaceCollapsingState.reset();
         resolver.setPosition(end, numberOfIsolateAncestors(end));
     }
 
@@ -1518,18 +1518,39 @@ void RenderBlockFlow::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, I
             markLinesDirtyInBlockRange(lastRootBox()->lineBottomWithLeading(), lineBox->lineBottomWithLeading(), lineBox);
         }
     }
-
     clearDidBreakAtLineToAvoidWidow();
+}
+
+void RenderBlockFlow::reattachCleanLineFloats(RootInlineBox& cleanLine, LayoutUnit delta, bool isFirstCleanLine)
+{
+    auto* cleanLineFloats = cleanLine.floatsPtr();
+    if (!cleanLineFloats)
+        return;
+
+    for (auto* floatingBox : *cleanLineFloats) {
+        auto* floatingObject = insertFloatingObject(*floatingBox);
+        if (isFirstCleanLine && floatingObject->originatingLine()) {
+            // Float box does not belong to this line anymore.
+            ASSERT_WITH_SECURITY_IMPLICATION(cleanLine.prevRootBox() == floatingObject->originatingLine());
+            cleanLine.removeFloat(*floatingBox);
+            continue;
+        }
+        ASSERT_WITH_SECURITY_IMPLICATION(!floatingObject->originatingLine());
+        floatingObject->setOriginatingLine(&cleanLine);
+        setLogicalHeight(logicalTopForChild(*floatingBox) - marginBeforeForChild(*floatingBox) + delta);
+        positionNewFloats();
+    }
 }
 
 void RenderBlockFlow::linkToEndLineIfNeeded(LineLayoutState& layoutState)
 {
-    if (layoutState.endLine()) {
+    auto* firstCleanLine = layoutState.endLine();
+    if (firstCleanLine) {
         if (layoutState.endLineMatched()) {
             bool paginated = view().layoutState() && view().layoutState()->isPaginated();
             // Attach all the remaining lines, and then adjust their y-positions as needed.
             LayoutUnit delta = logicalHeight() - layoutState.endLineLogicalTop();
-            for (RootInlineBox* line = layoutState.endLine(); line; line = line->nextRootBox()) {
+            for (auto* line = firstCleanLine; line; line = line->nextRootBox()) {
                 line->attachLine();
                 if (paginated) {
                     delta -= line->paginationStrut();
@@ -1542,16 +1563,7 @@ void RenderBlockFlow::linkToEndLineIfNeeded(LineLayoutState& layoutState)
                 }
                 if (layoutState.flowThread())
                     updateRegionForLine(line);
-                if (Vector<RenderBox*>* cleanLineFloats = line->floatsPtr()) {
-                    for (auto it = cleanLineFloats->begin(), end = cleanLineFloats->end(); it != end; ++it) {
-                        RenderBox* floatingBox = *it;
-                        FloatingObject* floatingObject = insertFloatingObject(*floatingBox);
-                        ASSERT(!floatingObject->originatingLine());
-                        floatingObject->setOriginatingLine(line);
-                        setLogicalHeight(logicalTopForChild(*floatingBox) - marginBeforeForChild(*floatingBox) + delta);
-                        positionNewFloats();
-                    }
-                }
+                reattachCleanLineFloats(*line, delta, line == firstCleanLine);
             }
             setLogicalHeight(lastRootBox()->lineBottomWithLeading());
         } else {
@@ -1847,7 +1859,7 @@ RootInlineBox* RenderBlockFlow::determineStartPosition(LineLayoutState& layoutSt
                 for (auto it = cleanLineFloats->begin(), end = cleanLineFloats->end(); it != end; ++it) {
                     RenderBox* floatingBox = *it;
                     FloatingObject* floatingObject = insertFloatingObject(*floatingBox);
-                    ASSERT(!floatingObject->originatingLine());
+                    ASSERT_WITH_SECURITY_IMPLICATION(!floatingObject->originatingLine());
                     floatingObject->setOriginatingLine(line);
                     setLogicalHeight(logicalTopForChild(*floatingBox) - marginBeforeForChild(*floatingBox));
                     positionNewFloats();

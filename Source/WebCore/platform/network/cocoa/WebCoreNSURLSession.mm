@@ -111,6 +111,7 @@ NS_ASSUME_NONNULL_END
 - (void)taskCompleted:(WebCoreNSURLSessionDataTask *)task
 {
     ASSERT(_dataTasks.contains(task));
+    task.session = nil;
     _dataTasks.remove(task);
     if (!_dataTasks.isEmpty() || !_invalidated)
         return;
@@ -456,7 +457,7 @@ void WebCoreNSURLSessionDataTaskClient::loadFinished(PlatformMediaResource& reso
 @synthesize error=_error;
 @synthesize taskDescription=_taskDescription;
 @synthesize priority=_priority;
-@dynamic response;
+
 - (NSURLResponse *)response
 {
     return _response.get();
@@ -494,6 +495,15 @@ void WebCoreNSURLSessionDataTaskClient::loadFinished(PlatformMediaResource& reso
         [strongSelf _restart];
         strongSelf.get().state = NSURLSessionTaskStateRunning;
     });
+}
+
+- (void)dealloc
+{
+    [_originalRequest release];
+    [_currentRequest release];
+    [_error release];
+    [_taskDescription release];
+    [super dealloc];
 }
 
 #pragma mark - NSURLSession SPI
@@ -593,6 +603,10 @@ void WebCoreNSURLSessionDataTaskClient::loadFinished(PlatformMediaResource& reso
 - (void)_resource:(PlatformMediaResource&)resource loadFinishedWithError:(NSError *)error
 {
     ASSERT_UNUSED(resource, &resource == _resource);
+    if (self.state == NSURLSessionTaskStateCompleted)
+        return;
+    self.state = NSURLSessionTaskStateCompleted;
+
     RetainPtr<WebCoreNSURLSessionDataTask> strongSelf { self };
     RetainPtr<NSError> strongError { error };
     [self.session addDelegateOperation:[strongSelf, strongError] {

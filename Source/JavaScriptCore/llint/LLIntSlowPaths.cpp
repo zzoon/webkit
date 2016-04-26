@@ -53,6 +53,7 @@
 #include "LowLevelInterpreter.h"
 #include "ObjectConstructor.h"
 #include "ProtoCallFrame.h"
+#include "ShadowChicken.h"
 #include "StructureRareDataInlines.h"
 #include "VMInlines.h"
 #include <wtf/StringPrintStream.h>
@@ -66,11 +67,11 @@ namespace JSC { namespace LLInt {
 #ifndef NDEBUG
 #define LLINT_SET_PC_FOR_STUBS() do { \
         exec->codeBlock()->bytecodeOffset(pc); \
-        exec->setCurrentVPC(pc + 1); \
+        exec->setCurrentVPC(pc); \
     } while (false)
 #else
 #define LLINT_SET_PC_FOR_STUBS() do { \
-        exec->setCurrentVPC(pc + 1); \
+        exec->setCurrentVPC(pc); \
     } while (false)
 #endif
 
@@ -542,6 +543,19 @@ LLINT_SLOW_PATH_DECL(slow_path_instanceof_custom)
 
     JSValue result = jsBoolean(constructor.getObject()->hasInstance(exec, value, hasInstanceValue));
     LLINT_RETURN(result);
+}
+
+LLINT_SLOW_PATH_DECL(slow_path_try_get_by_id)
+{
+    LLINT_BEGIN();
+    CodeBlock* codeBlock = exec->codeBlock();
+    const Identifier& ident = codeBlock->identifier(pc[3].u.operand);
+    JSValue baseValue = LLINT_OP_C(2).jsValue();
+    PropertySlot slot(baseValue, PropertySlot::PropertySlot::InternalMethodType::VMInquiry);
+
+    baseValue.getPropertySlot(exec, ident, slot);
+
+    LLINT_RETURN(slot.getPureResult());
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_get_by_id)
@@ -1469,7 +1483,7 @@ LLINT_SLOW_PATH_DECL(slow_path_put_to_scope)
     bool hasProperty = scope->hasProperty(exec, ident);
     if (hasProperty
         && scope->isGlobalLexicalEnvironment()
-        && getPutInfo.initializationMode() != Initialization) {
+        && !isInitialization(getPutInfo.initializationMode())) {
         // When we can't statically prove we need a TDZ check, we must perform the check on the slow path.
         PropertySlot slot(scope, PropertySlot::InternalMethodType::Get);
         JSGlobalLexicalEnvironment::getOwnPropertySlot(scope, exec, ident, slot);
@@ -1480,7 +1494,7 @@ LLINT_SLOW_PATH_DECL(slow_path_put_to_scope)
     if (getPutInfo.resolveMode() == ThrowIfNotFound && !hasProperty)
         LLINT_THROW(createUndefinedVariableError(exec, ident));
 
-    PutPropertySlot slot(scope, codeBlock->isStrictMode(), PutPropertySlot::UnknownContext, getPutInfo.initializationMode() == Initialization);
+    PutPropertySlot slot(scope, codeBlock->isStrictMode(), PutPropertySlot::UnknownContext, isInitialization(getPutInfo.initializationMode()));
     scope->methodTable()->put(scope, exec, ident, value, slot);
     
     CommonSlowPaths::tryCachePutToScopeGlobal(exec, codeBlock, pc, scope, getPutInfo, slot, ident);
@@ -1499,6 +1513,25 @@ LLINT_SLOW_PATH_DECL(slow_path_check_if_exception_is_uncatchable_and_notify_prof
     if (isTerminatedExecutionException(vm.exception()))
         LLINT_RETURN_TWO(pc, bitwise_cast<void*>(static_cast<uintptr_t>(1)));
     LLINT_RETURN_TWO(pc, 0);
+}
+
+LLINT_SLOW_PATH_DECL(slow_path_log_shadow_chicken_prologue)
+{
+    LLINT_BEGIN();
+    
+    vm.shadowChicken().log(
+        vm, exec, ShadowChicken::Packet::prologue(exec->callee(), exec, exec->callerFrame()));
+    
+    LLINT_END();
+}
+
+LLINT_SLOW_PATH_DECL(slow_path_log_shadow_chicken_tail)
+{
+    LLINT_BEGIN();
+    
+    vm.shadowChicken().log(vm, exec, ShadowChicken::Packet::tail(exec));
+    
+    LLINT_END();
 }
 
 extern "C" SlowPathReturnType llint_throw_stack_overflow_error(VM* vm, ProtoCallFrame* protoFrame)

@@ -32,6 +32,7 @@ interface TestRunner {
     void waitUntilDownloadFinished();
     void notifyDone();
     double preciseTime();
+    readonly attribute double timeout;
 
     // Other dumping.
     void dumpBackForwardList();
@@ -148,11 +149,11 @@ interface TestRunner {
     void removeChromeInputField(object callback);
     void focusWebView(object callback);
 
-    void clearTestRunnerCallbacks();
-
+    // Window/view state
     void setBackingScaleFactor(double backingScaleFactor, object callback);
 
     void setWindowIsKey(boolean isKey);
+    void setViewSize(double width, double height);
 
     // Cookies testing
     void setAlwaysAcceptCookies(boolean accept);
@@ -174,7 +175,7 @@ interface TestRunner {
 
     // Geolocation
     void setGeolocationPermission(boolean value);
-    void setMockGeolocationPosition(double latitude, double longitude, double accuracy, [Default=Undefined] optional object altitude, optional object altitudeAccuracy, optional object heading, optional object speed);
+    void setMockGeolocationPosition(double latitude, double longitude, double accuracy, optional object altitude, optional object altitudeAccuracy, optional object heading, optional object speed);
     void setMockGeolocationPositionUnavailableError(DOMString errorMessage);
     boolean isGeolocationProviderActive();
 
@@ -220,5 +221,7 @@ interface TestRunner {
 
     // UI Process Testing
     void runUIScript(DOMString script, object callback);
+
+    void clearTestRunnerCallbacks();
 };
 

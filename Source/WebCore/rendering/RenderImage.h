@@ -40,8 +40,8 @@ enum ImageSizeChangeType {
 
 class RenderImage : public RenderReplaced {
 public:
-    RenderImage(Element&, Ref<RenderStyle>&&, StyleImage* = nullptr, const float = 1.0f);
-    RenderImage(Document&, Ref<RenderStyle>&&, StyleImage* = nullptr);
+    RenderImage(Element&, RenderStyle&&, StyleImage* = nullptr, const float = 1.0f);
+    RenderImage(Document&, RenderStyle&&, StyleImage* = nullptr);
     virtual ~RenderImage();
 
     RenderImageResource& imageResource() { return *m_imageResource; }
@@ -117,7 +117,7 @@ private:
     // Update the size of the image to be rendered. Object-fit may cause this to be different from the CSS box's content rect.
     void updateInnerContentRect();
 
-    void paintAreaElementFocusRing(PaintInfo&);
+    void paintAreaElementFocusRing(PaintInfo&, const LayoutPoint& paintOffset);
     
     void layoutShadowControls(const LayoutSize& oldSize);
 

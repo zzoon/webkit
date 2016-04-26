@@ -299,7 +299,7 @@ sub SkipFunction {
 
     my $functionName = "webkit_dom_" . $decamelize . "_" . $prefix . decamelize($function->signature->name);
     my $functionReturnType = $prefix eq "set_" ? "void" : $function->signature->type;
-    my $isCustomFunction = $function->signature->extendedAttributes->{"Custom"} || $function->signature->extendedAttributes->{"CustomBinding"};
+    my $isCustomFunction = $function->signature->extendedAttributes->{"Custom"};
     my $callWith = $function->signature->extendedAttributes->{"CallWith"};
     my $isUnsupportedCallWith = $codeGenerator->ExtendedAttributeContains($callWith, "ScriptArguments") || $codeGenerator->ExtendedAttributeContains($callWith, "CallStack") || $codeGenerator->ExtendedAttributeContains($callWith, "FirstWindow") || $codeGenerator->ExtendedAttributeContains($callWith, "ActiveWindow");
 
@@ -1028,7 +1028,8 @@ sub GetEffectiveFunctionName {
 sub FunctionUsedToRaiseException {
     my $functionName = shift;
 
-    return $functionName eq "webkit_dom_character_data_append_data"
+    return $functionName eq "webkit_dom_attr_set_value"
+        || $functionName eq "webkit_dom_character_data_append_data"
         || $functionName eq "webkit_dom_character_data_set_data"
         || $functionName eq "webkit_dom_document_create_node_iterator"
         || $functionName eq "webkit_dom_document_create_tree_walker"
@@ -1109,6 +1110,9 @@ sub GenerateFunction {
         }
         if ($paramIsGDOMType || ($paramIDLType eq "DOMString")) {
             $paramName = "converted" . $codeGenerator->WK_ucfirst($paramName);
+            if ($prefix ne "set_" && $codeGenerator->ShouldPassWrapperByReference($param, $parentNode)) {
+                $paramName = "*$paramName";
+            }
         }
         if ($paramIDLType eq "NodeFilter" || $paramIDLType eq "XPathNSResolver") {
             $paramName = "WTF::getPtr(" . $paramName . ")";

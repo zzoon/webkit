@@ -84,15 +84,7 @@ JSFunction* JSFunction::create(VM& vm, WebAssemblyExecutable* executable, JSScop
 
 NativeExecutable* JSFunction::lookUpOrCreateNativeExecutable(VM& vm, NativeFunction nativeFunction, Intrinsic intrinsic, NativeFunction nativeConstructor, const String& name)
 {
-#if !ENABLE(JIT)
-    UNUSED_PARAM(intrinsic);
-#else
-    if (intrinsic != NoIntrinsic && vm.canUseJIT()) {
-        ASSERT(nativeConstructor == callHostFunctionAsConstructor);
-        return vm.getHostFunction(nativeFunction, intrinsic, name);
-    }
-#endif
-    return vm.getHostFunction(nativeFunction, nativeConstructor, name);
+    return vm.getHostFunction(nativeFunction, intrinsic, nativeConstructor, name);
 }
 
 JSFunction* JSFunction::create(VM& vm, JSGlobalObject* globalObject, int length, const String& name, NativeFunction nativeFunction, Intrinsic intrinsic, NativeFunction nativeConstructor)
@@ -250,7 +242,7 @@ public:
 
     JSValue result() const { return m_result; }
 
-    StackVisitor::Status operator()(StackVisitor& visitor)
+    StackVisitor::Status operator()(StackVisitor& visitor) const
     {
         JSObject* callee = visitor->callee();
         if (callee != m_targetCallee)
@@ -262,7 +254,7 @@ public:
 
 private:
     JSObject* m_targetCallee;
-    JSValue m_result;
+    mutable JSValue m_result;
 };
 
 static JSValue retrieveArguments(ExecState* exec, JSFunction* functionObj)
@@ -292,7 +284,7 @@ public:
 
     JSValue result() const { return m_result; }
 
-    StackVisitor::Status operator()(StackVisitor& visitor)
+    StackVisitor::Status operator()(StackVisitor& visitor) const
     {
         JSObject* callee = visitor->callee();
 
@@ -315,9 +307,9 @@ public:
 
 private:
     JSObject* m_targetCallee;
-    bool m_hasFoundFrame;
-    bool m_hasSkippedToCallerFrame;
-    JSValue m_result;
+    mutable bool m_hasFoundFrame;
+    mutable bool m_hasSkippedToCallerFrame;
+    mutable JSValue m_result;
 };
 
 static JSValue retrieveCallerFunction(ExecState* exec, JSFunction* functionObj)

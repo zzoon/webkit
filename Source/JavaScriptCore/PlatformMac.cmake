@@ -16,7 +16,7 @@ list(APPEND JavaScriptCore_SOURCES
     inspector/remote/RemoteInspector.mm
     inspector/remote/RemoteInspectorXPCConnection.mm
 )
-add_definitions(-DSTATICALLY_LINKED_WITH_WTF)
+add_definitions(-DSTATICALLY_LINKED_WITH_WTF -D__STDC_WANT_LIB_EXT1__)
 
 find_library(SECURITY_LIBRARY Security)
 list(APPEND JavaScriptCore_LIBRARIES
@@ -38,6 +38,8 @@ list(APPEND JavaScriptCore_INCLUDE_DIRECTORIES
 list(APPEND JavaScriptCore_HEADERS
     ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/TracingDtrace.h
 )
+
+set(CMAKE_SHARED_LINKER_FLAGS ${CMAKE_SHARED_LINKER_FLAGS} "-compatibility_version 1 -current_version ${WEBKIT_MAC_VERSION}")
 
 # FIXME: Make including these files consistent in the source so these forwarding headers are not needed.
 if (NOT EXISTS ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/InspectorBackendDispatchers.h)

@@ -214,7 +214,7 @@ public:
 
     int32_t asInt32() const;
     uint32_t asUInt32() const;
-    int64_t asMachineInt() const;
+    int64_t asAnyInt() const;
     double asDouble() const;
     bool asBoolean() const;
     double asNumber() const;
@@ -232,7 +232,7 @@ public:
     bool isNull() const;
     bool isUndefinedOrNull() const;
     bool isBoolean() const;
-    bool isMachineInt() const;
+    bool isAnyInt() const;
     bool isNumber() const;
     bool isString() const;
     bool isSymbol() const;
@@ -241,6 +241,7 @@ public:
     bool isCustomGetterSetter() const;
     bool isObject() const;
     bool inherits(const ClassInfo*) const;
+    const ClassInfo* classInfoOrNull() const;
         
     // Extracting the value.
     bool getString(ExecState*, WTF::String&) const;
@@ -307,6 +308,7 @@ public:
     JSCell* asCell() const;
     JS_EXPORT_PRIVATE bool isValidCallee();
 
+    Structure* structureOrNull() const;
     JSValue structureOrUndefined() const;
 
     JS_EXPORT_PRIVATE void dump(PrintStream&) const;

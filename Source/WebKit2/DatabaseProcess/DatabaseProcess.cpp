@@ -32,6 +32,7 @@
 #include "DatabaseProcessMessages.h"
 #include "DatabaseProcessProxyMessages.h"
 #include "DatabaseToWebProcessConnection.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebCrossThreadCopier.h"
 #include "WebsiteData.h"
 #include <WebCore/CrossThreadTask.h>
@@ -98,7 +99,7 @@ void DatabaseProcess::didReceiveInvalidMessage(IPC::Connection&, IPC::StringRefe
 IDBServer::IDBServer& DatabaseProcess::idbServer()
 {
     if (!m_idbServer)
-        m_idbServer = IDBServer::IDBServer::create(indexedDatabaseDirectory());
+        m_idbServer = IDBServer::IDBServer::create(indexedDatabaseDirectory(), DatabaseProcess::singleton());
 
     return *m_idbServer;
 }
@@ -305,7 +306,34 @@ void DatabaseProcess::deleteWebsiteDataForOrigins(WebCore::SessionID, OptionSet<
 #endif
 }
 
+void DatabaseProcess::grantSandboxExtensionsForBlobs(const Vector<String>& paths, const SandboxExtension::HandleArray& handles)
+{
+    ASSERT(paths.size() == handles.size());
+
+    for (size_t i = 0; i < paths.size(); ++i) {
+        auto result = m_blobTemporaryFileSandboxExtensions.add(paths[i], SandboxExtension::create(handles[i]));
+        ASSERT_UNUSED(result, result.isNewEntry);
+    }
+}
+
 #if ENABLE(INDEXED_DATABASE)
+void DatabaseProcess::prepareForAccessToTemporaryFile(const String& path)
+{
+    if (auto extension = m_blobTemporaryFileSandboxExtensions.get(path))
+        extension->consume();
+}
+
+void DatabaseProcess::accessToTemporaryFileComplete(const String& path)
+{
+    // We've either hard linked the temporary blob file to the database directory, copied it there,
+    // or the transaction is being aborted.
+    // In any of those cases, we can delete the temporary blob file now.
+    deleteFile(path);
+
+    if (auto extension = m_blobTemporaryFileSandboxExtensions.take(path))
+        extension->revoke();
+}
+
 Vector<RefPtr<WebCore::SecurityOrigin>> DatabaseProcess::indexedDatabaseOrigins()
 {
     if (m_indexedDatabaseDirectory.isEmpty())
@@ -321,9 +349,7 @@ Vector<RefPtr<WebCore::SecurityOrigin>> DatabaseProcess::indexedDatabaseOrigins(
 
     return securityOrigins;
 }
-#endif
 
-#if ENABLE(INDEXED_DATABASE)
 static void removeAllDatabasesForOriginPath(const String& originPath, std::chrono::system_clock::time_point modifiedSince)
 {
     // FIXME: We should also close/invalidate any live handles to the database files we are about to delete.
@@ -378,6 +404,21 @@ void DatabaseProcess::deleteIndexedDatabaseEntriesModifiedSince(std::chrono::sys
         removeAllDatabasesForOriginPath(originPath, modifiedSince);
 }
 #endif
+
+void DatabaseProcess::getSandboxExtensionsForBlobFiles(const Vector<String>& filenames, std::function<void (const SandboxExtension::HandleArray&)> completionHandler)
+{
+    static uint64_t lastRequestID;
+
+    uint64_t requestID = ++lastRequestID;
+    m_sandboxExtensionForBlobsCompletionHandlers.set(requestID, completionHandler);
+    parentProcessConnection()->send(Messages::DatabaseProcessProxy::GetSandboxExtensionsForBlobFiles(requestID, filenames), 0);
+}
+
+void DatabaseProcess::didGetSandboxExtensionsForBlobFiles(uint64_t requestID, const SandboxExtension::HandleArray& handles)
+{
+    if (auto handler = m_sandboxExtensionForBlobsCompletionHandlers.take(requestID))
+        handler(handles);
+}
 
 #if !PLATFORM(COCOA)
 void DatabaseProcess::initializeProcess(const ChildProcessInitializationParameters&)

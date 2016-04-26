@@ -37,6 +37,7 @@
 #include "JSReadableStream.h"
 #include "JSReadableStreamPrivateConstructors.h"
 #include "JSWorkerGlobalScope.h"
+#include "RuntimeEnabledFeatures.h"
 #include "WebCoreJSClientData.h"
 #include "WorkerGlobalScope.h"
 
@@ -113,7 +114,7 @@ void JSDOMGlobalObject::finishCreation(VM& vm, JSObject* thisValue)
 {
     Base::finishCreation(vm, thisValue);
     ASSERT(inherits(info()));
-
+    
     addBuiltinGlobals(vm);
 }
 
