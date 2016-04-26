@@ -34,6 +34,8 @@
 #include "MockMediaEndpoint.h"
 
 #include "MediaPayload.h"
+#include "MockRealtimeAudioSource.h"
+#include "MockRealtimeVideoSource.h"
 #include "RealtimeMediaSource.h"
 #include <wtf/MainThread.h>
 
@@ -154,10 +156,16 @@ void MockMediaEndpoint::addRemoteCandidate(IceCandidate& candidate, unsigned mde
     UNUSED_PARAM(password);
 }
 
-RefPtr<RealtimeMediaSource> MockMediaEndpoint::createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type type)
+RefPtr<RealtimeMediaSource> MockMediaEndpoint::createMutedRemoteSource(const String&, RealtimeMediaSource::Type type)
 {
-    UNUSED_PARAM(mid);
-    UNUSED_PARAM(type);
+    switch (type) {
+    case RealtimeMediaSource::Audio:
+        return MockRealtimeAudioSource::createMuted("remote audio");
+    case RealtimeMediaSource::Video:
+        return MockRealtimeVideoSource::createMuted("remote video");
+    case RealtimeMediaSource::None:
+        ASSERT_NOT_REACHED();
+    }
 
     return nullptr;
 }

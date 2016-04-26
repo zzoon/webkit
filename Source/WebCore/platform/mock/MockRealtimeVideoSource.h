@@ -47,6 +47,7 @@ class MockRealtimeVideoSource : public MockRealtimeMediaSource {
 public:
 
     static RefPtr<MockRealtimeVideoSource> create();
+    static RefPtr<MockRealtimeVideoSource> createMuted(const String& name);
 
     virtual ~MockRealtimeVideoSource() { }
 
@@ -56,7 +57,7 @@ public:
     void setFrameRate(float);
 
 protected:
-    MockRealtimeVideoSource();
+    MockRealtimeVideoSource(const String& name);
     virtual void updatePlatformLayer() const { }
 
     ImageBuffer* imageBuffer() const;
