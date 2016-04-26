@@ -214,9 +214,10 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
 
         mediaDescription->setMode(transceiver->directionalityString());
         if (transceiver->hasActiveSender()) {
-            RTCRtpSender* sender = transceiver->sender();
-            mediaDescription->setMediaStreamId(sender->mediaStreamIds()[0]);
-            mediaDescription->setMediaStreamTrackId(sender->trackId());
+            RTCRtpSender& sender = *transceiver->sender();
+
+            mediaDescription->setMediaStreamId(sender.mediaStreamIds()[0]);
+            mediaDescription->setMediaStreamTrackId(sender.trackId());
         }
 
         transceivers.removeFirst(transceiver);
@@ -225,13 +226,13 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
     // Add media descriptions for remaining transceivers.
     for (auto& transceiver : transceivers) {
         RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
-        RTCRtpSender* sender = transceiver->sender();
+        RTCRtpSender& sender = *transceiver->sender();
 
         mediaDescription->setMode(transceiver->directionalityString());
         mediaDescription->setMid(transceiver->provisionalMid());
-        mediaDescription->setMediaStreamId(sender->mediaStreamIds()[0]);
-        mediaDescription->setType(sender->trackKind());
-        mediaDescription->setPayloads(sender->trackKind() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads);
+        mediaDescription->setMediaStreamId(sender.mediaStreamIds()[0]);
+        mediaDescription->setType(sender.trackKind());
+        mediaDescription->setPayloads(sender.trackKind() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads);
         mediaDescription->setDtlsFingerprintHashFunction(m_dtlsFingerprintFunction);
         mediaDescription->setDtlsFingerprint(m_dtlsFingerprint);
         mediaDescription->setCname(m_cname);
@@ -239,8 +240,8 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         mediaDescription->setIceUfrag(m_iceUfrag);
         mediaDescription->setIcePassword(m_icePassword);
 
-        if (sender->track()) {
-            MediaStreamTrack& track = *sender->track();
+        if (sender.track()) {
+            MediaStreamTrack& track = *sender.track();
             mediaDescription->setMediaStreamTrackId(track.id());
         }
 
