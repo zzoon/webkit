@@ -12,6 +12,8 @@
             var sender;
             var sender2;
             var senderFromPc2
+            var receiver;
+            var transceiver;
 
             description("Test basic behavior of RTCPeerConnection.add/removeTrack()");
 
@@ -37,6 +39,20 @@
                 shouldBe("sender.track", "track");
                 shouldBe("pc.getSenders().length", "1");
                 shouldBe("pc.getSenders()[0]", "sender");
+
+                shouldBe("pc.getReceivers().length", "1");
+                receiver = pc.getReceivers()[0];
+                shouldBeType("receiver.track", "MediaStreamTrack");
+                shouldBeTrue("receiver.track.muted");
+
+                shouldBe("receiver.track.kind", "sender.track.kind");
+
+                shouldBe("pc.getTransceivers().length", "1");
+                transceiver = pc.getTransceivers()[0];
+                shouldBeNull("transceiver.mid");
+                shouldBe("transceiver.sender", "sender");
+                shouldBe("transceiver.receiver", "receiver");
+                shouldBeFalse("transceiver.stopped");
 
                 debug("Try to add same track again");
                 shouldThrow("sender = pc.addTrack(track, stream)");
