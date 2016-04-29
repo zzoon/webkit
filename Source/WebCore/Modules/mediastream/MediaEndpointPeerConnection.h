@@ -90,8 +90,8 @@ private:
     void createOfferTask(RTCOfferOptions&, PeerConnection::SessionDescriptionPromise&);
     void createAnswerTask(RTCAnswerOptions&, PeerConnection::SessionDescriptionPromise&);
 
-    void setLocalDescriptionTask(RTCSessionDescription&, PeerConnection::VoidPromise&);
-    void setRemoteDescriptionTask(RTCSessionDescription&, PeerConnection::VoidPromise&);
+    void setLocalDescriptionTask(RefPtr<RTCSessionDescription>&&, PeerConnection::VoidPromise&);
+    void setRemoteDescriptionTask(RefPtr<RTCSessionDescription>&&, PeerConnection::VoidPromise&);
 
     void addIceCandidateTask(RTCIceCandidate&, PeerConnection::VoidPromise&);
 

@@ -66,15 +66,15 @@ static SessionDescription::Type parseDescriptionType(const String& typeName)
 
 Ref<SessionDescription> SessionDescription::create(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration)
 {
-    return adoptRef(*new SessionDescription(type, WTFMove(configuration)));
+    return adoptRef(*new SessionDescription(type, WTFMove(configuration), nullptr));
 }
 
-RefPtr<SessionDescription> SessionDescription::create(const RTCSessionDescription& description, const SDPProcessor& sdpProcessor, RefPtr<DOMError>& error)
+RefPtr<SessionDescription> SessionDescription::create(RefPtr<RTCSessionDescription>&& rtcDescription, const SDPProcessor& sdpProcessor, RefPtr<DOMError>& error)
 {
-    SessionDescription::Type type = parseDescriptionType(description.type());
+    SessionDescription::Type type = parseDescriptionType(rtcDescription->type());
 
     RefPtr<MediaEndpointSessionConfiguration> configuration;
-    SDPProcessor::Result result = sdpProcessor.parse(description.sdp(), configuration);
+    SDPProcessor::Result result = sdpProcessor.parse(rtcDescription->sdp(), configuration);
     if (result != SDPProcessor::Result::Success) {
         if (result == SDPProcessor::Result::ParseError) {
             error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
@@ -85,7 +85,7 @@ RefPtr<SessionDescription> SessionDescription::create(const RTCSessionDescriptio
         return nullptr;
     }
 
-    return adoptRef(new SessionDescription(type, WTFMove(configuration)));
+    return adoptRef(new SessionDescription(type, WTFMove(configuration), WTFMove(rtcDescription)));
 }
 
 RefPtr<RTCSessionDescription> SessionDescription::toRTCSessionDescription(const SDPProcessor& sdpProcessor) const
@@ -95,6 +95,11 @@ RefPtr<RTCSessionDescription> SessionDescription::toRTCSessionDescription(const 
     if (result != SDPProcessor::Result::Success) {
         LOG_ERROR("SDPProcessor internal error");
         return nullptr;
+    }
+
+    if (m_rtcDescription) {
+        m_rtcDescription->setSdp(sdpString);
+        return m_rtcDescription;
     }
 
     return RTCSessionDescription::create(typeString(), sdpString);

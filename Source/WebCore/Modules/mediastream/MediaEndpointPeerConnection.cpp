@@ -356,15 +356,15 @@ void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& des
     RefPtr<RTCSessionDescription> protectedDescription = &description;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
 
-    runTask([this, protectedDescription, wrappedPromise]() {
-        setLocalDescriptionTask(*protectedDescription, wrappedPromise->promise());
+    runTask([this, protectedDescription, wrappedPromise]() mutable {
+        setLocalDescriptionTask(WTFMove(protectedDescription), wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::setLocalDescriptionTask(RTCSessionDescription& description, VoidPromise& promise)
+void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescription>&& description, VoidPromise& promise)
 {
     RefPtr<DOMError> error;
-    RefPtr<SessionDescription> newDescription = SessionDescription::create(description, *m_sdpProcessor, error);
+    RefPtr<SessionDescription> newDescription = SessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
     if (!newDescription) {
         promise.reject(error);
         return;
@@ -514,15 +514,15 @@ void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription& de
     RefPtr<RTCSessionDescription> protectedDescription = &description;
     RefPtr<WrappedVoidPromise> wrappedPromise = WrappedVoidPromise::create(WTFMove(promise));
 
-    runTask([this, protectedDescription, wrappedPromise]() {
-        setRemoteDescriptionTask(*protectedDescription, wrappedPromise->promise());
+    runTask([this, protectedDescription, wrappedPromise]() mutable {
+        setRemoteDescriptionTask(WTFMove(protectedDescription), wrappedPromise->promise());
     });
 }
 
-void MediaEndpointPeerConnection::setRemoteDescriptionTask(RTCSessionDescription& description, VoidPromise& promise)
+void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDescription>&& description, VoidPromise& promise)
 {
     RefPtr<DOMError> error;
-    RefPtr<SessionDescription> newDescription = SessionDescription::create(description, *m_sdpProcessor, error);
+    RefPtr<SessionDescription> newDescription = SessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
     if (!newDescription) {
         promise.reject(error);
         return;

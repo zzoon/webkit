@@ -54,7 +54,7 @@ public:
     };
 
     static Ref<SessionDescription> create(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration);
-    static RefPtr<SessionDescription> create(const RTCSessionDescription&, const SDPProcessor&, RefPtr<DOMError>&);
+    static RefPtr<SessionDescription> create(RefPtr<RTCSessionDescription>&&, const SDPProcessor&, RefPtr<DOMError>&);
     virtual ~SessionDescription() { }
 
     RefPtr<RTCSessionDescription> toRTCSessionDescription(const SDPProcessor&) const;
@@ -66,13 +66,16 @@ public:
     bool isLaterThan(SessionDescription* other) const;
 
 private:
-    SessionDescription(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration)
+    SessionDescription(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration, RefPtr<RTCSessionDescription>&& rtcDescription)
         : m_type(type)
         , m_configuration(configuration)
+        , m_rtcDescription(WTFMove(rtcDescription))
     { }
 
     Type m_type;
     RefPtr<MediaEndpointSessionConfiguration> m_configuration;
+
+    RefPtr<RTCSessionDescription> m_rtcDescription;
 };
 
 } // namespace WebCore
