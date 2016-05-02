@@ -2,6 +2,7 @@
 <html>
     <head>
         <script src="../../resources/js-test-pre.js"></script>
+        <script src="resources/promise-utils.js"></script>
     </head>
     <body>
         <script>
@@ -38,17 +39,17 @@
                 shouldBe("sender.track", "audioTrack");
 
                 promiseShouldReject("sender.replaceTrack()")
-                .catch(function () {
+                .then(function () {
                     return promiseShouldReject("sender.replaceTrack(null)");
                 })
-                .catch(function () {
+                .then(function () {
                     return promiseShouldReject("sender.replaceTrack({})");
                 })
-                .catch(function () {
+                .then(function () {
                     debug("Test mismatching track kind");
                     return promiseShouldReject("sender.replaceTrack(videoTrack)");
                 })
-                .catch(function () {
+                .then(function () {
                     return promiseShouldResolve("sender.replaceTrack(audioTrack2)");
                 })
                 .then(function () {
@@ -56,14 +57,14 @@
                     pc.removeTrack(sender);
                     return promiseShouldReject("sender.replaceTrack(audioTrack2)");
                 })
-                .catch(function () {
+                .then(function () {
                     debug("Create a new sender");
                     shouldNotThrow("sender = pc.addTrack(audioTrack2, stream)");
                     debug("Close pc and try replacing the track");
                     pc.close();
                     return promiseShouldReject("sender.replaceTrack(audioTrack3)");
                 })
-                .catch(function () {
+                .then(function () {
                     debug("End of promise chain");
                     finishJSTest();
                 });
@@ -72,60 +73,6 @@
                 testFailed("getUserMedia error: " + error);
                 finishJSTest();
             });
-
-            function promiseShouldResolve(expr) {
-                var p;
-                try {
-                    p = eval(expr);
-                } catch (e) {
-                    testFailed("evaluating " + expr + " threw exception " + e);
-                    return Promise.reject();
-                }
-
-                if (!(p instanceof Promise)) {
-                    testFailed(expr + " does not evaluate to a promise.");
-                    return Promise.reject();
-                }
-
-                p.then(function (result) {
-                    testPassed("promise " + expr + " fulfilled with " + result);
-                });
-
-                p.catch(function (reason) {
-                    testFailed("promise " + expr + " rejected unexpectedly with " + reason);
-                    if (window.jsTestIsAsync)
-                        finishJSTest();
-                });
-
-                return p;
-            }
-
-            function promiseShouldReject(expr) {
-                var p;
-                try {
-                    p = eval(expr);
-                } catch (e) {
-                    testFailed("evaluating " + expr + " threw exception " + e);
-                    return Promise.reject();
-                }
-
-                if (!(p instanceof Promise)) {
-                    testFailed(expr + " does not evaluate to a promise.");
-                    return Promise.reject();
-                }
-
-                p.then(function () {
-                    testFailed("promise " + expr + " fulfilled unexpectedly.");
-                    if (window.jsTestIsAsync)
-                        finishJSTest();
-                });
-
-                p.catch(function (reason) {
-                    testPassed("promise " + expr + " rejected with " + reason);
-                });
-
-                return p;
-            }
 
             window.jsTestIsAsync = true;
             window.successfullyParsed = true;
