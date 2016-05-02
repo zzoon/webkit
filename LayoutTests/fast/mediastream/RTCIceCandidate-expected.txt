@@ -8,6 +8,8 @@ PASS candidate.candidate is "foo"
 PASS candidate.sdpMid is "bar"
 PASS candidate.sdpMLineIndex is 6
 
+Dictionary argument is mandatory.
+PASS new RTCIceCandidate(); threw exception TypeError: Not enough arguments.
 Dictionary member 'candidate' is required.
 PASS new RTCIceCandidate({}); threw exception TypeError: Type error.
 PASS new RTCIceCandidate({sdpMid:"bar", sdpMLineIndex:6}); threw exception TypeError: Type error.

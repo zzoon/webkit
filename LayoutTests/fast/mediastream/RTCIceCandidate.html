@@ -15,6 +15,9 @@
             shouldBe('candidate.sdpMLineIndex', '6');
             debug("");
 
+            debug("Dictionary argument is mandatory.");
+            shouldThrow('new RTCIceCandidate();');
+
             debug("Dictionary member 'candidate' is required.");
             shouldThrow('new RTCIceCandidate({});');
             shouldThrow('new RTCIceCandidate({sdpMid:"bar", sdpMLineIndex:6});');

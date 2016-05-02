@@ -31,7 +31,7 @@
 
 [
     Conditional=WEB_RTC,
-    Constructor(optional Dictionary dictionary),
+    Constructor(Dictionary dictionary),
     ConstructorRaisesException
 ] interface RTCIceCandidate {
     attribute DOMString candidate;
