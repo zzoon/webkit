@@ -30,6 +30,10 @@ Set firstOffer as local description again.
 PASS firstOffer set as local description (again)
 PASS pc.signalingState is 'have-local-offer'
 
+*** Try setting local descriptions with bad types for the current state
+PASS promise pc.setLocalDescription(new RTCSessionDescription({type:'answer'})); rejected with [object DOMError]
+PASS promise pc.setLocalDescription(new RTCSessionDescription({type:'pranswer'})); rejected with [object DOMError]
+
 *** Add videoTrack
 PASS pc.getTransceivers().length is 2
 *** Find the transceiver for the newly added video track

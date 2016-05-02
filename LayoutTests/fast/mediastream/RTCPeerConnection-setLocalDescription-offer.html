@@ -2,6 +2,7 @@
 <html>
     <head>
         <script src="../../resources/js-test-pre.js"></script>
+        <script src="resources/promise-utils.js"></script>
     </head>
     <body>
         <script>
@@ -80,6 +81,15 @@
                 testPassed("firstOffer set as local description (again)");
 
                 shouldBe("pc.signalingState", "'have-local-offer'");
+                debug("");
+
+                debug("*** Try setting local descriptions with bad types for the current state");
+                return promiseShouldReject("pc.setLocalDescription(new RTCSessionDescription({type:'answer'}));");
+            })
+            .then(function () {
+                return promiseShouldReject("pc.setLocalDescription(new RTCSessionDescription({type:'pranswer'}));");
+            })
+            .then(function () {
                 debug("");
 
                 debug("*** Add videoTrack");
