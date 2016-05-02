@@ -39,33 +39,29 @@
 
 namespace WebCore {
 
-static bool verifyType(const String& type)
+static bool isRTCSdpTypeEnumValue(const String& type)
 {
-    return type == "offer" || type == "pranswer" || type == "answer";
+    return type == "offer" || type == "pranswer" || type == "answer" || type == "rollback";
 }
 
 RefPtr<RTCSessionDescription> RTCSessionDescription::create(const Dictionary& dictionary, ExceptionCode& ec)
 {
     String type;
-    bool ok = dictionary.get("type", type);
-    if (ok && !verifyType(type)) {
-        ec = TYPE_MISMATCH_ERR;
+    // Dictionary member type is required.
+    if (!dictionary.get("type", type)) {
+        ec = TypeError;
+        return nullptr;
+    }
+
+    if (!isRTCSdpTypeEnumValue(type)) {
+        ec = TypeError;
         return nullptr;
     }
 
     String sdp;
-    ok = dictionary.get("sdp", sdp);
-    if (ok && sdp.isEmpty()) {
-        ec = TYPE_MISMATCH_ERR;
-        return nullptr;
-    }
+    dictionary.get("sdp", sdp);
 
     return adoptRef(new RTCSessionDescription(type, sdp));
-}
-
-Ref<RTCSessionDescription> RTCSessionDescription::create(const RTCSessionDescription* description)
-{
-    return adoptRef(*new RTCSessionDescription(description->type(), description->sdp()));
 }
 
 Ref<RTCSessionDescription> RTCSessionDescription::create(const String& type, const String& sdp)
@@ -77,14 +73,7 @@ RTCSessionDescription::RTCSessionDescription(const String& type, const String& s
     : m_type(type)
     , m_sdp(sdp)
 {
-}
-
-void RTCSessionDescription::setType(const String& type, ExceptionCode& ec)
-{
-    if (verifyType(type))
-        m_type = type;
-    else
-        ec = TYPE_MISMATCH_ERR;
+    ASSERT(isRTCSdpTypeEnumValue(m_type));
 }
 
 } // namespace WebCore

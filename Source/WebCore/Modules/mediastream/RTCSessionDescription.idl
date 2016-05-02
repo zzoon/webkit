@@ -31,11 +31,11 @@
 
 [
     Conditional=WEB_RTC,
-    CustomConstructor(optional Dictionary dictionary),
+    Constructor(Dictionary dictionary),
     ConstructorRaisesException
 ] interface RTCSessionDescription {
-    [SetterRaisesException] attribute DOMString type;
-    attribute DOMString sdp;
+    [SetterRaisesException] readonly attribute DOMString type;
+    readonly attribute DOMString sdp;
 
     serializer = {type, sdp};
 };
