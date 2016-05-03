@@ -1,16 +1,26 @@
+function ensurePromise(expr) {
+    var p;
+    try {
+        p = eval(expr);
+    } catch (e) {
+        testFailed("evaluating " + expr + " threw exception " + e);
+        return null;
+    }
+
+    if (!(p instanceof Promise)) {
+        testFailed(expr + " does not evaluate to a promise.");
+        return null;
+    }
+
+    return p;
+}
+
 function promiseShouldResolve(expr) {
     return new Promise(function (done) {
-        var p;
-        try {
-            p = eval(expr);
-        } catch (e) {
-            testFailed("evaluating " + expr + " threw exception " + e);
+        var p = ensurePromise(expr);
+        if (!p) {
             done();
-        }
-
-        if (!(p instanceof Promise)) {
-            testFailed(expr + " does not evaluate to a promise.");
-            done();
+            return;
         }
 
         p.then(function (value) {
@@ -26,17 +36,10 @@ function promiseShouldResolve(expr) {
 
 function promiseShouldReject(expr) {
     return new Promise(function (done) {
-        var p;
-        try {
-            p = eval(expr);
-        } catch (e) {
-            testFailed("evaluating " + expr + " threw exception " + e);
+        var p = ensurePromise(expr);
+        if (!p) {
             done();
-        }
-
-        if (!(p instanceof Promise)) {
-            testFailed(expr + " does not evaluate to a promise.");
-            done();
+            return;
         }
 
         p.then(function () {
