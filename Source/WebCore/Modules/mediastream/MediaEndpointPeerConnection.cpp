@@ -577,7 +577,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
 
             if (!transceiver) {
                 RefPtr<RTCRtpSender> sender = RTCRtpSender::create(mediaDescription->type(), Vector<String>(), m_client->senderClient());
-                RefPtr<RTCRtpReceiver> receiver = createReceiver(mediaDescription->mid(), mediaDescription->type());
+                RefPtr<RTCRtpReceiver> receiver = createReceiver(mediaDescription->mid(), mediaDescription->type(), mediaDescription->mediaStreamTrackId());
 
                 Ref<RTCRtpTransceiver> newTransceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
                 newTransceiver->setMid(mediaDescription->mid());
@@ -760,14 +760,14 @@ Vector<RefPtr<MediaStream>> MediaEndpointPeerConnection::getRemoteStreams() cons
     return remoteStreams;
 }
 
-RefPtr<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String& transceiverMid, const String& trackKind)
+RefPtr<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId)
 {
     RealtimeMediaSource::Type sourceType = trackKind == "audio" ? RealtimeMediaSource::Type::Audio : RealtimeMediaSource::Type::Video;
 
     // Create a muted remote source that will be unmuted once media starts arriving.
     RefPtr<RealtimeMediaSource> remoteSource = m_mediaEndpoint->createMutedRemoteSource(transceiverMid, sourceType);
     // FIXME: Revisit when discussion about receiver track id concludes.
-    RefPtr<MediaStreamTrackPrivate> remoteTrackPrivate = MediaStreamTrackPrivate::create(WTFMove(remoteSource));
+    RefPtr<MediaStreamTrackPrivate> remoteTrackPrivate = MediaStreamTrackPrivate::create(WTFMove(remoteSource), trackId);
     RefPtr<MediaStreamTrack> remoteTrack = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *remoteTrackPrivate);
 
     return RTCRtpReceiver::create(WTFMove(remoteTrack));

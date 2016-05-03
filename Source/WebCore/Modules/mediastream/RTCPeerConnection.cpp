@@ -51,6 +51,7 @@
 #include "RTCOfferAnswerOptions.h"
 #include "RTCSessionDescription.h"
 #include "RTCTrackEvent.h"
+#include "UUID.h"
 #include <wtf/MainThread.h>
 #include <wtf/text/Base64.h>
 
@@ -174,9 +175,10 @@ RefPtr<RTCRtpSender> RTCPeerConnection::privateAddTrack(RefPtr<MediaStreamTrack>
     if (!transceiver) {
         String transceiverMid = RTCRtpTransceiver::getNextMid();
         const String& trackKind = track->kind();
+        String trackId = createCanonicalUUIDString();
 
         RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), WTFMove(mediaStreamIds), *this);
-        RefPtr<RTCRtpReceiver> receiver = m_backend->createReceiver(transceiverMid, trackKind);
+        RefPtr<RTCRtpReceiver> receiver = m_backend->createReceiver(transceiverMid, trackKind, trackId);
         RefPtr<RTCRtpTransceiver> newTransceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
 
         // This transceiver is not yet associated with an m-line (null mid), but we need a
@@ -228,9 +230,10 @@ RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(RefPtr<MediaStreamTr
 
     String transceiverMid = RTCRtpTransceiver::getNextMid();
     const String& trackKind = track->kind();
+    const String& trackId = track->id();
 
     RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), Vector<String>(), *this);
-    RefPtr<RTCRtpReceiver> receiver = m_backend->createReceiver(transceiverMid, trackKind);
+    RefPtr<RTCRtpReceiver> receiver = m_backend->createReceiver(transceiverMid, trackKind, trackId);
     Ref<RTCRtpTransceiver> transceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
     transceiver->setProvisionalMid(transceiverMid);
 
@@ -250,9 +253,10 @@ RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(const String& kind, 
     }
 
     String transceiverMid = RTCRtpTransceiver::getNextMid();
+    String trackId = createCanonicalUUIDString();
 
     RefPtr<RTCRtpSender> sender = RTCRtpSender::create(kind, Vector<String>(), *this);
-    RefPtr<RTCRtpReceiver> receiver = m_backend->createReceiver(transceiverMid, kind);
+    RefPtr<RTCRtpReceiver> receiver = m_backend->createReceiver(transceiverMid, kind, trackId);
     Ref<RTCRtpTransceiver> transceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
     transceiver->setProvisionalMid(transceiverMid);
 

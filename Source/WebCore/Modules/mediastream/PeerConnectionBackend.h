@@ -109,7 +109,7 @@ public:
 
     virtual Vector<RefPtr<MediaStream>> getRemoteStreams() const = 0;
 
-    virtual RefPtr<RTCRtpReceiver> createReceiver(const String& trackKind, const String& transceiverMid) = 0;
+    virtual RefPtr<RTCRtpReceiver> createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId) = 0;
     virtual void replaceTrack(RTCRtpSender&, RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&&) = 0;
 
     virtual void stop() = 0;
