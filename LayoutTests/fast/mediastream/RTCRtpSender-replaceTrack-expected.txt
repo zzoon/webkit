@@ -13,6 +13,12 @@ PASS promise sender.replaceTrack({}) rejected with TypeError: Argument 1 ('withT
 Test mismatching track kind
 PASS promise sender.replaceTrack(videoTrack) rejected with TypeError: Type error
 PASS promise sender.replaceTrack(audioTrack2) fulfilled with undefined
+PASS Track successfully replaced
+PASS sender.track is audioTrack2
+Sender should still use old track (audioTrack) id in negotiation.
+PASS offer created
+PASS offer.sdp.indexOf(audioTrack.id) is not -1
+PASS offer.sdp.indexOf(audioTrack2.id) is -1
 Stop sender, and try replacing the track
 PASS promise sender.replaceTrack(audioTrack2) rejected with [object DOMError]
 Create a new sender
