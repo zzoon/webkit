@@ -240,10 +240,8 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         mediaDescription->setIceUfrag(m_iceUfrag);
         mediaDescription->setIcePassword(m_icePassword);
 
-        if (sender.track()) {
-            MediaStreamTrack& track = *sender.track();
-            mediaDescription->setMediaStreamTrackId(track.id());
-        }
+        if (sender.track())
+            mediaDescription->setMediaStreamTrackId(sender.trackId());
 
         configurationSnapshot->addMediaDescription(WTFMove(mediaDescription));
     }
