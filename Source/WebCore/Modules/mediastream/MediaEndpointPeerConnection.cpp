@@ -488,31 +488,6 @@ RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::pendingLocalDescripti
     return createRTCSessionDescription(m_pendingLocalDescription.get());
 }
 
-static Vector<RefPtr<MediaPayload>> filterPayloads(const Vector<RefPtr<MediaPayload>>& remotePayloads, const Vector<RefPtr<MediaPayload>>& defaultPayloads)
-{
-    Vector<RefPtr<MediaPayload>> filteredPayloads;
-
-    for (auto& remotePayload : remotePayloads) {
-        MediaPayload* defaultPayload = nullptr;
-        for (auto& p : defaultPayloads) {
-            if (p->encodingName() == remotePayload->encodingName().convertToASCIIUppercase()) {
-                defaultPayload = p.get();
-                break;
-            }
-        }
-        if (!defaultPayload)
-            continue;
-
-        if (defaultPayload->parameters().contains("packetizationMode") && remotePayload->parameters().contains("packetizationMode")
-            && (defaultPayload->parameters().get("packetizationMode") != defaultPayload->parameters().get("packetizationMode")))
-            continue;
-
-        filteredPayloads.append(remotePayload);
-    }
-
-    return filteredPayloads;
-}
-
 void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription& description, VoidPromise&& promise)
 {
     RefPtr<RTCSessionDescription> protectedDescription = &description;
@@ -546,7 +521,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
         if (mediaDescription->type() != "audio" && mediaDescription->type() != "video")
             continue;
 
-        mediaDescription->setPayloads(filterPayloads(mediaDescription->payloads(),
+        mediaDescription->setPayloads(m_mediaEndpoint->filterPayloads(mediaDescription->payloads(),
             mediaDescription->type() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads));
     }
 

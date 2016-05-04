@@ -48,6 +48,7 @@ class PeerMediaDescription;
 class RealtimeMediaSource;
 
 typedef std::unique_ptr<MediaEndpoint> (*CreateMediaEndpoint)(MediaEndpointClient&);
+typedef Vector<RefPtr<MediaPayload>> MediaPayloadVector;
 
 class MediaEndpoint {
 public:
@@ -75,6 +76,7 @@ public:
     virtual void generateDtlsInfo() = 0;
     virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() = 0;
     virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() = 0;
+    virtual MediaPayloadVector filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads) = 0;
 
     virtual UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
     virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;

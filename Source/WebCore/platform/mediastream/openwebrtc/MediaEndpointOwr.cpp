@@ -157,6 +157,31 @@ Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultVideoPayloads()
     return payloads;
 }
 
+MediaPayloadVector MediaEndpointOwr::filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads)
+{
+    Vector<RefPtr<MediaPayload>> filteredPayloads;
+
+    for (auto& remotePayload : remotePayloads) {
+        MediaPayload* defaultPayload = nullptr;
+        for (auto& p : defaultPayloads) {
+            if (p->encodingName() == remotePayload->encodingName().convertToASCIIUppercase()) {
+                defaultPayload = p.get();
+                break;
+            }
+        }
+        if (!defaultPayload)
+            continue;
+
+        if (defaultPayload->parameters().contains("packetizationMode") && remotePayload->parameters().contains("packetizationMode")
+            && (defaultPayload->parameters().get("packetizationMode") != defaultPayload->parameters().get("packetizationMode")))
+            continue;
+
+        filteredPayloads.append(remotePayload);
+    }
+
+    return filteredPayloads;
+}
+
 MediaEndpoint::UpdateResult MediaEndpointOwr::updateReceiveConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     Vector<TransceiverConfig> transceiverConfigs;

@@ -132,6 +132,31 @@ Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultVideoPayloads()
     return payloads;
 }
 
+MediaPayloadVector MockMediaEndpoint::filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads)
+{
+    Vector<RefPtr<MediaPayload>> filteredPayloads;
+
+    for (auto& remotePayload : remotePayloads) {
+        MediaPayload* defaultPayload = nullptr;
+        for (auto& p : defaultPayloads) {
+            if (p->encodingName() == remotePayload->encodingName().convertToASCIIUppercase()) {
+                defaultPayload = p.get();
+                break;
+            }
+        }
+        if (!defaultPayload)
+            continue;
+
+        if (defaultPayload->parameters().contains("packetizationMode") && remotePayload->parameters().contains("packetizationMode")
+            && (defaultPayload->parameters().get("packetizationMode") != defaultPayload->parameters().get("packetizationMode")))
+            continue;
+
+        filteredPayloads.append(remotePayload);
+    }
+
+    return filteredPayloads;
+}
+
 MediaEndpoint::UpdateResult MockMediaEndpoint::updateReceiveConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     UNUSED_PARAM(configuration);
