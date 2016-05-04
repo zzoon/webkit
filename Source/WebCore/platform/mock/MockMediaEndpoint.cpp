@@ -71,9 +71,9 @@ void MockMediaEndpoint::generateDtlsInfo()
     });
 }
 
-Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultAudioPayloads()
+MediaPayloadVector MockMediaEndpoint::getDefaultAudioPayloads()
 {
-    Vector<RefPtr<MediaPayload>> payloads;
+    MediaPayloadVector payloads;
 
     RefPtr<MediaPayload> payload = MediaPayload::create();
     payload->setType(111);
@@ -99,9 +99,9 @@ Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultAudioPayloads()
     return payloads;
 }
 
-Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultVideoPayloads()
+MediaPayloadVector MockMediaEndpoint::getDefaultVideoPayloads()
 {
-    Vector<RefPtr<MediaPayload>> payloads;
+    MediaPayloadVector payloads;
 
     RefPtr<MediaPayload> payload = MediaPayload::create();
     payload->setType(103);
@@ -134,7 +134,7 @@ Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultVideoPayloads()
 
 MediaPayloadVector MockMediaEndpoint::filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads)
 {
-    Vector<RefPtr<MediaPayload>> filteredPayloads;
+    MediaPayloadVector filteredPayloads;
 
     for (auto& remotePayload : remotePayloads) {
         MediaPayload* defaultPayload = nullptr;

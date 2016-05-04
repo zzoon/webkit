@@ -96,9 +96,9 @@ void MediaEndpointOwr::generateDtlsInfo()
     owr_crypto_create_crypto_data(cryptoDataCallback, this);
 }
 
-Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultAudioPayloads()
+MediaPayloadVector MediaEndpointOwr::getDefaultAudioPayloads()
 {
-    Vector<RefPtr<MediaPayload>> payloads;
+    MediaPayloadVector payloads;
 
     RefPtr<MediaPayload> payload = MediaPayload::create();
     payload->setType(111);
@@ -124,9 +124,9 @@ Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultAudioPayloads()
     return payloads;
 }
 
-Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultVideoPayloads()
+MediaPayloadVector MediaEndpointOwr::getDefaultVideoPayloads()
 {
-    Vector<RefPtr<MediaPayload>> payloads;
+    MediaPayloadVector payloads;
 
     RefPtr<MediaPayload> payload = MediaPayload::create();
     payload->setType(103);
@@ -159,7 +159,7 @@ Vector<RefPtr<MediaPayload>> MediaEndpointOwr::getDefaultVideoPayloads()
 
 MediaPayloadVector MediaEndpointOwr::filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads)
 {
-    Vector<RefPtr<MediaPayload>> filteredPayloads;
+    MediaPayloadVector filteredPayloads;
 
     for (auto& remotePayload : remotePayloads) {
         MediaPayload* defaultPayload = nullptr;
@@ -207,7 +207,7 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateReceiveConfiguration(MediaEn
     return UpdateResult::Success;
 }
 
-static RefPtr<MediaPayload> findRtxPayload(Vector<RefPtr<MediaPayload>> payloads, unsigned apt)
+static RefPtr<MediaPayload> findRtxPayload(MediaPayloadVector payloads, unsigned apt)
 {
     for (auto& payload : payloads) {
         if (payload->encodingName().convertToASCIIUppercase() == "RTX" && payload->parameters().contains("apt")
