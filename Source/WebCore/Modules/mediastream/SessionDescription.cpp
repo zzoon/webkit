@@ -77,7 +77,7 @@ RefPtr<SessionDescription> SessionDescription::create(RefPtr<RTCSessionDescripti
     SDPProcessor::Result result = sdpProcessor.parse(rtcDescription->sdp(), configuration);
     if (result != SDPProcessor::Result::Success) {
         if (result == SDPProcessor::Result::ParseError) {
-            error = DOMError::create("InvalidSessionDescriptionError (unable to parse description)");
+            error = DOMError::create("InvalidAccessError: Invalid session description content");
             return nullptr;
         }
         LOG_ERROR("SDPProcessor internal error");
