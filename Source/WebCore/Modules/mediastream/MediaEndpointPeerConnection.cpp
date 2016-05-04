@@ -194,6 +194,9 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
 
+    if (m_client->internalSignalingState() == SignalingState::Closed)
+        return;
+
     RefPtr<MediaEndpointSessionConfiguration> configurationSnapshot = internalLocalDescription() ?
         internalLocalDescription()->configuration()->clone() : MediaEndpointSessionConfiguration::create();
 
@@ -263,6 +266,9 @@ void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, Sessio
 void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDescriptionPromise& promise)
 {
     ASSERT(!m_dtlsFingerprint.isEmpty());
+
+    if (m_client->internalSignalingState() == SignalingState::Closed)
+        return;
 
     if (!internalRemoteDescription()) {
         promise.reject(DOMError::create("InvalidStateError: No remote description set"));
@@ -360,6 +366,9 @@ void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& des
 
 void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescription>&& description, VoidPromise& promise)
 {
+    if (m_client->internalSignalingState() == SignalingState::Closed)
+        return;
+
     RefPtr<DOMError> error;
     RefPtr<SessionDescription> newDescription = SessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
     if (!newDescription) {
@@ -516,6 +525,9 @@ void MediaEndpointPeerConnection::setRemoteDescription(RTCSessionDescription& de
 
 void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDescription>&& description, VoidPromise& promise)
 {
+    if (m_client->internalSignalingState() == SignalingState::Closed)
+        return;
+
     RefPtr<DOMError> error;
     RefPtr<SessionDescription> newDescription = SessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
     if (!newDescription) {
@@ -690,6 +702,9 @@ void MediaEndpointPeerConnection::addIceCandidate(RTCIceCandidate& rtcCandidate,
 
 void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandidate, PeerConnection::VoidPromise& promise)
 {
+    if (m_client->internalSignalingState() == SignalingState::Closed)
+        return;
+
     if (!internalRemoteDescription()) {
         promise.reject(DOMError::create("InvalidStateError: No remote description set"));
         return;
@@ -793,6 +808,9 @@ void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<Medi
 
 void MediaEndpointPeerConnection::replaceTrackTask(RTCRtpSender& sender, const String& mid, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise& promise)
 {
+    if (m_client->internalSignalingState() == SignalingState::Closed)
+        return;
+
     m_mediaEndpoint->replaceSendSource(withTrack->source(), mid);
 
     sender.setTrack(WTFMove(withTrack));
