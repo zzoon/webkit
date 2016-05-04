@@ -80,22 +80,22 @@ public:
     MediaEndpointOwr(MediaEndpointClient&);
     ~MediaEndpointOwr();
 
-    virtual void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override;
+    void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override;
 
-    virtual void generateDtlsInfo() override;
-    virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;
-    virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() override;
-    virtual MediaPayloadVector filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads) override;
+    void generateDtlsInfo() override;
+    Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;
+    Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() override;
+    MediaPayloadVector filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads) override;
 
-    virtual UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
-    virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
+    UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
+    UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
 
-    virtual void addRemoteCandidate(IceCandidate&, const String& mid, const String& ufrag, const String& password) override;
+    void addRemoteCandidate(IceCandidate&, const String& mid, const String& ufrag, const String& password) override;
 
     RefPtr<RealtimeMediaSource> createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type) override;
-    virtual void replaceSendSource(RealtimeMediaSource&, const String& mid) override;
+    void replaceSendSource(RealtimeMediaSource&, const String& mid) override;
 
-    virtual void stop() override;
+    void stop() override;
 
     unsigned transceiverIndexForSession(OwrSession*) const;
     const String& sessionMid(OwrSession*) const;
