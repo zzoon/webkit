@@ -53,7 +53,7 @@ public:
         Rollback = 4
     };
 
-    static Ref<SessionDescription> create(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration);
+    static Ref<SessionDescription> create(Type, RefPtr<MediaEndpointSessionConfiguration>&&);
     static RefPtr<SessionDescription> create(RefPtr<RTCSessionDescription>&&, const SDPProcessor&, RefPtr<DOMError>&);
     virtual ~SessionDescription() { }
 

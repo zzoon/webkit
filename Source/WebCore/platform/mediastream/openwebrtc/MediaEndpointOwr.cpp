@@ -369,7 +369,7 @@ void MediaEndpointOwr::dispatchNewIceCandidate(const String& mid, RefPtr<IceCand
     m_client.gotIceCandidate(mid, WTFMove(iceCandidate));
 }
 
-  void MediaEndpointOwr::dispatchGatheringDone(const String& mid)
+void MediaEndpointOwr::dispatchGatheringDone(const String& mid)
 {
     m_client.doneGatheringCandidates(mid);
 }
