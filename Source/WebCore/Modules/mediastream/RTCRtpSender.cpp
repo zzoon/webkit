@@ -77,8 +77,8 @@ void RTCRtpSender::replaceTrack(RefPtr<MediaStreamTrack>&& withTrack, PeerConnec
         return;
     }
 
-    if (!m_client) {
-        promise.reject(DOMError::create("InvalidStateError"));
+    if (isStopped()) {
+        promise.reject(DOMError::create("InvalidStateError: Sender is stopped"));
         return;
     }
 

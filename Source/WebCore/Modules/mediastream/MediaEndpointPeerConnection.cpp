@@ -775,11 +775,6 @@ RefPtr<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String&
 
 void MediaEndpointPeerConnection::replaceTrack(RTCRtpSender& sender, RefPtr<MediaStreamTrack>&& withTrack, PeerConnection::VoidPromise&& promise)
 {
-    if (sender.isStopped()) {
-        promise.reject(DOMError::create("InvalidStateError (sender is stopped)"));
-        return;
-    }
-
     RTCRtpTransceiver* transceiver = matchTransceiver(m_client->getTransceivers(), [&sender] (RTCRtpTransceiver& current) {
         return current.sender() == &sender;
     });
