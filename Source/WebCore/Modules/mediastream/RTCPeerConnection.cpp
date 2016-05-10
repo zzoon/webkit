@@ -163,9 +163,9 @@ RefPtr<RTCRtpSender> RTCPeerConnection::privateAddTrack(RefPtr<MediaStreamTrack>
 
     for (auto& existingTransceiver : m_transceiverSet) {
         // Reuse an existing sender if it has never been used to send before.
-        if (!existingTransceiver->hasActiveSender() && existingTransceiver->sender()->trackId().isNull()) {
+        if (!existingTransceiver->hasSendingDirection() && existingTransceiver->sender()->trackId().isNull()) {
             transceiver = existingTransceiver.get();
-            transceiver->setSenderStatus(RTCRtpTransceiver::Status::Active);
+            transceiver->enableSendingDirection();
             transceiver->sender()->setTrack(WTFMove(track));
             transceiver->sender()->setMediaStreamIds(WTFMove(mediaStreamIds));
             break;

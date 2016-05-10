@@ -65,36 +65,24 @@ String RTCRtpTransceiver::getNextMid()
 }
 
 RTCRtpTransceiver::RTCRtpTransceiver(RefPtr<RTCRtpSender>&& sender, RefPtr<RTCRtpReceiver>&& receiver)
-    : m_sender(sender)
+    : m_direction(sendrecvString())
+    , m_sender(sender)
     , m_receiver(receiver)
     , m_iceTransport(RTCIceTransport::create())
 {
 }
 
-static bool parseDirectionality(const String& string, bool& hasActiveSender, bool& hasActiveReceiver)
+static bool isRTCRtpTransceiverDirectionEnumValue(const String& string)
 {
-    if (string == sendrecvString()) {
-        hasActiveSender = true;
-        hasActiveReceiver = true;
-    } else if (string == sendonlyString()) {
-        hasActiveSender = true;
-        hasActiveReceiver = false;
-    } else if (string == recvonlyString()) {
-        hasActiveSender = false;
-        hasActiveReceiver = true;
-    } else if (string == inactiveString()) {
-        hasActiveSender = false;
-        hasActiveReceiver = false;
-    } else
-        return false;
-    return true;
+    return string == sendrecvString() || string == sendonlyString()
+        || string == recvonlyString() || string == inactiveString();
 }
 
 bool RTCRtpTransceiver::configureWithDictionary(const Dictionary& dictionary)
 {
-    String directionality;
-    if (dictionary.get("directionality", directionality)) {
-        if (!parseDirectionality(directionality, m_hasActiveSender, m_hasActiveReceiver))
+    String direction;
+    if (dictionary.get("direction", direction)) {
+        if (!isRTCRtpTransceiverDirectionEnumValue(direction))
             return false;
     }
 
@@ -102,11 +90,25 @@ bool RTCRtpTransceiver::configureWithDictionary(const Dictionary& dictionary)
     return true;
 }
 
-const String& RTCRtpTransceiver::directionalityString() const
+bool RTCRtpTransceiver::hasSendingDirection() const
 {
-    if (m_hasActiveSender)
-        return m_hasActiveReceiver ? sendrecvString() : sendonlyString();
-    return m_hasActiveReceiver ? recvonlyString() : inactiveString();
+    return m_direction == sendrecvString() || m_direction == sendonlyString();
+}
+
+void RTCRtpTransceiver::enableSendingDirection()
+{
+    if (m_direction == recvonlyString())
+        m_direction = sendrecvString();
+    else if (m_direction == inactiveString())
+        m_direction = sendonlyString();
+}
+
+void RTCRtpTransceiver::disableSendingDirection()
+{
+    if (m_direction == sendrecvString())
+        m_direction = recvonlyString();
+    else if (m_direction == sendonlyString())
+        m_direction = inactiveString();
 }
 
 } // namespace WebCore

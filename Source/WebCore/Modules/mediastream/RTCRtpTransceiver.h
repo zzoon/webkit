@@ -48,23 +48,16 @@ class MediaStreamTrack;
 
 class RTCRtpTransceiver : public RefCounted<RTCRtpTransceiver>, public ScriptWrappable {
 public:
-    enum class Status {
-        Active,
-        Inactive
-    };
-
     static Ref<RTCRtpTransceiver> create(RefPtr<RTCRtpSender>&&, RefPtr<RTCRtpReceiver>&&);
     virtual ~RTCRtpTransceiver() { }
 
     bool configureWithDictionary(const Dictionary&);
 
-    bool hasActiveSender() const { return m_hasActiveSender; }
-    void setSenderStatus(Status status) { m_hasActiveSender = status == Status::Active; }
+    bool hasSendingDirection() const;
+    void enableSendingDirection();
+    void disableSendingDirection();
 
-    bool hasActiveReceiver() const { return m_hasActiveReceiver; }
-    void setReceiverStatus(Status status) { m_hasActiveReceiver = status == Status::Active; }
-
-    const String& directionalityString() const;
+    const String& direction() const { return m_direction; }
 
     const String& provisionalMid() const { return m_provisionalMid; }
     void setProvisionalMid(const String& provisionalMid) { m_provisionalMid = provisionalMid; }
@@ -88,13 +81,14 @@ public:
 private:
     RTCRtpTransceiver(RefPtr<RTCRtpSender>&&, RefPtr<RTCRtpReceiver>&&);
 
-    bool m_hasActiveSender { true };
-    bool m_hasActiveReceiver { true };
-
     String m_provisionalMid;
     String m_mid;
+
+    String m_direction;
+
     RefPtr<RTCRtpSender> m_sender;
     RefPtr<RTCRtpReceiver> m_receiver;
+
     bool m_stopped { false };
 
     RefPtr<RTCIceTransport> m_iceTransport;

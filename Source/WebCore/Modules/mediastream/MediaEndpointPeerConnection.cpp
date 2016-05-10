@@ -215,8 +215,8 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         if (!transceiver)
             continue;
 
-        mediaDescription->setMode(transceiver->directionalityString());
-        if (transceiver->hasActiveSender()) {
+        mediaDescription->setMode(transceiver->direction());
+        if (transceiver->hasSendingDirection()) {
             RTCRtpSender& sender = *transceiver->sender();
 
             mediaDescription->setMediaStreamId(sender.mediaStreamIds()[0]);
@@ -231,7 +231,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         RefPtr<PeerMediaDescription> mediaDescription = PeerMediaDescription::create();
         RTCRtpSender& sender = *transceiver->sender();
 
-        mediaDescription->setMode(transceiver->directionalityString());
+        mediaDescription->setMode(transceiver->direction());
         mediaDescription->setMid(transceiver->provisionalMid());
         mediaDescription->setMediaStreamId(sender.mediaStreamIds()[0]);
         mediaDescription->setType(sender.trackKind());
@@ -303,7 +303,7 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
                 newMediaDescription->addSsrc(cryptographicallyRandomNumber());
             }
 
-            newMediaDescription->setMode(transceiver->directionalityString());
+            newMediaDescription->setMode(transceiver->direction());
             newMediaDescription->setType(remoteMediaDescription.type());
             newMediaDescription->setMid(remoteMediaDescription.mid());
             newMediaDescription->setDtlsSetup(remoteMediaDescription.dtlsSetup() == "active" ? "passive" : "active");
@@ -347,7 +347,7 @@ static void updateSendSources(const MediaDescriptionVector& remoteMediaDescripti
 
         RTCRtpTransceiver* transceiver = matchTransceiverByMid(transceivers, remoteMediaDescription.mid());
         if (transceiver) {
-            if (transceiver->hasActiveSender() && transceiver->sender()->track())
+            if (transceiver->hasSendingDirection() && transceiver->sender()->track())
                 remoteMediaDescription.setSource(&transceiver->sender()->track()->source());
             return;
         }
@@ -565,7 +565,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
                 Ref<RTCRtpTransceiver> newTransceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
                 newTransceiver->setMid(mediaDescription->mid());
                 if (receiveOnlyFlag)
-                    newTransceiver->setSenderStatus(RTCRtpTransceiver::Status::Inactive);
+                    newTransceiver->disableSendingDirection();
 
                 transceiver = newTransceiver.ptr();
                 m_client->addTransceiver(WTFMove(newTransceiver));
