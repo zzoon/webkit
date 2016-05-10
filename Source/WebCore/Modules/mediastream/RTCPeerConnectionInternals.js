@@ -57,7 +57,7 @@ function enqueueOperation(peerConnection, operation)
     });
 }
 
-function objectAndCallbacksOverload(args, functionName, objectConstructor, objectIsNullable, promiseMode, legacyMode)
+function objectAndCallbacksOverload(args, functionName, objectConstructor, objectOptions, promiseMode, legacyMode)
 {
     "use strict";
 
@@ -65,13 +65,13 @@ function objectAndCallbacksOverload(args, functionName, objectConstructor, objec
     var objectArg = args[0];
     var objectArgOk = false;
 
-    if (argsCount == 0 && objectIsNullable) {
+    if (argsCount == 0 && objectOptions.optionalAndNullable) {
         objectArg = null;
         objectArgOk = true;
         argsCount = 1;
     } else {
         var hasMatchingType = objectArg instanceof objectConstructor;
-        objectArgOk = objectIsNullable ? (objectArg === null || typeof objectArg === "undefined" || hasMatchingType) : hasMatchingType;
+        objectArgOk = objectOptions.optionalAndNullable ? (objectArg === null || typeof objectArg === "undefined" || hasMatchingType) : hasMatchingType;
     }
 
     if (argsCount == 1 && objectArgOk)

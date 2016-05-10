@@ -192,7 +192,7 @@ function setLocalDescription()
 
     var peerConnection = this;
 
-    return @objectAndCallbacksOverload(arguments, "setLocalDescription", @RTCSessionDescription, false, function (description) {
+    return @objectAndCallbacksOverload(arguments, "setLocalDescription", @RTCSessionDescription, {}, function (description) {
         // Promise mode
         return @enqueueOperation(peerConnection, function () {
             return peerConnection.@queuedSetLocalDescription(description);
@@ -213,7 +213,7 @@ function setRemoteDescription()
 
     var peerConnection = this;
 
-    return @objectAndCallbacksOverload(arguments, "setRemoteDescription", @RTCSessionDescription, false, function (description) {
+    return @objectAndCallbacksOverload(arguments, "setRemoteDescription", @RTCSessionDescription, {}, function (description) {
         // Promise mode
         return @enqueueOperation(peerConnection, function () {
             return peerConnection.@queuedSetRemoteDescription(description);
@@ -234,7 +234,7 @@ function addIceCandidate()
 
     var peerConnection = this;
 
-    return @objectAndCallbacksOverload(arguments, "addIceCandidate", @RTCIceCandidate, false, function (candidate) {
+    return @objectAndCallbacksOverload(arguments, "addIceCandidate", @RTCIceCandidate, {}, function (candidate) {
         // Promise mode
         return @enqueueOperation(peerConnection, function () {
             return peerConnection.@queuedAddIceCandidate(candidate);
@@ -255,7 +255,8 @@ function getStats()
 
     var peerConnection = this;
 
-    return @objectAndCallbacksOverload(arguments, "getStats", @MediaStreamTrack, true, function (selector) {
+    var objectOptions = { "optionalAndNullable": true };
+    return @objectAndCallbacksOverload(arguments, "getStats", @MediaStreamTrack, objectOptions, function (selector) {
         // Promise mode
         return peerConnection.@privateGetStats(selector);
     }, function (selector, successCallback, errorCallback) {
