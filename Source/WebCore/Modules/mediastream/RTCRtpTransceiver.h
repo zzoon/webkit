@@ -58,6 +58,7 @@ public:
     void disableSendingDirection();
 
     const String& direction() const { return m_direction; }
+    void setDirection(const String direction) { m_direction = direction; }
 
     const String& provisionalMid() const { return m_provisionalMid; }
     void setProvisionalMid(const String& provisionalMid) { m_provisionalMid = provisionalMid; }
