@@ -57,71 +57,68 @@ function enqueueOperation(peerConnection, operation)
     });
 }
 
-function createOfferOrAnswer(peerConnection, targetFunction, functionName, args)
+function objectAndCallbacksOverload(args, functionName, objectConstructor, objectIsNullable, promiseMode, legacyMode)
 {
     "use strict";
 
-    var options = {};
+    var argsCount = Math.min(3, args.length);
+    var objectArg = args[0];
+    var objectArgOk = false;
 
-    if (args.length <= 1) {
-        // Promise mode
-        if (args.length && @isDictionary(args[0]))
-            options = args[0]
-
-        return @enqueueOperation(peerConnection, function () {
-            return targetFunction.@call(peerConnection, options);
-        });
+    if (argsCount == 0 && objectIsNullable) {
+        objectArg = null;
+        objectArgOk = true;
+        argsCount = 1;
+    } else {
+        var hasMatchingType = objectArg instanceof objectConstructor;
+        objectArgOk = objectIsNullable ? (objectArg === null || typeof objectArg === "undefined" || hasMatchingType) : hasMatchingType;
     }
 
-    // Legacy callbacks mode (2 or 3 arguments)
-    var successCallback = @extractCallbackArg(args, 0, "successCallback", functionName);
-    var errorCallback = @extractCallbackArg(args, 1, "errorCallback", functionName);
+    if (argsCount == 1 && objectArgOk)
+        return promiseMode(objectArg);
 
-    if (args.length > 2 && @isDictionary(args[2]))
-        options = args[2];
+    var successCallback = args[1];
+    var errorCallback = args[2];
+    if (argsCount == 3 && objectArgOk
+        && (successCallback == null || typeof successCallback === "function")
+        && (errorCallback == null || typeof errorCallback === "function")) {
+        if (typeof successCallback !== "function")
+            return @Promise.@reject(new @TypeError(`Argument 2 ('successCallback') to RTCPeerConnection.${functionName} must be a Function`));
 
-    @enqueueOperation(peerConnection, function () {
-        return targetFunction.@call(peerConnection, options).then(successCallback, errorCallback);
-    });
-}
+        if (typeof errorCallback !== "function")
+            return @Promise.@reject(new @TypeError(`Argument 3 ('errorCallback') to RTCPeerConnection.${functionName} must be a Function`));
 
-function setLocalOrRemoteDescription(peerConnection, targetFunction, functionName, args)
-{
-    "use strict";
-
-    if (args.length < 1)
-        throw new @TypeError("Not enough arguments");
-
-    var description = args[0];
-    if (!(description instanceof @RTCSessionDescription))
-        throw new @TypeError("Argument 1 ('description') to RTCPeerConnection." + functionName + " must be an instance of RTCSessionDescription");
-
-    if (args.length == 1) {
-        // Promise mode
-        return @enqueueOperation(peerConnection, function () {
-            return targetFunction.@call(peerConnection, description);
-        });
+        return legacyMode(objectArg, successCallback, errorCallback);
     }
 
-    // Legacy callbacks mode (3 arguments)
-    if (args.length < 3)
-        throw new @TypeError("Not enough arguments");
+    if (argsCount < 1)
+        return @Promise.@reject(new @TypeError("Not enough arguments"));
 
-    var successCallback = @extractCallbackArg(args, 1, "successCallback", functionName);
-    var errorCallback = @extractCallbackArg(args, 2, "errorCallback", functionName);
-
-    @enqueueOperation(peerConnection, function () {
-        return targetFunction.@call(peerConnection, description).then(successCallback, errorCallback);
-    });
+    return @Promise.@reject(new @TypeError("Type error"));
 }
 
-function extractCallbackArg(args, index, name, parentFunctionName)
+function callbacksAndDictionaryOverload(args, functionName, promiseMode, legacyMode)
 {
     "use strict";
 
-    var callback = args[index];
-    if (typeof callback !== "function")
-        throw new @TypeError("Argument " + (index + 1) + " ('" + name + "') to RTCPeerConnection." + parentFunctionName + " must be a Function");
+    var argsCount = Math.min(3, args.length);
 
-    return callback;
+    if (argsCount == 0 || argsCount == 1)
+        return promiseMode(args[0]);
+
+    var successCallback = args[0];
+    var errorCallback = args[1];
+    if ((argsCount == 2 || argsCount == 3)
+        && (successCallback == null || typeof successCallback === "function")
+        && (errorCallback == null || typeof errorCallback === "function")) {
+        if (typeof successCallback !== "function")
+            return @Promise.@reject(new @TypeError(`Argument 1 ('successCallback') to RTCPeerConnection.${functionName} must be a Function`));
+
+        if (typeof errorCallback !== "function")
+            return @Promise.@reject(new @TypeError(`Argument 2 ('errorCallback') to RTCPeerConnection.${functionName} must be a Function`));
+
+        return legacyMode(successCallback, errorCallback, args[2]);
+    }
+
+    return @Promise.@reject(new @TypeError("Type error"));
 }

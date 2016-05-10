@@ -34,7 +34,7 @@ function promiseShouldResolve(expr) {
     });
 }
 
-function promiseShouldReject(expr) {
+function promiseShouldReject(expr, reasonArg) {
     return new Promise(function (done) {
         var p = ensurePromise(expr);
         if (!p) {
@@ -46,8 +46,45 @@ function promiseShouldReject(expr) {
             testFailed("promise " + expr + " fulfilled unexpectedly.");
             done();
         })
+        .catch(function (actualReason) {
+            if (!reasonArg) {
+                testPassed("promise " + expr + " rejected with " + actualReason);
+            } else {
+                var reasonValue;
+                try {
+                    reasonValue = eval(reasonArg);
+                } catch (ex) {
+                    debug("promiseShouldReject: Error evaluating reason: " + ex);
+                }
+
+                if (actualReason == reasonValue)
+                    testPassed("promise " + expr + " rejected with " + actualReason);
+                else
+                    testFailed("promise " + expr + " rejected with " + actualReason + "; expected reason " + reasonValue);
+            }
+
+            done();
+        });
+    });
+}
+
+function promiseShouldNotRejectWithTypeError(expr) {
+    return new Promise(function (done) {
+        var p = ensurePromise(expr);
+        if (!p) {
+            done();
+            return;
+        }
+
+        p.then(function () {
+            testPassed("promise " + expr + " did not reject with TypeError.");
+            done();
+        })
         .catch(function (reason) {
-            testPassed("promise " + expr + " rejected with " + reason);
+            if (reason instanceof TypeError)
+                testFailed("promise " + expr + " rejected with TypeError");
+            else
+                testPassed("promise " + expr + " did not reject with TypeError.");
             done();
         });
     });

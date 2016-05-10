@@ -34,14 +34,42 @@ function createOffer()
 {
     "use strict";
 
-    return @createOfferOrAnswer(this, this.@queuedCreateOffer, "createOffer", arguments);
+    var peerConnection = this;
+
+    return @callbacksAndDictionaryOverload(arguments, "createOffer", function (options) {
+        // Promise mode
+        return @enqueueOperation(peerConnection, function () {
+            return peerConnection.@queuedCreateOffer(options);
+        });
+    }, function (successCallback, errorCallback, options) {
+        // Legacy callbacks mode
+        @enqueueOperation(peerConnection, function () {
+            return peerConnection.@queuedCreateOffer(options).then(successCallback, errorCallback);
+        });
+
+        return @Promise.@resolve(@undefined);
+    });
 }
 
 function createAnswer()
 {
     "use strict";
 
-    return @createOfferOrAnswer(this, this.@queuedCreateAnswer, "createAnswer", arguments);
+    var peerConnection = this;
+
+    return @callbacksAndDictionaryOverload(arguments, "createAnswer", function (options) {
+        // Promise mode
+        return @enqueueOperation(peerConnection, function () {
+            return peerConnection.@queuedCreateAnswer(options);
+        });
+    }, function (successCallback, errorCallback, options) {
+        // Legacy callbacks mode
+        @enqueueOperation(peerConnection, function () {
+            return peerConnection.@queuedCreateAnswer(options).then(successCallback, errorCallback);
+        });
+
+        return @Promise.@resolve(@undefined);
+    });
 }
 
 function addTrack()
@@ -162,14 +190,42 @@ function setLocalDescription()
 {
     "use strict";
 
-    return @setLocalOrRemoteDescription(this, this.@queuedSetLocalDescription, "setLocalDescription", arguments);
+    var peerConnection = this;
+
+    return @objectAndCallbacksOverload(arguments, "setLocalDescription", @RTCSessionDescription, false, function (description) {
+        // Promise mode
+        return @enqueueOperation(peerConnection, function () {
+            return peerConnection.@queuedSetLocalDescription(description);
+        });
+    }, function (description, successCallback, errorCallback) {
+        // Legacy callbacks mode
+        @enqueueOperation(peerConnection, function () {
+            return peerConnection.@queuedSetLocalDescription(description).then(successCallback, errorCallback);
+        });
+
+        return @Promise.@resolve(@undefined);
+    });
 }
 
 function setRemoteDescription()
 {
     "use strict";
 
-    return @setLocalOrRemoteDescription(this, this.@queuedSetRemoteDescription, "setRemoteDescription", arguments);
+    var peerConnection = this;
+
+    return @objectAndCallbacksOverload(arguments, "setRemoteDescription", @RTCSessionDescription, false, function (description) {
+        // Promise mode
+        return @enqueueOperation(peerConnection, function () {
+            return peerConnection.@queuedSetRemoteDescription(description);
+        });
+    }, function (description, successCallback, errorCallback) {
+        // Legacy callbacks mode
+        @enqueueOperation(peerConnection, function () {
+            return peerConnection.@queuedSetRemoteDescription(description).then(successCallback, errorCallback);
+        });
+
+        return @Promise.@resolve(@undefined);
+    });
 }
 
 function addIceCandidate()
@@ -178,29 +234,18 @@ function addIceCandidate()
 
     var peerConnection = this;
 
-    if (arguments.length < 1)
-        throw new @TypeError("Not enough arguments");
-
-    var candidate = arguments[0];
-    if (!(candidate instanceof @RTCIceCandidate))
-        throw new @TypeError("Argument 1 ('candidate') to RTCPeerConnection.addIceCandidate must be an instance of RTCIceCandidate");
-
-    if (arguments.length == 1) {
+    return @objectAndCallbacksOverload(arguments, "addIceCandidate", @RTCIceCandidate, false, function (candidate) {
         // Promise mode
         return @enqueueOperation(peerConnection, function () {
             return peerConnection.@queuedAddIceCandidate(candidate);
         });
-    }
+    }, function (candidate, successCallback, errorCallback) {
+        // Legacy callbacks mode
+        @enqueueOperation(peerConnection, function () {
+            return peerConnection.@queuedAddIceCandidate(candidate).then(successCallback, errorCallback);
+        });
 
-    // Legacy callbacks mode (3 arguments)
-    if (arguments.length < 3)
-        throw new @TypeError("Not enough arguments");
-
-    var successCallback = @extractCallbackArg(arguments, 1, "successCallback", "addIceCandidate");
-    var errorCallback = @extractCallbackArg(arguments, 2, "errorCallback", "addIceCandidate");
-
-    @enqueueOperation(peerConnection, function () {
-        return peerConnection.@queuedAddIceCandidate(candidate).then(successCallback, errorCallback);
+        return @Promise.@resolve(@undefined);
     });
 }
 
@@ -209,25 +254,14 @@ function getStats()
     "use strict";
 
     var peerConnection = this;
-    var selector = null;
 
-    if (arguments.length) {
-        selector = arguments[0];
-        if (selector != null && !(selector instanceof @MediaStreamTrack))
-            throw new @TypeError("Argument 1 ('selector') to RTCPeerConnection.getStats must be an instance of MediaStreamTrack");
-    }
-
-    if (arguments.length <= 1) {
+    return @objectAndCallbacksOverload(arguments, "getStats", @MediaStreamTrack, true, function (selector) {
         // Promise mode
         return peerConnection.@privateGetStats(selector);
-    }
+    }, function (selector, successCallback, errorCallback) {
+        // Legacy callbacks mode
+        peerConnection.@privateGetStats(selector).then(successCallback, errorCallback);
 
-    // Legacy callbacks mode (3 arguments)
-    if (arguments.length < 3)
-        throw new @TypeError("Not enough arguments");
-
-    var successCallback = @extractCallbackArg(arguments, 1, "successCallback", "getStats");
-    var errorCallback = @extractCallbackArg(arguments, 2, "errorCallback", "getStats");
-
-    peerConnection.@privateGetStats(selector).then(successCallback, errorCallback);
+        return @Promise.@resolve(@undefined);
+    });
 }
