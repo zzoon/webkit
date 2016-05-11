@@ -580,7 +580,10 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
         }
 
         if (mediaDescription->mode() == "sendrecv" || mediaDescription->mode() == "sendonly") {
-            MediaStreamTrack& remoteTrack = *transceiver->receiver()->track();
+            RTCRtpReceiver& receiver = *transceiver->receiver();
+            if (receiver.isDispatched())
+                continue;
+            receiver.setDispatched(true);
 
             // FIXME: PeerMediaDescription should have a mediaStreamIds vector.
             Vector<String> mediaStreamIds;
@@ -593,10 +596,10 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
             for (auto& id : mediaStreamIds) {
                 if (m_remoteStreamMap.contains(id)) {
                     RefPtr<MediaStream> stream = m_remoteStreamMap.get(id);
-                    stream->addTrack(&remoteTrack);
+                    stream->addTrack(receiver.track());
                     trackEventMediaStreams.add(id, WTFMove(stream));
                 } else {
-                    Ref<MediaStream> newStream = MediaStream::create(*m_client->scriptExecutionContext(), MediaStreamTrackVector({ &remoteTrack }));
+                    Ref<MediaStream> newStream = MediaStream::create(*m_client->scriptExecutionContext(), MediaStreamTrackVector({ receiver.track() }));
                     m_remoteStreamMap.add(id, newStream.copyRef());
                     legacyMediaStreamEvents.append(MediaStreamEvent::create(eventNames().addstreamEvent, false, false, newStream.copyRef()));
                     trackEventMediaStreams.add(id, WTFMove(newStream));
@@ -607,7 +610,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
             copyValuesToVector(trackEventMediaStreams, streams);
 
             m_client->fireEvent(RTCTrackEvent::create(eventNames().trackEvent, false, false,
-                transceiver->receiver(), &remoteTrack, WTFMove(streams), transceiver));
+                &receiver, receiver.track(), WTFMove(streams), transceiver));
         }
     }
 
