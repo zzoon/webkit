@@ -249,7 +249,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
         configurationSnapshot->addMediaDescription(WTFMove(mediaDescription));
     }
 
-    Ref<SessionDescription> description = SessionDescription::create(SessionDescription::Type::Offer, WTFMove(configurationSnapshot));
+    Ref<MediaEndpointSessionDescription> description = MediaEndpointSessionDescription::create(MediaEndpointSessionDescription::Type::Offer, WTFMove(configurationSnapshot));
     promise.resolve(description->toRTCSessionDescription(*m_sdpProcessor));
 }
 
@@ -334,7 +334,7 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
     if (hasUnassociatedTransceivers(transceivers))
         markAsNeedingNegotiation();
 
-    Ref<SessionDescription> description = SessionDescription::create(SessionDescription::Type::Answer, WTFMove(configurationSnapshot));
+    Ref<MediaEndpointSessionDescription> description = MediaEndpointSessionDescription::create(MediaEndpointSessionDescription::Type::Answer, WTFMove(configurationSnapshot));
     promise.resolve(description->toRTCSessionDescription(*m_sdpProcessor));
 }
 
@@ -370,7 +370,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
         return;
 
     RefPtr<DOMError> error;
-    RefPtr<SessionDescription> newDescription = SessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
+    RefPtr<MediaEndpointSessionDescription> newDescription = MediaEndpointSessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
     if (!newDescription) {
         promise.reject(error);
         return;
@@ -386,7 +386,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
     unsigned previousNumberOfMediaDescriptions = internalLocalDescription() ?
         internalLocalDescription()->configuration()->mediaDescriptions().size() : 0;
     bool hasNewMediaDescriptions = mediaDescriptions.size() > previousNumberOfMediaDescriptions;
-    bool isInitiator = newDescription->type() == SessionDescription::Type::Offer;
+    bool isInitiator = newDescription->type() == MediaEndpointSessionDescription::Type::Offer;
 
     if (hasNewMediaDescriptions) {
         MediaEndpoint::UpdateResult result = m_mediaEndpoint->updateReceiveConfiguration(newDescription->configuration(), isInitiator);
@@ -433,12 +433,12 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
 
     // Update state and local descriptions according to setLocal/RemoteDescription processing model
     switch (newDescription->type()) {
-    case SessionDescription::Type::Offer:
+    case MediaEndpointSessionDescription::Type::Offer:
         m_pendingLocalDescription = newDescription;
         newSignalingState = SignalingState::HaveLocalOffer;
         break;
 
-    case SessionDescription::Type::Answer:
+    case MediaEndpointSessionDescription::Type::Answer:
         m_currentLocalDescription = newDescription;
         m_currentRemoteDescription = m_pendingRemoteDescription;
         m_pendingLocalDescription = nullptr;
@@ -446,13 +446,13 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
         newSignalingState = SignalingState::Stable;
         break;
 
-    case SessionDescription::Type::Rollback:
+    case MediaEndpointSessionDescription::Type::Rollback:
         // FIXME: rollback is not supported in the platform yet
         m_pendingLocalDescription = nullptr;
         newSignalingState = SignalingState::Stable;
         break;
 
-    case SessionDescription::Type::Pranswer:
+    case MediaEndpointSessionDescription::Type::Pranswer:
         m_pendingLocalDescription = newDescription;
         newSignalingState = SignalingState::HaveLocalPrAnswer;
         break;
@@ -504,7 +504,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
         return;
 
     RefPtr<DOMError> error;
-    RefPtr<SessionDescription> newDescription = SessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
+    RefPtr<MediaEndpointSessionDescription> newDescription = MediaEndpointSessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
     if (!newDescription) {
         promise.reject(error);
         return;
@@ -525,7 +525,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
             mediaDescription->type() == "audio" ? m_defaultAudioPayloads : m_defaultVideoPayloads));
     }
 
-    bool isInitiator = newDescription->type() == SessionDescription::Type::Answer;
+    bool isInitiator = newDescription->type() == MediaEndpointSessionDescription::Type::Answer;
     const RtpTransceiverVector& transceivers = m_client->getTransceivers();
 
     if (internalLocalDescription())
@@ -612,12 +612,12 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
 
     // Update state and local descriptions according to setLocal/RemoteDescription processing model
     switch (newDescription->type()) {
-    case SessionDescription::Type::Offer:
+    case MediaEndpointSessionDescription::Type::Offer:
         m_pendingRemoteDescription = newDescription;
         newSignalingState = SignalingState::HaveRemoteOffer;
         break;
 
-    case SessionDescription::Type::Answer:
+    case MediaEndpointSessionDescription::Type::Answer:
         m_currentRemoteDescription = newDescription;
         m_currentLocalDescription = m_pendingLocalDescription;
         m_pendingRemoteDescription = nullptr;
@@ -625,13 +625,13 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
         newSignalingState = SignalingState::Stable;
         break;
 
-    case SessionDescription::Type::Rollback:
+    case MediaEndpointSessionDescription::Type::Rollback:
         // FIXME: rollback is not supported in the platform yet
         m_pendingRemoteDescription = nullptr;
         newSignalingState = SignalingState::Stable;
         break;
 
-    case SessionDescription::Type::Pranswer:
+    case MediaEndpointSessionDescription::Type::Pranswer:
         m_pendingRemoteDescription = newDescription;
         newSignalingState = SignalingState::HaveRemotePrAnswer;
         break;
@@ -808,17 +808,17 @@ void MediaEndpointPeerConnection::markAsNeedingNegotiation()
         m_client->scheduleNegotiationNeededEvent();
 }
 
-bool MediaEndpointPeerConnection::localDescriptionTypeValidForState(SessionDescription::Type type) const
+bool MediaEndpointPeerConnection::localDescriptionTypeValidForState(MediaEndpointSessionDescription::Type type) const
 {
     switch (m_client->internalSignalingState()) {
     case SignalingState::Stable:
-        return type == SessionDescription::Type::Offer;
+        return type == MediaEndpointSessionDescription::Type::Offer;
     case SignalingState::HaveLocalOffer:
-        return type == SessionDescription::Type::Offer;
+        return type == MediaEndpointSessionDescription::Type::Offer;
     case SignalingState::HaveRemoteOffer:
-        return type == SessionDescription::Type::Answer || type == SessionDescription::Type::Pranswer;
+        return type == MediaEndpointSessionDescription::Type::Answer || type == MediaEndpointSessionDescription::Type::Pranswer;
     case SignalingState::HaveLocalPrAnswer:
-        return type == SessionDescription::Type::Answer || type == SessionDescription::Type::Pranswer;
+        return type == MediaEndpointSessionDescription::Type::Answer || type == MediaEndpointSessionDescription::Type::Pranswer;
     default:
         return false;
     };
@@ -827,17 +827,17 @@ bool MediaEndpointPeerConnection::localDescriptionTypeValidForState(SessionDescr
     return false;
 }
 
-bool MediaEndpointPeerConnection::remoteDescriptionTypeValidForState(SessionDescription::Type type) const
+bool MediaEndpointPeerConnection::remoteDescriptionTypeValidForState(MediaEndpointSessionDescription::Type type) const
 {
     switch (m_client->internalSignalingState()) {
     case SignalingState::Stable:
-        return type == SessionDescription::Type::Offer;
+        return type == MediaEndpointSessionDescription::Type::Offer;
     case SignalingState::HaveLocalOffer:
-        return type == SessionDescription::Type::Answer || type == SessionDescription::Type::Pranswer;
+        return type == MediaEndpointSessionDescription::Type::Answer || type == MediaEndpointSessionDescription::Type::Pranswer;
     case SignalingState::HaveRemoteOffer:
-        return type == SessionDescription::Type::Offer;
+        return type == MediaEndpointSessionDescription::Type::Offer;
     case SignalingState::HaveRemotePrAnswer:
-        return type == SessionDescription::Type::Answer || type == SessionDescription::Type::Pranswer;
+        return type == MediaEndpointSessionDescription::Type::Answer || type == MediaEndpointSessionDescription::Type::Pranswer;
     default:
         return false;
     };
@@ -846,17 +846,17 @@ bool MediaEndpointPeerConnection::remoteDescriptionTypeValidForState(SessionDesc
     return false;
 }
 
-SessionDescription* MediaEndpointPeerConnection::internalLocalDescription() const
+MediaEndpointSessionDescription* MediaEndpointPeerConnection::internalLocalDescription() const
 {
     return m_pendingLocalDescription ? m_pendingLocalDescription.get() : m_currentLocalDescription.get();
 }
 
-SessionDescription* MediaEndpointPeerConnection::internalRemoteDescription() const
+MediaEndpointSessionDescription* MediaEndpointPeerConnection::internalRemoteDescription() const
 {
     return m_pendingRemoteDescription ? m_pendingRemoteDescription.get() : m_currentRemoteDescription.get();
 }
 
-RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::createRTCSessionDescription(SessionDescription* description) const
+RefPtr<RTCSessionDescription> MediaEndpointPeerConnection::createRTCSessionDescription(MediaEndpointSessionDescription* description) const
 {
     return description ? description->toRTCSessionDescription(*m_sdpProcessor) : nullptr;
 }

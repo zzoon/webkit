@@ -34,8 +34,8 @@
 #if ENABLE(WEB_RTC)
 
 #include "MediaEndpoint.h"
+#include "MediaEndpointSessionDescription.h"
 #include "PeerConnectionBackend.h"
-#include "SessionDescription.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
@@ -97,13 +97,13 @@ private:
 
     void replaceTrackTask(RTCRtpSender&, const String& mid, RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&);
 
-    bool localDescriptionTypeValidForState(SessionDescription::Type) const;
-    bool remoteDescriptionTypeValidForState(SessionDescription::Type) const;
-    SessionDescription::Type parseDescriptionType(const String& typeName) const;
+    bool localDescriptionTypeValidForState(MediaEndpointSessionDescription::Type) const;
+    bool remoteDescriptionTypeValidForState(MediaEndpointSessionDescription::Type) const;
+    MediaEndpointSessionDescription::Type parseDescriptionType(const String& typeName) const;
 
-    SessionDescription* internalLocalDescription() const;
-    SessionDescription* internalRemoteDescription() const;
-    RefPtr<RTCSessionDescription> createRTCSessionDescription(SessionDescription*) const;
+    MediaEndpointSessionDescription* internalLocalDescription() const;
+    MediaEndpointSessionDescription* internalRemoteDescription() const;
+    RefPtr<RTCSessionDescription> createRTCSessionDescription(MediaEndpointSessionDescription*) const;
 
     // MediaEndpointClient
     void gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction) override;
@@ -129,11 +129,11 @@ private:
     unsigned m_sdpOfferSessionVersion { 0 };
     unsigned m_sdpAnswerSessionVersion { 0 };
 
-    RefPtr<SessionDescription> m_currentLocalDescription;
-    RefPtr<SessionDescription> m_pendingLocalDescription;
+    RefPtr<MediaEndpointSessionDescription> m_currentLocalDescription;
+    RefPtr<MediaEndpointSessionDescription> m_pendingLocalDescription;
 
-    RefPtr<SessionDescription> m_currentRemoteDescription;
-    RefPtr<SessionDescription> m_pendingRemoteDescription;
+    RefPtr<MediaEndpointSessionDescription> m_currentRemoteDescription;
+    RefPtr<MediaEndpointSessionDescription> m_pendingRemoteDescription;
 
     RefPtr<RTCConfiguration> m_configuration;
 

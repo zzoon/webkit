@@ -28,8 +28,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef SessionDescription_h
-#define SessionDescription_h
+#ifndef MediaEndpointSessionDescription_h
+#define MediaEndpointSessionDescription_h
 
 #if ENABLE(WEB_RTC)
 
@@ -44,7 +44,7 @@ class MediaEndpointSessionConfiguration;
 class SDPProcessor;
 class DOMError;
 
-class SessionDescription : public RefCounted<SessionDescription> {
+class MediaEndpointSessionDescription : public RefCounted<MediaEndpointSessionDescription> {
 public:
     enum class Type {
         Offer = 1,
@@ -53,9 +53,9 @@ public:
         Rollback = 4
     };
 
-    static Ref<SessionDescription> create(Type, RefPtr<MediaEndpointSessionConfiguration>&&);
-    static RefPtr<SessionDescription> create(RefPtr<RTCSessionDescription>&&, const SDPProcessor&, RefPtr<DOMError>&);
-    virtual ~SessionDescription() { }
+    static Ref<MediaEndpointSessionDescription> create(Type, RefPtr<MediaEndpointSessionConfiguration>&&);
+    static RefPtr<MediaEndpointSessionDescription> create(RefPtr<RTCSessionDescription>&&, const SDPProcessor&, RefPtr<DOMError>&);
+    virtual ~MediaEndpointSessionDescription() { }
 
     RefPtr<RTCSessionDescription> toRTCSessionDescription(const SDPProcessor&) const;
 
@@ -63,10 +63,10 @@ public:
     const String& typeString() const;
     MediaEndpointSessionConfiguration* configuration() const { return m_configuration.get(); }
 
-    bool isLaterThan(SessionDescription* other) const;
+    bool isLaterThan(MediaEndpointSessionDescription* other) const;
 
 private:
-    SessionDescription(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration, RefPtr<RTCSessionDescription>&& rtcDescription)
+    MediaEndpointSessionDescription(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration, RefPtr<RTCSessionDescription>&& rtcDescription)
         : m_type(type)
         , m_configuration(configuration)
         , m_rtcDescription(WTFMove(rtcDescription))
@@ -82,4 +82,4 @@ private:
 
 #endif // ENABLE(WEB_RTC)
 
-#endif // SessionDescription_h
+#endif // MediaEndpointSessionDescription_h

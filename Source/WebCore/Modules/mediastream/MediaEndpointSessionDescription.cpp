@@ -29,7 +29,7 @@
  */
 
 #include "config.h"
-#include "SessionDescription.h"
+#include "MediaEndpointSessionDescription.h"
 
 #if ENABLE(WEB_RTC)
 
@@ -51,27 +51,27 @@ STRING_FUNCTION(pranswer)
 STRING_FUNCTION(answer)
 STRING_FUNCTION(rollback)
 
-static SessionDescription::Type parseDescriptionType(const String& typeName)
+static MediaEndpointSessionDescription::Type parseDescriptionType(const String& typeName)
 {
     if (typeName == offerString())
-        return SessionDescription::Type::Offer;
+        return MediaEndpointSessionDescription::Type::Offer;
     if (typeName == pranswerString())
-        return SessionDescription::Type::Pranswer;
+        return MediaEndpointSessionDescription::Type::Pranswer;
     if (typeName == answerString())
-        return SessionDescription::Type::Answer;
+        return MediaEndpointSessionDescription::Type::Answer;
 
     ASSERT(typeName == rollbackString());
-    return SessionDescription::Type::Rollback;
+    return MediaEndpointSessionDescription::Type::Rollback;
 }
 
-Ref<SessionDescription> SessionDescription::create(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration)
+Ref<MediaEndpointSessionDescription> MediaEndpointSessionDescription::create(Type type, RefPtr<MediaEndpointSessionConfiguration>&& configuration)
 {
-    return adoptRef(*new SessionDescription(type, WTFMove(configuration), nullptr));
+    return adoptRef(*new MediaEndpointSessionDescription(type, WTFMove(configuration), nullptr));
 }
 
-RefPtr<SessionDescription> SessionDescription::create(RefPtr<RTCSessionDescription>&& rtcDescription, const SDPProcessor& sdpProcessor, RefPtr<DOMError>& error)
+RefPtr<MediaEndpointSessionDescription> MediaEndpointSessionDescription::create(RefPtr<RTCSessionDescription>&& rtcDescription, const SDPProcessor& sdpProcessor, RefPtr<DOMError>& error)
 {
-    SessionDescription::Type type = parseDescriptionType(rtcDescription->type());
+    MediaEndpointSessionDescription::Type type = parseDescriptionType(rtcDescription->type());
 
     RefPtr<MediaEndpointSessionConfiguration> configuration;
     SDPProcessor::Result result = sdpProcessor.parse(rtcDescription->sdp(), configuration);
@@ -85,10 +85,10 @@ RefPtr<SessionDescription> SessionDescription::create(RefPtr<RTCSessionDescripti
         return nullptr;
     }
 
-    return adoptRef(new SessionDescription(type, WTFMove(configuration), WTFMove(rtcDescription)));
+    return adoptRef(new MediaEndpointSessionDescription(type, WTFMove(configuration), WTFMove(rtcDescription)));
 }
 
-RefPtr<RTCSessionDescription> SessionDescription::toRTCSessionDescription(const SDPProcessor& sdpProcessor) const
+RefPtr<RTCSessionDescription> MediaEndpointSessionDescription::toRTCSessionDescription(const SDPProcessor& sdpProcessor) const
 {
     String sdpString;
     SDPProcessor::Result result = sdpProcessor.generate(*m_configuration, sdpString);
@@ -108,12 +108,12 @@ RefPtr<RTCSessionDescription> SessionDescription::toRTCSessionDescription(const 
     return RTCSessionDescription::create(typeString(), sdpString);
 }
 
-bool SessionDescription::isLaterThan(SessionDescription* other) const
+bool MediaEndpointSessionDescription::isLaterThan(MediaEndpointSessionDescription* other) const
 {
     return !other || configuration()->sessionVersion() > other->configuration()->sessionVersion();
 }
 
-const String& SessionDescription::typeString() const
+const String& MediaEndpointSessionDescription::typeString() const
 {
     switch (m_type) {
     case Type::Offer:
