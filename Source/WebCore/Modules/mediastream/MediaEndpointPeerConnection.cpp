@@ -422,9 +422,10 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
     }
 
     if (internalRemoteDescription()) {
-        RealtimeMediaSourceMap sendSourceMap = createSourceMap(internalRemoteDescription()->configuration()->mediaDescriptions(), mediaDescriptions.size(), transceivers);
+        MediaEndpointSessionConfiguration* remoteConfiguration = internalRemoteDescription()->configuration();
+        RealtimeMediaSourceMap sendSourceMap = createSourceMap(remoteConfiguration->mediaDescriptions(), mediaDescriptions.size(), transceivers);
 
-        if (m_mediaEndpoint->updateSendConfiguration(internalRemoteDescription()->configuration(), sendSourceMap, isInitiator) == MediaEndpoint::UpdateResult::Failed) {
+        if (m_mediaEndpoint->updateSendConfiguration(remoteConfiguration, sendSourceMap, isInitiator) == MediaEndpoint::UpdateResult::Failed) {
             promise.reject(DOMError::create("OperationError: Unable to apply session description"));
             return;
         }
