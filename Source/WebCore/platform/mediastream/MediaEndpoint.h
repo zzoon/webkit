@@ -49,6 +49,7 @@ class RealtimeMediaSource;
 
 typedef std::unique_ptr<MediaEndpoint> (*CreateMediaEndpoint)(MediaEndpointClient&);
 typedef Vector<RefPtr<MediaPayload>> MediaPayloadVector;
+typedef HashMap<String, RealtimeMediaSource*> RealtimeMediaSourceMap;
 
 class MediaEndpoint {
 public:
@@ -79,7 +80,7 @@ public:
     virtual MediaPayloadVector filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads) = 0;
 
     virtual UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
-    virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
+    virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, const RealtimeMediaSourceMap&, bool isInitiator) = 0;
 
     virtual void addRemoteCandidate(IceCandidate&, const String& mid, const String& ufrag, const String& password) = 0;
 

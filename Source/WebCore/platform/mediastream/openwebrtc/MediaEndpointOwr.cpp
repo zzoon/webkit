@@ -217,7 +217,7 @@ static RefPtr<MediaPayload> findRtxPayload(MediaPayloadVector payloads, unsigned
     return nullptr;
 }
 
-MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
+MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpointSessionConfiguration* configuration, const RealtimeMediaSourceMap& sendSourceMap, bool isInitiator)
 {
     Vector<TransceiverConfig> transceiverConfigs;
     for (unsigned i = m_transceivers.size(); i < configuration->mediaDescriptions().size(); ++i) {
@@ -248,7 +248,7 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpo
         if (i < m_numberOfSendPreparedSessions)
             continue;
 
-        if (!mdesc.source())
+        if (!sendSourceMap.contains(mdesc.mid()))
             continue;
 
         MediaPayload* payload = nullptr;
@@ -265,7 +265,7 @@ MediaEndpoint::UpdateResult MediaEndpointOwr::updateSendConfiguration(MediaEndpo
         }
 
         RefPtr<MediaPayload> rtxPayload = findRtxPayload(mdesc.payloads(), payload->type());
-        RealtimeMediaSourceOwr* source = static_cast<RealtimeMediaSourceOwr*>(mdesc.source());
+        RealtimeMediaSourceOwr* source = static_cast<RealtimeMediaSourceOwr*>(sendSourceMap.get(mdesc.mid()));
 
         ASSERT(codecTypes.find(payload->encodingName().convertToASCIIUppercase()) != notFound);
         OwrCodecType codecType = static_cast<OwrCodecType>(codecTypes.find(payload->encodingName().convertToASCIIUppercase()));

@@ -338,8 +338,10 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
     promise.resolve(description->toRTCSessionDescription(*m_sdpProcessor));
 }
 
-static void updateSendSources(const MediaDescriptionVector& remoteMediaDescriptions, unsigned localMediaDescriptionCount, const RtpTransceiverVector& transceivers)
+static RealtimeMediaSourceMap createSourceMap(const MediaDescriptionVector& remoteMediaDescriptions, unsigned localMediaDescriptionCount, const RtpTransceiverVector& transceivers)
 {
+    RealtimeMediaSourceMap sourceMap;
+
     for (unsigned i = 0; i < remoteMediaDescriptions.size() && i < localMediaDescriptionCount; ++i) {
         PeerMediaDescription& remoteMediaDescription = *remoteMediaDescriptions[i];
         if (remoteMediaDescription.type() != "audio" && remoteMediaDescription.type() != "video")
@@ -348,10 +350,12 @@ static void updateSendSources(const MediaDescriptionVector& remoteMediaDescripti
         RTCRtpTransceiver* transceiver = matchTransceiverByMid(transceivers, remoteMediaDescription.mid());
         if (transceiver) {
             if (transceiver->hasSendingDirection() && transceiver->sender()->track())
-                remoteMediaDescription.setSource(&transceiver->sender()->track()->source());
-            return;
+                sourceMap.set(transceiver->mid(), &transceiver->sender()->track()->source());
+            break;
         }
     }
+
+    return sourceMap;
 }
 
 void MediaEndpointPeerConnection::setLocalDescription(RTCSessionDescription& description, VoidPromise&& promise)
@@ -418,9 +422,9 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
     }
 
     if (internalRemoteDescription()) {
-        updateSendSources(internalRemoteDescription()->configuration()->mediaDescriptions(), mediaDescriptions.size(), transceivers);
+        RealtimeMediaSourceMap sendSourceMap = createSourceMap(internalRemoteDescription()->configuration()->mediaDescriptions(), mediaDescriptions.size(), transceivers);
 
-        if (m_mediaEndpoint->updateSendConfiguration(internalRemoteDescription()->configuration(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
+        if (m_mediaEndpoint->updateSendConfiguration(internalRemoteDescription()->configuration(), sendSourceMap, isInitiator) == MediaEndpoint::UpdateResult::Failed) {
             promise.reject(DOMError::create("OperationError: Unable to apply session description"));
             return;
         }
@@ -528,10 +532,12 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
     bool isInitiator = newDescription->type() == MediaEndpointSessionDescription::Type::Answer;
     const RtpTransceiverVector& transceivers = m_client->getTransceivers();
 
-    if (internalLocalDescription())
-        updateSendSources(mediaDescriptions, internalLocalDescription()->configuration()->mediaDescriptions().size(), transceivers);
 
-    if (m_mediaEndpoint->updateSendConfiguration(newDescription->configuration(), isInitiator) == MediaEndpoint::UpdateResult::Failed) {
+    RealtimeMediaSourceMap sendSourceMap;
+    if (internalLocalDescription())
+        sendSourceMap = createSourceMap(mediaDescriptions, internalLocalDescription()->configuration()->mediaDescriptions().size(), transceivers);
+
+    if (m_mediaEndpoint->updateSendConfiguration(newDescription->configuration(), sendSourceMap, isInitiator) == MediaEndpoint::UpdateResult::Failed) {
         promise.reject(DOMError::create("OperationError: Unable to apply session description"));
         return;
     }

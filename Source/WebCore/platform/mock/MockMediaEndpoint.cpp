@@ -165,9 +165,10 @@ MediaEndpoint::UpdateResult MockMediaEndpoint::updateReceiveConfiguration(MediaE
     return UpdateResult::Success;
 }
 
-MediaEndpoint::UpdateResult MockMediaEndpoint::updateSendConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
+MediaEndpoint::UpdateResult MockMediaEndpoint::updateSendConfiguration(MediaEndpointSessionConfiguration* configuration, const RealtimeMediaSourceMap& sendSourceMap, bool isInitiator)
 {
     UNUSED_PARAM(configuration);
+    UNUSED_PARAM(sendSourceMap);
     UNUSED_PARAM(isInitiator);
 
     return UpdateResult::Success;

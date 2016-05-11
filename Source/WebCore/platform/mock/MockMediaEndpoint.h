@@ -52,7 +52,7 @@ public:
     MediaPayloadVector filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads) override;
 
     UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
-    UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
+    UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, const RealtimeMediaSourceMap&, bool isInitiator) override;
 
     void addRemoteCandidate(IceCandidate&, const String& mid, const String& ufrag, const String& password) override;
 
