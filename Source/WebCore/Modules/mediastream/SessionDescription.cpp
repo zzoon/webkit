@@ -97,6 +97,9 @@ RefPtr<RTCSessionDescription> SessionDescription::toRTCSessionDescription(const 
         return nullptr;
     }
 
+    // If this object was created from an RTCSessionDescription, toRTCSessionDescription will return
+    // that same instance but with an updated sdp. It is used for RTCPeerConnection's description
+    // atributes (e.g. localDescription and pendingLocalDescription).
     if (m_rtcDescription) {
         m_rtcDescription->setSdp(sdpString);
         return m_rtcDescription;
