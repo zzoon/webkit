@@ -159,39 +159,40 @@ RefPtr<RTCRtpSender> RTCPeerConnection::privateAddTrack(RefPtr<MediaStreamTrack>
     for (auto stream : streams)
         mediaStreamIds.append(stream->id());
 
-    RTCRtpTransceiver* transceiver = nullptr;
+    RTCRtpSender* sender = nullptr;
 
-    for (auto& existingTransceiver : m_transceiverSet) {
-        // Reuse an existing sender if it has never been used to send before.
-        if (!existingTransceiver->hasSendingDirection() && existingTransceiver->sender()->trackId().isNull()) {
-            transceiver = existingTransceiver.get();
+    // Reuse an existing sender with the same track kind if it has never been used to send before.
+    for (auto& transceiver : m_transceiverSet) {
+        RTCRtpSender& existingSender = *transceiver->sender();
+        if (existingSender.trackKind() == track->kind() && existingSender.trackId().isNull() && !transceiver->hasSendingDirection()) {
+            existingSender.setTrack(WTFMove(track));
+            existingSender.setMediaStreamIds(WTFMove(mediaStreamIds));
             transceiver->enableSendingDirection();
-            transceiver->sender()->setTrack(WTFMove(track));
-            transceiver->sender()->setMediaStreamIds(WTFMove(mediaStreamIds));
+            sender = &existingSender;
             break;
         }
     }
 
-    if (!transceiver) {
+    if (!sender) {
         String transceiverMid = RTCRtpTransceiver::getNextMid();
         const String& trackKind = track->kind();
         String trackId = createCanonicalUUIDString();
 
-        RefPtr<RTCRtpSender> sender = RTCRtpSender::create(WTFMove(track), WTFMove(mediaStreamIds), *this);
+        RefPtr<RTCRtpSender> newSender = RTCRtpSender::create(WTFMove(track), WTFMove(mediaStreamIds), *this);
         RefPtr<RTCRtpReceiver> receiver = m_backend->createReceiver(transceiverMid, trackKind, trackId);
-        RefPtr<RTCRtpTransceiver> newTransceiver = RTCRtpTransceiver::create(WTFMove(sender), WTFMove(receiver));
+        RefPtr<RTCRtpTransceiver> transceiver = RTCRtpTransceiver::create(WTFMove(newSender), WTFMove(receiver));
 
         // This transceiver is not yet associated with an m-line (null mid), but we need a
         // provisional mid if the transceiver is used to create an offer.
-        newTransceiver->setProvisionalMid(transceiverMid);
+        transceiver->setProvisionalMid(transceiverMid);
 
-        transceiver = newTransceiver.get();
-        m_transceiverSet.append(WTFMove(newTransceiver));
+        sender = transceiver->sender();
+        m_transceiverSet.append(WTFMove(transceiver));
     }
 
     m_backend->markAsNeedingNegotiation();
 
-    return transceiver->sender();
+    return sender;
 }
 
 void RTCPeerConnection::privateRemoveTrack(RTCRtpSender* sender, ExceptionCode& ec)
