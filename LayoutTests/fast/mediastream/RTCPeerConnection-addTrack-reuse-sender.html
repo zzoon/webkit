@@ -1,0 +1,83 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+    <head>
+        <script src="../../resources/js-test-pre.js"></script>
+    </head>
+    <body>
+        <script>
+            var stream;
+            var audioTrack;
+            var videoTrack;
+
+            var audioSender;
+            var senderFromAddTrack;
+
+            description("Test that RTCPeerConnection.addTrack reuses a unused sender of the same kind if present");
+
+            if (window.testRunner)
+                testRunner.setUserMediaPermission(true);
+            else {
+                debug("This test can not be run without the testRunner");
+                finishJSTest();
+            }
+
+            var pc = new webkitRTCPeerConnection({iceServers:[{urls:'stun:foo.com'}]});
+            var remotePc = new webkitRTCPeerConnection({iceServers:[{urls:'stun:foo.com'}]});
+
+            navigator.mediaDevices.getUserMedia({ "audio": true, "video": true })
+            .then(function (s) {
+                stream = s;
+
+                audioTrack = stream.getAudioTracks()[0];
+                videoTrack = stream.getVideoTracks()[0];
+
+                remotePc.addTrack(audioTrack, stream);
+                return remotePc.createOffer();
+            })
+            .then(function (audioOffer) {
+                return pc.setRemoteDescription(audioOffer);
+            })
+            .then(function () {
+                debug("*** Remote description with audio offer set");
+
+                shouldBe("pc.getSenders().length", "1");
+                shouldBe("pc.getReceivers().length", "1");
+                shouldBe("pc.getTransceivers().length", "1");
+                debug("");
+
+                evalAndLog("audioSender = pc.getSenders()[0]");
+                shouldBe("audioSender.track", "null");
+                debug("");
+
+                debug("*** Adding a video track should not reuse audioSender");
+                evalAndLog("senderFromAddTrack = pc.addTrack(videoTrack, stream)");
+                shouldNotBe("senderFromAddTrack", "audioSender");
+
+                debug("*** An extra sender should be added");
+                shouldBe("pc.getSenders().length", "2");
+                shouldBeTrue("pc.getSenders().includes(audioSender)");
+                shouldBeTrue("pc.getSenders().includes(senderFromAddTrack)");
+                debug("");
+
+                debug("*** Adding an audio track should reuse audioSender");
+                evalAndLog("senderFromAddTrack = pc.addTrack(audioTrack, stream)");
+                shouldBe("senderFromAddTrack", "audioSender");
+                shouldBe("audioSender.track", "audioTrack");
+
+                debug("*** The number of senders should not have changed");
+                shouldBe("pc.getSenders().length", "2");
+
+                finishJSTest();
+            })
+            .catch(function (error) {
+                testFailed("Error in promise chain: " + error);
+                finishJSTest();
+            });
+
+            window.jsTestIsAsync = true;
+            window.successfullyParsed = true;
+
+        </script>
+        <script src="../../resources/js-test-post.js"></script>
+    </body>
+</html>
