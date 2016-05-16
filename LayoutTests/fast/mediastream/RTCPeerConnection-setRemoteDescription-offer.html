@@ -54,11 +54,7 @@
             }
 
             pc.ontrack = function (evt) {
-                try {
-                    testRemoteTrack(evt, mediaTypes.shift());
-                } catch (e) {
-                    debug("e: " + e);
-                }
+                testRemoteTrack(evt, mediaTypes.shift());
             };
 
             navigator.mediaDevices.getUserMedia({ "audio": true, "video": true })
