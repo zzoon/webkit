@@ -67,7 +67,7 @@
             .then(function () {
                 debug("A: local offer set");
                 shouldBe("pcA.signalingState", "'have-local-offer'");
-                shouldNotBe("pcA.pendingLocalDescription", "null");
+                shouldBeType("pcA.pendingLocalDescription", "RTCSessionDescription");
                 shouldBeNull("pcA.currentLocalDescription");
                 debug("");
 
@@ -79,7 +79,7 @@
             .then(function () {
                 debug("B: remote offer set");
                 shouldBe("pcB.signalingState", "'have-remote-offer'");
-                shouldNotBe("pcB.pendingRemoteDescription", "null");
+                shouldBeType("pcB.pendingRemoteDescription", "RTCSessionDescription");
                 shouldBeNull("pcB.currentRemoteDescription");
                 debug("");
 
@@ -97,9 +97,9 @@
                 debug("B: local answer set");
                 shouldBe("pcB.signalingState", "'stable'");
                 shouldBeNull("pcB.pendingLocalDescription");
-                shouldNotBe("pcB.currentLocalDescription", "null");
+                shouldBeType("pcB.currentLocalDescription", "RTCSessionDescription");
                 shouldBeNull("pcB.pendingRemoteDescription");
-                shouldNotBe("pcB.currentRemoetDescription", "null");
+                shouldBeType("pcB.currentRemoetDescription", "RTCSessionDescription");
                 debug("");
 
                 debug("B: send answer to A");
@@ -111,9 +111,9 @@
                 debug("A: remote answer set");
                 shouldBe("pcA.signalingState", "'stable'");
                 shouldBeNull("pcA.pendingLocalDescription");
-                shouldNotBe("pcA.currentLocalDescription", "null");
+                shouldBeType("pcA.currentLocalDescription", "RTCSessionDescription");
                 shouldBeNull("pcA.pendingRemoteDescription");
-                shouldNotBe("pcA.currentRemoetDescription", "null");
+                shouldBeType("pcA.currentRemoetDescription", "RTCSessionDescription");
                 debug("");
 
                 testPassed("Offer/answer dialog completed")
