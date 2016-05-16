@@ -35,6 +35,15 @@
     readonly attribute RTCRtpSender sender;
     readonly attribute RTCRtpReceiver receiver;
     readonly attribute boolean stopped;
+    readonly attribute RTCRtpTransceiverDirection direction;
 
+    void setDirection(RTCRtpTransceiverDirection direction);
     void stop();
+};
+
+enum RTCRtpTransceiverDirection {
+    "sendrecv",
+    "sendonly",
+    "recvonly",
+    "inactive"
 };
