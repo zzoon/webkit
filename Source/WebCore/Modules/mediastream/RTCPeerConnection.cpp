@@ -249,7 +249,7 @@ RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(const String& kind, 
     }
 
     if (kind != "audio" && kind != "video") {
-        ec = INVALID_ACCESS_ERR;
+        ec = TypeError;
         return nullptr;
     }
 
