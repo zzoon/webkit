@@ -84,6 +84,7 @@ bool RTCRtpTransceiver::configureWithDictionary(const Dictionary& dictionary)
     if (dictionary.get("direction", direction)) {
         if (!isRTCRtpTransceiverDirectionEnumValue(direction))
             return false;
+        m_direction = direction;
     }
 
     // FIMXE: fix streams
