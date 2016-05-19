@@ -120,6 +120,8 @@ public:
 protected:
     RealtimeMediaSource(const String& id, Type, const String& name);
 
+    bool m_muted;
+
 private:
     String m_id;
     String m_persistentID;
@@ -128,7 +130,6 @@ private:
     bool m_stopped;
     Vector<Observer*> m_observers;
 
-    bool m_muted;
     bool m_readonly;
     bool m_remote;
     

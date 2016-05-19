@@ -55,16 +55,12 @@ class RTCOfferOptions : public RTCOfferAnswerOptions {
 public:
     static RefPtr<RTCOfferOptions> create(const Dictionary&, ExceptionCode&);
 
-    int64_t offerToReceiveVideo() const { return m_offerToReceiveVideo; }
-    int64_t offerToReceiveAudio() const { return m_offerToReceiveAudio; }
     bool iceRestart() const { return m_iceRestart; }
 
 private:
     bool initialize(const Dictionary&) override;
     RTCOfferOptions();
 
-    int64_t m_offerToReceiveVideo;
-    int64_t m_offerToReceiveAudio;
     bool m_iceRestart;
 };
 

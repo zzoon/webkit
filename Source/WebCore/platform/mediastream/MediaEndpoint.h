@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Ericsson AB. All rights reserved.
+ * Copyright (C) 2015, 2016 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,27 +34,22 @@
 #if ENABLE(WEB_RTC)
 
 #include "MediaEndpointConfiguration.h"
+#include "RealtimeMediaSource.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class IceCandidate;
 class MediaEndpoint;
+class MediaEndpointClient;
 class MediaEndpointSessionConfiguration;
 class MediaPayload;
+class PeerMediaDescription;
 class RealtimeMediaSource;
 
-class MediaEndpointClient {
-public:
-    virtual void gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction) = 0;
-    virtual void gotIceCandidate(unsigned mdescIndex, RefPtr<IceCandidate>&&) = 0;
-    virtual void doneGatheringCandidates(unsigned mdescIndex) = 0;
-    virtual void gotRemoteSource(unsigned mdescIndex, RefPtr<RealtimeMediaSource>&&) = 0;
-
-    virtual ~MediaEndpointClient() { }
-};
-
 typedef std::unique_ptr<MediaEndpoint> (*CreateMediaEndpoint)(MediaEndpointClient&);
+typedef Vector<RefPtr<MediaPayload>> MediaPayloadVector;
+typedef HashMap<String, RealtimeMediaSource*> RealtimeMediaSourceMap;
 
 class MediaEndpoint {
 public:
@@ -67,20 +62,42 @@ public:
         Failed
     };
 
+    enum class IceTransportState {
+        New = 1,
+        Checking = 2,
+        Connected = 3,
+        Completed = 4,
+        Failed = 5,
+        Disconnected = 6,
+        Closed = 7
+    };
+
     virtual void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) = 0;
 
     virtual void generateDtlsInfo() = 0;
-    virtual Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() = 0;
-    virtual Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() = 0;
+    virtual MediaPayloadVector getDefaultAudioPayloads() = 0;
+    virtual MediaPayloadVector getDefaultVideoPayloads() = 0;
+    virtual MediaPayloadVector filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads) = 0;
 
     virtual UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
-    virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) = 0;
+    virtual UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, const RealtimeMediaSourceMap&, bool isInitiator) = 0;
 
-    virtual void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) = 0;
+    virtual void addRemoteCandidate(IceCandidate&, const String& mid, const String& ufrag, const String& password) = 0;
 
-    virtual void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) = 0;
+    virtual RefPtr<RealtimeMediaSource> createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type) = 0;
+    virtual void replaceSendSource(RealtimeMediaSource&, const String& mid) = 0;
 
     virtual void stop() = 0;
+};
+
+class MediaEndpointClient {
+public:
+    virtual void gotDtlsFingerprint(const String& fingerprint, const String& fingerprintFunction) = 0;
+    virtual void gotIceCandidate(const String& mid, RefPtr<IceCandidate>&&) = 0;
+    virtual void doneGatheringCandidates(const String& mid) = 0;
+    virtual void iceTransportStateChanged(const String& mid, MediaEndpoint::IceTransportState) = 0;
+
+    virtual ~MediaEndpointClient() { }
 };
 
 } // namespace WebCore

@@ -34,6 +34,9 @@
 #include "MockMediaEndpoint.h"
 
 #include "MediaPayload.h"
+#include "MockRealtimeAudioSource.h"
+#include "MockRealtimeVideoSource.h"
+#include "RealtimeMediaSource.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
@@ -68,9 +71,9 @@ void MockMediaEndpoint::generateDtlsInfo()
     });
 }
 
-Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultAudioPayloads()
+MediaPayloadVector MockMediaEndpoint::getDefaultAudioPayloads()
 {
-    Vector<RefPtr<MediaPayload>> payloads;
+    MediaPayloadVector payloads;
 
     RefPtr<MediaPayload> payload = MediaPayload::create();
     payload->setType(111);
@@ -96,9 +99,9 @@ Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultAudioPayloads()
     return payloads;
 }
 
-Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultVideoPayloads()
+MediaPayloadVector MockMediaEndpoint::getDefaultVideoPayloads()
 {
-    Vector<RefPtr<MediaPayload>> payloads;
+    MediaPayloadVector payloads;
 
     RefPtr<MediaPayload> payload = MediaPayload::create();
     payload->setType(103);
@@ -129,6 +132,31 @@ Vector<RefPtr<MediaPayload>> MockMediaEndpoint::getDefaultVideoPayloads()
     return payloads;
 }
 
+MediaPayloadVector MockMediaEndpoint::filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads)
+{
+    MediaPayloadVector filteredPayloads;
+
+    for (auto& remotePayload : remotePayloads) {
+        MediaPayload* defaultPayload = nullptr;
+        for (auto& p : defaultPayloads) {
+            if (p->encodingName() == remotePayload->encodingName().convertToASCIIUppercase()) {
+                defaultPayload = p.get();
+                break;
+            }
+        }
+        if (!defaultPayload)
+            continue;
+
+        if (defaultPayload->parameters().contains("packetizationMode") && remotePayload->parameters().contains("packetizationMode")
+            && (defaultPayload->parameters().get("packetizationMode") != defaultPayload->parameters().get("packetizationMode")))
+            continue;
+
+        filteredPayloads.append(remotePayload);
+    }
+
+    return filteredPayloads;
+}
+
 MediaEndpoint::UpdateResult MockMediaEndpoint::updateReceiveConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
 {
     UNUSED_PARAM(configuration);
@@ -137,26 +165,41 @@ MediaEndpoint::UpdateResult MockMediaEndpoint::updateReceiveConfiguration(MediaE
     return UpdateResult::Success;
 }
 
-MediaEndpoint::UpdateResult MockMediaEndpoint::updateSendConfiguration(MediaEndpointSessionConfiguration* configuration, bool isInitiator)
+MediaEndpoint::UpdateResult MockMediaEndpoint::updateSendConfiguration(MediaEndpointSessionConfiguration* configuration, const RealtimeMediaSourceMap& sendSourceMap, bool isInitiator)
 {
     UNUSED_PARAM(configuration);
+    UNUSED_PARAM(sendSourceMap);
     UNUSED_PARAM(isInitiator);
 
     return UpdateResult::Success;
 }
 
-void MockMediaEndpoint::addRemoteCandidate(IceCandidate& candidate, unsigned mdescIndex, const String& ufrag, const String& password)
+void MockMediaEndpoint::addRemoteCandidate(IceCandidate& candidate, const String& mid, const String& ufrag, const String& password)
 {
     UNUSED_PARAM(candidate);
-    UNUSED_PARAM(mdescIndex);
+    UNUSED_PARAM(mid);
     UNUSED_PARAM(ufrag);
     UNUSED_PARAM(password);
 }
 
-void MockMediaEndpoint::replaceSendSource(RealtimeMediaSource& newSource, unsigned mdescIndex)
+RefPtr<RealtimeMediaSource> MockMediaEndpoint::createMutedRemoteSource(const String&, RealtimeMediaSource::Type type)
+{
+    switch (type) {
+    case RealtimeMediaSource::Audio:
+        return MockRealtimeAudioSource::createMuted("remote audio");
+    case RealtimeMediaSource::Video:
+        return MockRealtimeVideoSource::createMuted("remote video");
+    case RealtimeMediaSource::None:
+        ASSERT_NOT_REACHED();
+    }
+
+    return nullptr;
+}
+
+void MockMediaEndpoint::replaceSendSource(RealtimeMediaSource& newSource, const String& mid)
 {
     UNUSED_PARAM(newSource);
-    UNUSED_PARAM(mdescIndex);
+    UNUSED_PARAM(mid);
 }
 
 void MockMediaEndpoint::stop()

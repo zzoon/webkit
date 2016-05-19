@@ -61,9 +61,7 @@ RefPtr<RTCOfferOptions> RTCOfferOptions::create(const Dictionary& options, Excep
 }
 
 RTCOfferOptions::RTCOfferOptions()
-    : m_offerToReceiveVideo(0)
-    , m_offerToReceiveAudio(0)
-    , m_iceRestart(false)
+    : m_iceRestart(false)
 {
 }
 
@@ -71,26 +69,6 @@ bool RTCOfferOptions::initialize(const Dictionary& options)
 {
     if (options.isUndefinedOrNull())
         return true;
-
-    String stringValue;
-    int64_t intConversionResult;
-    bool numberConversionSuccess;
-
-    if (options.get("offerToReceiveVideo", stringValue)) {
-        intConversionResult = stringValue.toInt64Strict(&numberConversionSuccess);
-        if (!numberConversionSuccess)
-            return false;
-
-        m_offerToReceiveVideo = intConversionResult;
-    }
-
-    if (options.get("offerToReceiveAudio", stringValue)) {
-        intConversionResult = stringValue.toInt64Strict(&numberConversionSuccess);
-        if (!numberConversionSuccess)
-            return false;
-
-        m_offerToReceiveAudio = intConversionResult;
-    }
 
     bool iceRestart;
     if (options.get("iceRestart", iceRestart))

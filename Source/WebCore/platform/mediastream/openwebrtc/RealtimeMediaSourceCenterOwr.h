@@ -64,9 +64,14 @@ public:
     RefPtr<TrackSourceInfo> sourceWithUID(const String&, RealtimeMediaSource::Type, MediaConstraints*) override;
 
 private:
-    PassRefPtr<RealtimeMediaSource> firstSource(RealtimeMediaSource::Type);
+    typedef HashMap<String, RefPtr<RealtimeMediaSourceOwr>> RealtimeMediaSourceOwrMap;
+
+    PassRefPtr<RealtimeMediaSource> selectSource(RealtimeMediaSource::Type);
     RealtimeMediaSourceOwrMap m_sourceMap;
     RefPtr<MediaStreamCreationClient> m_client;
+
+    Vector<String> m_preferredAudioSourceNames;
+    Vector<String> m_preferredVideoSourceNames;
 };
 
 } // namespace WebCore

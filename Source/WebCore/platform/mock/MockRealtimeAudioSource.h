@@ -44,11 +44,12 @@ class MockRealtimeAudioSource : public MockRealtimeMediaSource {
 public:
 
     static RefPtr<MockRealtimeAudioSource> create();
+    static RefPtr<MockRealtimeAudioSource> createMuted(const String& name);
 
     virtual ~MockRealtimeAudioSource() { }
 
 protected:
-    MockRealtimeAudioSource();
+    MockRealtimeAudioSource(const String& name);
 
 private:
     void updateSettings(RealtimeMediaSourceSettings&) override;

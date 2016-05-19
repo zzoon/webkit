@@ -41,9 +41,13 @@ namespace WebCore {
     macro(fillFromJS) \
     macro(getUserMediaFromJS) \
     macro(initializeWith) \
+    macro(localStreams) \
     macro(operations) \
     macro(ownerReadableStream) \
+    macro(privateAddTrack) \
+    macro(privateGetRemoteStreams) \
     macro(privateGetStats) \
+    macro(privateRemoveTrack) \
     macro(pulling) \
     macro(pullAgain) \
     macro(queue) \
@@ -69,6 +73,7 @@ namespace WebCore {
     macro(underlyingSink) \
     macro(underlyingSource) \
     macro(writing) \
+    macro(MediaStream) \
     macro(MediaStreamTrack) \
     macro(ReadableStream) \
     macro(ReadableStreamReader) \

@@ -47,15 +47,17 @@ public:
     void setConfiguration(RefPtr<MediaEndpointConfiguration>&&) override;
 
     void generateDtlsInfo() override;
-    Vector<RefPtr<MediaPayload>> getDefaultAudioPayloads() override;
-    Vector<RefPtr<MediaPayload>> getDefaultVideoPayloads() override;
+    MediaPayloadVector getDefaultAudioPayloads() override;
+    MediaPayloadVector getDefaultVideoPayloads() override;
+    MediaPayloadVector filterPayloads(const MediaPayloadVector& remotePayloads, const MediaPayloadVector& defaultPayloads) override;
 
     UpdateResult updateReceiveConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
-    UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, bool isInitiator) override;
+    UpdateResult updateSendConfiguration(MediaEndpointSessionConfiguration*, const RealtimeMediaSourceMap&, bool isInitiator) override;
 
-    void addRemoteCandidate(IceCandidate&, unsigned mdescIndex, const String& ufrag, const String& password) override;
+    void addRemoteCandidate(IceCandidate&, const String& mid, const String& ufrag, const String& password) override;
 
-    void replaceSendSource(RealtimeMediaSource&, unsigned mdescIndex) override;
+    RefPtr<RealtimeMediaSource> createMutedRemoteSource(const String& mid, RealtimeMediaSource::Type) override;
+    void replaceSendSource(RealtimeMediaSource&, const String& mid) override;
 
     void stop() override;
 

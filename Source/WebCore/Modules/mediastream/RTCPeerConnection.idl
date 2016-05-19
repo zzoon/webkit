@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
  * Copyright (C) 2013 Nokia Corporation and/or its subsidiary(-ies).
- * Copyright (C) 2015 Ericsson AB. All rights reserved.
+ * Copyright (C) 2015, 2016 Ericsson AB. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,34 +49,52 @@
     [Private] Promise privateGetStats(optional MediaStreamTrack? selector = null);
 
     [JSBuiltin] Promise createOffer(optional Dictionary offerOptions);
-    // Legacy signature: void createOffer(RTCSessionDescriptionCallback successCallback
-    //                                    RTCPeerConnectionErrorCallback errorCallback,
-    //                                    optional Dictionary offerOptions);
+    // Legacy signature: Promise createOffer(RTCSessionDescriptionCallback successCallback
+    //                                       RTCPeerConnectionErrorCallback errorCallback,
+    //                                       optional Dictionary offerOptions);
 
     [JSBuiltin] Promise createAnswer(optional Dictionary answerOptions);
-    // Legacy signature: void createAnswer(RTCSessionDescriptionCallback successCallback
-    //                                    RTCPeerConnectionErrorCallback errorCallback,
-    //                                    optional Dictionary answerOptions);
+    // Legacy signature: Promise createAnswer(RTCSessionDescriptionCallback successCallback
+    //                                        RTCPeerConnectionErrorCallback errorCallback,
+    //                                        optional Dictionary answerOptions);
 
     sequence<RTCRtpSender> getSenders();
     sequence<RTCRtpReceiver> getReceivers();
+    sequence<RTCRtpTransceiver> getTransceivers();
 
-    [StrictTypeChecking, RaisesException] RTCRtpSender addTrack(MediaStreamTrack track, MediaStream... streams);
-    [StrictTypeChecking, RaisesException] void removeTrack(RTCRtpSender sender);
+    // Legacy
+    [JSBuiltin] sequence<MediaStream> getLocalStreams();
+    [JSBuiltin]sequence<MediaStream> getRemoteStreams();
+    [JSBuiltin] MediaStream getStreamById(DOMString streamId);
+    [Private] sequence<MediaStream> privateGetRemoteStreams();
+
+    [JSBuiltin] RTCRtpSender addTrack(MediaStreamTrack track, MediaStream... streams);
+    [JSBuiltin] void removeTrack(RTCRtpSender sender);
+
+    // Private functions used to implement both the supported add/removeTrack() API and the legacy add/removeStream() API.
+    [Private, StrictTypeChecking, RaisesException] RTCRtpSender privateAddTrack(MediaStreamTrack track, MediaStream... streams);
+    [Private, StrictTypeChecking, RaisesException] void privateRemoveTrack(RTCRtpSender sender);
+
+    // Legacy
+    [JSBuiltin] void addStream(MediaStream stream);
+    [JSBuiltin] void removeStream(MediaStream stream);
+
+    [StrictTypeChecking, RaisesException] RTCRtpTransceiver addTransceiver(MediaStreamTrack track, optional Dictionary init);
+    [StrictTypeChecking, RaisesException] RTCRtpTransceiver addTransceiver(DOMString kind, optional Dictionary init);
 
     [JSBuiltin] Promise setLocalDescription(RTCSessionDescription description);
-    // Legacy signature: void setLocalDescription(RTCSessionDescription description
-    //                                            VoidCallback successCallback,
-    //                                            RTCPeerConnectionErrorCallback errorCallback);
+    // Legacy signature: Promise setLocalDescription(RTCSessionDescription description
+    //                                               VoidCallback successCallback,
+    //                                               RTCPeerConnectionErrorCallback errorCallback);
 
     readonly attribute RTCSessionDescription localDescription;
     readonly attribute RTCSessionDescription currentLocalDescription;
     readonly attribute RTCSessionDescription pendingLocalDescription;
 
     [JSBuiltin] Promise setRemoteDescription(RTCSessionDescription description);
-    // Legacy signature: void setRemoteDescription(RTCSessionDescription description
-    //                                            VoidCallback successCallback,
-    //                                            RTCPeerConnectionErrorCallback errorCallback);
+    // Legacy signature: Promise setRemoteDescription(RTCSessionDescription description
+    //                                                VoidCallback successCallback,
+    //                                                RTCPeerConnectionErrorCallback errorCallback);
 
     readonly attribute RTCSessionDescription remoteDescription;
     readonly attribute RTCSessionDescription currentRemoteDescription;
@@ -85,9 +103,9 @@
     readonly attribute DOMString signalingState;
 
     [JSBuiltin] Promise addIceCandidate(RTCIceCandidate candidate);
-    // Legacy signature: void addIceCandidate(RTCIceCandidate candidate
-    //                                        VoidCallback successCallback,
-    //                                        RTCPeerConnectionErrorCallback errorCallback);
+    // Legacy signature: Promise addIceCandidate(RTCIceCandidate candidate
+    //                                           VoidCallback successCallback,
+    //                                           RTCPeerConnectionErrorCallback errorCallback);
 
     readonly attribute DOMString iceGatheringState;
     readonly attribute DOMString iceConnectionState;
@@ -95,10 +113,10 @@
     RTCConfiguration getConfiguration();
     [RaisesException] void setConfiguration(Dictionary configuration);
 
-    [JSBuiltin] Promise getStats(optional MediaStreamTrack selector);
-    // Legacy signature: void getStats(MediaStreamTrack selector
-    //                                 RTCStatsCallback successCallback,
-    //                                 RTCPeerConnectionErrorCallback errorCallback);
+    [JSBuiltin] Promise getStats(optional MediaStreamTrack? selector = null);
+    // Legacy signature: Promise getStats(MediaStreamTrack? selector
+    //                                    RTCStatsCallback successCallback,
+    //                                    RTCPeerConnectionErrorCallback errorCallback);
 
     [RaisesException] RTCDataChannel createDataChannel([TreatNullAs=EmptyString] DOMString label, optional Dictionary options);
 
@@ -108,6 +126,7 @@
     attribute EventHandler onicecandidate;
     attribute EventHandler onsignalingstatechange;
     attribute EventHandler ontrack;
+    attribute EventHandler onaddstream;
     attribute EventHandler oniceconnectionstatechange;
     attribute EventHandler onicegatheringstatechange;
     attribute EventHandler ondatachannel;

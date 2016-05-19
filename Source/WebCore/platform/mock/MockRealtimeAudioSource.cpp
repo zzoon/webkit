@@ -42,11 +42,19 @@ namespace WebCore {
 
 RefPtr<MockRealtimeAudioSource> MockRealtimeAudioSource::create()
 {
-    return adoptRef(new MockRealtimeAudioSource());
+    return adoptRef(new MockRealtimeAudioSource(MockRealtimeMediaSource::mockAudioSourceName()));
 }
 
-MockRealtimeAudioSource::MockRealtimeAudioSource()
-    : MockRealtimeMediaSource(createCanonicalUUIDString(), RealtimeMediaSource::Audio, mockAudioSourceName())
+RefPtr<MockRealtimeAudioSource> MockRealtimeAudioSource::createMuted(const String& name)
+{
+    RefPtr<MockRealtimeAudioSource> source = adoptRef(new MockRealtimeAudioSource(name));
+    source->m_muted = true;
+
+    return source;
+}
+
+MockRealtimeAudioSource::MockRealtimeAudioSource(const String& name)
+    : MockRealtimeMediaSource(createCanonicalUUIDString(), RealtimeMediaSource::Audio, name)
 {
 }
 

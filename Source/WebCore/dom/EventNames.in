@@ -34,7 +34,7 @@ WheelEvent
 XMLHttpRequestProgressEvent
 AudioProcessingEvent conditional=WEB_AUDIO
 OfflineAudioCompletionEvent conditional=WEB_AUDIO
-MediaStreamEvent conditional=MEDIA_STREAM
+MediaStreamEvent conditional=WEB_RTC
 MediaStreamTrackEvent conditional=MEDIA_STREAM
 RTCIceCandidateEvent conditional=WEB_RTC
 RTCDataChannelEvent conditional=WEB_RTC

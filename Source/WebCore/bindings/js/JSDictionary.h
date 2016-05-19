@@ -53,6 +53,7 @@ class MediaKeyError;
 class MediaStream;
 class MediaStreamTrack;
 class RTCRtpReceiver;
+class RTCRtpTransceiver;
 class Node;
 class SerializedScriptValue;
 class Storage;
@@ -152,6 +153,7 @@ private:
 #endif
 #if ENABLE(WEB_RTC)
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<RTCRtpReceiver>& result);
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<RTCRtpTransceiver>& result);
 #endif
 #if ENABLE(FONT_LOAD_EVENTS)
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<CSSFontFaceRule>& result);

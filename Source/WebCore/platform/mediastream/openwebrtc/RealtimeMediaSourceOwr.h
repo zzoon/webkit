@@ -54,9 +54,17 @@ RealtimeMediaSourceOwr(OwrMediaSource* mediaSource, const String& id, RealtimeMe
     : RealtimeMediaSource(id, type, name)
     , m_mediaSource(mediaSource)
     {
+        if (!mediaSource)
+            m_muted = true;
     }
 
     virtual ~RealtimeMediaSourceOwr() { }
+
+    void swapOutShallowSource(OwrMediaSource& realSource)
+    {
+        m_mediaSource = &realSource;
+        setMuted(false);
+    }
 
     virtual RefPtr<RealtimeMediaSourceCapabilities> capabilities() { return m_capabilities; }
     virtual const RealtimeMediaSourceSettings& settings() { return m_currentSettings; }
@@ -68,8 +76,6 @@ private:
     RealtimeMediaSourceSettings m_currentSettings;
     OwrMediaSource* m_mediaSource;
 };
-
-typedef HashMap<String, RefPtr<RealtimeMediaSourceOwr>> RealtimeMediaSourceOwrMap;
 
 } // namespace WebCore
 

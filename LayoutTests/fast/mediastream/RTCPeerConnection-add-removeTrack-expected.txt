@@ -9,6 +9,15 @@ PASS sender is an instance of RTCRtpSender
 PASS sender.track is track
 PASS pc.getSenders().length is 1
 PASS pc.getSenders()[0] is sender
+PASS pc.getReceivers().length is 1
+PASS receiver.track is an instance of MediaStreamTrack
+PASS receiver.track.muted is true
+PASS receiver.track.kind is sender.track.kind
+PASS pc.getTransceivers().length is 1
+PASS transceiver.mid is null
+PASS transceiver.sender is sender
+PASS transceiver.receiver is receiver
+PASS transceiver.stopped is false
 Try to add same track again
 PASS sender = pc.addTrack(track, stream) threw exception Error: InvalidModificationError: DOM Exception 13.
 PASS sender2 = pc.addTrack(track2, stream, stream2) did not throw exception.

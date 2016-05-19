@@ -1,0 +1,31 @@
+Test that RTCPeerConnection.addTrack reuses a unused sender of the same kind if present
+
+On success, you will see a series of "PASS" messages, followed by "TEST COMPLETE".
+
+
+*** Remote description with audio offer set
+PASS pc.getSenders().length is 1
+PASS pc.getReceivers().length is 1
+PASS pc.getTransceivers().length is 1
+
+audioSender = pc.getSenders()[0]
+PASS audioSender.track is null
+
+*** Adding a video track should not reuse audioSender
+senderFromAddTrack = pc.addTrack(videoTrack, stream)
+PASS senderFromAddTrack is not audioSender
+*** An extra sender should be added
+PASS pc.getSenders().length is 2
+PASS pc.getSenders().includes(audioSender) is true
+PASS pc.getSenders().includes(senderFromAddTrack) is true
+
+*** Adding an audio track should reuse audioSender
+senderFromAddTrack = pc.addTrack(audioTrack, stream)
+PASS senderFromAddTrack is audioSender
+PASS audioSender.track is audioTrack
+*** The number of senders should not have changed
+PASS pc.getSenders().length is 2
+PASS successfullyParsed is true
+
+TEST COMPLETE
+
