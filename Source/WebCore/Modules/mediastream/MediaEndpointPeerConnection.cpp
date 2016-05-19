@@ -33,6 +33,7 @@
 #if ENABLE(WEB_RTC)
 #include "MediaEndpointPeerConnection.h"
 
+#include "DOMError.h"
 #include "JSRTCSessionDescription.h"
 #include "MediaEndpointSessionConfiguration.h"
 #include "MediaStream.h"
@@ -112,7 +113,35 @@ static RefPtr<MediaEndpointConfiguration> createMediaEndpointConfiguration(RTCCo
     for (auto& server : rtcConfig.iceServers())
         iceServers.append(IceServerInfo::create(server->urls(), server->credential(), server->username()));
 
-    return MediaEndpointConfiguration::create(iceServers, rtcConfig.iceTransportPolicy(), rtcConfig.bundlePolicy());
+    MediaEndpointConfiguration::IceTransportPolicy iceTransportPolicy;
+    switch (rtcConfig.iceTransportPolicy()) {
+    case RTCConfiguration::IceTransportPolicy::Public:
+        iceTransportPolicy = MediaEndpointConfiguration::IceTransportPolicy::None;
+        break;
+    case RTCConfiguration::IceTransportPolicy::Relay:
+        iceTransportPolicy = MediaEndpointConfiguration::IceTransportPolicy::Relay;
+        break;
+    case RTCConfiguration::IceTransportPolicy::All:
+        iceTransportPolicy = MediaEndpointConfiguration::IceTransportPolicy::All;
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+    }
+
+    MediaEndpointConfiguration::BundlePolicy bundlePolicy;
+    switch (rtcConfig.bundlePolicy()) {
+    case RTCConfiguration::BundlePolicy::Balanced:
+        bundlePolicy = MediaEndpointConfiguration::BundlePolicy::Balanced;
+        break;
+    case RTCConfiguration::BundlePolicy::MaxCompat:
+        bundlePolicy = MediaEndpointConfiguration::BundlePolicy::MaxCompat;
+        break;
+    case RTCConfiguration::BundlePolicy::MaxBundle:
+        bundlePolicy = MediaEndpointConfiguration::BundlePolicy::MaxBundle;
+        break;
+    }
+
+    return MediaEndpointConfiguration::create(iceServers, iceTransportPolicy, bundlePolicy);
 }
 
 MediaEndpointPeerConnection::MediaEndpointPeerConnection(PeerConnectionBackendClient* client)
@@ -248,7 +277,7 @@ void MediaEndpointPeerConnection::createOfferTask(RTCOfferOptions&, SessionDescr
     }
 
     Ref<MediaEndpointSessionDescription> description = MediaEndpointSessionDescription::create(MediaEndpointSessionDescription::Type::Offer, WTFMove(configurationSnapshot));
-    promise.resolve(description->toRTCSessionDescription(*m_sdpProcessor));
+    promise.resolve(*description->toRTCSessionDescription(*m_sdpProcessor));
 }
 
 void MediaEndpointPeerConnection::createAnswer(RTCAnswerOptions& options, SessionDescriptionPromise&& promise)
@@ -269,7 +298,7 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
         return;
 
     if (!internalRemoteDescription()) {
-        promise.reject(DOMError::create("InvalidStateError: No remote description set"));
+        promise.reject(INVALID_STATE_ERR, "No remote description set");
         return;
     }
 
@@ -333,7 +362,7 @@ void MediaEndpointPeerConnection::createAnswerTask(RTCAnswerOptions&, SessionDes
         markAsNeedingNegotiation();
 
     Ref<MediaEndpointSessionDescription> description = MediaEndpointSessionDescription::create(MediaEndpointSessionDescription::Type::Answer, WTFMove(configurationSnapshot));
-    promise.resolve(description->toRTCSessionDescription(*m_sdpProcessor));
+    promise.resolve(*description->toRTCSessionDescription(*m_sdpProcessor));
 }
 
 static RealtimeMediaSourceMap createSourceMap(const MediaDescriptionVector& remoteMediaDescriptions, unsigned localMediaDescriptionCount, const RtpTransceiverVector& transceivers)
@@ -374,12 +403,13 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
     RefPtr<DOMError> error;
     RefPtr<MediaEndpointSessionDescription> newDescription = MediaEndpointSessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
     if (!newDescription) {
-        promise.reject(error);
+        // Should use `error`, can't use it.
+        promise.reject(nullptr);
         return;
     }
 
     if (!localDescriptionTypeValidForState(newDescription->type())) {
-        promise.reject(DOMError::create("InvalidStateError: Description type incompatible with current signaling state"));
+        promise.reject(INVALID_STATE_ERR, "Description type incompatible with current signaling state");
         return;
     }
 
@@ -403,7 +433,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
             printf("ICE restart not implemented\n");
 
         } else if (result == MediaEndpoint::UpdateResult::Failed) {
-            promise.reject(DOMError::create("OperationError: Unable to apply session description"));
+            promise.reject(OperationError, "Unable to apply session description");
             return;
         }
 
@@ -424,7 +454,7 @@ void MediaEndpointPeerConnection::setLocalDescriptionTask(RefPtr<RTCSessionDescr
         RealtimeMediaSourceMap sendSourceMap = createSourceMap(remoteConfiguration->mediaDescriptions(), mediaDescriptions.size(), transceivers);
 
         if (m_mediaEndpoint->updateSendConfiguration(remoteConfiguration, sendSourceMap, isInitiator) == MediaEndpoint::UpdateResult::Failed) {
-            promise.reject(DOMError::create("OperationError: Unable to apply session description"));
+            promise.reject(OperationError, "Unable to apply session description");
             return;
         }
     }
@@ -509,12 +539,12 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
     RefPtr<DOMError> error;
     RefPtr<MediaEndpointSessionDescription> newDescription = MediaEndpointSessionDescription::create(WTFMove(description), *m_sdpProcessor, error);
     if (!newDescription) {
-        promise.reject(error);
+        promise.reject(nullptr);
         return;
     }
 
     if (!remoteDescriptionTypeValidForState(newDescription->type())) {
-        promise.reject(DOMError::create("InvalidStateError: Description type incompatible with current signaling state"));
+        promise.reject(INVALID_STATE_ERR, "Description type incompatible with current signaling state");
         return;
     }
 
@@ -537,7 +567,7 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
         sendSourceMap = createSourceMap(mediaDescriptions, internalLocalDescription()->configuration()->mediaDescriptions().size(), transceivers);
 
     if (m_mediaEndpoint->updateSendConfiguration(newDescription->configuration(), sendSourceMap, isInitiator) == MediaEndpoint::UpdateResult::Failed) {
-        promise.reject(DOMError::create("OperationError: Unable to apply session description"));
+        promise.reject(OperationError, "Unable to apply session description");
         return;
     }
 
@@ -594,7 +624,8 @@ void MediaEndpointPeerConnection::setRemoteDescriptionTask(RefPtr<RTCSessionDesc
             for (auto& id : mediaStreamIds) {
                 if (m_remoteStreamMap.contains(id)) {
                     RefPtr<MediaStream> stream = m_remoteStreamMap.get(id);
-                    stream->addTrack(receiver.track());
+                    if (auto* track = receiver.track())
+                        stream->addTrack(*track);
                     trackEventMediaStreams.add(id, WTFMove(stream));
                 } else {
                     Ref<MediaStream> newStream = MediaStream::create(*m_client->scriptExecutionContext(), MediaStreamTrackVector({ receiver.track() }));
@@ -689,7 +720,7 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
         return;
 
     if (!internalRemoteDescription()) {
-        promise.reject(DOMError::create("InvalidStateError: No remote description set"));
+        promise.reject(INVALID_STATE_ERR, "No remote description set");
         return;
     }
 
@@ -708,13 +739,13 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
         }
 
         if (!targetMediaDescription) {
-            promise.reject(DOMError::create("OperationError: sdpMid did not match any media description"));
+            promise.reject(OperationError, "sdpMid did not match any media description");
             return;
         }
     } else if (rtcCandidate.sdpMLineIndex()) {
         unsigned short sdpMLineIndex = rtcCandidate.sdpMLineIndex().value();
         if (sdpMLineIndex >= remoteMediaDescriptions.size()) {
-            promise.reject(DOMError::create("OperationError: sdpMLineIndex is out of range)"));
+            promise.reject(OperationError, "sdpMLineIndex is out of range)");
             return;
         }
         targetMediaDescription = remoteMediaDescriptions[sdpMLineIndex].get();
@@ -727,7 +758,7 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
     SDPProcessor::Result result = m_sdpProcessor->parseCandidateLine(rtcCandidate.candidate(), candidate);
     if (result != SDPProcessor::Result::Success) {
         if (result == SDPProcessor::Result::ParseError)
-            promise.reject(DOMError::create("OperationError: Unable to apply candidate"));
+            promise.reject(OperationError, "Unable to apply candidate");
         else
             LOG_ERROR("SDPProcessor internal error");
         return;
@@ -743,7 +774,7 @@ void MediaEndpointPeerConnection::addIceCandidateTask(RTCIceCandidate& rtcCandid
 
 void MediaEndpointPeerConnection::getStats(MediaStreamTrack*, PeerConnection::StatsPromise&& promise)
 {
-    promise.reject(DOMError::create("Not implemented"));
+    promise.reject(UnknownError, "Not implemented");
 }
 
 Vector<RefPtr<MediaStream>> MediaEndpointPeerConnection::getRemoteStreams() const
@@ -761,7 +792,7 @@ RefPtr<RTCRtpReceiver> MediaEndpointPeerConnection::createReceiver(const String&
     RefPtr<RealtimeMediaSource> remoteSource = m_mediaEndpoint->createMutedRemoteSource(transceiverMid, sourceType);
     // FIXME: Revisit when discussion about receiver track id concludes.
     RefPtr<MediaStreamTrackPrivate> remoteTrackPrivate = MediaStreamTrackPrivate::create(WTFMove(remoteSource), trackId);
-    RefPtr<MediaStreamTrack> remoteTrack = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *remoteTrackPrivate);
+    Ref<MediaStreamTrack> remoteTrack = MediaStreamTrack::create(*m_client->scriptExecutionContext(), *remoteTrackPrivate);
 
     return RTCRtpReceiver::create(WTFMove(remoteTrack));
 }

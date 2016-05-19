@@ -112,6 +112,26 @@ void RTCRtpTransceiver::disableSendingDirection()
         m_direction = inactiveString();
 }
 
+void RTCRtpTransceiver::setDirection(RTCRtpTransceiver::Direction direction)
+{
+    switch (direction) {
+    case Direction::Sendrecv:
+        m_direction = sendrecvString();
+        return;
+    case Direction::Sendonly:
+        m_direction = sendonlyString();
+        return;
+    case Direction::Recvonly:
+        m_direction = recvonlyString();
+        return;
+    case Direction::Inactive:
+        m_direction = inactiveString();
+        return;
+    };
+
+    ASSERT_NOT_REACHED();
+}
+
 } // namespace WebCore
 
 #endif // ENABLE(WEB_RTC)

@@ -57,8 +57,9 @@ public:
     void enableSendingDirection();
     void disableSendingDirection();
 
+    enum class Direction { Sendrecv, Sendonly, Recvonly, Inactive };
     const String& direction() const { return m_direction; }
-    void setDirection(const String direction) { m_direction = direction; }
+    void setDirection(Direction);
 
     const String& provisionalMid() const { return m_provisionalMid; }
     void setProvisionalMid(const String& provisionalMid) { m_provisionalMid = provisionalMid; }

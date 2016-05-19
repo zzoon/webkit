@@ -115,6 +115,8 @@ list(APPEND WebCore_SOURCES
 
     platform/image-decoders/cairo/ImageDecoderCairo.cpp
 
+    platform/mediastream/SDPProcessorScriptResource.cpp
+
     platform/network/soup/AuthenticationChallengeSoup.cpp
     platform/network/soup/CertificateInfo.cpp
     platform/network/soup/CookieJarSoup.cpp

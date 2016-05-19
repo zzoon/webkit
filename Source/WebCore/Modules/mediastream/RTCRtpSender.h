@@ -61,7 +61,7 @@ public:
     void stop() { m_client = nullptr; }
     void setTrack(RefPtr<MediaStreamTrack>&&);
 
-    void replaceTrack(RefPtr<MediaStreamTrack>&&, PeerConnection::VoidPromise&&, ExceptionCode&);
+    void replaceTrack(Ref<MediaStreamTrack>&&, PeerConnection::VoidPromise&&, ExceptionCode&);
 
 private:
     RTCRtpSender(RefPtr<MediaStreamTrack>&&, const String& trackKind, Vector<String>&& mediaStreamIds, RTCRtpSenderClient&);

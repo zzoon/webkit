@@ -203,13 +203,8 @@ void RTCPeerConnection::privateRemoveTrack(RTCRtpSender& sender, ExceptionCode& 
     m_backend->markAsNeedingNegotiation();
 }
 
-RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(RefPtr<MediaStreamTrack>&& track, const Dictionary& init, ExceptionCode& ec)
+RefPtr<RTCRtpTransceiver> RTCPeerConnection::addTransceiver(Ref<MediaStreamTrack>&& track, const Dictionary& init, ExceptionCode& ec)
 {
-    if (!track) {
-        ec = TypeError;
-        return nullptr;
-    }
-
     if (m_signalingState == SignalingState::Closed) {
         ec = INVALID_STATE_ERR;
         return nullptr;

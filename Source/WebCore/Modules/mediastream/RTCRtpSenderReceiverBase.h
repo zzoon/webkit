@@ -46,14 +46,17 @@ class RTCRtpSenderReceiverBase : public RefCounted<RTCRtpSenderReceiverBase>, pu
 public:
     virtual ~RTCRtpSenderReceiverBase() { }
 
-    MediaStreamTrack& track() { return m_track; }
+    MediaStreamTrack* track() { return m_track.get(); }
 
 protected:
-    RTCRtpSenderReceiverBase(Ref<MediaStreamTrack>&& track)
+    RTCRtpSenderReceiverBase()
+    { }
+
+    RTCRtpSenderReceiverBase(RefPtr<MediaStreamTrack>&& track)
         : m_track(WTFMove(track))
     { }
 
-    Ref<MediaStreamTrack> m_track;
+    RefPtr<MediaStreamTrack> m_track;
 };
 
 } // namespace WebCore

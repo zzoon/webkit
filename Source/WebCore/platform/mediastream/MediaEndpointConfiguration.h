@@ -63,11 +63,6 @@ private:
 
 class MediaEndpointConfiguration : public RefCounted<MediaEndpointConfiguration> {
 public:
-    static RefPtr<MediaEndpointConfiguration> create(Vector<RefPtr<IceServerInfo>>& iceServers, const String& iceTransportPolicy, const String& bundlePolicy)
-    {
-        return adoptRef(new MediaEndpointConfiguration(iceServers, iceTransportPolicy, bundlePolicy));
-    }
-
     enum class IceTransportPolicy {
         None,
         Relay,
@@ -80,12 +75,17 @@ public:
         MaxBundle
     };
 
+    static RefPtr<MediaEndpointConfiguration> create(Vector<RefPtr<IceServerInfo>>& iceServers, IceTransportPolicy iceTransportPolicy, BundlePolicy bundlePolicy)
+    {
+        return adoptRef(new MediaEndpointConfiguration(iceServers, iceTransportPolicy, bundlePolicy));
+    }
+
     const Vector<RefPtr<IceServerInfo>>& iceServers() const { return m_iceServers; }
     IceTransportPolicy iceTransportPolicy() const { return m_iceTransportPolicy; }
     BundlePolicy bundlePolicy() const { return m_bundlePolicy; }
 
 private:
-    MediaEndpointConfiguration(Vector<RefPtr<IceServerInfo>>&, const String& iceTransportPolicy, const String& bundlePolicy);
+    MediaEndpointConfiguration(Vector<RefPtr<IceServerInfo>>&, IceTransportPolicy, BundlePolicy);
 
     Vector<RefPtr<IceServerInfo>> m_iceServers;
     IceTransportPolicy m_iceTransportPolicy;

@@ -73,7 +73,7 @@ public:
     RefPtr<RTCRtpSender> privateAddTrack(Ref<MediaStreamTrack>&&, Vector<MediaStream*>, ExceptionCode&);
     void privateRemoveTrack(RTCRtpSender&, ExceptionCode&);
 
-    RefPtr<RTCRtpTransceiver> addTransceiver(RefPtr<MediaStreamTrack>&&, const Dictionary& init, ExceptionCode&);
+    RefPtr<RTCRtpTransceiver> addTransceiver(Ref<MediaStreamTrack>&&, const Dictionary& init, ExceptionCode&);
     RefPtr<RTCRtpTransceiver> addTransceiver(const String& kind, const Dictionary& init, ExceptionCode&);
 
     void queuedCreateOffer(const Dictionary& offerOptions, PeerConnection::SessionDescriptionPromise&&);
