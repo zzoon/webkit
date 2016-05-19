@@ -37,6 +37,7 @@ list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/opentype"
     "${WEBCORE_DIR}/platform/graphics/wpe"
     "${WEBCORE_DIR}/platform/graphics/wayland"
+    "${WEBCORE_DIR}/platform/mediastream/openwebrtc"
     "${WEBCORE_DIR}/platform/mock/mediasource"
     "${WEBCORE_DIR}/platform/network/soup"
     "${WEBCORE_DIR}/platform/text/icu"
