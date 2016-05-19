@@ -15,6 +15,7 @@
       <dep package="gst-plugins-good"/>
       <dep package="gst-plugins-bad"/>
       <dep package="gst-libav"/>
+      <dep package="openwebrtc"/>
     </dependencies>
   </metamodule>
 
@@ -34,6 +35,8 @@
       href="http://gstreamer.freedesktop.org/src/"/>
   <repository type="tarball" name="xkbcommon.org"
       href="http://xkbcommon.org"/>
+  <repository type="git" name="freedesktop-git"
+      href="http://anongit.freedesktop.org/git"/>
 
   <autotools id="libffi" autogen-sh="configure">
     <branch module="libffi/libffi-3.0.10.tar.gz" version="3.0.10"
@@ -156,6 +159,33 @@
     <branch module="gst-libav/gst-libav-1.6.1.tar.xz" version="1.6.1"
             repo="gstreamer"
             hash="sha256:24d5e8e8b8c825af1a19aa80a27aba268ec383c8133fd4ef66e0e572ff6137a9"/>
+  </autotools>
+
+  <autotools id="libusrsctp" supports-non-srcdir-builds="no" autogen-sh="./bootstrap; ./configure --disable-warnings-as-errors">
+    <branch repo="github.com" module="sctplab/usrsctp.git" checkoutdir="usrsctp" tag="078ff3252f73327e0ac11d6fd5eff62011f6646e"/>
+   </autotools>
+
+   <autotools id="gst-plugins-openwebrtc" supports-parallel-builds="no" supports-non-srcdir-builds="no" autogen-sh="./autogen.sh; ./configure">
+     <dependencies>
+       <dep package="gst-plugins-base"/>
+       <dep package="libusrsctp"/>
+     </dependencies>
+    <branch repo="github.com" module="EricssonResearch/openwebrtc-gst-plugins.git" checkoutdir="gst-plugins-openwebrtc" tag="e359b67484af90f416ea35e301205d2b53c77a14"/>
+   </autotools>
+
+   <autotools id="libnice" supports-non-srcdir-builds="no">
+    <dependencies>
+      <dep package="gstreamer"/>
+    </dependencies>
+    <branch repo="freedesktop-git" module="libnice/libnice.git" tag="0.1.13" checkoutdir="libnice"/>
+  </autotools>
+
+  <autotools id="openwebrtc" autogenargs="--enable-bridge=no --enable-owr-gst=yes">
+    <dependencies>
+      <dep package="gst-plugins-openwebrtc"/>
+      <dep package="libnice"/>
+     </dependencies>
+    <branch repo="github.com" module="EricssonResearch/openwebrtc.git" checkoutdir="openwebrtc" tag="f511ea1fa79a33fa3d52bfd1c0969c28084aeb35"/>
   </autotools>
 
 </moduleset>
