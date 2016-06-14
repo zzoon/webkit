@@ -52,6 +52,12 @@ using namespace std;
 
 namespace JSC {
 
+double totalBaselineCompileTime;
+double totalDFGCompileTime;
+double totalFTLCompileTime;
+double totalFTLDFGCompileTime;
+double totalFTLB3CompileTime;
+
 void ctiPatchCallByReturnAddress(ReturnAddressPtr returnAddress, FunctionPtr newCalleeFunction)
 {
     MacroAssembler::repatchCall(
@@ -75,6 +81,10 @@ JIT::JIT(VM* vm, CodeBlock* codeBlock)
 {
 }
 
+JIT::~JIT()
+{
+}
+
 #if ENABLE(DFG_JIT)
 void JIT::emitEnterOptimizationCheck()
 {
@@ -86,7 +96,7 @@ void JIT::emitEnterOptimizationCheck()
     skipOptimize.append(branchAdd32(Signed, TrustedImm32(Options::executionCounterIncrementForEntry()), AbsoluteAddress(m_codeBlock->addressOfJITExecuteCounter())));
     ASSERT(!m_bytecodeOffset);
 
-    copyCalleeSavesFromFrameOrRegisterToVMCalleeSavesBuffer();
+    copyCalleeSavesFromFrameOrRegisterToVMEntryFrameCalleeSavesBuffer();
 
     callOperation(operationOptimize, m_bytecodeOffset);
     skipOptimize.append(branchTestPtr(Zero, returnValueGPR));
@@ -187,7 +197,6 @@ void JIT::privateCompileMainPass()
         unsigned bytecodeOffset = m_bytecodeOffset;
 
         switch (opcodeID) {
-        DEFINE_SLOW_OP(del_by_val)
         DEFINE_SLOW_OP(in)
         DEFINE_SLOW_OP(less)
         DEFINE_SLOW_OP(lesseq)
@@ -214,6 +223,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_create_direct_arguments)
         DEFINE_OP(op_create_scoped_arguments)
         DEFINE_OP(op_create_cloned_arguments)
+        DEFINE_OP(op_argument_count)
         DEFINE_OP(op_copy_rest)
         DEFINE_OP(op_get_rest_length)
         DEFINE_OP(op_check_tdz)
@@ -222,6 +232,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_resume)
         DEFINE_OP(op_debug)
         DEFINE_OP(op_del_by_id)
+        DEFINE_OP(op_del_by_val)
         DEFINE_OP(op_div)
         DEFINE_OP(op_end)
         DEFINE_OP(op_enter)
@@ -230,11 +241,16 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_eq_null)
         DEFINE_OP(op_try_get_by_id)
         case op_get_array_length:
+        case op_get_by_id_proto_load:
+        case op_get_by_id_unset:
         DEFINE_OP(op_get_by_id)
+        DEFINE_OP(op_get_by_id_with_this)
         DEFINE_OP(op_get_by_val)
+        DEFINE_OP(op_get_by_val_with_this)
         DEFINE_OP(op_overrides_has_instance)
         DEFINE_OP(op_instanceof)
         DEFINE_OP(op_instanceof_custom)
+        DEFINE_OP(op_is_empty)
         DEFINE_OP(op_is_undefined)
         DEFINE_OP(op_is_boolean)
         DEFINE_OP(op_is_number)
@@ -270,24 +286,23 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_new_func_exp)
         DEFINE_OP(op_new_generator_func)
         DEFINE_OP(op_new_generator_func_exp)
-        DEFINE_OP(op_new_arrow_func_exp) 
         DEFINE_OP(op_new_object)
         DEFINE_OP(op_new_regexp)
         DEFINE_OP(op_not)
         DEFINE_OP(op_nstricteq)
         DEFINE_OP(op_dec)
         DEFINE_OP(op_inc)
-        DEFINE_OP(op_profile_did_call)
-        DEFINE_OP(op_profile_will_call)
         DEFINE_OP(op_profile_type)
         DEFINE_OP(op_profile_control_flow)
         DEFINE_OP(op_push_with_scope)
         DEFINE_OP(op_create_lexical_environment)
         DEFINE_OP(op_get_parent_scope)
         DEFINE_OP(op_put_by_id)
+        DEFINE_OP(op_put_by_id_with_this)
         DEFINE_OP(op_put_by_index)
         case op_put_by_val_direct:
         DEFINE_OP(op_put_by_val)
+        DEFINE_OP(op_put_by_val_with_this)
         DEFINE_OP(op_put_getter_by_id)
         DEFINE_OP(op_put_setter_by_id)
         DEFINE_OP(op_put_getter_setter_by_id)
@@ -409,6 +424,8 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_eq)
         DEFINE_SLOWCASE_OP(op_try_get_by_id)
         case op_get_array_length:
+        case op_get_by_id_proto_load:
+        case op_get_by_id_unset:
         DEFINE_SLOWCASE_OP(op_get_by_id)
         DEFINE_SLOWCASE_OP(op_get_by_val)
         DEFINE_SLOWCASE_OP(op_instanceof)
@@ -483,6 +500,10 @@ void JIT::privateCompileSlowCases()
 
 CompilationResult JIT::privateCompile(JITCompilationEffort effort)
 {
+    double before = 0;
+    if (UNLIKELY(computeCompileTimes()))
+        before = monotonicallyIncreasingTimeMS();
+
     DFG::CapabilityLevel level = m_codeBlock->capabilityLevel();
     switch (level) {
     case DFG::CannotCompile:
@@ -723,7 +744,7 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
     if (m_compilation) {
         if (Options::disassembleBaselineForProfiler())
             m_disassembler->reportToProfiler(m_compilation.get(), patchBuffer);
-        m_vm->m_perBytecodeProfiler->addCompilation(m_compilation);
+        m_vm->m_perBytecodeProfiler->addCompilation(m_codeBlock, m_compilation);
     }
 
     if (m_pcToCodeOriginMapBuilder.didBuildMapping())
@@ -740,7 +761,20 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
     m_codeBlock->shrinkToFit(CodeBlock::LateShrink);
     m_codeBlock->setJITCode(
         adoptRef(new DirectJITCode(result, withArityCheck, JITCode::BaselineJIT)));
-    
+
+    double after;
+    if (UNLIKELY(computeCompileTimes())) {
+        after = monotonicallyIncreasingTimeMS();
+
+        if (Options::reportTotalCompileTimes())
+            totalBaselineCompileTime += after - before;
+    }
+    if (UNLIKELY(reportCompileTimes())) {
+        CString codeBlockName = toCString(*m_codeBlock);
+        
+        dataLog("Optimized ", codeBlockName, " with Baseline JIT into ", patchBuffer.size(), " bytes in ", after - before, " ms.\n");
+    }
+
 #if ENABLE(JIT_VERBOSE)
     dataLogF("JIT generated code for %p at [%p, %p).\n", m_codeBlock, result.executableMemory()->start(), result.executableMemory()->end());
 #endif
@@ -753,7 +787,7 @@ void JIT::privateCompileExceptionHandlers()
     if (!m_exceptionChecksWithCallFrameRollback.empty()) {
         m_exceptionChecksWithCallFrameRollback.link(this);
 
-        copyCalleeSavesToVMCalleeSavesBuffer();
+        copyCalleeSavesToVMEntryFrameCalleeSavesBuffer();
 
         // lookupExceptionHandlerFromCallerFrame is passed two arguments, the VM and the exec (the CallFrame*).
 
@@ -772,7 +806,7 @@ void JIT::privateCompileExceptionHandlers()
     if (!m_exceptionChecks.empty()) {
         m_exceptionChecks.link(this);
 
-        copyCalleeSavesToVMCalleeSavesBuffer();
+        copyCalleeSavesToVMEntryFrameCalleeSavesBuffer();
 
         // lookupExceptionHandler is passed two arguments, the VM and the exec (the CallFrame*).
         move(TrustedImmPtr(vm()), GPRInfo::argumentGPR0);
@@ -798,6 +832,34 @@ unsigned JIT::frameRegisterCountFor(CodeBlock* codeBlock)
 int JIT::stackPointerOffsetFor(CodeBlock* codeBlock)
 {
     return virtualRegisterForLocal(frameRegisterCountFor(codeBlock) - 1).offset();
+}
+
+bool JIT::reportCompileTimes()
+{
+    return Options::reportCompileTimes() || Options::reportBaselineCompileTimes();
+}
+
+bool JIT::computeCompileTimes()
+{
+    return reportCompileTimes() || Options::reportTotalCompileTimes();
+}
+
+HashMap<CString, double> JIT::compileTimeStats()
+{
+    HashMap<CString, double> result;
+    if (Options::reportTotalCompileTimes()) {
+        result.add("Total Compile Time", totalBaselineCompileTime + totalDFGCompileTime + totalFTLCompileTime);
+        result.add("Baseline Compile Time", totalBaselineCompileTime);
+#if ENABLE(DFG_JIT)
+        result.add("DFG Compile Time", totalDFGCompileTime);
+#if ENABLE(FTL_JIT)
+        result.add("FTL Compile Time", totalFTLCompileTime);
+        result.add("FTL (DFG) Compile Time", totalFTLDFGCompileTime);
+        result.add("FTL (B3) Compile Time", totalFTLB3CompileTime);
+#endif // ENABLE(FTL_JIT)
+#endif // ENABLE(DFG_JIT)
+    }
+    return result;
 }
 
 } // namespace JSC

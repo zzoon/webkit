@@ -93,7 +93,7 @@ private:
     JSString(VM& vm, PassRefPtr<StringImpl> value)
         : JSCell(vm, vm.stringStructure.get())
         , m_flags(0)
-        , m_value(value)
+        , m_value(RefPtr<StringImpl>(value))
     {
     }
 
@@ -603,7 +603,7 @@ inline JSString* jsSubstring(VM* vm, const String& s, unsigned offset, unsigned 
         if (c <= maxSingleCharacterString)
             return vm->smallStrings.singleCharacterString(c);
     }
-    return JSString::createHasOtherOwner(*vm, StringImpl::createSubstringSharingImpl(s.impl(), offset, length));
+    return JSString::createHasOtherOwner(*vm, StringImpl::createSubstringSharingImpl(*s.impl(), offset, length));
 }
 
 inline JSString* jsOwnedString(VM* vm, const String& s)
@@ -651,11 +651,6 @@ ALWAYS_INLINE JSString* jsStringWithCache(ExecState* exec, const String& s)
     }
 
     return jsStringWithCacheSlowCase(vm, *stringImpl);
-}
-
-ALWAYS_INLINE JSString* jsStringWithCache(ExecState* exec, const AtomicString& s)
-{
-    return jsStringWithCache(exec, s.string());
 }
 
 ALWAYS_INLINE bool JSString::getStringPropertySlot(ExecState* exec, PropertyName propertyName, PropertySlot& slot)

@@ -376,7 +376,7 @@ public:
     void updateGlobalHistoryRedirectLinks() override { }
     bool shouldGoToHistoryItem(HistoryItem*) const override { return false; }
     void updateGlobalHistoryItemForPage() override { }
-    void saveViewStateToItem(HistoryItem*) override { }
+    void saveViewStateToItem(HistoryItem&) override { }
     bool canCachePage() const override { return false; }
     void didDisplayInsecureContent() override { }
     void didRunInsecureContent(SecurityOrigin*, const URL&) override { }
@@ -468,6 +468,7 @@ public:
     void didWriteSelectionToPasteboard() override { }
     void getClientPasteboardDataForRange(Range*, Vector<String>&, Vector<RefPtr<SharedBuffer>>&) override { }
     void requestCandidatesForSelection(const VisibleSelection&) override { }
+    void handleAcceptedCandidateWithSoftSpaces(TextCheckingResult) override { }
 
     void registerUndoStep(PassRefPtr<UndoStep>) override;
     void registerRedoStep(PassRefPtr<UndoStep>) override;
@@ -640,8 +641,6 @@ class EmptyDiagnosticLoggingClient final : public DiagnosticLoggingClient {
     void logDiagnosticMessage(const String&, const String&, ShouldSample) override { }
     void logDiagnosticMessageWithResult(const String&, const String&, DiagnosticLoggingResultType, ShouldSample) override { }
     void logDiagnosticMessageWithValue(const String&, const String&, const String&, ShouldSample) override { }
-
-    void mainFrameDestroyed() override { }
 };
 
 void fillWithEmptyClients(PageConfiguration&);

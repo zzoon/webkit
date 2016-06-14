@@ -44,7 +44,7 @@ class RenderQuote;
 
 class RenderView final : public RenderBlockFlow, public SelectionSubtreeRoot {
 public:
-    RenderView(Document&, Ref<RenderStyle>&&);
+    RenderView(Document&, RenderStyle&&);
     virtual ~RenderView();
 
     WEBCORE_EXPORT bool hitTest(const HitTestRequest&, HitTestResult&);
@@ -76,7 +76,7 @@ public:
     FrameView& frameView() const { return m_frameView; }
 
     LayoutRect visualOverflowRect() const override;
-    LayoutRect computeRectForRepaint(const LayoutRect&, const RenderLayerModelObject* repaintContainer, bool fixed = false) const override;
+    LayoutRect computeRectForRepaint(const LayoutRect&, const RenderLayerModelObject* repaintContainer, RepaintContext = { }) const override;
     void repaintRootContents();
     void repaintViewRectangle(const LayoutRect&) const;
     void repaintViewAndCompositedLayers();

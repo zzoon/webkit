@@ -140,15 +140,6 @@ void JSTestActiveDOMObject::destroy(JSC::JSCell* cell)
     thisObject->JSTestActiveDOMObject::~JSTestActiveDOMObject();
 }
 
-bool JSTestActiveDOMObject::getOwnPropertySlot(JSObject* object, ExecState* state, PropertyName propertyName, PropertySlot& slot)
-{
-    auto* thisObject = jsCast<JSTestActiveDOMObject*>(object);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    if (getStaticValueSlot<JSTestActiveDOMObject, Base>(state, JSTestActiveDOMObjectTable, thisObject, propertyName, slot))
-        return true;
-    return false;
-}
-
 EncodedJSValue jsTestActiveDOMObjectExcitingAttr(ExecState* state, EncodedJSValue thisValue, PropertyName)
 {
     UNUSED_PARAM(state);
@@ -169,7 +160,7 @@ EncodedJSValue jsTestActiveDOMObjectExcitingAttr(ExecState* state, EncodedJSValu
 EncodedJSValue jsTestActiveDOMObjectConstructor(ExecState* state, EncodedJSValue thisValue, PropertyName)
 {
     JSTestActiveDOMObjectPrototype* domObject = jsDynamicCast<JSTestActiveDOMObjectPrototype*>(JSValue::decode(thisValue));
-    if (!domObject)
+    if (UNLIKELY(!domObject))
         return throwVMTypeError(state);
     return JSValue::encode(JSTestActiveDOMObject::getConstructor(state->vm(), domObject->globalObject()));
 }
@@ -203,11 +194,9 @@ EncodedJSValue JSC_HOST_CALL jsTestActiveDOMObjectPrototypeFunctionExcitingFunct
     auto& impl = castedThis->wrapped();
     if (UNLIKELY(state->argumentCount() < 1))
         return throwVMError(state, createNotEnoughArgumentsError(state));
-    Node* nextChild = JSNode::toWrapped(state->argument(0));
-    if (UNLIKELY(state->hadException()))
-        return JSValue::encode(jsUndefined());
-    if (!nextChild)
-        return throwVMTypeError(state);
+    auto nextChild = JSNode::toWrapped(state->argument(0));
+    if (UNLIKELY(!nextChild))
+        return throwArgumentTypeError(*state, 0, "nextChild", "TestActiveDOMObject", "excitingFunction", "Node");
     impl.excitingFunction(*nextChild);
     return JSValue::encode(jsUndefined());
 }
@@ -222,10 +211,10 @@ EncodedJSValue JSC_HOST_CALL jsTestActiveDOMObjectPrototypeFunctionPostMessage(E
     auto& impl = castedThis->wrapped();
     if (UNLIKELY(state->argumentCount() < 1))
         return throwVMError(state, createNotEnoughArgumentsError(state));
-    String message = state->argument(0).toString(state)->value(state);
+    auto message = state->argument(0).toWTFString(state);
     if (UNLIKELY(state->hadException()))
         return JSValue::encode(jsUndefined());
-    impl.postMessage(message);
+    impl.postMessage(WTFMove(message));
     return JSValue::encode(jsUndefined());
 }
 
@@ -252,22 +241,11 @@ extern "C" { extern void* _ZTVN7WebCore19TestActiveDOMObjectE[]; }
 #endif
 #endif
 
-JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestActiveDOMObject* impl)
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, Ref<TestActiveDOMObject>&& impl)
 {
-    if (!impl)
-        return jsNull();
-    return createNewWrapper<JSTestActiveDOMObject>(globalObject, impl);
-}
-
-JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestActiveDOMObject* impl)
-{
-    if (!impl)
-        return jsNull();
-    if (JSValue result = getExistingWrapper<JSTestActiveDOMObject>(globalObject, impl))
-        return result;
 
 #if ENABLE(BINDING_INTEGRITY)
-    void* actualVTablePointer = *(reinterpret_cast<void**>(impl));
+    void* actualVTablePointer = *(reinterpret_cast<void**>(impl.ptr()));
 #if PLATFORM(WIN)
     void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestActiveDOMObject@WebCore@@6B@"));
 #else
@@ -275,7 +253,7 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestActiveDO
 #if COMPILER(CLANG)
     // If this fails TestActiveDOMObject does not have a vtable, so you need to add the
     // ImplementationLacksVTable attribute to the interface definition
-    COMPILE_ASSERT(__is_polymorphic(TestActiveDOMObject), TestActiveDOMObject_is_not_polymorphic);
+    static_assert(__is_polymorphic(TestActiveDOMObject), "TestActiveDOMObject is not polymorphic");
 #endif
 #endif
     // If you hit this assertion you either have a use after free bug, or
@@ -284,7 +262,12 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestActiveDO
     // by adding the SkipVTableValidation attribute to the interface IDL definition
     RELEASE_ASSERT(actualVTablePointer == expectedVTablePointer);
 #endif
-    return createNewWrapper<JSTestActiveDOMObject>(globalObject, impl);
+    return createWrapper<JSTestActiveDOMObject, TestActiveDOMObject>(globalObject, WTFMove(impl));
+}
+
+JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestActiveDOMObject& impl)
+{
+    return wrap(state, globalObject, impl);
 }
 
 TestActiveDOMObject* JSTestActiveDOMObject::toWrapped(JSC::JSValue value)

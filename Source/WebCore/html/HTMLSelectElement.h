@@ -119,8 +119,6 @@ private:
     
     bool canStartSelection() const final { return false; }
 
-    bool canHaveUserAgentShadowRoot() const final { return true; }
-
     bool isEnumeratable() const final { return true; }
     bool supportLabels() const final { return true; }
 
@@ -131,7 +129,7 @@ private:
     bool isPresentationAttribute(const QualifiedName&) const final;
 
     bool childShouldCreateRenderer(const Node&) const final;
-    RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) final;
+    RenderPtr<RenderElement> createElementRenderer(RenderStyle&&, const RenderTreePosition&) final;
     bool appendFormData(FormDataList&, bool) final;
 
     void reset() final;

@@ -222,14 +222,11 @@ void PrintContext::end()
     m_frame->setPrinting(false, FloatSize(), FloatSize(), 0, AdjustViewSize);
 }
 
-static RenderBoxModelObject* enclosingBoxModelObject(RenderObject* object)
+static inline RenderBoxModelObject* enclosingBoxModelObject(RenderElement* renderer)
 {
-
-    while (object && !is<RenderBoxModelObject>(*object))
-        object = object->parent();
-    if (!object)
-        return nullptr;
-    return downcast<RenderBoxModelObject>(object);
+    while (renderer && !is<RenderBoxModelObject>(*renderer))
+        renderer = renderer->parent();
+    return downcast<RenderBoxModelObject>(renderer);
 }
 
 int PrintContext::pageNumberForElement(Element* element, const FloatSize& pageSizeInPixels)
@@ -238,7 +235,7 @@ int PrintContext::pageNumberForElement(Element* element, const FloatSize& pageSi
     RefPtr<Element> elementRef(element);
     element->document().updateLayout();
 
-    RenderBoxModelObject* box = enclosingBoxModelObject(element->renderer());
+    auto* box = enclosingBoxModelObject(element->renderer());
     if (!box)
         return -1;
 
@@ -267,7 +264,7 @@ String PrintContext::pageProperty(Frame* frame, const char* propertyName, int pa
     PrintContext printContext(frame);
     printContext.begin(800); // Any width is OK here.
     document->updateLayout();
-    RefPtr<RenderStyle> style = document->ensureStyleResolver().styleForPage(pageNumber);
+    std::unique_ptr<RenderStyle> style = document->ensureStyleResolver().styleForPage(pageNumber);
 
     // Implement formatters for properties we care about.
     if (!strcmp(propertyName, "margin-left")) {

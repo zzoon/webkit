@@ -46,10 +46,12 @@
 #include "JSMainThreadExecState.h"
 #include "ParsingUtilities.h"
 #include "PingLoader.h"
+#include "ResourceRequest.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicyViolationEvent.h"
+#include "Settings.h"
 #include "TextEncoding.h"
 #include <inspector/InspectorValues.h>
 #include <inspector/ScriptCallStack.h>
@@ -91,17 +93,14 @@ ContentSecurityPolicy::ContentSecurityPolicy(ScriptExecutionContext& scriptExecu
     , m_sandboxFlags(SandboxNone)
 {
     ASSERT(scriptExecutionContext.securityOrigin());
-    auto& securityOrigin = *scriptExecutionContext.securityOrigin();
-    m_selfSourceProtocol = securityOrigin.protocol();
-    m_selfSource = std::make_unique<ContentSecurityPolicySource>(*this, m_selfSourceProtocol, securityOrigin.host(), securityOrigin.port(), emptyString(), false, false);
+    updateSourceSelf(*scriptExecutionContext.securityOrigin());
 }
 
 ContentSecurityPolicy::ContentSecurityPolicy(const SecurityOrigin& securityOrigin, const Frame* frame)
     : m_frame(frame)
     , m_sandboxFlags(SandboxNone)
 {
-    m_selfSourceProtocol = securityOrigin.protocol();
-    m_selfSource = std::make_unique<ContentSecurityPolicySource>(*this, m_selfSourceProtocol, securityOrigin.host(), securityOrigin.port(), emptyString(), false, false);
+    updateSourceSelf(securityOrigin);
 }
 
 ContentSecurityPolicy::~ContentSecurityPolicy()
@@ -113,6 +112,9 @@ void ContentSecurityPolicy::copyStateFrom(const ContentSecurityPolicy* other)
     ASSERT(m_policies.isEmpty());
     for (auto& policy : other->m_policies)
         didReceiveHeader(policy->header(), policy->headerType(), ContentSecurityPolicy::PolicyFrom::Inherited);
+
+    m_upgradeInsecureRequests = other->m_upgradeInsecureRequests;
+    m_insecureNavigationRequestsToUpgrade.add(other->m_insecureNavigationRequestsToUpgrade.begin(), other->m_insecureNavigationRequestsToUpgrade.end());
 }
 
 void ContentSecurityPolicy::didCreateWindowShell(JSDOMWindowShell& windowShell) const
@@ -175,9 +177,22 @@ void ContentSecurityPolicy::didReceiveHeader(const String& header, ContentSecuri
         applyPolicyToScriptExecutionContext();
 }
 
+void ContentSecurityPolicy::updateSourceSelf(const SecurityOrigin& securityOrigin)
+{
+    m_selfSourceProtocol = securityOrigin.protocol();
+    m_selfSource = std::make_unique<ContentSecurityPolicySource>(*this, m_selfSourceProtocol, securityOrigin.host(), securityOrigin.port(), emptyString(), false, false);
+}
+
 void ContentSecurityPolicy::applyPolicyToScriptExecutionContext()
 {
     ASSERT(m_scriptExecutionContext);
+
+    // Update source self as the security origin may have changed between the time we were created and now.
+    // For instance, we may have been initially created for an about:blank iframe that later inherited the
+    // security origin of its owner document.
+    ASSERT(m_scriptExecutionContext->securityOrigin());
+    updateSourceSelf(*m_scriptExecutionContext->securityOrigin());
+
     if (!m_lastPolicyEvalDisabledErrorMessage.isNull())
         m_scriptExecutionContext->disableEval(m_lastPolicyEvalDisabledErrorMessage);
     if (m_sandboxFlags != SandboxNone && is<Document>(m_scriptExecutionContext))
@@ -192,6 +207,13 @@ void ContentSecurityPolicy::setOverrideAllowInlineStyle(bool value)
 bool ContentSecurityPolicy::urlMatchesSelf(const URL& url) const
 {
     return m_selfSource->matches(url);
+}
+
+bool ContentSecurityPolicy::allowContentSecurityPolicySourceStarToMatchAnyProtocol() const
+{
+    if (Settings* settings = is<Document>(m_scriptExecutionContext) ? downcast<Document>(*m_scriptExecutionContext).settings() : nullptr)
+        return settings->allowContentSecurityPolicySourceStarToMatchAnyProtocol();
+    return false;
 }
 
 bool ContentSecurityPolicy::protocolMatchesSelf(const URL& url) const
@@ -736,5 +758,70 @@ bool ContentSecurityPolicy::experimentalFeaturesEnabled() const
     return false;
 #endif
 }
+
+void ContentSecurityPolicy::upgradeInsecureRequestIfNeeded(ResourceRequest& request, InsecureRequestType requestType)
+{
+    URL url = request.url();
+    upgradeInsecureRequestIfNeeded(url, requestType);
+    request.setURL(url);
+}
+
+void ContentSecurityPolicy::upgradeInsecureRequestIfNeeded(URL& url, InsecureRequestType requestType)
+{
+    if (!url.protocolIs("http") && !url.protocolIs("ws"))
+        return;
+
+    bool upgradeRequest = m_insecureNavigationRequestsToUpgrade.contains(SecurityOrigin::create(url));
+    if (requestType == InsecureRequestType::Load || requestType == InsecureRequestType::FormSubmission)
+        upgradeRequest |= m_upgradeInsecureRequests;
     
+    if (!upgradeRequest)
+        return;
+
+    if (url.protocolIs("http"))
+        url.setProtocol("https");
+    else if (url.protocolIs("ws"))
+        url.setProtocol("wss");
+    else
+        return;
+    
+    if (url.port() == 80)
+        url.setPort(443);
+}
+
+void ContentSecurityPolicy::setUpgradeInsecureRequests(bool upgradeInsecureRequests)
+{
+    m_upgradeInsecureRequests = upgradeInsecureRequests;
+    if (!m_upgradeInsecureRequests)
+        return;
+
+    if (!m_scriptExecutionContext)
+        return;
+
+    // Store the upgrade domain as an 'insecure' protocol so we can quickly identify
+    // origins we should upgrade.
+    URL upgradeURL = m_scriptExecutionContext->url();
+    if (upgradeURL.protocolIs("https"))
+        upgradeURL.setProtocol("http");
+    else if (upgradeURL.protocolIs("wss"))
+        upgradeURL.setProtocol("ws");
+    
+    m_insecureNavigationRequestsToUpgrade.add(SecurityOrigin::create(upgradeURL));
+}
+
+void ContentSecurityPolicy::inheritInsecureNavigationRequestsToUpgradeFromOpener(const ContentSecurityPolicy& other)
+{
+    m_insecureNavigationRequestsToUpgrade.add(other.m_insecureNavigationRequestsToUpgrade.begin(), other.m_insecureNavigationRequestsToUpgrade.end());
+}
+
+HashSet<RefPtr<SecurityOrigin>>&& ContentSecurityPolicy::takeNavigationRequestsToUpgrade()
+{
+    return WTFMove(m_insecureNavigationRequestsToUpgrade);
+}
+
+void ContentSecurityPolicy::setInsecureNavigationRequestsToUpgrade(HashSet<RefPtr<SecurityOrigin>>&& insecureNavigationRequests)
+{
+    m_insecureNavigationRequestsToUpgrade = WTFMove(insecureNavigationRequests);
+}
+
 }

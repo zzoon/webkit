@@ -31,19 +31,22 @@
 #include "PageConsoleClient.h"
 #include <runtime/Float32Array.h>
 
+#if ENABLE(MEDIA_SESSION)
+#include "MediaSessionInterruptionProvider.h"
+#endif
+
 namespace WebCore {
 
 class AudioContext;
 class ClientRect;
 class ClientRectList;
-class DOMPath;
-class DOMStringList;
 class DOMURL;
 class DOMWindow;
 class Document;
 class Element;
 class File;
 class Frame;
+class GCObservation;
 class HTMLImageElement;
 class HTMLInputElement;
 class HTMLLinkElement;
@@ -56,12 +59,10 @@ class MediaSession;
 class MemoryInfo;
 class MockContentFilterSettings;
 class MockPageOverlay;
-class Node;
 class NodeList;
 class Page;
 class Range;
 class RenderedDocumentMarker;
-class ScriptExecutionContext;
 class SerializedScriptValue;
 class SourceBuffer;
 class TimeRanges;
@@ -88,11 +89,13 @@ public:
     bool isPreloaded(const String& url);
     bool isLoadingFromMemoryCache(const String& url);
     String xhrResponseSource(XMLHttpRequest&);
-    bool isSharingStyleSheetContents(HTMLLinkElement& a, HTMLLinkElement& b);
+    bool isSharingStyleSheetContents(HTMLLinkElement&, HTMLLinkElement&);
     bool isStyleSheetLoadingSubresources(HTMLLinkElement&);
-    void setOverrideCachePolicy(const String&);
+    enum class CachePolicy { UseProtocolCachePolicy, ReloadIgnoringCacheData, ReturnCacheDataElseLoad, ReturnCacheDataDontLoad };
+    void setOverrideCachePolicy(CachePolicy);
     void setCanShowModalDialogOverride(bool allow, ExceptionCode&);
-    void setOverrideResourceLoadPriority(const String&);
+    enum class ResourceLoadPriority { ResourceLoadPriorityVeryLow, ResourceLoadPriorityLow, ResourceLoadPriorityMedium, ResourceLoadPriorityHigh, ResourceLoadPriorityVeryHigh };
+    void setOverrideResourceLoadPriority(ResourceLoadPriority);
     void setStrictRawResourceValidationPolicyDisabled(bool);
 
     void clearMemoryCache();
@@ -161,7 +164,6 @@ public:
     void setScrollViewPosition(int x, int y, ExceptionCode&);
     void setViewBaseBackgroundColor(const String& colorValue, ExceptionCode&);
 
-    void setPagination(const String& mode, int gap, ExceptionCode& ec) { setPagination(mode, gap, 0, ec); }
     void setPagination(const String& mode, int gap, int pageLength, ExceptionCode&);
     void setPaginationLineGridEnabled(bool, ExceptionCode&);
     String configurationForViewport(float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode&);
@@ -170,7 +172,8 @@ public:
     bool elementShouldAutoComplete(HTMLInputElement&);
     void setEditingValue(HTMLInputElement&, const String&);
     void setAutofilled(HTMLInputElement&, bool enabled);
-    void setShowAutoFillButton(HTMLInputElement&, const String& autoFillButtonType);
+    enum class AutoFillButtonType { AutoFillButtonTypeNone, AutoFillButtonTypeContacts, AutoFillButtonTypeCredentials };
+    void setShowAutoFillButton(HTMLInputElement&, AutoFillButtonType);
     void scrollElementToRect(Element&, int x, int y, int w, int h, ExceptionCode&);
 
     String autofillFieldName(Element&, ExceptionCode&);
@@ -201,7 +204,7 @@ public:
     RefPtr<NodeList> nodesFromRect(Document&, int x, int y, unsigned topPadding, unsigned rightPadding,
         unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, bool allowChildFrameContent, ExceptionCode&) const;
 
-    String parserMetaData(JSC::JSValue = { });
+    String parserMetaData(JSC::JSValue = JSC::JSValue::JSUndefined);
 
     void updateEditorUINowIfScheduled();
 
@@ -221,6 +224,7 @@ public:
     void toggleOverwriteModeEnabled(ExceptionCode&);
 
     unsigned countMatchesForText(const String&, unsigned findOptions, const String& markMatches, ExceptionCode&);
+    unsigned countFindMatches(const String&, unsigned findOptions, ExceptionCode&);
 
     unsigned numberOfScrollableAreas(ExceptionCode&);
 
@@ -243,8 +247,7 @@ public:
         LAYER_TREE_INCLUDES_PAINTING_PHASES = 8,
         LAYER_TREE_INCLUDES_CONTENT_LAYERS = 16
     };
-    String layerTreeAsText(Document&, unsigned flags, ExceptionCode&) const;
-    String layerTreeAsText(Document&, ExceptionCode&) const;
+    String layerTreeAsText(Document&, unsigned short flags, ExceptionCode&) const;
     String repaintRectsAsText(ExceptionCode&) const;
     String scrollingStateTreeAsText(ExceptionCode&) const;
     String mainThreadScrollingReasons(ExceptionCode&) const;
@@ -257,25 +260,20 @@ public:
         // Values need to be kept in sync with Internals.idl.
         DISPLAY_LIST_INCLUDES_PLATFORM_OPERATIONS = 1,
     };
-    String displayListForElement(Element&, unsigned flags, ExceptionCode&);
-    String displayListForElement(Element&, ExceptionCode&);
+    String displayListForElement(Element&, unsigned short flags, ExceptionCode&);
 
-    String replayDisplayListForElement(Element&, unsigned flags, ExceptionCode&);
-    String replayDisplayListForElement(Element&, ExceptionCode&);
+    String replayDisplayListForElement(Element&, unsigned short flags, ExceptionCode&);
 
     void garbageCollectDocumentResources(ExceptionCode&) const;
 
     void insertAuthorCSS(const String&, ExceptionCode&) const;
     void insertUserCSS(const String&, ExceptionCode&) const;
 
-    const ProfilesArray& consoleProfiles() const;
-
     unsigned numberOfLiveNodes() const;
     unsigned numberOfLiveDocuments() const;
 
     RefPtr<DOMWindow> openDummyInspectorFrontend(const String& url);
     void closeDummyInspectorFrontend();
-    void setLegacyJavaScriptProfilingEnabled(bool enabled, ExceptionCode&);
     void setInspectorIsUnderTest(bool isUnderTest, ExceptionCode&);
 
     String counterValue(Element&);
@@ -330,7 +328,6 @@ public:
     void startTrackingCompositingUpdates(ExceptionCode&);
     unsigned compositingUpdateCount(ExceptionCode&);
 
-    void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(ExceptionCode&);
     void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(Node*, ExceptionCode&);
     unsigned layoutCount() const;
 
@@ -384,7 +381,7 @@ public:
     void setCaptionDisplayMode(const String&, ExceptionCode&);
 
 #if ENABLE(VIDEO)
-    Ref<TimeRanges> createTimeRanges(Float32Array* startTimes, Float32Array* endTimes);
+    Ref<TimeRanges> createTimeRanges(Float32Array& startTimes, Float32Array& endTimes);
     double closestTimeToTimeRanges(double time, TimeRanges&);
 #endif
 
@@ -415,11 +412,12 @@ public:
 #endif
 
 #if ENABLE(MEDIA_SESSION)
-    void sendMediaSessionStartOfInterruptionNotification(const String&);
-    void sendMediaSessionEndOfInterruptionNotification(const String&);
+    void sendMediaSessionStartOfInterruptionNotification(MediaSessionInterruptingCategory);
+    void sendMediaSessionEndOfInterruptionNotification(MediaSessionInterruptingCategory);
     String mediaSessionCurrentState(MediaSession&) const;
     double mediaElementPlayerVolume(HTMLMediaElement&) const;
-    void sendMediaControlEvent(const String&);
+    enum class MediaControlEvent { PlayPause, NextTrack, PreviousTrack };
+    void sendMediaControlEvent(MediaControlEvent);
 #endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
@@ -434,7 +432,8 @@ public:
     void simulateSystemSleep() const;
     void simulateSystemWake() const;
 
-    RefPtr<MockPageOverlay> installMockPageOverlay(const String& overlayType, ExceptionCode&);
+    enum class PageOverlayType { View, Document };
+    RefPtr<MockPageOverlay> installMockPageOverlay(PageOverlayType, ExceptionCode&);
     String pageOverlayLayerTreeAsText(ExceptionCode&) const;
 
     void setPageMuted(bool);
@@ -472,6 +471,20 @@ public:
     
     void setViewportForceAlwaysUserScalable(bool);
     void setLinkPreloadSupport(bool);
+    void setResourceTimingSupport(bool);
+
+#if ENABLE(CSS_GRID_LAYOUT)
+    void setCSSGridLayoutEnabled(bool);
+#endif
+
+#if ENABLE(WEBGL2)
+    bool webGL2Enabled() const;
+    void setWebGL2Enabled(bool);
+#endif
+
+    bool isProcessingUserGesture();
+
+    RefPtr<GCObservation> observeGC(JSC::JSValue);
 
 private:
     explicit Internals(Document&);

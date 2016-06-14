@@ -279,7 +279,7 @@ WebInspector.ResourceSidebarPanel = class ResourceSidebarPanel extends WebInspec
             return;
 
         // If the script URL matches a resource we can assume it is part of that resource and does not need added.
-        if (script.resource)
+        if (script.resource || script.dynamicallyAddedScriptElement)
             return;
 
         var insertIntoTopLevel = false;
@@ -320,7 +320,11 @@ WebInspector.ResourceSidebarPanel = class ResourceSidebarPanel extends WebInspec
         if (!scriptTreeElement)
             return;
 
-        scriptTreeElement.parent.removeChild(scriptTreeElement);
+        let parentTreeElement = scriptTreeElement.parent;
+        parentTreeElement.removeChild(scriptTreeElement);
+
+        if (parentTreeElement instanceof WebInspector.FolderTreeElement && !parentTreeElement.children.length)
+            parentTreeElement.parent.removeChild(parentTreeElement);
     }
 
     _scriptsCleared(event)

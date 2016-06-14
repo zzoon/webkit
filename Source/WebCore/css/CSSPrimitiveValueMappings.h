@@ -1379,10 +1379,10 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
         break;
 #if ENABLE(CSS_GRID_LAYOUT)
     case GRID:
-        m_value.valueID = CSSValueWebkitGrid;
+        m_value.valueID = CSSValueGrid;
         break;
     case INLINE_GRID:
-        m_value.valueID = CSSValueWebkitInlineGrid;
+        m_value.valueID = CSSValueInlineGrid;
         break;
 #endif
     case NONE:
@@ -5118,6 +5118,9 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(ItemPosition itemPosition
     case ItemPositionAuto:
         m_value.valueID = CSSValueAuto;
         break;
+    case ItemPositionNormal:
+        m_value.valueID = CSSValueNormal;
+        break;
     case ItemPositionStretch:
         m_value.valueID = CSSValueStretch;
         break;
@@ -5162,6 +5165,8 @@ template<> inline CSSPrimitiveValue::operator ItemPosition() const
     switch (m_value.valueID) {
     case CSSValueAuto:
         return ItemPositionAuto;
+    case CSSValueNormal:
+        return ItemPositionNormal;
     case CSSValueStretch:
         return ItemPositionStretch;
     case CSSValueBaseline:

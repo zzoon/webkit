@@ -77,7 +77,7 @@ JSValue JSIDBDatabase::createObjectStore(ExecState& state)
     }
 
     ExceptionCodeWithMessage ec;
-    JSValue result = toJS(&state, globalObject(), wrapped().createObjectStore(name, keyPath, autoIncrement, ec).get());
+    JSValue result = toJS(&state, globalObject(), wrapped().createObjectStore(name, keyPath, autoIncrement, ec));
     setDOMException(&state, ec);
     return result;
 }
@@ -94,7 +94,7 @@ JSValue JSIDBDatabase::transaction(ExecState& exec)
 
     Vector<String> scope;
     JSValue scopeArg(exec.argument(0));
-    auto domStringList = JSDOMStringList::toWrapped(&exec, scopeArg);
+    auto domStringList = JSDOMStringList::toWrapped(exec, scopeArg);
     if (exec.hadException())
         return jsUndefined();
 
@@ -116,7 +116,7 @@ JSValue JSIDBDatabase::transaction(ExecState& exec)
     }
 
     ExceptionCodeWithMessage ec;
-    JSValue result = toJS(&exec, globalObject(), wrapped().transaction(scriptContext, scope, mode, ec).get());
+    JSValue result = toJS(&exec, globalObject(), wrapped().transaction(scriptContext, scope, mode, ec));
     setDOMException(&exec, ec);
     return result;
 }

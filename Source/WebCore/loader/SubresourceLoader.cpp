@@ -61,7 +61,7 @@ namespace WebCore {
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, subresourceLoaderCounter, ("SubresourceLoader"));
 
-SubresourceLoader::RequestCountTracker::RequestCountTracker(CachedResourceLoader& cachedResourceLoader, CachedResource* resource)
+SubresourceLoader::RequestCountTracker::RequestCountTracker(CachedResourceLoader& cachedResourceLoader, const CachedResource& resource)
     : m_cachedResourceLoader(cachedResourceLoader)
     , m_resource(resource)
 {
@@ -73,18 +73,18 @@ SubresourceLoader::RequestCountTracker::~RequestCountTracker()
     m_cachedResourceLoader.decrementRequestCount(m_resource);
 }
 
-SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, const ResourceLoaderOptions& options)
+SubresourceLoader::SubresourceLoader(Frame& frame, CachedResource& resource, const ResourceLoaderOptions& options)
     : ResourceLoader(frame, options)
-    , m_resource(resource)
+    , m_resource(&resource)
     , m_loadingMultipartContent(false)
     , m_state(Uninitialized)
-    , m_requestCountTracker(std::make_unique<RequestCountTracker>(frame->document()->cachedResourceLoader(), resource))
+    , m_requestCountTracker(InPlace, frame.document()->cachedResourceLoader(), resource)
 {
 #ifndef NDEBUG
     subresourceLoaderCounter.increment();
 #endif
 #if ENABLE(CONTENT_EXTENSIONS)
-    m_resourceType = toResourceType(resource->type());
+    m_resourceType = toResourceType(resource.type());
 #endif
 }
 
@@ -97,7 +97,7 @@ SubresourceLoader::~SubresourceLoader()
 #endif
 }
 
-RefPtr<SubresourceLoader> SubresourceLoader::create(Frame* frame, CachedResource* resource, const ResourceRequest& request, const ResourceLoaderOptions& options)
+RefPtr<SubresourceLoader> SubresourceLoader::create(Frame& frame, CachedResource& resource, const ResourceRequest& request, const ResourceLoaderOptions& options)
 {
     RefPtr<SubresourceLoader> subloader(adoptRef(new SubresourceLoader(frame, resource, options)));
 #if PLATFORM(IOS)
@@ -166,7 +166,7 @@ void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, con
 {
     // Store the previous URL because the call to ResourceLoader::willSendRequest will modify it.
     URL previousURL = request().url();
-    Ref<SubresourceLoader> protect(*this);
+    Ref<SubresourceLoader> protectedThis(*this);
 
     if (!newRequest.url().isValid()) {
         cancel(cannotShowURLError());
@@ -175,6 +175,17 @@ void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, con
 
     ASSERT(!newRequest.isNull());
     if (!redirectResponse.isNull()) {
+        if (options().fetchOptions().redirect != FetchOptions::Redirect::Follow) {
+            if (options().fetchOptions().redirect == FetchOptions::Redirect::Error) {
+                cancel();
+                return;
+            }
+            m_resource->setOpaqueRedirect();
+            m_resource->responseReceived({ });
+            didFinishLoading(currentTime());
+            return;
+        }
+
         // CachedResources are keyed off their original request URL.
         // Requesting the same original URL a second time can redirect to a unique second resource.
         // Therefore, if a redirect to a different destination URL occurs, we should no longer consider this a revalidation of the first resource.
@@ -182,8 +193,8 @@ void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, con
         if (newRequest.isConditional() && m_resource->resourceToRevalidate() && newRequest.url() != m_resource->resourceToRevalidate()->response().url()) {
             newRequest.makeUnconditional();
             MemoryCache::singleton().revalidationFailed(*m_resource);
-            if (m_frame)
-                m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail, ShouldSample::Yes);
+            if (m_frame && m_frame->page())
+                m_frame->page()->diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail, ShouldSample::Yes);
         }
 
         if (!m_documentLoader->cachedResourceLoader().canRequest(m_resource->type(), newRequest.url(), options(), false /* forPreload */, true /* didReceiveRedirectResponse */)) {
@@ -216,7 +227,7 @@ void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, con
 void SubresourceLoader::didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent)
 {
     ASSERT(m_state == Initialized);
-    Ref<SubresourceLoader> protect(*this);
+    Ref<SubresourceLoader> protectedThis(*this);
     m_resource->didSendData(bytesSent, totalBytesToBeSent);
 }
 
@@ -227,7 +238,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
 
     // Reference the object in this method since the additional processing can do
     // anything including removing the last reference to this object; one example of this is 3266216.
-    Ref<SubresourceLoader> protect(*this);
+    Ref<SubresourceLoader> protectedThis(*this);
 
     if (shouldIncludeCertificateInfo())
         response.includeCertificateInfo();
@@ -246,16 +257,16 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
             // Existing resource is ok, just use it updating the expiration time.
             m_resource->setResponse(response);
             MemoryCache::singleton().revalidationSucceeded(*m_resource, response);
-            if (m_frame)
-                m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultPass, ShouldSample::Yes);
+            if (m_frame && m_frame->page())
+                m_frame->page()->diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultPass, ShouldSample::Yes);
             if (!reachedTerminalState())
                 ResourceLoader::didReceiveResponse(response);
             return;
         }
         // Did not get 304 response, continue as a regular resource load.
         MemoryCache::singleton().revalidationFailed(*m_resource);
-        if (m_frame)
-            m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail, ShouldSample::Yes);
+        if (m_frame && m_frame->page())
+            m_frame->page()->diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail, ShouldSample::Yes);
     }
 
     m_resource->responseReceived(response);
@@ -272,7 +283,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         m_loadingMultipartContent = true;
 
         // We don't count multiParts in a CachedResourceLoader's request count
-        m_requestCountTracker = nullptr;
+        m_requestCountTracker = Nullopt;
         if (!m_resource->isImage()) {
             cancel();
             return;
@@ -295,15 +306,15 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
 
 void SubresourceLoader::didReceiveData(const char* data, unsigned length, long long encodedDataLength, DataPayloadType dataPayloadType)
 {
-    didReceiveDataOrBuffer(data, length, 0, encodedDataLength, dataPayloadType);
+    didReceiveDataOrBuffer(data, length, nullptr, encodedDataLength, dataPayloadType);
 }
 
-void SubresourceLoader::didReceiveBuffer(PassRefPtr<SharedBuffer> buffer, long long encodedDataLength, DataPayloadType dataPayloadType)
+void SubresourceLoader::didReceiveBuffer(Ref<SharedBuffer>&& buffer, long long encodedDataLength, DataPayloadType dataPayloadType)
 {
-    didReceiveDataOrBuffer(0, 0, buffer, encodedDataLength, dataPayloadType);
+    didReceiveDataOrBuffer(nullptr, 0, WTFMove(buffer), encodedDataLength, dataPayloadType);
 }
 
-void SubresourceLoader::didReceiveDataOrBuffer(const char* data, int length, PassRefPtr<SharedBuffer> prpBuffer, long long encodedDataLength, DataPayloadType dataPayloadType)
+void SubresourceLoader::didReceiveDataOrBuffer(const char* data, int length, RefPtr<SharedBuffer>&& prpBuffer, long long encodedDataLength, DataPayloadType dataPayloadType)
 {
     if (m_resource->response().httpStatusCode() >= 400 && !m_resource->shouldIgnoreHTTPStatusCodeErrors())
         return;
@@ -312,10 +323,10 @@ void SubresourceLoader::didReceiveDataOrBuffer(const char* data, int length, Pas
     ASSERT(m_state == Initialized);
     // Reference the object in this method since the additional processing can do
     // anything including removing the last reference to this object; one example of this is 3266216.
-    Ref<SubresourceLoader> protect(*this);
+    Ref<SubresourceLoader> protectedThis(*this);
     RefPtr<SharedBuffer> buffer = prpBuffer;
     
-    ResourceLoader::didReceiveDataOrBuffer(data, length, buffer, encodedDataLength, dataPayloadType);
+    ResourceLoader::didReceiveDataOrBuffer(data, length, WTFMove(buffer), encodedDataLength, dataPayloadType);
 
     if (!m_loadingMultipartContent) {
         if (auto* resourceData = this->resourceData())
@@ -338,7 +349,7 @@ bool SubresourceLoader::checkForHTTPStatusCodeError()
 
 static void logResourceLoaded(Frame* frame, CachedResource::Type type)
 {
-    if (!frame)
+    if (!frame || !frame->page())
         return;
 
     String resourceType;
@@ -382,7 +393,7 @@ static void logResourceLoaded(Frame* frame, CachedResource::Type type)
         resourceType = DiagnosticLoggingKeys::otherKey();
         break;
     }
-    frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceKey(), DiagnosticLoggingKeys::loadedKey(), resourceType, ShouldSample::Yes);
+    frame->page()->diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceKey(), DiagnosticLoggingKeys::loadedKey(), resourceType, ShouldSample::Yes);
 }
 
 bool SubresourceLoader::checkCrossOriginAccessControl(const ResourceRequest& previousRequest, const ResourceResponse& redirectResponse, ResourceRequest& newRequest)
@@ -421,7 +432,7 @@ void SubresourceLoader::didFinishLoading(double finishTime)
     LOG(ResourceLoading, "Received '%s'.", m_resource->url().string().latin1().data());
     logResourceLoaded(m_frame.get(), m_resource->type());
 
-    Ref<SubresourceLoader> protect(*this);
+    Ref<SubresourceLoader> protectedThis(*this);
     CachedResourceHandle<CachedResource> protectResource(m_resource);
 
     m_state = Finishing;
@@ -446,7 +457,7 @@ void SubresourceLoader::didFail(const ResourceError& error)
     ASSERT(!reachedTerminalState());
     LOG(ResourceLoading, "Failed to load '%s'.\n", m_resource->url().string().latin1().data());
 
-    Ref<SubresourceLoader> protect(*this);
+    Ref<SubresourceLoader> protectedThis(*this);
     CachedResourceHandle<CachedResource> protectResource(m_resource);
     m_state = Finishing;
     if (m_resource->resourceToRevalidate())
@@ -476,7 +487,7 @@ void SubresourceLoader::willCancel(const ResourceError& error)
     ASSERT(!reachedTerminalState());
     LOG(ResourceLoading, "Cancelled load of '%s'.\n", m_resource->url().string().latin1().data());
 
-    Ref<SubresourceLoader> protect(*this);
+    Ref<SubresourceLoader> protectedThis(*this);
 #if PLATFORM(IOS)
     m_state = m_state == Uninitialized ? CancelledWhileInitializing : Finishing;
 #else
@@ -503,7 +514,7 @@ void SubresourceLoader::notifyDone()
     if (reachedTerminalState())
         return;
 
-    m_requestCountTracker = nullptr;
+    m_requestCountTracker = Nullopt;
 #if PLATFORM(IOS)
     m_documentLoader->cachedResourceLoader().loadDone(m_resource, m_state != CancelledWhileInitializing);
 #else

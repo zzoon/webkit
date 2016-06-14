@@ -71,6 +71,8 @@ InspectorBackendClass = class InspectorBackendClass
 
     set dumpInspectorTimeStats(value)
     {
+        this._dumpInspectorTimeStats = !!value;
+
         if (!this.dumpInspectorProtocolMessages)
             this.dumpInspectorProtocolMessages = true;
 
@@ -200,7 +202,7 @@ InspectorBackendClass = class InspectorBackendClass
             "method": command.qualifiedName,
         };
 
-        if (Object.keys(parameters).length)
+        if (!isEmptyObject(parameters))
             messageObject["params"] = parameters;
 
         let responseData = {command, callback};
@@ -221,7 +223,7 @@ InspectorBackendClass = class InspectorBackendClass
             "method": command.qualifiedName,
         };
 
-        if (Object.keys(parameters).length)
+        if (!isEmptyObject(parameters))
             messageObject["params"] = parameters;
 
         let responseData = {command};
@@ -526,9 +528,7 @@ InspectorBackend.Command.prototype = {
         'use strict';
 
         var instance = this._instance;
-        return instance.callSignature.some(function(parameter) {
-            return parameter["name"] === parameterName;
-        });
+        return instance.callSignature.some((parameter) => parameter["name"] === parameterName);
     },
 
     // Private

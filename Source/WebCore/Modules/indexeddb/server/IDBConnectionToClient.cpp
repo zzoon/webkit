@@ -133,9 +133,19 @@ void IDBConnectionToClient::didStartTransaction(const IDBResourceIdentifier& tra
     m_delegate->didStartTransaction(transactionIdentifier, error);
 }
 
+void IDBConnectionToClient::didCloseFromServer(UniqueIDBDatabaseConnection& connection, const IDBError& error)
+{
+    m_delegate->didCloseFromServer(connection, error);
+}
+
 void IDBConnectionToClient::notifyOpenDBRequestBlocked(const IDBResourceIdentifier& requestIdentifier, uint64_t oldVersion, uint64_t newVersion)
 {
     m_delegate->notifyOpenDBRequestBlocked(requestIdentifier, oldVersion, newVersion);
+}
+
+void IDBConnectionToClient::didGetAllDatabaseNames(uint64_t callbackID, const Vector<String>& databaseNames)
+{
+    m_delegate->didGetAllDatabaseNames(callbackID, databaseNames);
 }
 
 } // namespace IDBServer

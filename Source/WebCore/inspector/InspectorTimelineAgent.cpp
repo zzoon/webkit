@@ -35,6 +35,7 @@
 
 #include "Event.h"
 #include "Frame.h"
+#include "InspectorMemoryAgent.h"
 #include "InspectorPageAgent.h"
 #include "InstrumentingAgents.h"
 #include "JSDOMWindow.h"
@@ -43,7 +44,9 @@
 #include "ScriptState.h"
 #include "TimelineRecordFactory.h"
 #include <inspector/ScriptBreakpoint.h>
-#include <profiler/LegacyProfiler.h>
+#include <inspector/agents/InspectorDebuggerAgent.h>
+#include <inspector/agents/InspectorHeapAgent.h>
+#include <inspector/agents/InspectorScriptProfilerAgent.h>
 #include <wtf/Stopwatch.h>
 
 #if PLATFORM(IOS)
@@ -77,6 +80,16 @@ static CFRunLoopRef currentRunLoop()
 }
 #endif
 
+InspectorTimelineAgent::InspectorTimelineAgent(WebAgentContext& context, InspectorScriptProfilerAgent* scriptProfileAgent, InspectorHeapAgent* heapAgent, InspectorPageAgent* pageAgent)
+    : InspectorAgentBase(ASCIILiteral("Timeline"), context)
+    , m_frontendDispatcher(std::make_unique<Inspector::TimelineFrontendDispatcher>(context.frontendRouter))
+    , m_backendDispatcher(Inspector::TimelineBackendDispatcher::create(context.backendDispatcher, this))
+    , m_scriptProfilerAgent(scriptProfileAgent)
+    , m_heapAgent(heapAgent)
+    , m_pageAgent(pageAgent)
+{
+}
+
 InspectorTimelineAgent::~InspectorTimelineAgent()
 {
 }
@@ -92,6 +105,9 @@ void InspectorTimelineAgent::willDestroyFrontendAndBackend(Inspector::Disconnect
 
     ErrorString unused;
     stop(unused);
+
+    m_autoCaptureEnabled = false;
+    m_autoCaptureInstruments.clear();
 }
 
 void InspectorTimelineAgent::start(ErrorString&, const int* maxCallStackDepth)
@@ -106,6 +122,35 @@ void InspectorTimelineAgent::stop(ErrorString&)
     internalStop();
 
     m_enabledFromFrontend = false;
+}
+
+void InspectorTimelineAgent::setAutoCaptureEnabled(ErrorString&, bool enabled)
+{
+    m_autoCaptureEnabled = enabled;
+}
+
+void InspectorTimelineAgent::setAutoCaptureInstruments(ErrorString& errorString, const InspectorArray& instruments)
+{
+    Vector<Protocol::Timeline::Instrument> newInstruments;
+    newInstruments.reserveCapacity(instruments.length());
+
+    for (auto instrumentValue : instruments) {
+        String enumValueString;
+        if (!instrumentValue->asString(enumValueString)) {
+            errorString = ASCIILiteral("Unexpected type in instruments list, should be string");
+            return;
+        }
+
+        Optional<Protocol::Timeline::Instrument> instrumentType = Protocol::InspectorHelpers::parseEnumValueFromString<Protocol::Timeline::Instrument>(enumValueString);
+        if (!instrumentType) {
+            errorString = makeString("Unexpected enum value: ", enumValueString);
+            return;
+        }
+
+        newInstruments.uncheckedAppend(*instrumentType);
+    }
+
+    m_autoCaptureInstruments.swap(newInstruments);
 }
 
 void InspectorTimelineAgent::internalStart(const int* maxCallStackDepth)
@@ -196,58 +241,14 @@ double InspectorTimelineAgent::timestamp()
     return m_environment.executionStopwatch()->elapsedTime();
 }
 
-void InspectorTimelineAgent::startFromConsole(JSC::ExecState* exec, const String &title)
+void InspectorTimelineAgent::startFromConsole(JSC::ExecState*, const String&)
 {
     // FIXME: <https://webkit.org/b/153499> Web Inspector: console.profile should use the new Sampling Profiler
-
-    // Only allow recording of a profile if it is anonymous (empty title) or does not match
-    // the title of an already recording profile.
-    if (!title.isEmpty()) {
-        for (const TimelineRecordEntry& record : m_pendingConsoleProfileRecords) {
-            String recordTitle;
-            record.data->getString(ASCIILiteral("title"), recordTitle);
-            if (recordTitle == title)
-                return;
-        }
-    }
-
-    if (!m_enabled && m_pendingConsoleProfileRecords.isEmpty())
-        internalStart();
-
-    JSC::LegacyProfiler::profiler()->startProfiling(exec, title, m_environment.executionStopwatch());
-
-    m_pendingConsoleProfileRecords.append(createRecordEntry(TimelineRecordFactory::createConsoleProfileData(title), TimelineRecordType::ConsoleProfile, true, frameFromExecState(exec)));
 }
 
-RefPtr<JSC::Profile> InspectorTimelineAgent::stopFromConsole(JSC::ExecState* exec, const String& title)
+void InspectorTimelineAgent::stopFromConsole(JSC::ExecState*, const String&)
 {
     // FIXME: <https://webkit.org/b/153499> Web Inspector: console.profile should use the new Sampling Profiler
-
-    // Stop profiles in reverse order. If the title is empty, then stop the last profile.
-    // Otherwise, match the title of the profile to stop.
-    for (ptrdiff_t i = m_pendingConsoleProfileRecords.size() - 1; i >= 0; --i) {
-        const TimelineRecordEntry& record = m_pendingConsoleProfileRecords[i];
-
-        String recordTitle;
-        record.data->getString(ASCIILiteral("title"), recordTitle);
-
-        if (title.isEmpty() || recordTitle == title) {
-            RefPtr<JSC::Profile> profile = JSC::LegacyProfiler::profiler()->stopProfiling(exec, title);
-            if (profile)
-                TimelineRecordFactory::appendProfile(record.data.get(), profile.copyRef());
-
-            didCompleteRecordEntry(record);
-
-            m_pendingConsoleProfileRecords.remove(i);
-
-            if (!m_enabledFromFrontend && m_pendingConsoleProfileRecords.isEmpty())
-                internalStop();
-
-            return profile;
-        }
-    }
-
-    return nullptr;
 }
 
 void InspectorTimelineAgent::willCallFunction(const String& scriptName, int scriptLine, Frame* frame)
@@ -382,6 +383,60 @@ void InspectorTimelineAgent::time(Frame& frame, const String& message)
 void InspectorTimelineAgent::timeEnd(Frame& frame, const String& message)
 {
     appendRecord(TimelineRecordFactory::createTimeStampData(message), TimelineRecordType::TimeEnd, true, &frame);
+}
+
+void InspectorTimelineAgent::mainFrameStartedLoading()
+{
+    if (m_enabled)
+        return;
+
+    if (!m_autoCaptureEnabled)
+        return;
+
+    if (m_autoCaptureInstruments.isEmpty())
+        return;
+
+    // Pre-emptively disable breakpoints. The frontend must re-enable them.
+    if (InspectorDebuggerAgent* debuggerAgent = m_instrumentingAgents.inspectorDebuggerAgent()) {
+        ErrorString unused;
+        debuggerAgent->setBreakpointsActive(unused, false);
+    }
+
+    // Inform the frontend we started an auto capture. The frontend must stop capture.
+    m_frontendDispatcher->autoCaptureStarted();
+
+    // Enable instruments.
+    for (auto instrumentType : m_autoCaptureInstruments) {
+        switch (instrumentType) {
+        case Inspector::Protocol::Timeline::Instrument::ScriptProfiler: {
+            if (m_scriptProfilerAgent) {
+                ErrorString unused;
+                const bool includeSamples = true;
+                m_scriptProfilerAgent->startTracking(unused, &includeSamples);
+            }
+            break;
+        }
+        case Inspector::Protocol::Timeline::Instrument::Heap: {
+            if (m_heapAgent) {
+                ErrorString unused;
+                m_heapAgent->startTracking(unused);
+            }
+            break;
+        }
+        case Inspector::Protocol::Timeline::Instrument::Memory: {
+#if ENABLE(RESOURCE_USAGE)
+            if (InspectorMemoryAgent* memoryAgent = m_instrumentingAgents.inspectorMemoryAgent()) {
+                ErrorString unused;
+                memoryAgent->startTracking(unused);
+            }
+#endif
+            break;
+        }
+        case Inspector::Protocol::Timeline::Instrument::Timeline:
+            internalStart();
+            break;
+        }
+    }
 }
 
 void InspectorTimelineAgent::didCommitLoad()
@@ -522,14 +577,6 @@ void InspectorTimelineAgent::didCompleteCurrentRecord(TimelineRecordType type)
 
         didCompleteRecordEntry(entry);
     }
-}
-
-InspectorTimelineAgent::InspectorTimelineAgent(WebAgentContext& context, InspectorPageAgent* pageAgent)
-    : InspectorAgentBase(ASCIILiteral("Timeline"), context)
-    , m_frontendDispatcher(std::make_unique<Inspector::TimelineFrontendDispatcher>(context.frontendRouter))
-    , m_backendDispatcher(Inspector::TimelineBackendDispatcher::create(context.backendDispatcher, this))
-    , m_pageAgent(pageAgent)
-{
 }
 
 void InspectorTimelineAgent::appendRecord(RefPtr<InspectorObject>&& data, TimelineRecordType type, bool captureCallStack, Frame* frame)

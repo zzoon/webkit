@@ -66,11 +66,12 @@
 namespace WebCore {
 
 InternalSettings::Backup::Backup(Settings& settings)
-    : m_originalCSSShapesEnabled(RuntimeEnabledFeatures::sharedFeatures().cssShapesEnabled())
-    , m_originalEditingBehavior(settings.editingBehaviorType())
-#if ENABLE(TEXT_AUTOSIZING)
+    : m_originalEditingBehavior(settings.editingBehaviorType())
+#if ENABLE(TEXT_AUTOSIZING) || ENABLE(IOS_TEXT_AUTOSIZING)
     , m_originalTextAutosizingEnabled(settings.textAutosizingEnabled())
     , m_originalTextAutosizingWindowSizeOverride(settings.textAutosizingWindowSizeOverride())
+#endif
+#if ENABLE(TEXT_AUTOSIZING)
     , m_originalTextAutosizingFontScaleFactor(settings.textAutosizingFontScaleFactor())
 #endif
     , m_originalMediaTypeOverride(settings.mediaTypeOverride())
@@ -92,6 +93,7 @@ InternalSettings::Backup::Backup(Settings& settings)
     , m_pluginReplacementEnabled(RuntimeEnabledFeatures::sharedFeatures().pluginReplacementEnabled())
     , m_shouldConvertPositionStyleOnCopy(settings.shouldConvertPositionStyleOnCopy())
     , m_fontFallbackPrefersPictographs(settings.fontFallbackPrefersPictographs())
+    , m_webFontsAlwaysFallBack(settings.webFontsAlwaysFallBack())
     , m_backgroundShouldExtendBeyondPage(settings.backgroundShouldExtendBeyondPage())
     , m_storageBlockingPolicy(settings.storageBlockingPolicy())
     , m_scrollingTreeIncludesFrames(settings.scrollingTreeIncludesFrames())
@@ -102,16 +104,18 @@ InternalSettings::Backup::Backup(Settings& settings)
     , m_allowsAirPlayForMediaPlayback(settings.allowsAirPlayForMediaPlayback())
 #endif
     , m_allowsInlineMediaPlayback(settings.allowsInlineMediaPlayback())
+    , m_allowsInlineMediaPlaybackAfterFullscreen(settings.allowsInlineMediaPlaybackAfterFullscreen())
     , m_inlineMediaPlaybackRequiresPlaysInlineAttribute(settings.inlineMediaPlaybackRequiresPlaysInlineAttribute())
 #if ENABLE(INDEXED_DATABASE_IN_WORKERS)
     , m_indexedDBWorkersEnabled(RuntimeEnabledFeatures::sharedFeatures().indexedDBWorkersEnabled())
 #endif
+    , m_userInterfaceDirectionPolicy(settings.userInterfaceDirectionPolicy())
+    , m_systemLayoutDirection(settings.systemLayoutDirection())
 {
 }
 
 void InternalSettings::Backup::restoreTo(Settings& settings)
 {
-    RuntimeEnabledFeatures::sharedFeatures().setCSSShapesEnabled(m_originalCSSShapesEnabled);
     settings.setEditingBehaviorType(m_originalEditingBehavior);
 
     for (const auto& standardFont : m_standardFontFamilies)
@@ -142,9 +146,11 @@ void InternalSettings::Backup::restoreTo(Settings& settings)
         settings.setPictographFontFamily(pictographFont.value, static_cast<UScriptCode>(pictographFont.key));
     m_pictographFontFamilies.clear();
 
-#if ENABLE(TEXT_AUTOSIZING)
+#if ENABLE(TEXT_AUTOSIZING) || ENABLE(IOS_TEXT_AUTOSIZING)
     settings.setTextAutosizingEnabled(m_originalTextAutosizingEnabled);
     settings.setTextAutosizingWindowSizeOverride(m_originalTextAutosizingWindowSizeOverride);
+#endif
+#if ENABLE(TEXT_AUTOSIZING)
     settings.setTextAutosizingFontScaleFactor(m_originalTextAutosizingFontScaleFactor);
 #endif
     settings.setMediaTypeOverride(m_originalMediaTypeOverride);
@@ -164,6 +170,7 @@ void InternalSettings::Backup::restoreTo(Settings& settings)
     settings.setAutoscrollForDragAndDropEnabled(m_autoscrollForDragAndDropEnabled);
     settings.setShouldConvertPositionStyleOnCopy(m_shouldConvertPositionStyleOnCopy);
     settings.setFontFallbackPrefersPictographs(m_fontFallbackPrefersPictographs);
+    settings.setWebFontsAlwaysFallBack(m_webFontsAlwaysFallBack);
     settings.setBackgroundShouldExtendBeyondPage(m_backgroundShouldExtendBeyondPage);
     settings.setStorageBlockingPolicy(m_storageBlockingPolicy);
     settings.setScrollingTreeIncludesFrames(m_scrollingTreeIncludesFrames);
@@ -171,11 +178,15 @@ void InternalSettings::Backup::restoreTo(Settings& settings)
     settings.setTouchEventEmulationEnabled(m_touchEventEmulationEnabled);
 #endif
     settings.setAllowsInlineMediaPlayback(m_allowsInlineMediaPlayback);
+    settings.setAllowsInlineMediaPlaybackAfterFullscreen(m_allowsInlineMediaPlaybackAfterFullscreen);
     settings.setInlineMediaPlaybackRequiresPlaysInlineAttribute(m_inlineMediaPlaybackRequiresPlaysInlineAttribute);
     RuntimeEnabledFeatures::sharedFeatures().setPluginReplacementEnabled(m_pluginReplacementEnabled);
 #if ENABLE(INDEXED_DATABASE_IN_WORKERS)
     RuntimeEnabledFeatures::sharedFeatures().setIndexedDBWorkersEnabled(m_indexedDBWorkersEnabled);
 #endif
+    settings.setUserInterfaceDirectionPolicy(m_userInterfaceDirectionPolicy);
+    settings.setSystemLayoutDirection(m_systemLayoutDirection);
+    Settings::setAllowsAnySSLCertificate(false);
 }
 
 class InternalSettingsWrapper : public Supplement<Page> {
@@ -220,11 +231,12 @@ InternalSettings::InternalSettings(Page* page)
 
 void InternalSettings::resetToConsistentState()
 {
-    page()->setPageScaleFactor(1, IntPoint(0, 0));
+    page()->setPageScaleFactor(1, { 0, 0 });
+    page()->mainFrame().setPageAndTextZoomFactors(1, 1);
     page()->setCanStartMedia(true);
     page()->settings().setForcePendingWebGLPolicy(false);
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
-    m_page->settings().setAllowsAirPlayForMediaPlayback(false);
+    page()->settings().setAllowsAirPlayForMediaPlayback(false);
 #endif
 
     m_backup.restoreTo(*settings());
@@ -323,7 +335,7 @@ void InternalSettings::setPictographFontFamily(const String& family, const Strin
 
 void InternalSettings::setTextAutosizingEnabled(bool enabled, ExceptionCode& ec)
 {
-#if ENABLE(TEXT_AUTOSIZING)
+#if ENABLE(TEXT_AUTOSIZING) || ENABLE(IOS_TEXT_AUTOSIZING)
     InternalSettingsGuardForSettings();
     settings()->setTextAutosizingEnabled(enabled);
 #else
@@ -334,7 +346,7 @@ void InternalSettings::setTextAutosizingEnabled(bool enabled, ExceptionCode& ec)
 
 void InternalSettings::setTextAutosizingWindowSizeOverride(int width, int height, ExceptionCode& ec)
 {
-#if ENABLE(TEXT_AUTOSIZING)
+#if ENABLE(TEXT_AUTOSIZING) || ENABLE(IOS_TEXT_AUTOSIZING)
     InternalSettingsGuardForSettings();
     settings()->setTextAutosizingWindowSizeOverride(IntSize(width, height));
 #else
@@ -359,12 +371,6 @@ void InternalSettings::setTextAutosizingFontScaleFactor(float fontScaleFactor, E
     UNUSED_PARAM(fontScaleFactor);
     UNUSED_PARAM(ec);
 #endif
-}
-
-void InternalSettings::setCSSShapesEnabled(bool enabled, ExceptionCode& ec)
-{
-    UNUSED_PARAM(ec);
-    RuntimeEnabledFeatures::sharedFeatures().setCSSShapesEnabled(enabled);
 }
 
 void InternalSettings::setCanStartMedia(bool enabled, ExceptionCode& ec)
@@ -511,6 +517,12 @@ void InternalSettings::setFontFallbackPrefersPictographs(bool preferPictographs,
     settings()->setFontFallbackPrefersPictographs(preferPictographs);
 }
 
+void InternalSettings::setWebFontsAlwaysFallBack(bool enable, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setWebFontsAlwaysFallBack(enable);
+}
+
 void InternalSettings::setPluginReplacementEnabled(bool enabled)
 {
     RuntimeEnabledFeatures::sharedFeatures().setPluginReplacementEnabled(enabled);
@@ -540,6 +552,12 @@ void InternalSettings::setAllowsInlineMediaPlayback(bool allows, ExceptionCode& 
     settings()->setAllowsInlineMediaPlayback(allows);
 }
 
+void InternalSettings::setAllowsInlineMediaPlaybackAfterFullscreen(bool allows, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setAllowsInlineMediaPlaybackAfterFullscreen(allows);
+}
+
 void InternalSettings::setInlineMediaPlaybackRequiresPlaysInlineAttribute(bool requires, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
@@ -555,6 +573,64 @@ void InternalSettings::setIndexedDBWorkersEnabled(bool enabled, ExceptionCode&)
 #endif
 }
 
+String InternalSettings::userInterfaceDirectionPolicy(ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettingsReturn("");
+    switch (settings()->userInterfaceDirectionPolicy()) {
+    case UserInterfaceDirectionPolicy::Content:
+        return ASCIILiteral("Content");
+    case UserInterfaceDirectionPolicy::System:
+        return ASCIILiteral("View");
+    }
+    ASSERT_NOT_REACHED();
+    return String();
+}
+
+void InternalSettings::setUserInterfaceDirectionPolicy(const String& policy, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    if (equalLettersIgnoringASCIICase(policy, "content")) {
+        settings()->setUserInterfaceDirectionPolicy(UserInterfaceDirectionPolicy::Content);
+        return;
+    }
+    if (equalLettersIgnoringASCIICase(policy, "view")) {
+        settings()->setUserInterfaceDirectionPolicy(UserInterfaceDirectionPolicy::System);
+        return;
+    }
+    ec = INVALID_ACCESS_ERR;
+}
+
+String InternalSettings::systemLayoutDirection(ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettingsReturn("");
+    switch (settings()->systemLayoutDirection()) {
+    case LTR:
+        return ASCIILiteral("LTR");
+    case RTL:
+        return ASCIILiteral("RTL");
+    }
+    ASSERT_NOT_REACHED();
+    return String();
+}
+
+void InternalSettings::setSystemLayoutDirection(const String& direction, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    if (equalLettersIgnoringASCIICase(direction, "ltr")) {
+        settings()->setSystemLayoutDirection(LTR);
+        return;
+    }
+    if (equalLettersIgnoringASCIICase(direction, "rtl")) {
+        settings()->setSystemLayoutDirection(RTL);
+        return;
+    }
+    ec = INVALID_ACCESS_ERR;
+}
+
+void InternalSettings::setAllowsAnySSLCertificate(bool allowsAnyCertificate)
+{
+    Settings::setAllowsAnySSLCertificate(allowsAnyCertificate);
+}
 
 // If you add to this list, make sure that you update the Backup class for test reproducability!
 

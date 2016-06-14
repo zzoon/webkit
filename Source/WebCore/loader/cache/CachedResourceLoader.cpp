@@ -2,7 +2,7 @@
     Copyright (C) 1998 Lars Knoll (knoll@mpi-hd.mpg.de)
     Copyright (C) 2001 Dirk Mueller (mueller@kde.org)
     Copyright (C) 2002 Waldo Bastian (bastian@kde.org)
-    Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+    Copyright (C) 2004-2016 Apple Inc. All rights reserved.
     Copyright (C) 2009 Torch Mobile Inc. http://www.torchmobile.com/
 
     This library is free software; you can redistribute it and/or
@@ -57,10 +57,12 @@
 #include "MainFrame.h"
 #include "MemoryCache.h"
 #include "Page.h"
+#include "Performance.h"
 #include "PingLoader.h"
 #include "PlatformStrategies.h"
 #include "RenderElement.h"
 #include "ResourceLoadInfo.h"
+#include "RuntimeEnabledFeatures.h"
 #include "ScriptController.h"
 #include "SecurityOrigin.h"
 #include "SessionID.h"
@@ -73,10 +75,6 @@
 
 #if ENABLE(VIDEO_TRACK)
 #include "CachedTextTrack.h"
-#endif
-
-#if ENABLE(RESOURCE_TIMING)
-#include "Performance.h"
 #endif
 
 #define PRELOAD_DEBUG 0
@@ -181,6 +179,8 @@ CachedResourceHandle<CachedImage> CachedResourceLoader::requestImage(CachedResou
 {
     if (Frame* frame = this->frame()) {
         if (frame->loader().pageDismissalEventBeingDispatched() != FrameLoader::PageDismissalType::None) {
+            if (Document* document = frame->document())
+                document->contentSecurityPolicy()->upgradeInsecureRequestIfNeeded(request.mutableResourceRequest(), ContentSecurityPolicy::InsecureRequestType::Load);
             URL requestURL = request.resourceRequest().url();
             if (requestURL.isValid() && canRequest(CachedResource::ImageResource, requestURL, request.options(), request.forPreload()))
                 PingLoader::loadImage(*frame, requestURL);
@@ -539,16 +539,19 @@ bool CachedResourceLoader::shouldContinueAfterNotifyingLoadedFromMemoryCache(con
 
 static inline void logMemoryCacheResourceRequest(Frame* frame, const String& description, const String& value = String())
 {
-    if (!frame)
+    if (!frame || !frame->page())
         return;
     if (value.isNull())
-        frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessage(DiagnosticLoggingKeys::resourceRequestKey(), description, ShouldSample::Yes);
+        frame->page()->diagnosticLoggingClient().logDiagnosticMessage(DiagnosticLoggingKeys::resourceRequestKey(), description, ShouldSample::Yes);
     else
-        frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceRequestKey(), description, value, ShouldSample::Yes);
+        frame->page()->diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceRequestKey(), description, value, ShouldSample::Yes);
 }
 
 CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(CachedResource::Type type, CachedResourceRequest& request)
 {
+    if (Document* document = this->document())
+        document->contentSecurityPolicy()->upgradeInsecureRequestIfNeeded(request.mutableResourceRequest(), ContentSecurityPolicy::InsecureRequestType::Load);
+    
     URL url = request.resourceRequest().url();
     
     LOG(ResourceLoading, "CachedResourceLoader::requestResource '%s', charset '%s', priority=%d, forPreload=%u", url.stringCenterEllipsizedToLength().latin1().data(), request.charset().latin1().data(), request.priority() ? static_cast<int>(request.priority().value()) : -1, request.forPreload());
@@ -620,6 +623,12 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
             return nullptr;
         logMemoryCacheResourceRequest(frame(), DiagnosticLoggingKeys::inMemoryCacheKey(), DiagnosticLoggingKeys::usedKey());
         memoryCache.resourceAccessed(*resource);
+#if ENABLE(WEB_TIMING)
+        if (document() && RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled()) {
+            m_resourceTimingInfo.storeResourceTimingInitiatorInformation(resource, request, frame());
+            m_resourceTimingInfo.addResourceTiming(resource.get(), *document());
+        }
+#endif
         break;
     }
 
@@ -671,8 +680,9 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::revalidateResource(co
     
     memoryCache.remove(*resource);
     memoryCache.add(*newResource);
-#if ENABLE(RESOURCE_TIMING)
-    storeResourceTimingInitiatorInformation(resource, request);
+#if ENABLE(WEB_TIMING)
+    if (RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
+        m_resourceTimingInfo.storeResourceTimingInitiatorInformation(resource, request, frame());
 #else
     UNUSED_PARAM(request);
 #endif
@@ -682,7 +692,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::revalidateResource(co
 CachedResourceHandle<CachedResource> CachedResourceLoader::loadResource(CachedResource::Type type, CachedResourceRequest& request)
 {
     auto& memoryCache = MemoryCache::singleton();
-    ASSERT(!memoryCache.resourceForRequest(request.resourceRequest(), sessionID()));
+    ASSERT(!request.allowsCaching() || !memoryCache.resourceForRequest(request.resourceRequest(), sessionID()));
 
     LOG(ResourceLoading, "Loading CachedResource for '%s'.", request.resourceRequest().url().stringCenterEllipsizedToLength().latin1().data());
 
@@ -690,27 +700,12 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::loadResource(CachedRe
 
     if (request.allowsCaching() && !memoryCache.add(*resource))
         resource->setOwningCachedResourceLoader(this);
-#if ENABLE(RESOURCE_TIMING)
-    storeResourceTimingInitiatorInformation(resource, request);
+#if ENABLE(WEB_TIMING)
+    if (RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
+        m_resourceTimingInfo.storeResourceTimingInitiatorInformation(resource, request, frame());
 #endif
     return resource;
 }
-
-#if ENABLE(RESOURCE_TIMING)
-void CachedResourceLoader::storeResourceTimingInitiatorInformation(const CachedResourceHandle<CachedResource>& resource, const CachedResourceRequest& request)
-{
-    if (resource->type() == CachedResource::MainResource) {
-        // <iframe>s should report the initial navigation requested by the parent document, but not subsequent navigations.
-        if (frame()->ownerElement() && m_documentLoader->frameLoader()->stateMachine().committingFirstRealLoad()) {
-            InitiatorInfo info = { frame()->ownerElement()->localName(), monotonicallyIncreasingTime() };
-            m_initiatorMap.add(resource.get(), info);
-        }
-    } else {
-        InitiatorInfo info = { request.initiatorName(), monotonicallyIncreasingTime() };
-        m_initiatorMap.add(resource.get(), info);
-    }
-}
-#endif // ENABLE(RESOURCE_TIMING)
 
 static void logRevalidation(const String& reason, DiagnosticLoggingClient& logClient)
 {
@@ -719,9 +714,9 @@ static void logRevalidation(const String& reason, DiagnosticLoggingClient& logCl
 
 static void logResourceRevalidationDecision(CachedResource::RevalidationDecision reason, const Frame* frame)
 {
-    if (!frame)
+    if (!frame || !frame->page())
         return;
-    auto& logClient = frame->mainFrame().diagnosticLoggingClient();
+    auto& logClient = frame->page()->diagnosticLoggingClient();
     switch (reason) {
     case CachedResource::RevalidationDecision::No:
         break;
@@ -758,7 +753,11 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
         return Reload;
     }
 
-    if (existingResource->encoding() != TextEncoding(cachedResourceRequest.charset()))
+    if (!existingResource->varyHeaderValuesMatch(request, *this))
+        return Reload;
+
+    auto* textDecoder = existingResource->textResourceDecoder();
+    if (textDecoder && !textDecoder->hasEqualEncodingForCharset(cachedResourceRequest.charset()))
         return Reload;
 
     // FIXME: We should use the same cache policy for all resource types. The raw resource policy is overly strict
@@ -975,23 +974,12 @@ void CachedResourceLoader::loadDone(CachedResource* resource, bool shouldPerform
     RefPtr<DocumentLoader> protectDocumentLoader(m_documentLoader);
     RefPtr<Document> protectDocument(m_document);
 
-#if ENABLE(RESOURCE_TIMING)
-    if (resource && resource->response().isHTTP() && ((!resource->errorOccurred() && !resource->wasCanceled()) || resource->response().httpStatusCode() == 304)) {
-        HashMap<CachedResource*, InitiatorInfo>::iterator initiatorIt = m_initiatorMap.find(resource);
-        if (initiatorIt != m_initiatorMap.end()) {
-            ASSERT(document());
-            Document* initiatorDocument = document();
-            if (resource->type() == CachedResource::MainResource)
-                initiatorDocument = document()->parentDocument();
-            ASSERT(initiatorDocument);
-            const InitiatorInfo& info = initiatorIt->value;
-            initiatorDocument->domWindow()->performance()->addResourceTiming(info.name, initiatorDocument, resource->resourceRequest(), resource->response(), info.startTime, resource->loadFinishTime());
-            m_initiatorMap.remove(initiatorIt);
-        }
-    }
+#if ENABLE(WEB_TIMING)
+    if (document() && RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
+        m_resourceTimingInfo.addResourceTiming(resource, *document());
 #else
     UNUSED_PARAM(resource);
-#endif // ENABLE(RESOURCE_TIMING)
+#endif
 
     if (frame())
         frame()->loader().loadDone();
@@ -1032,17 +1020,17 @@ void CachedResourceLoader::performPostLoadActions()
     platformStrategies()->loaderStrategy()->servePendingRequests();
 }
 
-void CachedResourceLoader::incrementRequestCount(const CachedResource* res)
+void CachedResourceLoader::incrementRequestCount(const CachedResource& resource)
 {
-    if (res->ignoreForRequestCount())
+    if (resource.ignoreForRequestCount())
         return;
 
     ++m_requestCount;
 }
 
-void CachedResourceLoader::decrementRequestCount(const CachedResource* res)
+void CachedResourceLoader::decrementRequestCount(const CachedResource& resource)
 {
-    if (res->ignoreForRequestCount())
+    if (resource.ignoreForRequestCount())
         return;
 
     --m_requestCount;

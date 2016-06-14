@@ -1,4 +1,6 @@
 list(APPEND WTF_SOURCES
+    PLatformUserPreferredLanguagesWin.cpp
+
     text/cf/AtomicStringImplCF.cpp
     text/cf/StringCF.cpp
     text/cf/StringImplCF.cpp
@@ -6,7 +8,6 @@ list(APPEND WTF_SOURCES
 
     win/MainThreadWin.cpp
     win/RunLoopWin.cpp
-    win/WorkItemWin.cpp
     win/WorkQueueWin.cpp
 )
 

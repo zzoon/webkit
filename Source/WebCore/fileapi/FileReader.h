@@ -67,7 +67,6 @@ public:
     void readAsArrayBuffer(Blob*, ExceptionCode&);
     void readAsBinaryString(Blob*, ExceptionCode&);
     void readAsText(Blob*, const String& encoding, ExceptionCode&);
-    void readAsText(Blob*, ExceptionCode&);
     void readAsDataURL(Blob*, ExceptionCode&);
     void abort();
 
@@ -105,7 +104,7 @@ private:
     void derefEventTarget() override { deref(); }
 
     void terminate();
-    void readInternal(Blob*, FileReaderLoader::ReadType, ExceptionCode&);
+    void readInternal(Blob&, FileReaderLoader::ReadType, ExceptionCode&);
     void fireErrorEvent(int httpStatusCode);
     void fireEvent(const AtomicString& type);
 

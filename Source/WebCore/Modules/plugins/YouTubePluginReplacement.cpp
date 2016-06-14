@@ -67,7 +67,7 @@ YouTubePluginReplacement::YouTubePluginReplacement(HTMLPlugInElement& plugin, co
         m_attributes.add(paramNames[i], paramValues[i]);
 }
 
-RenderPtr<RenderElement> YouTubePluginReplacement::createElementRenderer(HTMLPlugInElement& plugin, Ref<RenderStyle>&& style, const RenderTreePosition& insertionPosition)
+RenderPtr<RenderElement> YouTubePluginReplacement::createElementRenderer(HTMLPlugInElement& plugin, RenderStyle&& style, const RenderTreePosition& insertionPosition)
 {
     ASSERT_UNUSED(plugin, m_parentElement == &plugin);
 
@@ -83,7 +83,7 @@ bool YouTubePluginReplacement::installReplacement(ShadowRoot& root)
 
     root.appendChild(*m_embedShadowElement);
 
-    Ref<HTMLIFrameElement> iframeElement = HTMLIFrameElement::create(HTMLNames::iframeTag, m_parentElement->document());
+    auto iframeElement = HTMLIFrameElement::create(HTMLNames::iframeTag, m_parentElement->document());
     if (m_attributes.contains("width"))
         iframeElement->setAttribute(HTMLNames::widthAttr, AtomicString("100%", AtomicString::ConstructFromLiteral));
     
@@ -98,7 +98,7 @@ bool YouTubePluginReplacement::installReplacement(ShadowRoot& root)
     
     // Disable frame flattening for this iframe.
     iframeElement->setAttribute(HTMLNames::scrollingAttr, AtomicString("no", AtomicString::ConstructFromLiteral));
-    m_embedShadowElement->appendChild(WTFMove(iframeElement));
+    m_embedShadowElement->appendChild(iframeElement);
 
     return true;
 }

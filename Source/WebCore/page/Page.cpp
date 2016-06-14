@@ -31,11 +31,13 @@
 #include "ContextMenuClient.h"
 #include "ContextMenuController.h"
 #include "DatabaseProvider.h"
+#include "DiagnosticLoggingClient.h"
 #include "DocumentLoader.h"
 #include "DocumentMarkerController.h"
 #include "DragController.h"
 #include "Editor.h"
 #include "EditorClient.h"
+#include "EmptyClients.h"
 #include "Event.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
@@ -94,7 +96,6 @@
 #include "VisitedLinkStore.h"
 #include "VoidCallback.h"
 #include "Widget.h"
-#include <JavaScriptCore/Profile.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
@@ -181,6 +182,7 @@ Page::Page(PageConfiguration& pageConfiguration)
     , m_editorClient(*pageConfiguration.editorClient)
     , m_plugInClient(pageConfiguration.plugInClient)
     , m_validationMessageClient(pageConfiguration.validationMessageClient)
+    , m_diagnosticLoggingClient(WTFMove(pageConfiguration.diagnosticLoggingClient))
     , m_subframeCount(0)
     , m_openedByDOM(false)
     , m_tabKeyCyclesThroughElements(true)
@@ -267,6 +269,7 @@ Page::Page(PageConfiguration& pageConfiguration)
 
 Page::~Page()
 {
+    m_diagnosticLoggingClient = nullptr;
     m_mainFrame->setView(nullptr);
     setGroupName(String());
     allPages->remove(this);
@@ -760,6 +763,15 @@ void Page::setInLowQualityImageInterpolationMode(bool mode)
     m_inLowQualityInterpolationMode = mode;
 }
 
+DiagnosticLoggingClient& Page::diagnosticLoggingClient() const
+{
+    static NeverDestroyed<EmptyDiagnosticLoggingClient> dummyClient;
+    if (!settings().diagnosticLoggingEnabled() || !m_diagnosticLoggingClient)
+        return dummyClient;
+
+    return *m_diagnosticLoggingClient;
+}
+
 void Page::setMediaVolume(float volume)
 {
     if (volume < 0 || volume > 1)
@@ -863,6 +875,7 @@ void Page::setViewScaleFactor(float scale)
 
     m_viewScaleFactor = scale;
     PageCache::singleton().markPagesForDeviceOrPageScaleChanged(*this);
+    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 void Page::setDeviceScaleFactor(float scaleFactor)
@@ -880,6 +893,7 @@ void Page::setDeviceScaleFactor(float scaleFactor)
     mainFrame().deviceOrPageScaleFactorChanged();
     PageCache::singleton().markPagesForDeviceOrPageScaleChanged(*this);
 
+    PageCache::singleton().markPagesForFullStyleRecalc(*this);
     GraphicsContext::updateDocumentMarkerResources();
 
     mainFrame().pageOverlayController().didChangeDeviceScaleFactor();
@@ -957,6 +971,7 @@ void Page::setPagination(const Pagination& pagination)
     m_pagination = pagination;
 
     setNeedsRecalcStyleInAllFrames();
+    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 void Page::setPaginationLineGridEnabled(bool enabled)
@@ -967,6 +982,7 @@ void Page::setPaginationLineGridEnabled(bool enabled)
     m_paginationLineGridEnabled = enabled;
     
     setNeedsRecalcStyleInAllFrames();
+    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 unsigned Page::pageCount() const
@@ -1850,6 +1866,7 @@ void Page::setVisitedLinkStore(Ref<VisitedLinkStore>&& visitedLinkStore)
     m_visitedLinkStore->addPage(*this);
 
     invalidateStylesForAllLinks();
+    PageCache::singleton().markPagesForFullStyleRecalc(*this);
 }
 
 SessionID Page::sessionID() const

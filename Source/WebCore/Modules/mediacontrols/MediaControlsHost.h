@@ -64,14 +64,18 @@ public:
     void updateTextTrackContainer();
     bool allowsInlineMediaPlayback() const;
     bool supportsFullscreen();
+    bool isVideoLayerInline();
     bool userGestureRequired() const;
+    void setPreparedForInline(bool);
 
     void updateCaptionDisplaySizes();
     void enteredFullscreen();
     void exitedFullscreen();
 
     String externalDeviceDisplayName() const;
-    String externalDeviceType() const;
+
+    enum class DeviceType { None, Airplay, Tvout };
+    DeviceType externalDeviceType() const;
 
     bool controlsDependOnPageScaleFactor() const;
     void setControlsDependOnPageScaleFactor(bool v);

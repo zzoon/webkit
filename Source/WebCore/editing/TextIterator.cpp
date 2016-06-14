@@ -31,9 +31,15 @@
 #include "ExceptionCodePlaceholder.h"
 #include "FontCascade.h"
 #include "Frame.h"
+#include "HTMLBodyElement.h"
 #include "HTMLElement.h"
+#include "HTMLFrameOwnerElement.h"
+#include "HTMLInputElement.h"
+#include "HTMLLegendElement.h"
+#include "HTMLMeterElement.h"
 #include "HTMLNames.h"
 #include "HTMLParagraphElement.h"
+#include "HTMLProgressElement.h"
 #include "HTMLTextFormControlElement.h"
 #include "InlineTextBox.h"
 #include "NodeTraversal.h"
@@ -180,18 +186,6 @@ unsigned BitStack::size() const
 
 // --------
 
-#if !ASSERT_DISABLED
-
-static unsigned depthCrossingShadowBoundaries(Node& node)
-{
-    unsigned depth = 0;
-    for (Node* parent = node.parentOrShadowHostNode(); parent; parent = parent->parentOrShadowHostNode())
-        ++depth;
-    return depth;
-}
-
-#endif
-
 // This function is like Range::pastLastNode, except for the fact that it can climb up out of shadow trees.
 static Node* nextInPreOrderCrossingShadowBoundaries(Node& rangeEndContainer, int rangeEndOffset)
 {
@@ -209,9 +203,17 @@ static Node* nextInPreOrderCrossingShadowBoundaries(Node& rangeEndContainer, int
 static inline bool fullyClipsContents(Node& node)
 {
     auto* renderer = node.renderer();
-    if (!is<RenderBox>(renderer) || !renderer->hasOverflowClip())
+    if (!renderer) {
+        if (!is<Element>(node))
+            return false;
+        return !downcast<Element>(node).hasDisplayContents();
+    }
+    if (!is<RenderBox>(*renderer))
         return false;
-    return downcast<RenderBox>(*renderer).size().isEmpty();
+    auto& box = downcast<RenderBox>(*renderer);
+    if (!box.hasOverflowClip())
+        return false;
+    return box.contentSize().isEmpty();
 }
 
 static inline bool ignoresContainerClip(Node& node)
@@ -224,8 +226,6 @@ static inline bool ignoresContainerClip(Node& node)
 
 static void pushFullyClippedState(BitStack& stack, Node& node)
 {
-    ASSERT(stack.size() == depthCrossingShadowBoundaries(node));
-
     // Push true if this node full clips its contents, or if a parent already has fully
     // clipped and this is not a node that ignores its container's clip.
     stack.push(fullyClipsContents(node) || (stack.top() && !ignoresContainerClip(node)));
@@ -234,6 +234,7 @@ static void pushFullyClippedState(BitStack& stack, Node& node)
 static void setUpFullyClippedStack(BitStack& stack, Node& node)
 {
     // Put the nodes in a vector so we can iterate in reverse order.
+    // FIXME: This (and TextIterator in general) should use ComposedTreeIterator.
     Vector<Node*, 100> ancestry;
     for (Node* parent = node.parentOrShadowHostNode(); parent; parent = parent->parentOrShadowHostNode())
         ancestry.append(parent);
@@ -243,8 +244,20 @@ static void setUpFullyClippedStack(BitStack& stack, Node& node)
     for (size_t i = 0; i < size; ++i)
         pushFullyClippedState(stack, *ancestry[size - i - 1]);
     pushFullyClippedState(stack, node);
+}
 
-    ASSERT(stack.size() == 1 + depthCrossingShadowBoundaries(node));
+static bool isClippedByFrameAncestor(const Document& document, TextIteratorBehavior behavior)
+{
+    if (!(behavior & TextIteratorClipsToFrameAncestors))
+        return false;
+
+    for (auto* owner = document.ownerElement(); owner; owner = owner->document().ownerElement()) {
+        BitStack ownerClipStack;
+        setUpFullyClippedStack(ownerClipStack, *owner);
+        if (ownerClipStack.top())
+            return true;
+    }
+    return false;
 }
 
 // FIXME: editingIgnoresContent and isRendererReplacedElement try to do the same job.
@@ -254,12 +267,16 @@ bool isRendererReplacedElement(RenderObject* renderer)
     if (!renderer)
         return false;
     
-    if (renderer->isImage() || renderer->isWidget() || renderer->isMedia())
+    bool isAttachment = false;
+#if ENABLE(ATTACHMENT_ELEMENT)
+    isAttachment = renderer->isAttachment();
+#endif
+    if (renderer->isImage() || renderer->isWidget() || renderer->isMedia() || isAttachment)
         return true;
 
     if (is<Element>(renderer->node())) {
         Element& element = downcast<Element>(*renderer->node());
-        if (is<HTMLFormControlElement>(element) || is<HTMLLegendElement>(element) || is<HTMLMeterElement>(element) || is<HTMLProgressElement>(element))
+        if (is<HTMLFormControlElement>(element) || is<HTMLLegendElement>(element) || is<HTMLProgressElement>(element) || element.hasTagName(meterTag))
             return true;
         if (equalLettersIgnoringASCIICase(element.fastGetAttribute(roleAttr), "img"))
             return true;
@@ -356,15 +373,17 @@ TextIterator::TextIterator(const Range* range, TextIteratorBehavior behavior)
     m_node = range->firstNode();
     if (!m_node)
         return;
+
+    if (isClippedByFrameAncestor(m_node->document(), m_behavior))
+        return;
+
     setUpFullyClippedStack(m_fullyClippedStack, *m_node);
+
     m_offset = m_node == m_startContainer ? m_startOffset : 0;
 
     m_pastEndNode = nextInPreOrderCrossingShadowBoundaries(*m_endContainer, m_endOffset);
 
-#ifndef NDEBUG
-    // Need this just because of the assert in advance().
     m_positionNode = m_node;
-#endif
 
     advance();
 }
@@ -410,9 +429,6 @@ void TextIterator::advance()
     }
 
     while (m_node && m_node != m_pastEndNode) {
-        if ((m_behavior & TextIteratorStopsOnFormControls) && HTMLFormControlElement::enclosingFormControlElement(m_node))
-            return;
-
         // if the range ends at offset 0 of an element, represent the
         // position, but not the content, of that element e.g. if the
         // node is a blockflow element, emit a newline that
@@ -973,7 +989,7 @@ static int collapsedSpaceLength(RenderText& renderer, int textEnd)
 
 static int maxOffsetIncludingCollapsedSpaces(Node& node)
 {
-    int offset = caretMaxOffset(&node);
+    int offset = caretMaxOffset(node);
     if (auto* renderer = node.renderer()) {
         if (is<RenderText>(*renderer))
             offset += collapsedSpaceLength(downcast<RenderText>(*renderer), offset);
@@ -1184,26 +1200,8 @@ Node* TextIterator::node() const
 
 // --------
 
-SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator(const Range& range, TextIteratorBehavior behavior)
-    : m_behavior(behavior)
-    , m_node(nullptr)
-    , m_offset(0)
-    , m_handledNode(false)
-    , m_handledChildren(false)
-    , m_startContainer(nullptr)
-    , m_startOffset(0)
-    , m_endContainer(nullptr)
-    , m_endOffset(0)
-    , m_positionNode(nullptr)
-    , m_positionStartOffset(0)
-    , m_positionEndOffset(0)
-    , m_lastTextNode(nullptr)
-    , m_lastCharacter(0)
-    , m_havePassedStartContainer(false)
-    , m_shouldHandleFirstLetter(false)
+SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator(const Range& range)
 {
-    ASSERT(behavior == TextIteratorDefaultBehavior || behavior == TextIteratorStopsOnFormControls);
-
     range.ownerDocument().updateLayoutIgnorePendingStylesheets();
 
     Node* startNode = &range.startContainer();
@@ -1235,10 +1233,7 @@ SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator(const Range& ra
     m_endContainer = endNode;
     m_endOffset = endOffset;
     
-#ifndef NDEBUG
-    // Need this just because of the assert.
     m_positionNode = endNode;
-#endif
 
     m_lastTextNode = nullptr;
     m_lastCharacter = '\n';
@@ -1255,9 +1250,6 @@ void SimplifiedBackwardsTextIterator::advance()
     m_positionNode = nullptr;
     m_copyableText.reset();
     m_text = StringView();
-
-    if ((m_behavior & TextIteratorStopsOnFormControls) && HTMLFormControlElement::enclosingFormControlElement(m_node))
-        return;
 
     while (m_node && !m_havePassedStartContainer) {
         // Don't handle node if we start iterating at [node, 0].
@@ -1281,10 +1273,7 @@ void SimplifiedBackwardsTextIterator::advance()
         } else {
             // Exit empty containers as we pass over them or containers
             // where [container, 0] is where we started iterating.
-            if (!m_handledNode
-                    && canHaveChildrenForEditing(m_node)
-                    && m_node->parentNode()
-                    && (!m_node->lastChild() || (m_node == m_endContainer && !m_endOffset))) {
+            if (!m_handledNode && canHaveChildrenForEditing(*m_node) && m_node->parentNode() && (!m_node->lastChild() || (m_node == m_endContainer && !m_endOffset))) {
                 exitNode();
                 if (m_positionNode) {
                     m_handledNode = true;
@@ -1550,7 +1539,7 @@ static Ref<Range> characterSubrange(Document& document, CharacterIterator& it, i
 }
 
 BackwardsCharacterIterator::BackwardsCharacterIterator(const Range& range)
-    : m_underlyingIterator(range, TextIteratorDefaultBehavior)
+    : m_underlyingIterator(range)
     , m_offset(0)
     , m_runOffset(0)
     , m_atBreak(true)
@@ -2631,7 +2620,7 @@ static size_t findPlainText(const Range& range, const String& target, FindOption
         }
     }
 
-    CharacterIterator findIterator(range, TextIteratorEntersTextControls);
+    CharacterIterator findIterator(range, TextIteratorEntersTextControls | TextIteratorClipsToFrameAncestors);
 
     while (!findIterator.atEnd()) {
         findIterator.advance(buffer.append(findIterator.text()));
@@ -2670,7 +2659,7 @@ Ref<Range> findPlainText(const Range& range, const String& target, FindOptions o
     }
 
     // Then, find the document position of the start and the end of the text.
-    CharacterIterator computeRangeIterator(range, TextIteratorEntersTextControls);
+    CharacterIterator computeRangeIterator(range, TextIteratorEntersTextControls | TextIteratorClipsToFrameAncestors);
     return characterSubrange(range.ownerDocument(), computeRangeIterator, matchStart, matchLength);
 }
 

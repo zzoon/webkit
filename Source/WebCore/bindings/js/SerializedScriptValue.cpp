@@ -79,6 +79,7 @@
 #include <runtime/TypedArrays.h>
 #include <wtf/HashTraits.h>
 #include <wtf/MainThread.h>
+#include <wtf/RunLoop.h>
 #include <wtf/Vector.h>
 
 using namespace JSC;
@@ -478,20 +479,20 @@ public:
         return serializer.serialize(value);
     }
 
-    static bool serialize(const String& s, Vector<uint8_t>& out)
+    static bool serialize(StringView string, Vector<uint8_t>& out)
     {
         writeLittleEndian(out, CurrentVersion);
-        if (s.isEmpty()) {
+        if (string.isEmpty()) {
             writeLittleEndian<uint8_t>(out, EmptyStringTag);
             return true;
         }
         writeLittleEndian<uint8_t>(out, StringTag);
-        if (s.is8Bit()) {
-            writeLittleEndian(out, s.length() | StringDataIs8BitFlag);
-            return writeLittleEndian(out, s.characters8(), s.length());
+        if (string.is8Bit()) {
+            writeLittleEndian(out, string.length() | StringDataIs8BitFlag);
+            return writeLittleEndian(out, string.characters8(), string.length());
         }
-        writeLittleEndian(out, s.length());
-        return writeLittleEndian(out, s.characters16(), s.length());
+        writeLittleEndian(out, string.length());
+        return writeLittleEndian(out, string.characters16(), string.length());
     }
 
     static void serializeUndefined(Vector<uint8_t>& out)
@@ -2462,6 +2463,8 @@ DeserializationResult CloneDeserializer::deserialize()
                 goto error;
             }
             JSArray* outArray = constructEmptyArray(m_exec, 0, m_globalObject, length);
+            if (UNLIKELY(m_exec->hadException()))
+                goto error;
             m_gcBuffer.append(outArray);
             outputObjectStack.append(outArray);
         }
@@ -2687,7 +2690,7 @@ RefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec, JSV
     return adoptRef(*new SerializedScriptValue(WTFMove(buffer), blobURLs, WTFMove(arrayBufferContentsArray)));
 }
 
-RefPtr<SerializedScriptValue> SerializedScriptValue::create(const String& string)
+RefPtr<SerializedScriptValue> SerializedScriptValue::create(StringView string)
 {
     Vector<uint8_t> buffer;
     if (!CloneSerializer::serialize(string, buffer))
@@ -2795,13 +2798,13 @@ Vector<String> SerializedScriptValue::blobURLsIsolatedCopy() const
     return result;
 }
 
-void SerializedScriptValue::writeBlobsToDiskForIndexedDB(std::function<void (const IDBValue&)> completionHandler)
+void SerializedScriptValue::writeBlobsToDiskForIndexedDB(NoncopyableFunction<void (const IDBValue&)>&& completionHandler)
 {
     ASSERT(isMainThread());
     ASSERT(hasBlobURLs());
 
-    RefPtr<SerializedScriptValue> protector(this);
-    blobRegistry().writeBlobsToTemporaryFiles(m_blobURLs, [completionHandler, this, protector](const Vector<String>& blobFilePaths) {
+    RefPtr<SerializedScriptValue> protectedThis(this);
+    blobRegistry().writeBlobsToTemporaryFiles(m_blobURLs, [completionHandler = WTFMove(completionHandler), this, protectedThis = WTFMove(protectedThis)](auto& blobFilePaths) {
         ASSERT(isMainThread());
 
         if (blobFilePaths.isEmpty()) {
@@ -2816,6 +2819,30 @@ void SerializedScriptValue::writeBlobsToDiskForIndexedDB(std::function<void (con
         completionHandler({ *this, m_blobURLs, blobFilePaths });
     });
 }
+
+IDBValue SerializedScriptValue::writeBlobsToDiskForIndexedDBSynchronously()
+{
+    ASSERT(!isMainThread());
+
+    IDBValue value;
+    Lock lock;
+    Condition condition;
+    lock.lock();
+
+    RunLoop::main().dispatch([this, conditionPtr = &condition, valuePtr = &value] {
+        writeBlobsToDiskForIndexedDB([conditionPtr, valuePtr](const IDBValue& result) {
+            ASSERT(isMainThread());
+            valuePtr->setAsIsolatedCopy(result);
+
+            conditionPtr->notifyAll();
+        });
+    });
+
+    condition.wait(lock);
+
+    return value;
+}
+
 #endif // ENABLE(INDEXED_DATABASE)
 
 } // namespace WebCore

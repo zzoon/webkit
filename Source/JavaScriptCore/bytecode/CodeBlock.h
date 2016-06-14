@@ -56,10 +56,10 @@
 #include "JSGlobalObject.h"
 #include "JumpTable.h"
 #include "LLIntCallLinkInfo.h"
+#include "LLIntPrototypeLoadAdaptiveStructureWatchpoint.h"
 #include "LazyOperandValueProfile.h"
 #include "ObjectAllocationProfile.h"
 #include "Options.h"
-#include "ProfilerCompilation.h"
 #include "ProfilerJettisonReason.h"
 #include "PutPropertySlot.h"
 #include "RegExpObject.h"
@@ -232,6 +232,8 @@ public:
     void expressionRangeForBytecodeOffset(unsigned bytecodeOffset, int& divot,
                                           int& startOffset, int& endOffset, unsigned& line, unsigned& column);
 
+    Optional<unsigned> bytecodeOffsetFromCallSiteIndex(CallSiteIndex);
+
     void getStubInfoMap(const ConcurrentJITLocker&, StubInfoMap& result);
     void getStubInfoMap(StubInfoMap& result);
     
@@ -339,8 +341,7 @@ public:
     ExecutableBase* ownerExecutable() const { return m_ownerExecutable.get(); }
     ScriptExecutable* ownerScriptExecutable() const { return jsCast<ScriptExecutable*>(m_ownerExecutable.get()); }
 
-    void setVM(VM* vm) { m_vm = vm; }
-    VM* vm() { return m_vm; }
+    VM* vm() const { return m_vm; }
 
     void setThisRegister(VirtualRegister thisRegister) { m_thisRegister = thisRegister; }
     VirtualRegister thisRegister() const { return m_thisRegister; }
@@ -500,7 +501,7 @@ public:
     {
         ASSERT(JITCode::isBaselineCode(jitType()));
         ConcurrentJITLocker locker(m_lock);
-        return m_exitProfile.add(locker, site);
+        return m_exitProfile.add(locker, this, site);
     }
 
     bool hasExitSite(const ConcurrentJITLocker& locker, const DFG::FrequentExitSite& site) const
@@ -678,6 +679,9 @@ public:
         return m_llintExecuteCounter;
     }
 
+    typedef HashMap<Structure*, Bag<LLIntPrototypeLoadAdaptiveStructureWatchpoint>> StructureWatchpointMap;
+    StructureWatchpointMap& llintGetByIdWatchpointMap() { return m_llintGetByIdWatchpointMap; }
+
     // Functions for controlling when tiered compilation kicks in. This
     // controls both when the optimizing compiler is invoked and when OSR
     // entry happens. Two triggers exist: the loop trigger and the return
@@ -834,6 +838,8 @@ public:
         m_steppingMode = SteppingModeDisabled;
         m_numBreakpoints = 0;
     }
+
+    bool wasCompiledWithDebuggingOpcodes() const { return m_unlinkedCode->wasCompiledWithDebuggingOpcodes(); }
     
     // FIXME: Make these remaining members private.
 
@@ -1017,6 +1023,7 @@ private:
 
     RefCountedArray<LLIntCallLinkInfo> m_llintCallLinkInfos;
     SentinelLinkedList<LLIntCallLinkInfo, BasicRawSentinelNode<LLIntCallLinkInfo>> m_incomingLLIntCalls;
+    StructureWatchpointMap m_llintGetByIdWatchpointMap;
     RefPtr<JITCode> m_jitCode;
 #if ENABLE(JIT)
     std::unique_ptr<RegisterAtOffsetList> m_calleeSaveRegisters;
@@ -1307,6 +1314,14 @@ private:
 };
 #endif
 
+inline void clearLLIntGetByIdCache(Instruction* instruction)
+{
+    instruction[0].u.opcode = LLInt::getOpcode(op_get_by_id);
+    instruction[4].u.pointer = nullptr;
+    instruction[5].u.pointer = nullptr;
+    instruction[6].u.pointer = nullptr;
+}
+
 inline Register& ExecState::r(int index)
 {
     CodeBlock* codeBlock = this->codeBlock();
@@ -1403,6 +1418,9 @@ template <typename Functor> inline void ScriptExecutable::forEachCodeBlock(Funct
         RELEASE_ASSERT_NOT_REACHED();
     }
 }
+
+#define CODEBLOCK_LOG_EVENT(codeBlock, summary, details) \
+    (codeBlock->vm()->logEvent(codeBlock, summary, [&] () { return toCString details; }))
 
 } // namespace JSC
 

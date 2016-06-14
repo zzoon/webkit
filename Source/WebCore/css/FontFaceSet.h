@@ -47,22 +47,22 @@ public:
     bool remove(FontFace&);
     void clear();
 
-    void load(JSC::ExecState&, const String& font, DeferredWrapper&& promise, ExceptionCode&);
-    void load(JSC::ExecState&, const String& font, const String& text, DeferredWrapper&& promise, ExceptionCode&);
-    bool check(const String& font, ExceptionCode&);
+    typedef DOMPromise<Vector<RefPtr<FontFace>>> LoadPromise;
+    void load(const String& font, const String& text, LoadPromise&&);
     bool check(const String& font, const String& text, ExceptionCode&);
 
-    String status() const;
+    enum class LoadStatus { Loading, Loaded };
+    LoadStatus status() const;
 
-    typedef DOMPromise<FontFaceSet&, DOMCoreException&> Promise;
-    Promise& promise(JSC::ExecState&);
+    typedef DOMPromise<FontFaceSet&> ReadyPromise;
+    void registerReady(ReadyPromise&&);
 
     CSSFontFaceSet& backing() { return m_backing; }
 
     class Iterator {
     public:
         explicit Iterator(FontFaceSet&);
-        Optional<WTF::KeyValuePair<RefPtr<FontFace>, RefPtr<FontFace>>> next(JSC::ExecState&);
+        RefPtr<FontFace> next();
 
     private:
         Ref<FontFaceSet> m_target;
@@ -75,26 +75,23 @@ public:
 
 private:
     struct PendingPromise : RefCounted<PendingPromise> {
-        typedef DOMPromise<Vector<RefPtr<FontFace>>&, DOMCoreException&> Promise;
-        static Ref<PendingPromise> create(Promise&& promise)
+        static Ref<PendingPromise> create(LoadPromise&& promise)
         {
             return adoptRef(*new PendingPromise(WTFMove(promise)));
         }
         ~PendingPromise();
 
     private:
-        PendingPromise(Promise&&);
+        PendingPromise(LoadPromise&&);
 
     public:
         Vector<RefPtr<FontFace>> faces;
-        Promise promise;
+        LoadPromise promise;
         bool hasReachedTerminalState { false };
     };
 
     FontFaceSet(Document&, const Vector<RefPtr<FontFace>>&);
     FontFaceSet(Document&, CSSFontFaceSet&);
-
-    void fulfillPromise();
 
     // CSSFontFaceSetClient
     void startedLoading() final;
@@ -113,7 +110,8 @@ private:
 
     Ref<CSSFontFaceSet> m_backing;
     HashMap<RefPtr<CSSFontFace>, Vector<Ref<PendingPromise>>> m_pendingPromises;
-    Optional<Promise> m_promise;
+    Optional<ReadyPromise> m_promise;
+    bool m_isReady { false };
 };
 
 }

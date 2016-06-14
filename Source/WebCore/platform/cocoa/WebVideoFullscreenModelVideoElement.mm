@@ -75,7 +75,6 @@ void WebVideoFullscreenModelVideoElement::setWebVideoFullscreenInterface(WebVide
 
 void WebVideoFullscreenModelVideoElement::setVideoElement(HTMLVideoElement* videoElement)
 {
-    m_playbackSessionModel->setMediaElement(videoElement);
     if (m_videoElement == videoElement)
         return;
 
@@ -84,17 +83,18 @@ void WebVideoFullscreenModelVideoElement::setVideoElement(HTMLVideoElement* vide
 
     if (m_videoElement && m_isListening) {
         for (auto& eventName : observedEventNames())
-            m_videoElement->removeEventListener(eventName, this, false);
+            m_videoElement->removeEventListener(eventName, *this, false);
     }
     m_isListening = false;
 
     m_videoElement = videoElement;
+    m_playbackSessionModel->setMediaElement(videoElement);
 
     if (!m_videoElement)
         return;
 
     for (auto& eventName : observedEventNames())
-        m_videoElement->addEventListener(eventName, this, false);
+        m_videoElement->addEventListener(eventName, *this, false);
     m_isListening = true;
 
     updateForEventName(eventNameAll());
@@ -120,10 +120,12 @@ void WebVideoFullscreenModelVideoElement::updateForEventName(const WTF::AtomicSt
         m_videoFullscreenInterface->setVideoDimensions(true, m_videoElement->videoWidth(), m_videoElement->videoHeight());
 }
 
-void WebVideoFullscreenModelVideoElement::setVideoFullscreenLayer(PlatformLayer* videoLayer)
+void WebVideoFullscreenModelVideoElement::setVideoFullscreenLayer(PlatformLayer* videoLayer, std::function<void()> completionHandler)
 {
-    if (m_videoFullscreenLayer == videoLayer)
+    if (m_videoFullscreenLayer == videoLayer) {
+        completionHandler();
         return;
+    }
     
     m_videoFullscreenLayer = videoLayer;
 #if PLATFORM(MAC)
@@ -133,58 +135,22 @@ void WebVideoFullscreenModelVideoElement::setVideoFullscreenLayer(PlatformLayer*
 #endif
     [m_videoFullscreenLayer setBounds:m_videoFrame];
     
-    if (m_videoElement)
-        m_videoElement->setVideoFullscreenLayer(m_videoFullscreenLayer.get());
+    if (!m_videoElement) {
+        completionHandler();
+        return;
+    }
+
+    m_videoElement->setVideoFullscreenLayer(m_videoFullscreenLayer.get(), completionHandler);
 }
 
-void WebVideoFullscreenModelVideoElement::play()
+void WebVideoFullscreenModelVideoElement::waitForPreparedForInlineThen(std::function<void()> completionHandler)
 {
-    m_playbackSessionModel->play();
-}
+    if (!m_videoElement) {
+        completionHandler();
+        return;
+    }
 
-void WebVideoFullscreenModelVideoElement::pause()
-{
-    m_playbackSessionModel->pause();
-}
-
-void WebVideoFullscreenModelVideoElement::togglePlayState()
-{
-    m_playbackSessionModel->togglePlayState();
-}
-
-void WebVideoFullscreenModelVideoElement::beginScrubbing()
-{
-    m_playbackSessionModel->beginScrubbing();
-}
-
-void WebVideoFullscreenModelVideoElement::endScrubbing()
-{
-    m_playbackSessionModel->endScrubbing();
-}
-
-void WebVideoFullscreenModelVideoElement::seekToTime(double time)
-{
-    m_playbackSessionModel->seekToTime(time);
-}
-
-void WebVideoFullscreenModelVideoElement::fastSeek(double time)
-{
-    m_playbackSessionModel->fastSeek(time);
-}
-
-void WebVideoFullscreenModelVideoElement::beginScanningForward()
-{
-    m_playbackSessionModel->beginScanningForward();
-}
-
-void WebVideoFullscreenModelVideoElement::beginScanningBackward()
-{
-    m_playbackSessionModel->beginScanningBackward();
-}
-
-void WebVideoFullscreenModelVideoElement::endScanning()
-{
-    m_playbackSessionModel->endScanning();
+    m_videoElement->waitForPreparedForInlineThen(completionHandler);
 }
 
 void WebVideoFullscreenModelVideoElement::requestFullscreenMode(HTMLMediaElementEnums::VideoFullscreenMode mode)
@@ -214,16 +180,6 @@ void WebVideoFullscreenModelVideoElement::setVideoLayerGravity(WebVideoFullscree
         ASSERT_NOT_REACHED();
     
     m_videoElement->setVideoFullscreenGravity(videoGravity);
-}
-
-void WebVideoFullscreenModelVideoElement::selectAudioMediaOption(uint64_t selectedAudioIndex)
-{
-    m_playbackSessionModel->selectAudioMediaOption(selectedAudioIndex);
-}
-
-void WebVideoFullscreenModelVideoElement::selectLegibleMediaOption(uint64_t index)
-{
-    m_playbackSessionModel->selectLegibleMediaOption(index);
 }
 
 const Vector<AtomicString>& WebVideoFullscreenModelVideoElement::observedEventNames()

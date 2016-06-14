@@ -76,7 +76,14 @@ WorkerGlobalScope::WorkerGlobalScope(const URL& url, const String& userAgent, Wo
     , m_connectionProxy(connectionProxy)
 #endif
 {
-    setSecurityOriginPolicy(SecurityOriginPolicy::create(SecurityOrigin::create(url)));
+#if !ENABLE(INDEXED_DATABASE)
+    UNUSED_PARAM(connectionProxy);
+#endif
+    auto origin = SecurityOrigin::create(url);
+    if (m_topOrigin->hasUniversalAccess())
+        origin->grantUniversalAccess();
+
+    setSecurityOriginPolicy(SecurityOriginPolicy::create(WTFMove(origin)));
     setContentSecurityPolicy(std::make_unique<ContentSecurityPolicy>(*this));
 }
 
@@ -125,13 +132,21 @@ IDBClient::IDBConnectionProxy* WorkerGlobalScope::idbConnectionProxy()
     return nullptr;
 #endif
 }
+
+void WorkerGlobalScope::stopIndexedDatabase()
+{
+#if ENABLE(INDEXED_DATABASE_IN_WORKERS)
+    ASSERT(m_connectionProxy);
+    m_connectionProxy->forgetActivityForCurrentThread();
+#endif
+}
 #endif // ENABLE(INDEXED_DATABASE)
 
-WorkerLocation* WorkerGlobalScope::location() const
+WorkerLocation& WorkerGlobalScope::location() const
 {
     if (!m_location)
         m_location = WorkerLocation::create(m_url);
-    return m_location.get();
+    return *m_location;
 }
 
 void WorkerGlobalScope::close()
@@ -151,14 +166,14 @@ void WorkerGlobalScope::close()
     } });
 }
 
-WorkerNavigator* WorkerGlobalScope::navigator() const
+WorkerNavigator& WorkerGlobalScope::navigator() const
 {
     if (!m_navigator)
         m_navigator = WorkerNavigator::create(m_userAgent);
-    return m_navigator.get();
+    return *m_navigator;
 }
 
-void WorkerGlobalScope::postTask(Task task)
+void WorkerGlobalScope::postTask(Task&& task)
 {
     thread().runLoop().postTask(WTFMove(task));
 }
@@ -238,7 +253,7 @@ void WorkerGlobalScope::logExceptionToConsole(const String& errorMessage, const 
 void WorkerGlobalScope::addConsoleMessage(std::unique_ptr<Inspector::ConsoleMessage> message)
 {
     if (!isContextThread()) {
-        postTask(AddConsoleMessageTask(message->source(), message->level(), StringCapture(message->message())));
+        postTask(AddConsoleMessageTask(message->source(), message->level(), message->message()));
         return;
     }
 
@@ -249,7 +264,7 @@ void WorkerGlobalScope::addConsoleMessage(std::unique_ptr<Inspector::ConsoleMess
 void WorkerGlobalScope::addConsoleMessage(MessageSource source, MessageLevel level, const String& message, unsigned long requestIdentifier)
 {
     if (!isContextThread()) {
-        postTask(AddConsoleMessageTask(source, level, StringCapture(message)));
+        postTask(AddConsoleMessageTask(source, level, message));
         return;
     }
 
@@ -260,7 +275,7 @@ void WorkerGlobalScope::addConsoleMessage(MessageSource source, MessageLevel lev
 void WorkerGlobalScope::addMessage(MessageSource source, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, RefPtr<ScriptCallStack>&& callStack, JSC::ExecState* state, unsigned long requestIdentifier)
 {
     if (!isContextThread()) {
-        postTask(AddConsoleMessageTask(source, level, StringCapture(message)));
+        postTask(AddConsoleMessageTask(source, level, message));
         return;
     }
 

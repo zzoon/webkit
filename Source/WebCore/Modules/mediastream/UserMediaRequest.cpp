@@ -43,7 +43,6 @@
 #include "Frame.h"
 #include "JSMediaDeviceInfo.h"
 #include "JSMediaStream.h"
-#include "JSNavigatorUserMediaError.h"
 #include "MainFrame.h"
 #include "MediaConstraintsImpl.h"
 #include "MediaStream.h"
@@ -136,11 +135,10 @@ void UserMediaRequest::constraintsValidated(const Vector<RefPtr<RealtimeMediaSou
     for (auto& videoTrack : videoTracks)
         m_videoDeviceUIDs.append(videoTrack->persistentID());
 
-    RefPtr<UserMediaRequest> protectedThis(this);
-    callOnMainThread([protectedThis] {
+    callOnMainThread([protectedThis = Ref<UserMediaRequest>(*this)]() mutable {
         // 2 - The constraints are valid, ask the user for access to media.
         if (UserMediaController* controller = protectedThis->m_controller)
-            controller->requestUserMediaAccess(*protectedThis.get());
+            controller->requestUserMediaAccess(protectedThis.get());
     });
 }
 
@@ -149,10 +147,9 @@ void UserMediaRequest::userMediaAccessGranted(const String& audioDeviceUID, cons
     m_allowedVideoDeviceUID = videoDeviceUID;
     m_audioDeviceUIDAllowed = audioDeviceUID;
 
-    RefPtr<UserMediaRequest> protectedThis(this);
-    callOnMainThread([protectedThis, audioDeviceUID, videoDeviceUID] {
+    callOnMainThread([protectedThis = Ref<UserMediaRequest>(*this), audioDeviceUID, videoDeviceUID]() mutable {
         // 3 - the user granted access, ask platform to create the media stream descriptors.
-        RealtimeMediaSourceCenter::singleton().createMediaStream(protectedThis.get(), audioDeviceUID, videoDeviceUID);
+        RealtimeMediaSourceCenter::singleton().createMediaStream(protectedThis.ptr(), audioDeviceUID, videoDeviceUID);
     });
 }
 
@@ -172,7 +169,7 @@ void UserMediaRequest::didCreateStream(PassRefPtr<MediaStreamPrivate> privateStr
         return;
 
     // 4 - Create the MediaStream and pass it to the success callback.
-    RefPtr<MediaStream> stream = MediaStream::create(*m_scriptExecutionContext, privateStream);
+    Ref<MediaStream> stream = MediaStream::create(*m_scriptExecutionContext, privateStream);
     if (m_audioConstraints) {
         for (auto& track : stream->getAudioTracks()) {
             track->applyConstraints(*m_audioConstraints);
@@ -191,11 +188,13 @@ void UserMediaRequest::didCreateStream(PassRefPtr<MediaStreamPrivate> privateStr
 
 void UserMediaRequest::failedToCreateStreamWithConstraintsError(const String& constraintName)
 {
+    UNUSED_PARAM(constraintName);
     ASSERT(!constraintName.isEmpty());
     if (!m_scriptExecutionContext)
         return;
 
-    m_promise.reject(NavigatorUserMediaError::create(NavigatorUserMediaError::constraintNotSatisfiedErrorName(), constraintName));
+    // FIXME: The promise should be rejected with an OverconstrainedError, https://bugs.webkit.org/show_bug.cgi?id=157839.
+    m_promise.reject(DataError);
 }
 
 void UserMediaRequest::failedToCreateStreamWithPermissionError()
@@ -203,13 +202,12 @@ void UserMediaRequest::failedToCreateStreamWithPermissionError()
     if (!m_scriptExecutionContext)
         return;
 
-    // FIXME: Replace NavigatorUserMediaError with MediaStreamError (see bug 143335)
-    m_promise.reject(NavigatorUserMediaError::create(NavigatorUserMediaError::permissionDeniedErrorName(), emptyString()));
+    m_promise.reject(NotAllowedError);
 }
 
 void UserMediaRequest::contextDestroyed()
 {
-    Ref<UserMediaRequest> protect(*this);
+    Ref<UserMediaRequest> protectedThis(*this);
 
     if (m_controller) {
         m_controller->cancelUserMediaAccessRequest(*this);

@@ -17,10 +17,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef RenderSVGResourceMasker_h
-#define RenderSVGResourceMasker_h
+#pragma once
 
-#include "GraphicsContext.h"
 #include "ImageBuffer.h"
 #include "IntSize.h"
 #include "RenderSVGResourceContainer.h"
@@ -31,13 +29,15 @@
 
 namespace WebCore {
 
+class GraphicsContext;
+
 struct MaskerData {
     std::unique_ptr<ImageBuffer> maskImage;
 };
 
 class RenderSVGResourceMasker final : public RenderSVGResourceContainer {
 public:
-    RenderSVGResourceMasker(SVGMaskElement&, Ref<RenderStyle>&&);
+    RenderSVGResourceMasker(SVGMaskElement&, RenderStyle&&);
     virtual ~RenderSVGResourceMasker();
 
     SVGMaskElement& maskElement() const { return downcast<SVGMaskElement>(RenderSVGResourceContainer::element()); }
@@ -67,5 +67,3 @@ private:
 }
 
 SPECIALIZE_TYPE_TRAITS_RENDER_SVG_RESOURCE(RenderSVGResourceMasker, MaskerResourceType)
-
-#endif

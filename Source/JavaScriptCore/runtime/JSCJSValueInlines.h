@@ -530,7 +530,7 @@ inline bool isInt52(double number)
     return tryConvertToInt52(number) != JSValue::notInt52;
 }
 
-inline bool JSValue::isMachineInt() const
+inline bool JSValue::isAnyInt() const
 {
     if (isInt32())
         return true;
@@ -539,9 +539,9 @@ inline bool JSValue::isMachineInt() const
     return isInt52(asDouble());
 }
 
-inline int64_t JSValue::asMachineInt() const
+inline int64_t JSValue::asAnyInt() const
 {
-    ASSERT(isMachineInt());
+    ASSERT(isAnyInt());
     if (isInt32())
         return asInt32();
     return static_cast<int64_t>(asDouble());
@@ -766,6 +766,22 @@ ALWAYS_INLINE JSValue JSValue::get(ExecState* exec, PropertyName propertyName, P
 {
     return getPropertySlot(exec, propertyName, slot) ? 
         slot.getValue(exec, propertyName) : jsUndefined();
+}
+
+template<typename CallbackWhenNoException>
+ALWAYS_INLINE typename std::result_of<CallbackWhenNoException(bool, PropertySlot&)>::type JSValue::getPropertySlot(ExecState* exec, PropertyName propertyName, CallbackWhenNoException callback) const
+{
+    PropertySlot slot(asValue(), PropertySlot::InternalMethodType::Get);
+    return getPropertySlot(exec, propertyName, slot, callback);
+}
+
+template<typename CallbackWhenNoException>
+ALWAYS_INLINE typename std::result_of<CallbackWhenNoException(bool, PropertySlot&)>::type JSValue::getPropertySlot(ExecState* exec, PropertyName propertyName, PropertySlot& slot, CallbackWhenNoException callback) const
+{
+    bool found = getPropertySlot(exec, propertyName, slot);
+    if (UNLIKELY(exec->hadException()))
+        return { };
+    return callback(found, slot);
 }
 
 ALWAYS_INLINE bool JSValue::getPropertySlot(ExecState* exec, PropertyName propertyName, PropertySlot& slot) const

@@ -80,6 +80,10 @@ OBJC_CLASS _WKThumbnailView;
 
 - (void)_web_didChangeContentSize:(NSSize)newSize;
 
+@optional
+- (void)_web_didAddMediaControlsManager;
+- (void)_web_didRemoveMediaControlsManager;
+
 @end
 
 namespace WebCore {
@@ -472,13 +476,20 @@ public:
     void rightMouseUp(NSEvent *);
 
     void updateWebViewImplAdditions();
+    bool shouldRequestCandidates() const;
     void showCandidates(NSArray *candidates, NSString *, NSRect rectOfTypedString, NSRange selectedRange, NSView *, void (^completionHandler)(NSTextCheckingResult *acceptedCandidate));
     void webViewImplAdditionsWillDestroyView();
 
     bool windowIsFrontWindowUnderMouse(NSEvent *);
 
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 && USE(APPLE_INTERNAL_SDK)
+    void setRequiresUserActionForEditingControlsManager(bool requiresUserActionForEditingControlsManager) { m_requiresUserActionForEditingControlsManager = requiresUserActionForEditingControlsManager; }
+    bool requiresUserActionForEditingControlsManager() const { return m_requiresUserActionForEditingControlsManager; }
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 
+    void handleAcceptedCandidate(NSTextCheckingResult *acceptedCandidate);
+#if USE(APPLE_INTERNAL_SDK)
 #import <WebKitAdditions/WebViewImplAdditions.h>
+#endif
 #endif
 
 private:
@@ -513,7 +524,6 @@ private:
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
     void handleRequestedCandidates(NSInteger sequenceNumber, NSArray<NSTextCheckingResult *> *candidates);
-    void handleAcceptedCandidate(NSTextCheckingResult *acceptedCandidate);
 #endif
 
     NSView <WebViewImplDelegate> *m_view;
@@ -628,9 +638,11 @@ private:
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
     String m_lastStringForCandidateRequest;
+    NSInteger m_lastCandidateRequestSequenceNumber;
 #endif
     NSRange m_softSpaceRange { NSNotFound, 0 };
     bool m_isHandlingAcceptedCandidate { false };
+    bool m_requiresUserActionForEditingControlsManager { false };
 };
     
 } // namespace WebKit

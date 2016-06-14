@@ -18,8 +18,7 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef CSSParserValues_h
-#define CSSParserValues_h
+#pragma once
 
 #include "CSSSelector.h"
 #include "CSSValueKeywords.h"
@@ -124,7 +123,7 @@ struct CSSParserValue {
 
     void setFromValueList(std::unique_ptr<CSSParserValueList>);
 
-    PassRefPtr<CSSValue> createCSSValue();
+    RefPtr<CSSValue> createCSSValue();
 };
 
 void destroy(const CSSParserValue&);
@@ -140,7 +139,6 @@ public:
 
     void addValue(const CSSParserValue&);
     void insertValueAt(unsigned, const CSSParserValue&);
-    void deleteValueAt(unsigned);
     void extend(CSSParserValueList&);
 
     unsigned size() const { return m_values.size(); }
@@ -278,5 +276,3 @@ template<unsigned length> inline bool equalLettersIgnoringASCIICase(const CSSPar
 }
 
 }
-
-#endif

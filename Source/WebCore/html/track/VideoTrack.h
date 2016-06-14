@@ -24,15 +24,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VideoTrack_h
-#define VideoTrack_h
+#pragma once
 
 #if ENABLE(VIDEO_TRACK)
 
 #include "ExceptionCode.h"
 #include "TrackBase.h"
 #include "VideoTrackPrivate.h"
-#include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -46,7 +44,7 @@ public:
     virtual void videoTrackSelectedChanged(VideoTrack*) = 0;
 };
 
-class VideoTrack final : public TrackBase, public VideoTrackPrivateClient {
+class VideoTrack final : public MediaTrackBase, public VideoTrackPrivateClient {
 public:
     static Ref<VideoTrack> create(VideoTrackClient* client, PassRefPtr<VideoTrackPrivate> trackPrivate)
     {
@@ -104,13 +102,10 @@ private:
     RefPtr<VideoTrackPrivate> m_private;
 };
 
-inline VideoTrack* toVideoTrack(TrackBase* track)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(track->type() == TrackBase::VideoTrack);
-    return static_cast<VideoTrack*>(track);
-}
-
 } // namespace WebCore
 
-#endif
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::VideoTrack)
+    static bool isType(const WebCore::TrackBase& track) { return track.type() == WebCore::TrackBase::VideoTrack; }
+SPECIALIZE_TYPE_TRAITS_END()
+
 #endif

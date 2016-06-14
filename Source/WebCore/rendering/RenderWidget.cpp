@@ -80,7 +80,7 @@ static void moveWidgetToParentSoon(Widget* child, FrameView* parent)
     WidgetHierarchyUpdatesSuspensionScope::scheduleWidgetToMove(child, parent);
 }
 
-RenderWidget::RenderWidget(HTMLFrameOwnerElement& element, Ref<RenderStyle>&& style)
+RenderWidget::RenderWidget(HTMLFrameOwnerElement& element, RenderStyle&& style)
     : RenderReplaced(element, WTFMove(style))
     , m_weakPtrFactory(this)
 {
@@ -254,7 +254,7 @@ void RenderWidget::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 
     LayoutPoint adjustedPaintOffset = paintOffset + location();
 
-    if (hasBoxDecorations() && (paintInfo.phase == PaintPhaseForeground || paintInfo.phase == PaintPhaseSelection))
+    if (hasVisibleBoxDecorations() && (paintInfo.phase == PaintPhaseForeground || paintInfo.phase == PaintPhaseSelection))
         paintBoxDecorations(paintInfo, adjustedPaintOffset);
 
     if (paintInfo.phase == PaintPhaseMask) {

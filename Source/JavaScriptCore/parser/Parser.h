@@ -50,6 +50,7 @@ class Identifier;
 class VM;
 class ProgramNode;
 class SourceCode;
+class SyntaxChecker;
 
 // Macros to make the more common TreeBuilder types a little less verbose
 #define TreeStatement typename TreeBuilder::Statement
@@ -501,6 +502,14 @@ public:
         }
         return false;
     }
+    template <typename Func>
+    void forEachUsedVariable(const Func& func)
+    {
+        for (const UniquedStringImplPtrSet& set : m_usedVariables) {
+            for (UniquedStringImpl* impl : set)
+                func(impl);
+        }
+    }
     void useVariable(const Identifier* ident, bool isEval)
     {
         useVariable(ident->impl(), isEval);
@@ -521,11 +530,11 @@ public:
     bool isArrowFunctionBoundary() { return m_isArrowFunctionBoundary; }
     bool isArrowFunction() { return m_isArrowFunction; }
 
-    bool hasDirectSuper() { return m_hasDirectSuper; }
-    void setHasDirectSuper() { m_hasDirectSuper = true; }
+    bool hasDirectSuper() const { return m_hasDirectSuper; }
+    bool setHasDirectSuper() { return std::exchange(m_hasDirectSuper, true); }
 
-    bool needsSuperBinding() { return m_needsSuperBinding; }
-    void setNeedsSuperBinding() { m_needsSuperBinding = true; }
+    bool needsSuperBinding() const { return m_needsSuperBinding; }
+    bool setNeedsSuperBinding() { return std::exchange(m_needsSuperBinding, true); }
     
     void setEvalContextType(EvalContextType evalContextType) { m_evalContextType = evalContextType; }
     EvalContextType evalContextType() { return m_evalContextType; }
@@ -644,7 +653,7 @@ public:
         }
     }
 
-    void fillParametersForSourceProviderCache(SourceProviderCacheItemCreationParameters& parameters)
+    void fillParametersForSourceProviderCache(SourceProviderCacheItemCreationParameters& parameters, const UniquedStringImplPtrSet& capturesFromParameterExpressions)
     {
         ASSERT(m_isFunction);
         parameters.usesEval = m_usesEval;
@@ -653,6 +662,18 @@ public:
         parameters.innerArrowFunctionFeatures = m_innerArrowFunctionFeatures;
         for (const UniquedStringImplPtrSet& set : m_usedVariables)
             copyCapturedVariablesToVector(set, parameters.usedVariables);
+
+        // FIXME: https://bugs.webkit.org/show_bug.cgi?id=156962
+        // We add these unconditionally because we currently don't keep a separate
+        // declaration scope for a function's parameters and its var/let/const declarations.
+        // This is somewhat unfortunate and we should refactor to do this at some point
+        // because parameters logically form a parent scope to var/let/const variables.
+        // But because we don't do this, we must grab capture candidates from a parameter
+        // list before we parse the body of a function because the body's declarations
+        // might make us believe something isn't actually a capture candidate when it really
+        // is.
+        for (UniquedStringImpl* impl : capturesFromParameterExpressions)
+            parameters.usedVariables.append(impl);
     }
 
     void restoreFromSourceProviderCache(const SourceProviderCacheItem* info)
@@ -793,7 +814,7 @@ class Parser {
     WTF_MAKE_FAST_ALLOCATED;
 
 public:
-    Parser(VM*, const SourceCode&, JSParserBuiltinMode, JSParserStrictMode, SourceParseMode, SuperBinding, ConstructorKind defaultConstructorKind = ConstructorKind::None, ThisTDZMode = ThisTDZMode::CheckIfNeeded, DerivedContextType = DerivedContextType::None, bool isEvalContext = false, EvalContextType = EvalContextType::None);
+    Parser(VM*, const SourceCode&, JSParserBuiltinMode, JSParserStrictMode, SourceParseMode, SuperBinding, ConstructorKind defaultConstructorKind = ConstructorKind::None, DerivedContextType = DerivedContextType::None, bool isEvalContext = false, EvalContextType = EvalContextType::None);
     ~Parser();
 
     template <class ParsedNode>
@@ -1013,6 +1034,7 @@ private:
         ASSERT(i < m_scopeStack.size() && m_scopeStack.size());
         while (i && (!m_scopeStack[i].isFunctionBoundary() || m_scopeStack[i].isGeneratorBoundary() || m_scopeStack[i].isArrowFunctionBoundary()))
             i--;
+        // When reaching the top level scope (it can be non ordinary function scope), we return it.
         return ScopeRef(&m_scopeStack, i);
     }
     
@@ -1254,7 +1276,10 @@ private:
 
     void setErrorMessage(const String& message)
     {
+        ASSERT_WITH_MESSAGE(!message.isEmpty(), "Attempted to set the empty string as an error message. Likely caused by invalid UTF8 used when creating the message.");
         m_errorMessage = message;
+        if (m_errorMessage.isEmpty())
+            m_errorMessage = ASCIILiteral("Unparseable script");
     }
     
     NEVER_INLINE void logError(bool);
@@ -1388,8 +1413,8 @@ private:
     template <class TreeBuilder> ALWAYS_INLINE TreeExpression parseArgument(TreeBuilder&, ArgumentType&);
     template <class TreeBuilder> TreeProperty parseProperty(TreeBuilder&, bool strict);
     template <class TreeBuilder> TreeExpression parsePropertyMethod(TreeBuilder& context, const Identifier* methodName, bool isGenerator);
-    template <class TreeBuilder> TreeProperty parseGetterSetter(TreeBuilder&, bool strict, PropertyNode::Type, unsigned getterOrSetterStartOffset, ConstructorKind = ConstructorKind::None, SuperBinding = SuperBinding::NotNeeded);
-    template <class TreeBuilder> ALWAYS_INLINE TreeFunctionBody parseFunctionBody(TreeBuilder&, const JSTokenLocation&, int, int functionKeywordStart, int functionNameStart, int parametersStart, ConstructorKind, SuperBinding, FunctionBodyType, unsigned, SourceParseMode);
+    template <class TreeBuilder> TreeProperty parseGetterSetter(TreeBuilder&, bool strict, PropertyNode::Type, unsigned getterOrSetterStartOffset, ConstructorKind, bool isClassProperty);
+    template <class TreeBuilder> ALWAYS_INLINE TreeFunctionBody parseFunctionBody(TreeBuilder&, SyntaxChecker&, const JSTokenLocation&, int, int functionKeywordStart, int functionNameStart, int parametersStart, ConstructorKind, SuperBinding, FunctionBodyType, unsigned, SourceParseMode);
     template <class TreeBuilder> ALWAYS_INLINE bool parseFormalParameters(TreeBuilder&, TreeFormalParameterList, unsigned&);
     enum VarDeclarationListContext { ForLoopContext, VarDeclarationContext };
     template <class TreeBuilder> TreeExpression parseVariableDeclarationList(TreeBuilder&, int& declarations, TreeDestructuringPattern& lastPattern, TreeExpression& lastInitializer, JSTextPosition& identStart, JSTextPosition& initStart, JSTextPosition& initEnd, VarDeclarationListContext, DeclarationType, ExportType, bool& forLoopConstDoesNotHaveInitializer);
@@ -1415,7 +1440,7 @@ private:
     
     ALWAYS_INLINE bool isArrowFunctionParameters();
     
-    template <class TreeBuilder> NEVER_INLINE int parseFunctionParameters(TreeBuilder&, SourceParseMode, ParserFunctionInfo<TreeBuilder>&);
+    template <class TreeBuilder, class FunctionInfoType> NEVER_INLINE typename TreeBuilder::FormalParameterList parseFunctionParameters(TreeBuilder&, SourceParseMode, FunctionInfoType&);
     template <class TreeBuilder> NEVER_INLINE typename TreeBuilder::FormalParameterList createGeneratorParameters(TreeBuilder&);
 
     template <class TreeBuilder> NEVER_INLINE TreeClassExpression parseClass(TreeBuilder&, FunctionRequirements, ParserClassInfo<TreeBuilder>&);
@@ -1497,6 +1522,7 @@ private:
 
     ALWAYS_INLINE void restoreLexerState(const LexerState& lexerState)
     {
+        // setOffset clears lexer errors.
         m_lexer->setOffset(lexerState.startOffset, lexerState.oldLineStartOffset);
         next();
         m_lexer->setLastLineNumber(lexerState.oldLastLineNumber);
@@ -1507,31 +1533,55 @@ private:
         ParserState parserState;
         LexerState lexerState;
     };
-    
-    ALWAYS_INLINE SavePoint createSavePointForError()
+
+    struct SavePointWithError : public SavePoint {
+        bool lexerError;
+        String lexerErrorMessage;
+        String parserErrorMessage;
+    };
+
+    ALWAYS_INLINE void internalSaveState(SavePoint& savePoint)
     {
-        SavePoint result;
-        result.parserState = internalSaveParserState();
-        result.lexerState = internalSaveLexerState();
-        return result;
+        savePoint.parserState = internalSaveParserState();
+        savePoint.lexerState = internalSaveLexerState();
+    }
+    
+    ALWAYS_INLINE SavePointWithError createSavePointForError()
+    {
+        SavePointWithError savePoint;
+        internalSaveState(savePoint);
+        savePoint.lexerError = m_lexer->sawError();
+        savePoint.lexerErrorMessage = m_lexer->getErrorMessage();
+        savePoint.parserErrorMessage = m_errorMessage;
+        return savePoint;
     }
     
     ALWAYS_INLINE SavePoint createSavePoint()
     {
         ASSERT(!hasError());
-        return createSavePointForError();
+        SavePoint savePoint;
+        internalSaveState(savePoint);
+        return savePoint;
     }
 
-    ALWAYS_INLINE void restoreSavePointWithError(const SavePoint& savePoint, const String& message)
+    ALWAYS_INLINE void internalRestoreState(const SavePoint& savePoint)
     {
-        m_errorMessage = message;
         restoreLexerState(savePoint.lexerState);
         restoreParserState(savePoint.parserState);
     }
 
+    ALWAYS_INLINE void restoreSavePointWithError(const SavePointWithError& savePoint)
+    {
+        internalRestoreState(savePoint);
+        m_lexer->setSawError(savePoint.lexerError);
+        m_lexer->setErrorMessage(savePoint.lexerErrorMessage);
+        m_errorMessage = savePoint.parserErrorMessage;
+    }
+
     ALWAYS_INLINE void restoreSavePoint(const SavePoint& savePoint)
     {
-        restoreSavePointWithError(savePoint, String());
+        internalRestoreState(savePoint);
+        m_errorMessage = String();
     }
 
     VM* m_vm;
@@ -1554,7 +1604,6 @@ private:
     bool m_parsingBuiltin;
     SuperBinding m_superBinding;
     ConstructorKind m_defaultConstructorKind;
-    ThisTDZMode m_thisTDZMode;
     VariableEnvironment m_varDeclarations;
     DeclarationStacks::FunctionStack m_funcDeclarations;
     UniquedStringImplPtrSet m_sloppyModeHoistedFunctions;
@@ -1682,12 +1731,11 @@ std::unique_ptr<ParsedNode> parse(
     const Identifier& name, JSParserBuiltinMode builtinMode,
     JSParserStrictMode strictMode, SourceParseMode parseMode, SuperBinding superBinding,
     ParserError& error, JSTextPosition* positionBeforeLastNewline = nullptr,
-    ConstructorKind defaultConstructorKind = ConstructorKind::None, ThisTDZMode thisTDZMode = ThisTDZMode::CheckIfNeeded, 
-    DerivedContextType derivedContextType = DerivedContextType::None, EvalContextType evalContextType = EvalContextType::None)
+    ConstructorKind defaultConstructorKind = ConstructorKind::None, DerivedContextType derivedContextType = DerivedContextType::None, EvalContextType evalContextType = EvalContextType::None)
 {
     ASSERT(!source.provider()->source().isNull());
     if (source.provider()->source().is8Bit()) {
-        Parser<Lexer<LChar>> parser(vm, source, builtinMode, strictMode, parseMode, superBinding, defaultConstructorKind, thisTDZMode, derivedContextType, isEvalNode<ParsedNode>(), evalContextType);
+        Parser<Lexer<LChar>> parser(vm, source, builtinMode, strictMode, parseMode, superBinding, defaultConstructorKind, derivedContextType, isEvalNode<ParsedNode>(), evalContextType);
         std::unique_ptr<ParsedNode> result = parser.parse<ParsedNode>(error, name, parseMode);
         if (positionBeforeLastNewline)
             *positionBeforeLastNewline = parser.positionBeforeLastNewline();
@@ -1698,7 +1746,7 @@ std::unique_ptr<ParsedNode> parse(
         return result;
     }
     ASSERT_WITH_MESSAGE(defaultConstructorKind == ConstructorKind::None, "BuiltinExecutables::createDefaultConstructor should always use a 8-bit string");
-    Parser<Lexer<UChar>> parser(vm, source, builtinMode, strictMode, parseMode, superBinding, defaultConstructorKind, thisTDZMode, derivedContextType, isEvalNode<ParsedNode>(), evalContextType);
+    Parser<Lexer<UChar>> parser(vm, source, builtinMode, strictMode, parseMode, superBinding, defaultConstructorKind, derivedContextType, isEvalNode<ParsedNode>(), evalContextType);
     std::unique_ptr<ParsedNode> result = parser.parse<ParsedNode>(error, name, parseMode);
     if (positionBeforeLastNewline)
         *positionBeforeLastNewline = parser.positionBeforeLastNewline();

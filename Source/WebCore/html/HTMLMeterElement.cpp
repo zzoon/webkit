@@ -57,9 +57,9 @@ Ref<HTMLMeterElement> HTMLMeterElement::create(const QualifiedName& tagName, Doc
     return meter;
 }
 
-RenderPtr<RenderElement> HTMLMeterElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> HTMLMeterElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
-    if (!document().page()->theme().supportsMeter(style.get().appearance()))
+    if (!document().page()->theme().supportsMeter(style.appearance()))
         return RenderElement::createFor(*this, WTFMove(style));
 
     return createRenderer<RenderMeter>(*this, WTFMove(style));
@@ -229,16 +229,16 @@ void HTMLMeterElement::didAddUserAgentShadowRoot(ShadowRoot* root)
 {
     ASSERT(!m_value);
 
-    Ref<MeterInnerElement> inner = MeterInnerElement::create(document());
-    root->appendChild(inner.copyRef());
+    auto inner = MeterInnerElement::create(document());
+    root->appendChild(inner);
 
-    Ref<MeterBarElement> bar = MeterBarElement::create(document());
+    auto bar = MeterBarElement::create(document());
     m_value = MeterValueElement::create(document());
     m_value->setWidthPercentage(0);
     m_value->updatePseudo();
     bar->appendChild(*m_value, ASSERT_NO_EXCEPTION);
 
-    inner->appendChild(WTFMove(bar), ASSERT_NO_EXCEPTION);
+    inner->appendChild(bar, ASSERT_NO_EXCEPTION);
 }
 
 } // namespace

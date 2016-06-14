@@ -288,7 +288,8 @@ private:
                 break;
             }
                 
-            case GetMyArgumentByVal: {
+            case GetMyArgumentByVal:
+            case GetMyArgumentByValOutOfBounds: {
                 JSValue index = m_state.forNode(node->child2()).value();
                 if (!index || !index.isInt32())
                     break;
@@ -337,6 +338,9 @@ private:
                     eliminated = true;
                     break;
                 }
+                
+                if (node->op() == GetMyArgumentByValOutOfBounds)
+                    break;
                 
                 Node* length = emitCodeToGetArgumentsArrayLength(
                     m_insertionSet, arguments, indexInBlock, node->origin);
@@ -548,6 +552,15 @@ private:
                 if (m_state.forNode(node->child1()).m_type & ~(SpecFullNumber | SpecBoolean | SpecString | SpecSymbol))
                     break;
                 
+                node->convertToIdentity();
+                changed = true;
+                break;
+            }
+
+            case ToThis: {
+                if (!isToThisAnIdentity(m_graph.executableFor(node->origin.semantic)->isStrictMode(), m_state.forNode(node->child1())))
+                    break;
+
                 node->convertToIdentity();
                 changed = true;
                 break;

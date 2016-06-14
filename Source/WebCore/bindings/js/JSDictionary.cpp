@@ -73,19 +73,15 @@ JSDictionary::GetPropertyResult JSDictionary::tryGetProperty(const char* propert
 {
     ASSERT(isValid());
     Identifier identifier = Identifier::fromString(m_exec, propertyName);
-    PropertySlot slot(m_initializerObject.get(), PropertySlot::InternalMethodType::Get);
-
-    if (!m_initializerObject.get()->getPropertySlot(m_exec, identifier, slot))
-        return NoPropertyFound;
-
+    bool propertyFound = m_initializerObject.get()->getPropertySlot(m_exec, identifier, [&] (bool propertyFound, PropertySlot& slot) -> bool {
+        if (!propertyFound)
+            return false;
+        finalResult = slot.getValue(m_exec, identifier);
+        return true;
+    });
     if (m_exec->hadException())
         return ExceptionThrown;
-
-    finalResult = slot.getValue(m_exec, identifier);
-    if (m_exec->hadException())
-        return ExceptionThrown;
-
-    return PropertyFound;
+    return propertyFound ? PropertyFound : NoPropertyFound;
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, bool& result)
@@ -94,6 +90,11 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, bool& result)
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, int& result)
+{
+    result = value.toInt32(exec);
+}
+
+void JSDictionary::convertValue(ExecState* exec, JSValue value, long int& result)
 {
     result = value.toInt32(exec);
 }
@@ -117,6 +118,12 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, unsigned long lo
 {
     double d = value.toNumber(exec);
     doubleToInteger(d, result);
+}
+
+void JSDictionary::convertValue(ExecState* exec, JSValue value, long long& result)
+{
+    double d = value.toNumber(exec);
+    result = llrint(d);
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, double& result)
@@ -162,14 +169,14 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, RefPtr<Serialize
     result = SerializedScriptValue::create(exec, value, 0, 0);
 }
 
-void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<DOMWindow>& result)
+void JSDictionary::convertValue(ExecState* state, JSValue value, RefPtr<DOMWindow>& result)
 {
-    result = JSDOMWindow::toWrapped(value);
+    result = JSDOMWindow::toWrapped(*state, value);
 }
 
-void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<EventTarget>& result)
+void JSDictionary::convertValue(ExecState* state, JSValue value, RefPtr<EventTarget>& result)
 {
-    result = JSEventTarget::toWrapped(value);
+    result = JSEventTarget::toWrapped(*state, value);
 }
 
 void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<Node>& result)

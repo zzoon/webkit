@@ -70,13 +70,12 @@ private:
 
     bool supportLabels() const override { return true; }
 
-    RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
+    RenderPtr<RenderElement> createElementRenderer(RenderStyle&&, const RenderTreePosition&) override;
     bool childShouldCreateRenderer(const Node&) const override;
     void parseAttribute(const QualifiedName&, const AtomicString&) override;
 
     void didElementStateChange();
     void didAddUserAgentShadowRoot(ShadowRoot*) override;
-    bool canHaveUserAgentShadowRoot() const final { return true; }
 
     RefPtr<MeterValueElement> m_value;
 };

@@ -33,6 +33,7 @@
 #import "MediaControlsHost.h"
 #import "WebVideoFullscreenInterface.h"
 #import <QuartzCore/CoreAnimation.h>
+#import <WebCore/AudioTrackList.h>
 #import <WebCore/DOMEventListener.h>
 #import <WebCore/Event.h>
 #import <WebCore/EventListener.h>
@@ -65,11 +66,18 @@ void WebPlaybackSessionModelMediaElement::setWebPlaybackSessionInterface(WebPlay
 
     m_playbackSessionInterface = interface;
 
-    if (m_playbackSessionInterface) {
-        m_playbackSessionInterface->resetMediaState();
-        if (m_mediaElement)
-            m_playbackSessionInterface->setWirelessVideoPlaybackDisabled(m_mediaElement->mediaSession().wirelessVideoPlaybackDisabled(*m_mediaElement));
-    }
+    if (!m_playbackSessionInterface)
+        return;
+
+    m_playbackSessionInterface->resetMediaState();
+    m_playbackSessionInterface->setDuration(duration());
+    m_playbackSessionInterface->setCurrentTime(currentTime(), [[NSProcessInfo processInfo] systemUptime]);
+    m_playbackSessionInterface->setBufferedTime(bufferedTime());
+    m_playbackSessionInterface->setRate(isPlaying(), playbackRate());
+    m_playbackSessionInterface->setSeekableRanges(seekableRanges());
+    m_playbackSessionInterface->setCanPlayFastReverse(canPlayFastReverse());
+    m_playbackSessionInterface->setWirelessVideoPlaybackDisabled(wirelessVideoPlaybackDisabled());
+    updateLegibleOptions();
 }
 
 void WebPlaybackSessionModelMediaElement::setMediaElement(HTMLMediaElement* mediaElement)
@@ -82,7 +90,7 @@ void WebPlaybackSessionModelMediaElement::setMediaElement(HTMLMediaElement* medi
 
     if (m_mediaElement && m_isListening) {
         for (auto& eventName : observedEventNames())
-            m_mediaElement->removeEventListener(eventName, this, false);
+            m_mediaElement->removeEventListener(eventName, *this, false);
     }
     m_isListening = false;
 
@@ -92,7 +100,7 @@ void WebPlaybackSessionModelMediaElement::setMediaElement(HTMLMediaElement* medi
         return;
 
     for (auto& eventName : observedEventNames())
-        m_mediaElement->addEventListener(eventName, this, false);
+        m_mediaElement->addEventListener(eventName, *this, false);
     m_isListening = true;
 
     updateForEventName(eventNameAll());
@@ -132,7 +140,7 @@ void WebPlaybackSessionModelMediaElement::updateForEventName(const WTF::AtomicSt
         m_playbackSessionInterface->setCurrentTime(m_mediaElement->currentTime(), [[NSProcessInfo processInfo] systemUptime]);
         m_playbackSessionInterface->setBufferedTime(m_mediaElement->maxBufferedTime());
         // FIXME: 130788 - find a better event to update seekable ranges from.
-        m_playbackSessionInterface->setSeekableRanges(*m_mediaElement->seekable());
+        m_playbackSessionInterface->setSeekableRanges(m_mediaElement->seekable());
     }
 
     if (all
@@ -147,13 +155,10 @@ void WebPlaybackSessionModelMediaElement::updateForEventName(const WTF::AtomicSt
         String localizedDeviceName;
 
         if (m_mediaElement->mediaControlsHost()) {
-            static NeverDestroyed<String> airplay(ASCIILiteral("airplay"));
-            static NeverDestroyed<String> tvout(ASCIILiteral("tvout"));
-
-            String type = m_mediaElement->mediaControlsHost()->externalDeviceType();
-            if (type == airplay)
+            auto type = m_mediaElement->mediaControlsHost()->externalDeviceType();
+            if (type == MediaControlsHost::DeviceType::Airplay)
                 targetType = WebPlaybackSessionInterface::TargetTypeAirPlay;
-            else if (type == tvout)
+            else if (type == MediaControlsHost::DeviceType::Tvout)
                 targetType = WebPlaybackSessionInterface::TargetTypeTVOut;
             localizedDeviceName = m_mediaElement->mediaControlsHost()->externalDeviceDisplayName();
         }
@@ -224,6 +229,9 @@ void WebPlaybackSessionModelMediaElement::endScanning()
 
 void WebPlaybackSessionModelMediaElement::selectAudioMediaOption(uint64_t selectedAudioIndex)
 {
+    if (!m_mediaElement)
+        return;
+
     ASSERT(selectedAudioIndex < std::numeric_limits<size_t>::max());
     AudioTrack* selectedAudioTrack = nullptr;
 
@@ -239,6 +247,9 @@ void WebPlaybackSessionModelMediaElement::selectAudioMediaOption(uint64_t select
 
 void WebPlaybackSessionModelMediaElement::selectLegibleMediaOption(uint64_t index)
 {
+    if (!m_mediaElement)
+        return;
+
     ASSERT(index < std::numeric_limits<size_t>::max());
     TextTrack* textTrack = nullptr;
 
@@ -252,62 +263,27 @@ void WebPlaybackSessionModelMediaElement::selectLegibleMediaOption(uint64_t inde
 
 void WebPlaybackSessionModelMediaElement::updateLegibleOptions()
 {
-    AudioTrackList* audioTrackList = m_mediaElement->audioTracks();
-    TextTrackList* trackList = m_mediaElement->textTracks();
-
-    if ((!trackList && !audioTrackList) || !m_mediaElement->document().page() || !m_mediaElement->mediaControlsHost())
+    if (!m_mediaElement)
         return;
 
-    AtomicString displayMode = m_mediaElement->mediaControlsHost()->captionDisplayMode();
-    TextTrack* offItem = m_mediaElement->mediaControlsHost()->captionMenuOffItem();
-    TextTrack* automaticItem = m_mediaElement->mediaControlsHost()->captionMenuAutomaticItem();
+    if (!m_mediaElement->document().page())
+        return;
 
     auto& captionPreferences = m_mediaElement->document().page()->group().captionPreferences();
-    m_legibleTracksForMenu = captionPreferences.sortedTrackListForMenu(trackList);
-    m_audioTracksForMenu = captionPreferences.sortedTrackListForMenu(audioTrackList);
+    auto& textTracks = m_mediaElement->textTracks();
+    if (textTracks.length())
+        m_legibleTracksForMenu = captionPreferences.sortedTrackListForMenu(&textTracks);
+    else
+        m_legibleTracksForMenu.clear();
 
-    Vector<String> audioTrackDisplayNames;
-    uint64_t selectedAudioIndex = 0;
+    auto& audioTracks = m_mediaElement->audioTracks();
+    if (audioTracks.length() > 1)
+        m_audioTracksForMenu = captionPreferences.sortedTrackListForMenu(&audioTracks);
+    else
+        m_audioTracksForMenu.clear();
 
-    for (size_t index = 0; index < m_audioTracksForMenu.size(); ++index) {
-        auto& track = m_audioTracksForMenu[index];
-        audioTrackDisplayNames.append(captionPreferences.displayNameForTrack(track.get()));
-
-        if (track->enabled())
-            selectedAudioIndex = index;
-    }
-
-    m_playbackSessionInterface->setAudioMediaSelectionOptions(audioTrackDisplayNames, selectedAudioIndex);
-
-    Vector<String> trackDisplayNames;
-    uint64_t selectedIndex = 0;
-    uint64_t offIndex = 0;
-    bool trackMenuItemSelected = false;
-
-    for (size_t index = 0; index < m_legibleTracksForMenu.size(); index++) {
-        auto& track = m_legibleTracksForMenu[index];
-        trackDisplayNames.append(captionPreferences.displayNameForTrack(track.get()));
-
-        if (track == offItem)
-            offIndex = index;
-
-        if (track == automaticItem && displayMode == MediaControlsHost::automaticKeyword()) {
-            selectedIndex = index;
-            trackMenuItemSelected = true;
-        }
-
-        if (displayMode != MediaControlsHost::automaticKeyword() && track->mode() == TextTrack::showingKeyword()) {
-            selectedIndex = index;
-            trackMenuItemSelected = true;
-        }
-    }
-
-    if (offIndex && !trackMenuItemSelected && displayMode == MediaControlsHost::forcedOnlyKeyword()) {
-        selectedIndex = offIndex;
-        trackMenuItemSelected = true;
-    }
-
-    m_playbackSessionInterface->setLegibleMediaSelectionOptions(trackDisplayNames, selectedIndex);
+    m_playbackSessionInterface->setAudioMediaSelectionOptions(audioMediaSelectionOptions(), audioMediaSelectedIndex());
+    m_playbackSessionInterface->setLegibleMediaSelectionOptions(legibleMediaSelectionOptions(), legibleMediaSelectedIndex());
 }
 
 const Vector<AtomicString>&  WebPlaybackSessionModelMediaElement::observedEventNames()
@@ -331,6 +307,125 @@ const AtomicString&  WebPlaybackSessionModelMediaElement::eventNameAll()
 {
     static NeverDestroyed<AtomicString> sEventNameAll = "allEvents";
     return sEventNameAll;
+}
+
+double WebPlaybackSessionModelMediaElement::duration() const
+{
+    return m_mediaElement ? m_mediaElement->duration() : 0;
+}
+
+double WebPlaybackSessionModelMediaElement::currentTime() const
+{
+    return m_mediaElement ? m_mediaElement->currentTime() : 0;
+}
+
+double WebPlaybackSessionModelMediaElement::bufferedTime() const
+{
+    return m_mediaElement ? m_mediaElement->maxBufferedTime() : 0;
+}
+
+bool WebPlaybackSessionModelMediaElement::isPlaying() const
+{
+    return m_mediaElement ? !m_mediaElement->paused() : false;
+}
+
+float WebPlaybackSessionModelMediaElement::playbackRate() const
+{
+    return m_mediaElement ? m_mediaElement->playbackRate() : 0;
+}
+
+Ref<TimeRanges> WebPlaybackSessionModelMediaElement::seekableRanges() const
+{
+    return m_mediaElement ? m_mediaElement->seekable() : TimeRanges::create();
+}
+
+bool WebPlaybackSessionModelMediaElement::canPlayFastReverse() const
+{
+    return m_mediaElement ? m_mediaElement->minFastReverseRate() < 0.0 : false;
+}
+
+Vector<WTF::String> WebPlaybackSessionModelMediaElement::audioMediaSelectionOptions() const
+{
+    Vector<String> audioTrackDisplayNames;
+
+    if (!m_mediaElement || !m_mediaElement->document().page())
+        return audioTrackDisplayNames;
+
+    auto& captionPreferences = m_mediaElement->document().page()->group().captionPreferences();
+
+    for (auto& audioTrack : m_audioTracksForMenu)
+        audioTrackDisplayNames.append(captionPreferences.displayNameForTrack(audioTrack.get()));
+
+    return audioTrackDisplayNames;
+}
+
+uint64_t WebPlaybackSessionModelMediaElement::audioMediaSelectedIndex() const
+{
+    for (size_t index = 0; index < m_audioTracksForMenu.size(); ++index) {
+        if (m_audioTracksForMenu[index]->enabled())
+            return index;
+    }
+    return 0;
+}
+
+Vector<WTF::String> WebPlaybackSessionModelMediaElement::legibleMediaSelectionOptions() const
+{
+    Vector<String> trackDisplayNames;
+
+    if (!m_mediaElement || !m_mediaElement->document().page())
+        return trackDisplayNames;
+
+    auto& captionPreferences = m_mediaElement->document().page()->group().captionPreferences();
+
+    for (auto& track : m_legibleTracksForMenu)
+        trackDisplayNames.append(captionPreferences.displayNameForTrack(track.get()));
+
+    return trackDisplayNames;
+}
+
+uint64_t WebPlaybackSessionModelMediaElement::legibleMediaSelectedIndex() const
+{
+    uint64_t selectedIndex = 0;
+    uint64_t offIndex = 0;
+    bool trackMenuItemSelected = false;
+
+    if (!m_mediaElement || !m_mediaElement->mediaControlsHost())
+        return selectedIndex;
+
+    AtomicString displayMode = m_mediaElement->mediaControlsHost()->captionDisplayMode();
+    TextTrack* offItem = m_mediaElement->mediaControlsHost()->captionMenuOffItem();
+    TextTrack* automaticItem = m_mediaElement->mediaControlsHost()->captionMenuAutomaticItem();
+
+    for (size_t index = 0; index < m_legibleTracksForMenu.size(); index++) {
+        auto& track = m_legibleTracksForMenu[index];
+        if (track == offItem)
+            offIndex = index;
+
+        if (track == automaticItem && displayMode == MediaControlsHost::automaticKeyword()) {
+            selectedIndex = index;
+            trackMenuItemSelected = true;
+        }
+
+        if (displayMode != MediaControlsHost::automaticKeyword() && track->mode() == TextTrack::Mode::Showing) {
+            selectedIndex = index;
+            trackMenuItemSelected = true;
+        }
+    }
+
+    if (offIndex && !trackMenuItemSelected && displayMode == MediaControlsHost::forcedOnlyKeyword())
+        selectedIndex = offIndex;
+
+    return selectedIndex;
+}
+
+bool WebPlaybackSessionModelMediaElement::externalPlaybackEnabled() const
+{
+    return m_mediaElement ? m_mediaElement->webkitCurrentPlaybackTargetIsWireless() : false;
+}
+
+bool WebPlaybackSessionModelMediaElement::wirelessVideoPlaybackDisabled() const
+{
+    return m_mediaElement ? m_mediaElement->mediaSession().wirelessVideoPlaybackDisabled(*m_mediaElement) : false;
 }
 
 #endif

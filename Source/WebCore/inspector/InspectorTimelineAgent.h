@@ -41,8 +41,9 @@
 #include <inspector/ScriptDebugListener.h>
 #include <wtf/Vector.h>
 
-namespace JSC {
-class Profile;
+namespace Inspector {
+class InspectorHeapAgent;
+class InspectorScriptProfilerAgent;
 }
 
 namespace WebCore {
@@ -92,7 +93,7 @@ class InspectorTimelineAgent final
     WTF_MAKE_NONCOPYABLE(InspectorTimelineAgent);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    InspectorTimelineAgent(WebAgentContext&, InspectorPageAgent*);
+    InspectorTimelineAgent(WebAgentContext&, Inspector::InspectorScriptProfilerAgent*, Inspector::InspectorHeapAgent*, InspectorPageAgent*);
     virtual ~InspectorTimelineAgent();
 
     void didCreateFrontendAndBackend(Inspector::FrontendRouter*, Inspector::BackendDispatcher*) final;
@@ -100,14 +101,16 @@ public:
 
     void start(ErrorString&, const int* maxCallStackDepth = nullptr) final;
     void stop(ErrorString&) final;
+    void setAutoCaptureEnabled(ErrorString&, bool) final;
+    void setAutoCaptureInstruments(ErrorString&, const Inspector::InspectorArray&) final;
 
     int id() const { return m_id; }
 
     void didCommitLoad();
 
     // Methods called from WebCore.
-    void startFromConsole(JSC::ExecState*, const String &title);
-    RefPtr<JSC::Profile> stopFromConsole(JSC::ExecState*, const String& title);
+    void startFromConsole(JSC::ExecState*, const String& title);
+    void stopFromConsole(JSC::ExecState*, const String& title);
 
     // InspectorInstrumentation callbacks.
     void didInstallTimer(int timerId, std::chrono::milliseconds timeout, bool singleShot, Frame*);
@@ -137,6 +140,7 @@ public:
     void didFireAnimationFrame();
     void time(Frame&, const String&);
     void timeEnd(Frame&, const String&);
+    void mainFrameStartedLoading();
 
 private:
     // ScriptDebugListener
@@ -191,16 +195,20 @@ private:
 
     std::unique_ptr<Inspector::TimelineFrontendDispatcher> m_frontendDispatcher;
     RefPtr<Inspector::TimelineBackendDispatcher> m_backendDispatcher;
+    Inspector::InspectorScriptProfilerAgent* m_scriptProfilerAgent;
+    Inspector::InspectorHeapAgent* m_heapAgent;
     InspectorPageAgent* m_pageAgent;
 
     Vector<TimelineRecordEntry> m_recordStack;
+
     int m_id { 1 };
     int m_maxCallStackDepth { 5 };
 
-    Vector<TimelineRecordEntry> m_pendingConsoleProfileRecords;
-
     bool m_enabled { false };
     bool m_enabledFromFrontend { false };
+
+    bool m_autoCaptureEnabled { false };
+    Vector<Inspector::Protocol::Timeline::Instrument> m_autoCaptureInstruments;
 
 #if PLATFORM(COCOA)
     std::unique_ptr<WebCore::RunLoopObserver> m_frameStartObserver;

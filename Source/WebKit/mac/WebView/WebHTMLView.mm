@@ -72,7 +72,6 @@
 #import "WebTypesInternal.h"
 #import "WebUIDelegatePrivate.h"
 #import "WebViewInternal.h"
-#import <WebCore/BlockExceptions.h>
 #import <WebCore/CSSStyleDeclaration.h>
 #import <WebCore/CachedImage.h>
 #import <WebCore/CachedResourceClient.h>
@@ -133,6 +132,7 @@
 #import <dlfcn.h>
 #import <limits>
 #import <runtime/InitializeThreading.h>
+#import <wtf/BlockObjCExceptions.h>
 #import <wtf/MainThread.h>
 #import <wtf/MathExtras.h>
 #import <wtf/ObjcRuntimeExtras.h>
@@ -2182,6 +2182,11 @@ static bool mouseEventIsPartOfClickOrDrag(NSEvent *event)
 
         [view release];
     }
+}
+
++ (NSString *)_dummyPasteboardType
+{
+    return @"Apple WebKit dummy pasteboard type";
 }
 
 + (NSArray *)_insertablePasteboardTypes
@@ -4571,6 +4576,8 @@ static RetainPtr<NSArray> customMenuFromDefaultItems(WebView *webView, const Con
         slideBack:(BOOL)slideBack
 {
     ASSERT(self == [self _topHTMLView]);
+    [pasteboard setString:@"" forType:[WebHTMLView _dummyPasteboardType]];
+
     [super dragImage:dragImage at:at offset:offset event:event pasteboard:pasteboard source:source slideBack:slideBack];
 }
 
@@ -5599,14 +5606,14 @@ static PassRefPtr<KeyboardEvent> currentKeyboardEvent(Frame* coreFrame)
     return [[NSFontManager sharedFontManager] fontWithFamily:@"Times" traits:NSFontItalicTrait weight:STANDARD_BOLD_WEIGHT size:12.0f];
 }
 
-static NSString *fontNameForDescription(NSString *familyName, BOOL italic, BOOL bold)
+static RetainPtr<CFStringRef> fontNameForDescription(NSString *familyName, BOOL italic, BOOL bold)
 {
     // Find the font the same way the rendering code would later if it encountered this CSS.
     FontDescription fontDescription;
     fontDescription.setIsItalic(italic);
     fontDescription.setWeight(bold ? FontWeight900 : FontWeight500);
     RefPtr<Font> font = FontCache::singleton().fontForFamily(fontDescription, familyName);
-    return [font->platformData().nsFont() fontName];
+    return adoptCF(CTFontCopyPostScriptName(font->getCTFont()));
 }
 
 - (void)_addToStyle:(DOMCSSStyleDeclaration *)style fontA:(NSFont *)a fontB:(NSFont *)b
@@ -5645,8 +5652,10 @@ static NSString *fontNameForDescription(NSString *familyName, BOOL italic, BOOL 
         // the Postscript name.
         // If we don't find a font with the same Postscript name, then we'll have to use the
         // Postscript name to make the CSS specific enough.
-        if (![fontNameForDescription(aFamilyName, aIsItalic, aIsBold) isEqualToString:[a fontName]])
-            familyNameForCSS = [a fontName];
+        auto fontName = fontNameForDescription(aFamilyName, aIsItalic, aIsBold);
+        auto aName = [a fontName];
+        if (!fontName || !aName || !CFEqual(fontName.get(), static_cast<CFStringRef>(aName)))
+            familyNameForCSS = aName;
 
         // FIXME: Need more sophisticated escaping code if we want to handle family names
         // with characters like single quote or backslash in their names.
@@ -6509,10 +6518,6 @@ static BOOL writingDirectionKeyBindingsEnabled()
 #define kWebBackspaceKey     0x0008
 #define kWebReturnKey        0x000d
 #define kWebDeleteKey        0x007F
-#define kWebLeftArrowKey     0x00AC
-#define kWebUpArrowKey       0x00AD
-#define kWebRightArrowKey    0x00AE
-#define kWebDownArrowKey     0x00AF
 #define kWebDeleteForwardKey 0xF728
     
 - (BOOL)_handleEditingKeyEvent:(KeyboardEvent *)wcEvent
@@ -6524,79 +6529,36 @@ static BOOL writingDirectionKeyBindingsEnabled()
     // embedded as the whole view, as in Mail, and tabs should input tabs as expected
     // in a text editor.
     
-    // FIXME - this code will break when content editable is supported.
     if (const PlatformKeyboardEvent* platformEvent = wcEvent->keyEvent()) {
         WebEvent *event = platformEvent->event();
         if (![[self _webView] isEditable] && event.isTabKey) 
             return NO;
         
-        // Now process the key normally
-        BOOL shift = platformEvent->shiftKey();
-        
-        switch (event.characterSet) {
-            case WebEventCharacterSetSymbol: {
-                SEL sel = 0;
-                NSString *s = [event charactersIgnoringModifiers];
-                if ([s length] == 0)
-                    break;
-                switch ([s characterAtIndex:0]) {
-                    case kWebLeftArrowKey:
-                        sel = shift ? @selector(moveLeftAndModifySelection:) : @selector(moveLeft:);
-                        break;
-                    case kWebUpArrowKey:
-                        sel = shift ? @selector(moveUpAndModifySelection:) : @selector(moveUp:);
-                        break;
-                    case kWebRightArrowKey:
-                        sel = shift ? @selector(moveRightAndModifySelection:) : @selector(moveRight:);
-                        break;
-                    case kWebDownArrowKey:
-                        sel = shift ? @selector(moveDownAndModifySelection:) : @selector(moveDown:);
-                        break;
-                }
-                if (sel) {
-                    [self performSelector:sel withObject:self];
-                    return YES;
-                }
-                break;
+        NSString *s = [event characters];
+        if (!s.length)
+            return NO;
+        WebView* webView = [self _webView];
+        switch ([s characterAtIndex:0]) {
+        case kWebBackspaceKey:
+        case kWebDeleteKey:
+            [[webView _UIKitDelegateForwarder] deleteFromInputWithFlags:event.keyboardFlags];
+            return YES;
+        case kWebEnterKey:
+        case kWebReturnKey:
+            if (platformEvent->type() == PlatformKeyboardEvent::Char) {
+                // Map \r from HW keyboard to \n to match the behavior of the soft keyboard.
+                [[webView _UIKitDelegateForwarder] addInputString:@"\n" withFlags:0];
+                return YES;
             }
-            case WebEventCharacterSetASCII:
-            case WebEventCharacterSetUnicode: {
-                NSString *s = [event characters];
-                if ([s length] == 0)
-                    break;
-                WebView* webView = [self _webView];
-                switch ([s characterAtIndex:0]) {
-                    case kWebBackspaceKey:
-                    case kWebDeleteKey:
-                        // FIXME: remove the call to deleteFromInput when UIKit implements deleteFromInputWithFlags.
-                        if ([webView respondsToSelector:@selector(deleteFromInputWithFlags:)])
-                            [[webView _UIKitDelegateForwarder] deleteFromInputWithFlags:event.keyboardFlags];
-                        else
-                            [[webView _UIKitDelegateForwarder] deleteFromInput];
-                        return YES;
-                    case kWebEnterKey:
-                    case kWebReturnKey:
-                        if (platformEvent->type() == PlatformKeyboardEvent::Char) {
-                            // Map \r from HW keyboard to \n to match the behavior of the soft keyboard.
-                            [[webView _UIKitDelegateForwarder] addInputString:@"\n" withFlags:0];
-                            return YES;
-                        }
-                        return NO;
-                    case kWebDeleteForwardKey:
-                        [self deleteForward:self];
-                        return YES;
-                    default: {                    
-                        if (platformEvent->type() == PlatformKeyboardEvent::Char) {
-                            [[webView _UIKitDelegateForwarder] addInputString:event.characters withFlags:event.keyboardFlags];
-                            return YES;
-                        }
-                        return NO;
-                    }
-                }
-                break;
+            break;
+        case kWebDeleteForwardKey:
+            [self deleteForward:self];
+            return YES;
+        default:
+            if (platformEvent->type() == PlatformKeyboardEvent::Char) {
+                [[webView _UIKitDelegateForwarder] addInputString:event.characters withFlags:event.keyboardFlags];
+                return YES;
             }
-            default:
-                return NO;
         }
     }
     return NO;
@@ -7276,6 +7238,10 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
 #endif // PLATFORM(IOS)
 }
 
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200 && USE(APPLE_INTERNAL_SDK)
+#import <WebKitAdditions/WebHTMLViewWebNSTextInputSupportAdditions.mm>
+#endif
+
 @end
 
 @implementation WebHTMLView (WebDocumentPrivateProtocols)
@@ -7530,7 +7496,7 @@ static CGImageRef selectionImage(Frame* frame, bool forceBlackText)
     if (!coreFrame)
         return nil;
     HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active
-        | (allow ? 0 : HitTestRequest::DisallowShadowContent);
+        | (allow ? 0 : HitTestRequest::DisallowUserAgentShadowContent);
     return [[[WebElementDictionary alloc] initWithHitTestResult:coreFrame->eventHandler().hitTestResultAtPoint(IntPoint(point), hitType)] autorelease];
 }
 

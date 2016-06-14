@@ -85,6 +85,8 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
         // FIXME: Cmd+L shortcut doesn't actually work.
         new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.Command, "L", this.showGoToLineDialog.bind(this), this.element);
         new WebInspector.KeyboardShortcut(WebInspector.KeyboardShortcut.Modifier.Control, "G", this.showGoToLineDialog.bind(this), this.element);
+
+        WebInspector.logManager.addEventListener(WebInspector.LogManager.Event.Cleared, this._logCleared, this);
     }
 
     // Public
@@ -394,7 +396,9 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
         if (this._autoFormat) {
             console.assert(!this.formatted);
             this._autoFormat = false;
+            this.deferReveal = true;
             this.string = content;
+            this.deferReveal = false;
             this.updateFormattedState(true).then(() => {
                 this._proceedPopulateWithContent(this.string);
             });
@@ -784,26 +788,16 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
         if (this._sourceCode instanceof WebInspector.SourceMapResource)
             return breakpoint.sourceCodeLocation.displaySourceCode === this._sourceCode;
         if (this._sourceCode instanceof WebInspector.Resource)
-            return breakpoint.url === this._sourceCode.url;
+            return breakpoint.contentIdentifier === this._sourceCode.contentIdentifier;
         if (this._sourceCode instanceof WebInspector.Script)
-            return breakpoint.url === this._sourceCode.url || breakpoint.scriptIdentifier === this._sourceCode.id;
-        return false;
-    }
-
-    _matchesIssue(issue)
-    {
-        if (this._sourceCode instanceof WebInspector.Resource)
-            return issue.url === this._sourceCode.url;
-        // FIXME: Support issues for Scripts based on id, not only by URL.
-        if (this._sourceCode instanceof WebInspector.Script)
-            return issue.url === this._sourceCode.url;
+            return breakpoint.contentIdentifier === this._sourceCode.contentIdentifier || breakpoint.scriptIdentifier === this._sourceCode.id;
         return false;
     }
 
     _issueWasAdded(event)
     {
         var issue = event.data.issue;
-        if (!this._matchesIssue(issue))
+        if (!WebInspector.IssueManager.issueMatchSourceCode(issue, this._sourceCode))
             return;
 
         this._addIssue(issue);
@@ -811,8 +805,11 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
 
     _addIssue(issue)
     {
-        // FIXME: Issue should have a SourceCodeLocation.
-        var sourceCodeLocation = this._sourceCode.createSourceCodeLocation(issue.lineNumber, issue.columnNumber);
+        var sourceCodeLocation = issue.sourceCodeLocation;
+        console.assert(sourceCodeLocation, "Expected source code location to place issue.");
+        if (!sourceCodeLocation)
+            return;
+
         var lineNumber = sourceCodeLocation.formattedLineNumber;
 
         var lineNumberIssues = this._issuesLineNumberMap.get(lineNumber);
@@ -823,7 +820,7 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
 
         // Avoid displaying duplicate issues on the same line.
         for (var existingIssue of lineNumberIssues) {
-            if (existingIssue.columnNumber === issue.columnNumber && existingIssue.text === issue.text)
+            if (existingIssue.sourceCodeLocation.columnNumber === sourceCodeLocation.columnNumber && existingIssue.text === issue.text)
                 return;
         }
 
@@ -1208,10 +1205,8 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
         this._clearWidgets();
 
         var issues = WebInspector.issueManager.issuesForSourceCode(this._sourceCode);
-        for (var issue of issues) {
-            console.assert(this._matchesIssue(issue));
+        for (var issue of issues)
             this._addIssue(issue);
-        }
     }
 
     _debuggerDidPause(event)
@@ -1804,6 +1799,17 @@ WebInspector.SourceCodeTextEditor = class SourceCodeTextEditor extends WebInspec
         }
 
         return scrollHandler.bind(this);
+    }
+
+    _logCleared(event)
+    {
+        for (let lineNumber of this._issuesLineNumberMap.keys()) {
+            this.removeStyleClassFromLine(lineNumber, WebInspector.SourceCodeTextEditor.LineErrorStyleClassName);
+            this.removeStyleClassFromLine(lineNumber, WebInspector.SourceCodeTextEditor.LineWarningStyleClassName);
+        }
+
+        this._issuesLineNumberMap.clear();
+        this._clearWidgets();
     }
 };
 

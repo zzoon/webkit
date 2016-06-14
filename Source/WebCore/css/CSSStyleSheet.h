@@ -22,7 +22,6 @@
 #define CSSStyleSheet_h
 
 #include "CSSParserMode.h"
-#include "CSSRule.h"
 #include "StyleSheet.h"
 #include <memory>
 #include <wtf/HashMap.h>
@@ -70,8 +69,7 @@ public:
     
     // IE Extensions
     RefPtr<CSSRuleList> rules();
-    int addRule(const String& selector, const String& style, int index, ExceptionCode&);
-    int addRule(const String& selector, const String& style, ExceptionCode&);
+    int addRule(const String& selector, const String& style, Optional<unsigned> index, ExceptionCode&);
     void removeRule(unsigned index, ExceptionCode& ec) { deleteRule(index, ec); }
     
     // For CSSRuleList.
@@ -86,7 +84,7 @@ public:
     void clearOwnerRule() { m_ownerRule = 0; }
     Document* ownerDocument() const;
     MediaQuerySet* mediaQueries() const { return m_mediaQueries.get(); }
-    void setMediaQueries(PassRefPtr<MediaQuerySet>);
+    void setMediaQueries(Ref<MediaQuerySet>&&);
     void setTitle(const String& title) { m_title = title; }
 
     bool hadRulesMutation() const { return m_mutatedRules; }

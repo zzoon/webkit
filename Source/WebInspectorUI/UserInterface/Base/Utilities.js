@@ -424,6 +424,27 @@ Object.defineProperty(DocumentFragment.prototype, "createChild",
     value: Element.prototype.createChild
 });
 
+Object.defineProperty(Array, "shallowEqual",
+{
+    value: function(a, b)
+    {
+        if (a === b)
+            return true;
+
+        let length = a.length;
+
+        if (length !== b.length)
+            return false;
+
+        for (var i = 0; i < length; ++i) {
+            if (a[i] !== b[i])
+                return false;
+        }
+
+        return true;
+    }
+});
+
 Object.defineProperty(Array.prototype, "lastValue",
 {
     get: function()
@@ -1252,11 +1273,52 @@ Object.defineProperty(Array.prototype, "binaryIndexOf",
             this[debounceTimeoutSymbol] = undefined;
         }
     });
+
+    const requestAnimationFrameSymbol = Symbol("peform-on-animation-frame");
+    const requestAnimationFrameProxySymbol = Symbol("perform-on-animation-frame-proxy");
+
+    Object.defineProperty(Object.prototype, "onNextFrame",
+    {
+        get: function()
+        {
+            if (!this[requestAnimationFrameProxySymbol]) {
+                this[requestAnimationFrameProxySymbol] = new Proxy(this, {
+                    get(target, property, receiver) {
+                        return (...args) => {
+                            let original = target[property];
+                            console.assert(typeof original === "function");
+
+                            if (original[requestAnimationFrameSymbol])
+                                return;
+
+                            let performWork = () => {
+                                original[requestAnimationFrameSymbol] = undefined;
+                                original.apply(target, args);
+                            };
+
+                            original[requestAnimationFrameSymbol] = requestAnimationFrame(performWork);
+                        };
+                    }
+                });
+            }
+
+            return this[requestAnimationFrameProxySymbol];
+        }
+    });
 })();
 
 function appendWebInspectorSourceURL(string)
 {
+    if (string.includes("//# sourceURL"))
+        return string;
     return "\n//# sourceURL=__WebInspectorInternal__\n" + string;
+}
+
+function appendWebInspectorConsoleEvaluationSourceURL(string)
+{
+    if (string.includes("//# sourceURL"))
+        return string;
+    return "\n//# sourceURL=__WebInspectorConsoleEvaluation__\n" + string;
 }
 
 function isWebInspectorInternalScript(url)
@@ -1264,8 +1326,24 @@ function isWebInspectorInternalScript(url)
     return url === "__WebInspectorInternal__";
 }
 
+function isWebInspectorConsoleEvaluationScript(url)
+{
+    return url === "__WebInspectorConsoleEvaluation__";
+}
+
+function isWebKitInjectedScript(url)
+{
+    return url && url.startsWith("__InjectedScript_") && url.endsWith(".js");
+}
+
 function isWebKitInternalScript(url)
 {
+    if (isWebInspectorConsoleEvaluationScript(url))
+        return false;
+
+    if (isWebKitInjectedScript(url))
+        return true;
+
     return url && url.startsWith("__Web") && url.endsWith("__");
 }
 

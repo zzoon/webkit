@@ -31,6 +31,10 @@
     bottom: 0;
 }
 
+.heap-snapshot > .data-grid td .sub-retained {
+    color: hsl(0, 0%, 60%);
+}
+
 .heap-snapshot > .data-grid td .percentage {
     width: 45px;
     margin-left: 4px;
@@ -43,10 +47,6 @@
 
 .heap-snapshot .object-id:hover {
     text-decoration: underline;
-}
-
-.heap-snapshot > .data-grid tr:not(.selected) td .preview-error {
-    color: red;
 }
 
 .heap-snapshot > .data-grid td .location {
@@ -177,4 +177,9 @@
 .heap-snapshot-instance-popover-content .node * {
     display: inline-block;
     vertical-align: top;
+}
+
+.heap-snapshot-instance-popover-content .node .go-to-link {
+    position: relative;
+    top: 1px;
 }

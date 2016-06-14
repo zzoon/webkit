@@ -310,7 +310,7 @@ bool AccessibilityObject::accessibleNameDerivesFromContent() const
     case DocumentArticleRole:
     case DocumentMathRole:
     case DocumentNoteRole:
-    case DocumentRegionRole:
+    case LandmarkRegionRole:
     case FormRole:
     case GridRole:
     case GroupRole:
@@ -360,7 +360,7 @@ String AccessibilityObject::computedLabel()
 {
     // This method is being called by WebKit inspector, which may happen at any time, so we need to update our backing store now.
     // Also hold onto this object in case updateBackingStore deletes this node.
-    RefPtr<AccessibilityObject> protector(this);
+    RefPtr<AccessibilityObject> protectedThis(this);
     updateBackingStore();
     Vector<AccessibilityText> text;
     accessibilityText(text);
@@ -392,6 +392,11 @@ bool AccessibilityObject::isARIATextControl() const
     return ariaRoleAttribute() == TextAreaRole || ariaRoleAttribute() == TextFieldRole || ariaRoleAttribute() == SearchFieldRole;
 }
 
+bool AccessibilityObject::isNonNativeTextControl() const
+{
+    return (isARIATextControl() || hasContentEditableAttributeSet()) && !isNativeTextControl();
+}
+
 bool AccessibilityObject::isLandmark() const
 {
     AccessibilityRole role = roleValue();
@@ -401,6 +406,7 @@ bool AccessibilityObject::isLandmark() const
         || role == LandmarkContentInfoRole
         || role == LandmarkMainRole
         || role == LandmarkNavigationRole
+        || role == LandmarkRegionRole
         || role == LandmarkSearchRole;
 }
 
@@ -1134,7 +1140,7 @@ static VisiblePosition startOfStyleRange(const VisiblePosition& visiblePos)
 {
     RenderObject* renderer = visiblePos.deepEquivalent().deprecatedNode()->renderer();
     RenderObject* startRenderer = renderer;
-    RenderStyle* style = &renderer->style();
+    auto* style = &renderer->style();
 
     // traverse backward by renderer to look for style change
     for (RenderObject* r = renderer->previousInPreOrder(); r; r = r->previousInPreOrder()) {
@@ -1555,6 +1561,37 @@ bool AccessibilityObject::hasContentEditableAttributeSet() const
     return contentEditableAttributeIsEnabled(element());
 }
 
+bool AccessibilityObject::supportsARIAReadOnly() const
+{
+    AccessibilityRole role = roleValue();
+
+    return role == CheckBoxRole
+        || role == ColumnHeaderRole
+        || role == ComboBoxRole
+        || role == GridRole
+        || role == GridCellRole
+        || role == ListBoxRole
+        || role == MenuItemCheckboxRole
+        || role == MenuItemRadioRole
+        || role == RadioGroupRole
+        || role == RowHeaderRole
+        || role == SearchFieldRole
+        || role == SliderRole
+        || role == SpinButtonRole
+        || role == SwitchRole
+        || role == TextFieldRole
+        || role == TreeGridRole
+        || isPasswordField();
+}
+
+String AccessibilityObject::ariaReadOnlyValue() const
+{
+    if (!hasAttribute(aria_readonlyAttr))
+        return ariaRoleAttribute() != UnknownRole && supportsARIAReadOnly() ? "false" : String();
+
+    return getAttribute(aria_readonlyAttr).string().convertToASCIILowercase();
+}
+
 bool AccessibilityObject::contentEditableAttributeIsEnabled(Element* element)
 {
     if (!element)
@@ -1642,7 +1679,7 @@ unsigned AccessibilityObject::doAXLineForIndex(unsigned index)
 void AccessibilityObject::updateBackingStore()
 {
     // Updating the layout may delete this object.
-    RefPtr<AccessibilityObject> protector(this);
+    RefPtr<AccessibilityObject> protectedThis(this);
 
     if (Document* document = this->document()) {
         if (!document->view()->isInRenderTreeLayout())
@@ -2071,7 +2108,7 @@ static void initializeRoleMap()
         { "progressbar", ProgressIndicatorRole },
         { "radio", RadioButtonRole },
         { "radiogroup", RadioGroupRole },
-        { "region", DocumentRegionRole },
+        { "region", LandmarkRegionRole },
         { "row", RowRole },
         { "rowgroup", RowGroupRole },
         { "scrollbar", ScrollBarRole },
@@ -3024,7 +3061,20 @@ bool AccessibilityObject::isStyleFormatGroup() const
     return node->hasTagName(kbdTag) || node->hasTagName(codeTag)
     || node->hasTagName(preTag) || node->hasTagName(sampTag)
     || node->hasTagName(varTag) || node->hasTagName(citeTag)
-    || node->hasTagName(insTag) || node->hasTagName(delTag);
+    || node->hasTagName(insTag) || node->hasTagName(delTag)
+    || node->hasTagName(supTag) || node->hasTagName(subTag);
+}
+
+bool AccessibilityObject::isSubscriptStyleGroup() const
+{
+    Node* node = this->node();
+    return node && node->hasTagName(subTag);
+}
+
+bool AccessibilityObject::isSuperscriptStyleGroup() const
+{
+    Node* node = this->node();
+    return node && node->hasTagName(supTag);
 }
     
 bool AccessibilityObject::isContainedByPasswordField() const

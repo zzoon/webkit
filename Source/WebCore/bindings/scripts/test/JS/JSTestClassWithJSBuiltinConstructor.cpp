@@ -124,7 +124,7 @@ void JSTestClassWithJSBuiltinConstructor::destroy(JSC::JSCell* cell)
 EncodedJSValue jsTestClassWithJSBuiltinConstructorConstructor(ExecState* state, EncodedJSValue thisValue, PropertyName)
 {
     JSTestClassWithJSBuiltinConstructorPrototype* domObject = jsDynamicCast<JSTestClassWithJSBuiltinConstructorPrototype*>(JSValue::decode(thisValue));
-    if (!domObject)
+    if (UNLIKELY(!domObject))
         return throwVMTypeError(state);
     return JSValue::encode(JSTestClassWithJSBuiltinConstructor::getConstructor(state->vm(), domObject->globalObject()));
 }
@@ -176,22 +176,11 @@ extern "C" { extern void* _ZTVN7WebCore33TestClassWithJSBuiltinConstructorE[]; }
 #endif
 #endif
 
-JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestClassWithJSBuiltinConstructor* impl)
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, Ref<TestClassWithJSBuiltinConstructor>&& impl)
 {
-    if (!impl)
-        return jsNull();
-    return createNewWrapper<JSTestClassWithJSBuiltinConstructor>(globalObject, impl);
-}
-
-JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestClassWithJSBuiltinConstructor* impl)
-{
-    if (!impl)
-        return jsNull();
-    if (JSValue result = getExistingWrapper<JSTestClassWithJSBuiltinConstructor>(globalObject, impl))
-        return result;
 
 #if ENABLE(BINDING_INTEGRITY)
-    void* actualVTablePointer = *(reinterpret_cast<void**>(impl));
+    void* actualVTablePointer = *(reinterpret_cast<void**>(impl.ptr()));
 #if PLATFORM(WIN)
     void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestClassWithJSBuiltinConstructor@WebCore@@6B@"));
 #else
@@ -199,7 +188,7 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestClassWit
 #if COMPILER(CLANG)
     // If this fails TestClassWithJSBuiltinConstructor does not have a vtable, so you need to add the
     // ImplementationLacksVTable attribute to the interface definition
-    COMPILE_ASSERT(__is_polymorphic(TestClassWithJSBuiltinConstructor), TestClassWithJSBuiltinConstructor_is_not_polymorphic);
+    static_assert(__is_polymorphic(TestClassWithJSBuiltinConstructor), "TestClassWithJSBuiltinConstructor is not polymorphic");
 #endif
 #endif
     // If you hit this assertion you either have a use after free bug, or
@@ -208,7 +197,12 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestClassWit
     // by adding the SkipVTableValidation attribute to the interface IDL definition
     RELEASE_ASSERT(actualVTablePointer == expectedVTablePointer);
 #endif
-    return createNewWrapper<JSTestClassWithJSBuiltinConstructor>(globalObject, impl);
+    return createWrapper<JSTestClassWithJSBuiltinConstructor, TestClassWithJSBuiltinConstructor>(globalObject, WTFMove(impl));
+}
+
+JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestClassWithJSBuiltinConstructor& impl)
+{
+    return wrap(state, globalObject, impl);
 }
 
 TestClassWithJSBuiltinConstructor* JSTestClassWithJSBuiltinConstructor::toWrapped(JSC::JSValue value)

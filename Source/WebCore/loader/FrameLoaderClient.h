@@ -31,7 +31,6 @@
 #define FrameLoaderClient_h
 
 #include "FrameLoaderTypes.h"
-#include "IconURL.h"
 #include "LayoutMilestones.h"
 #include "ResourceLoadPriority.h"
 #include <functional>
@@ -51,8 +50,6 @@ typedef id RemoteAXObjectRef;
 typedef void* RemoteAXObjectRef;
 #endif
 #endif
-
-typedef class _jobject* jobject;
 
 #if PLATFORM(COCOA)
 OBJC_CLASS NSArray;
@@ -249,7 +246,7 @@ namespace WebCore {
         virtual String generatedMIMETypeForURLScheme(const String& URLScheme) const = 0;
 
         virtual void frameLoadCompleted() = 0;
-        virtual void saveViewStateToItem(HistoryItem*) = 0;
+        virtual void saveViewStateToItem(HistoryItem&) = 0;
         virtual void restoreViewState() = 0;
         virtual void provisionalLoadStarted() = 0;
         virtual void didFinishLoad() = 0;

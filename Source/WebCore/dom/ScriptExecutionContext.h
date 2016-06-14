@@ -33,7 +33,9 @@
 #include "SecurityContext.h"
 #include "Supplementable.h"
 #include <runtime/ConsoleTypes.h>
+#include <wtf/CrossThreadTask.h>
 #include <wtf/HashSet.h>
+#include <wtf/NoncopyableFunction.h>
 
 namespace JSC {
 class ExecState;
@@ -131,20 +133,20 @@ public:
     public:
         enum CleanupTaskTag { CleanupTask };
 
-        template<typename T, typename = typename std::enable_if<!std::is_base_of<Task, T>::value && std::is_convertible<T, std::function<void (ScriptExecutionContext&)>>::value>::type>
+        template<typename T, typename = typename std::enable_if<!std::is_base_of<Task, T>::value && std::is_convertible<T, NoncopyableFunction<void (ScriptExecutionContext&)>>::value>::type>
         Task(T task)
             : m_task(WTFMove(task))
             , m_isCleanupTask(false)
         {
         }
 
-        Task(std::function<void()> task)
-            : m_task([task](ScriptExecutionContext&) { task(); })
+        Task(NoncopyableFunction<void ()>&& task)
+            : m_task([task = WTFMove(task)](ScriptExecutionContext&) { task(); })
             , m_isCleanupTask(false)
         {
         }
 
-        template<typename T, typename = typename std::enable_if<std::is_convertible<T, std::function<void (ScriptExecutionContext&)>>::value>::type>
+        template<typename T, typename = typename std::enable_if<std::is_convertible<T, NoncopyableFunction<void (ScriptExecutionContext&)>>::value>::type>
         Task(CleanupTaskTag, T task)
             : m_task(WTFMove(task))
             , m_isCleanupTask(true)
@@ -161,11 +163,19 @@ public:
         bool isCleanupTask() const { return m_isCleanupTask; }
 
     protected:
-        std::function<void (ScriptExecutionContext&)> m_task;
+        NoncopyableFunction<void (ScriptExecutionContext&)> m_task;
         bool m_isCleanupTask;
     };
 
-    virtual void postTask(Task) = 0; // Executes the task on context's thread asynchronously.
+    virtual void postTask(Task&&) = 0; // Executes the task on context's thread asynchronously.
+
+    template<typename... Arguments>
+    void postCrossThreadTask(Arguments&&... arguments)
+    {
+        postTask([crossThreadTask = createCrossThreadTask(arguments...)](ScriptExecutionContext&) mutable {
+            crossThreadTask.performTask();
+        });
+    }
 
     // Gets the next id in a circular sequence from 1 to 2^31-1.
     int circularSequentialID();
@@ -200,9 +210,9 @@ public:
 protected:
     class AddConsoleMessageTask : public Task {
     public:
-        AddConsoleMessageTask(MessageSource source, MessageLevel level, const StringCapture& message)
-            : Task([source, level, message](ScriptExecutionContext& context) {
-                context.addConsoleMessage(source, level, message.string());
+        AddConsoleMessageTask(MessageSource source, MessageLevel level, const String& message)
+            : Task([source, level, message = message.isolatedCopy()](ScriptExecutionContext& context) {
+                context.addConsoleMessage(source, level, message);
             })
         {
         }

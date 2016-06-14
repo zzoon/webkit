@@ -214,7 +214,7 @@ public:
 
     int32_t asInt32() const;
     uint32_t asUInt32() const;
-    int64_t asMachineInt() const;
+    int64_t asAnyInt() const;
     double asDouble() const;
     bool asBoolean() const;
     double asNumber() const;
@@ -232,7 +232,7 @@ public:
     bool isNull() const;
     bool isUndefinedOrNull() const;
     bool isBoolean() const;
-    bool isMachineInt() const;
+    bool isAnyInt() const;
     bool isNumber() const;
     bool isString() const;
     bool isSymbol() const;
@@ -287,6 +287,8 @@ public:
     JSValue get(ExecState*, uint64_t propertyName) const;
 
     bool getPropertySlot(ExecState*, PropertyName, PropertySlot&) const;
+    template<typename CallbackWhenNoException> typename std::result_of<CallbackWhenNoException(bool, PropertySlot&)>::type getPropertySlot(ExecState*, PropertyName, CallbackWhenNoException) const;
+    template<typename CallbackWhenNoException> typename std::result_of<CallbackWhenNoException(bool, PropertySlot&)>::type getPropertySlot(ExecState*, PropertyName, PropertySlot&, CallbackWhenNoException) const;
 
     bool put(ExecState*, PropertyName, JSValue, PutPropertySlot&);
     bool putInline(ExecState*, PropertyName, JSValue, PutPropertySlot&);

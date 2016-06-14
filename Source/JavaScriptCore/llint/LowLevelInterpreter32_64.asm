@@ -302,7 +302,7 @@ _handleUncaughtException:
     loadp Callee + PayloadOffset[cfr], t3
     andp MarkedBlockMask, t3
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
-    restoreCalleeSavesFromVMCalleeSavesBuffer(t3, t0)
+    restoreCalleeSavesFromVMEntryFrameCalleeSavesBuffer(t3, t0)
     loadp VM::callFrameForCatch[t3], cfr
     storep 0, VM::callFrameForCatch[t3]
 
@@ -675,6 +675,17 @@ _llint_op_enter:
 .opEnterDone:
     callSlowPath(_slow_path_enter)
     dispatch(1)
+
+
+_llint_op_argument_count:
+    traceExecution()
+    loadisFromInstruction(1, t2)
+    loadi PayloadOffset + ArgumentCount[cfr], t0
+    subi 1, t0
+    move Int32Tag, t1
+    storei t1, TagOffset[cfr, t2, 8]
+    storei t0, PayloadOffset[cfr, t2, 8]
+    dispatch(2)
 
 
 _llint_op_get_scope:
@@ -1212,6 +1223,17 @@ _llint_op_instanceof_custom:
     dispatch(5)
 
 
+_llint_op_is_empty:
+    traceExecution()
+    loadi 8[PC], t1
+    loadi 4[PC], t0
+    loadConstantOrVariable(t1, t2, t3)
+    cieq t2, EmptyValueTag, t3
+    storei BooleanTag, TagOffset[cfr, t0, 8]
+    storei t3, PayloadOffset[cfr, t0, 8]
+    dispatch(3)
+
+
 _llint_op_is_undefined:
     traceExecution()
     loadi 8[PC], t1
@@ -1323,10 +1345,12 @@ end
 
 
 # We only do monomorphic get_by_id caching for now, and we do not modify the
-# opcode. We do, however, allow for the cache to change anytime if fails, since
-# ping-ponging is free. At best we get lucky and the get_by_id will continue
+# opcode for own properties. We also allow for the cache to change anytime it fails,
+# since ping-ponging is free. At best we get lucky and the get_by_id will continue
 # to take fast path on the new cache. At worst we take slow path, which is what
-# we would have been doing anyway.
+# we would have been doing anyway. For prototype/unset properties, we will attempt to
+# convert opcode into a get_by_id_proto_load/get_by_id_unset, respectively, after an
+# execution counter hits zero.
 
 _llint_op_get_by_id:
     traceExecution()
@@ -1343,6 +1367,43 @@ _llint_op_get_by_id:
     dispatch(9)
 
 .opGetByIdSlow:
+    callSlowPath(_llint_slow_path_get_by_id)
+    dispatch(9)
+
+
+_llint_op_get_by_id_proto_load:
+    traceExecution()
+    loadi 8[PC], t0
+    loadi 16[PC], t1
+    loadConstantOrVariablePayload(t0, CellTag, t3, .opGetByIdProtoSlow)
+    loadi 20[PC], t2
+    bineq JSCell::m_structureID[t3], t1, .opGetByIdProtoSlow
+    loadpFromInstruction(6, t3)
+    loadPropertyAtVariableOffset(t2, t3, t0, t1)
+    loadi 4[PC], t2
+    storei t0, TagOffset[cfr, t2, 8]
+    storei t1, PayloadOffset[cfr, t2, 8]
+    valueProfile(t0, t1, 32, t2)
+    dispatch(9)
+
+.opGetByIdProtoSlow:
+    callSlowPath(_llint_slow_path_get_by_id)
+    dispatch(9)
+
+
+_llint_op_get_by_id_unset:
+    traceExecution()
+    loadi 8[PC], t0
+    loadi 16[PC], t1
+    loadConstantOrVariablePayload(t0, CellTag, t3, .opGetByIdUnsetSlow)
+    bineq JSCell::m_structureID[t3], t1, .opGetByIdUnsetSlow
+    loadi 4[PC], t2
+    storei UndefinedTag, TagOffset[cfr, t2, 8]
+    storei 0, PayloadOffset[cfr, t2, 8]
+    valueProfile(UndefinedTag, 0, 32, t2)
+    dispatch(9)
+
+.opGetByIdUnsetSlow:
     callSlowPath(_llint_slow_path_get_by_id)
     dispatch(9)
 
@@ -1904,7 +1965,7 @@ _llint_op_catch:
     loadp Callee + PayloadOffset[cfr], t3
     andp MarkedBlockMask, t3
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
-    restoreCalleeSavesFromVMCalleeSavesBuffer(t3, t0)
+    restoreCalleeSavesFromVMEntryFrameCalleeSavesBuffer(t3, t0)
     loadp VM::callFrameForCatch[t3], cfr
     storep 0, VM::callFrameForCatch[t3]
     restoreStackPointerAfterCall()
@@ -1954,7 +2015,7 @@ _llint_throw_from_slow_path_trampoline:
     loadp Callee[cfr], t1
     andp MarkedBlockMask, t1
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t1], t1
-    copyCalleeSavesToVMCalleeSavesBuffer(t1, t2)
+    copyCalleeSavesToVMEntryFrameCalleeSavesBuffer(t1, t2)
     jmp VM::targetMachinePCForThrow[t1]
 
 
@@ -2432,4 +2493,41 @@ _llint_op_get_rest_length:
     loadisFromInstruction(1, t1)
     storei t0, PayloadOffset[cfr, t1, 8]
     storei Int32Tag, TagOffset[cfr, t1, 8]
+    dispatch(3)
+
+
+_llint_op_log_shadow_chicken_prologue:
+    traceExecution()
+    acquireShadowChickenPacket(.opLogShadowChickenPrologueSlow)
+    storep cfr, ShadowChicken::Packet::frame[t0]
+    loadp CallerFrame[cfr], t1
+    storep t1, ShadowChicken::Packet::callerFrame[t0]
+    loadp Callee + PayloadOffset[cfr], t1
+    storep t1, ShadowChicken::Packet::callee[t0]
+    loadisFromInstruction(1, t1)
+    loadi PayloadOffset[cfr, t1, 8], t1
+    storep t1, ShadowChicken::Packet::scope[t0]
+    dispatch(2)
+.opLogShadowChickenPrologueSlow:
+    callSlowPath(_llint_slow_path_log_shadow_chicken_prologue)
+    dispatch(2)
+
+
+_llint_op_log_shadow_chicken_tail:
+    traceExecution()
+    acquireShadowChickenPacket(.opLogShadowChickenTailSlow)
+    storep cfr, ShadowChicken::Packet::frame[t0]
+    storep ShadowChickenTailMarker, ShadowChicken::Packet::callee[t0]
+    loadVariable(1, t3, t2, t1)
+    storei t2, TagOffset + ShadowChicken::Packet::thisValue[t0]
+    storei t1, PayloadOffset + ShadowChicken::Packet::thisValue[t0]
+    loadisFromInstruction(2, t1)
+    loadi PayloadOffset[cfr, t1, 8], t1
+    storep t1, ShadowChicken::Packet::scope[t0]
+    loadp CodeBlock[cfr], t1
+    storep t1, ShadowChicken::Packet::codeBlock[t0]
+    storei PC, ShadowChicken::Packet::callSiteIndex[t0]
+    dispatch(3)
+.opLogShadowChickenTailSlow:
+    callSlowPath(_llint_slow_path_log_shadow_chicken_tail)
     dispatch(3)

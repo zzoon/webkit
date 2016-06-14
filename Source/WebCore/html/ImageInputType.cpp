@@ -102,7 +102,7 @@ void ImageInputType::handleDOMActivateEvent(Event* event)
     event->setDefaultHandled();
 }
 
-RenderPtr<RenderElement> ImageInputType::createInputRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> ImageInputType::createInputRenderer(RenderStyle&& style)
 {
     return createRenderer<RenderImage>(element(), WTFMove(style));
 }
@@ -182,7 +182,7 @@ unsigned ImageInputType::height() const
         // If the image is available, use its height.
         HTMLImageLoader* imageLoader = element->imageLoader();
         if (imageLoader && imageLoader->image())
-            return imageLoader->image()->imageSizeForRenderer(element->renderer(), 1).height();
+            return imageLoader->image()->imageSizeForRenderer(element->renderer(), 1).height().toUnsigned();
     }
 
     element->document().updateLayout();
@@ -203,7 +203,7 @@ unsigned ImageInputType::width() const
         // If the image is available, use its width.
         HTMLImageLoader* imageLoader = element->imageLoader();
         if (imageLoader && imageLoader->image())
-            return imageLoader->image()->imageSizeForRenderer(element->renderer(), 1).width();
+            return imageLoader->image()->imageSizeForRenderer(element->renderer(), 1).width().toUnsigned();
     }
 
     element->document().updateLayout();

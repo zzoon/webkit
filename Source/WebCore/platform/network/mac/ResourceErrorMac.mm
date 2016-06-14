@@ -26,10 +26,10 @@
 #import "config.h"
 #import "ResourceError.h"
 
-#import "BlockExceptions.h"
 #import "URL.h"
 #import <CoreFoundation/CFError.h>
 #import <Foundation/Foundation.h>
+#import <wtf/BlockObjCExceptions.h>
 
 #if PLATFORM(IOS) && USE(CFNETWORK)
 #import <CFNetwork/CFSocketStreamPriv.h>
@@ -279,6 +279,10 @@ void ResourceError::platformLazyInit()
 bool ResourceError::platformCompare(const ResourceError& a, const ResourceError& b)
 {
     return a.nsError() == b.nsError();
+}
+
+void ResourceError::doPlatformIsolatedCopy(const ResourceError&)
+{
 }
 
 NSError *ResourceError::nsError() const

@@ -386,7 +386,7 @@ public:
     void setHasVisibleContent();
     void dirtyVisibleContentStatus();
 
-    bool hasBoxDecorationsOrBackground() const;
+    bool hasVisibleBoxDecorationsOrBackground() const;
     bool hasVisibleBoxDecorations() const;
     // Returns true if this layer has visible content (ignoring any child layers).
     bool isVisuallyNonEmpty() const;
@@ -538,7 +538,8 @@ public:
     LayoutRect calculateLayerBounds(const RenderLayer* ancestorLayer, const LayoutSize& offsetFromRoot, CalculateLayerBoundsFlags = DefaultCalculateLayerBoundsFlags) const;
     
     // Return a cached repaint rect, computed relative to the layer renderer's containerForRepaint.
-    LayoutRect repaintRect() const { return m_repaintRect; }
+    bool hasComputedRepaintRect() const { return m_hasComputedRepaintRect; }
+    LayoutRect repaintRect() const { ASSERT(hasComputedRepaintRect()); return m_repaintRect; }
     LayoutRect repaintRectIncludingNonCompositingDescendants() const;
 
     void setRepaintStatus(RepaintStatus status) { m_repaintStatus = status; }
@@ -671,6 +672,8 @@ public:
 
     RenderLayer* enclosingFlowThreadAncestor() const;
 
+    bool shouldPlaceBlockDirectionScrollbarOnLeft() const final { return renderer().shouldPlaceBlockDirectionScrollbarOnLeft(); }
+
 private:
     enum CollectLayersBehavior { StopAtStackingContexts, StopAtStackingContainers };
 
@@ -724,8 +727,8 @@ private:
     void computeRepaintRectsIncludingDescendants();
     void clearRepaintRects();
 
-    void clipToRect(const LayerPaintingInfo&, GraphicsContext&, const ClipRect&, BorderRadiusClippingRule = IncludeSelfForBorderRadius);
-    void restoreClip(GraphicsContext&, const LayoutRect& paintDirtyRect, const ClipRect&);
+    void clipToRect(GraphicsContext&, const LayerPaintingInfo&, const ClipRect&, BorderRadiusClippingRule = IncludeSelfForBorderRadius);
+    void restoreClip(GraphicsContext&, const LayerPaintingInfo&, const ClipRect&);
 
     bool shouldRepaintAfterLayout() const;
 
@@ -756,10 +759,6 @@ private:
     typedef unsigned UpdateLayerPositionsAfterScrollFlags;
     void updateLayerPositionsAfterScroll(RenderGeometryMap*, UpdateLayerPositionsAfterScrollFlags = NoFlag);
 
-    friend IntSize RenderBox::scrolledContentOffset() const;
-    // FIXME: rename this toscrolledContentPosition(), or remove it.
-    IntSize scrolledContentOffset() const { return toIntSize(m_scrollPosition); }
-
     ScrollOffset clampScrollOffset(const ScrollOffset&) const;
 
     RenderLayer* enclosingPaginationLayerInSubtree(const RenderLayer* rootLayer, PaginationInclusionMode) const;
@@ -784,7 +783,7 @@ private:
 
     bool hasFilterThatIsPainting(GraphicsContext&, PaintLayerFlags) const;
     std::unique_ptr<FilterEffectRendererHelper> setupFilters(GraphicsContext&, LayerPaintingInfo&, PaintLayerFlags, const LayoutSize& offsetFromRoot, LayoutRect& rootRelativeBounds, bool& rootRelativeBoundsComputed);
-    GraphicsContext& applyFilters(FilterEffectRendererHelper*, GraphicsContext& originalContext, LayerPaintingInfo&, LayerFragments&);
+    void applyFilters(FilterEffectRendererHelper*, GraphicsContext& originalContext, const LayerPaintingInfo&, const LayerFragments&);
 
     void paintLayer(GraphicsContext&, const LayerPaintingInfo&, PaintLayerFlags);
     void paintFixedLayersInNamedFlows(GraphicsContext&, const LayerPaintingInfo&, PaintLayerFlags);
@@ -881,7 +880,6 @@ private:
     bool shouldSuspendScrollAnimations() const override;
     IntRect scrollableAreaBoundingBox(bool* isInsideFixed = nullptr) const override;
     bool isRubberBandInProgress() const override;
-    bool updatesScrollLayerPositionOnMainThread() const override { return true; }
     bool forceUpdateScrollbarsOnMainThreadForPerformanceTesting() const override;
 #if ENABLE(CSS_SCROLL_SNAP)
     bool isScrollSnapInProgress() const override;
@@ -924,7 +922,7 @@ private:
     void createReflection();
     void removeReflection();
 
-    Ref<RenderStyle> createReflectionStyle();
+    RenderStyle createReflectionStyle();
     bool paintingInsideReflection() const { return m_paintingInsideReflection; }
     void setPaintingInsideReflection(bool b) { m_paintingInsideReflection = b; }
 
@@ -997,7 +995,6 @@ private:
 
     RenderNamedFlowFragment* currentRenderNamedFlowFragment() const;
 
-private:
     // The bitfields are up here so they will fall into the padding from ScrollableArea on 64-bit.
 
     const bool m_isRootLayer : 1;
@@ -1072,6 +1069,8 @@ private:
 #endif
 
     bool m_hasFilterInfo : 1;
+    
+    bool m_hasComputedRepaintRect : 1;
 
 #if ENABLE(CSS_COMPOSITING)
     unsigned m_blendMode : 5;
@@ -1103,7 +1102,7 @@ private:
     ScrollPosition m_scrollPosition;
 
     // The width/height of our scrolled area.
-    LayoutSize m_scrollSize;
+    IntSize m_scrollSize;
 
     // For layers with overflow, we have a pair of scrollbars.
     RefPtr<Scrollbar> m_hBar;
@@ -1152,6 +1151,7 @@ private:
 inline void RenderLayer::clearZOrderLists()
 {
     ASSERT(!isStackingContainer());
+    ASSERT(m_layerListMutationAllowed);
 
     m_posZOrderList = nullptr;
     m_negZOrderList = nullptr;

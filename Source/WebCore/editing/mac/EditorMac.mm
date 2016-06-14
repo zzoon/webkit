@@ -26,7 +26,6 @@
 #import "config.h"
 #import "Editor.h"
 
-#import "BlockExceptions.h"
 #import "CSSPrimitiveValueMappings.h"
 #import "CSSValuePool.h"
 #import "CachedResourceLoader.h"
@@ -65,6 +64,7 @@
 #import "WebNSAttributedStringExtras.h"
 #import "htmlediting.h"
 #import "markup.h"
+#import <wtf/BlockObjCExceptions.h>
 
 namespace WebCore {
 
@@ -107,7 +107,7 @@ const Font* Editor::fontForSelection(bool& hasMultipleFonts) const
 
     if (!m_frame.selection().isRange()) {
         Node* nodeToRemove;
-        RenderStyle* style = styleForSelectionStart(&m_frame, nodeToRemove); // sets nodeToRemove
+        auto* style = styleForSelectionStart(&m_frame, nodeToRemove); // sets nodeToRemove
 
         const Font* result = nullptr;
         if (style) {
@@ -146,7 +146,7 @@ const Font* Editor::fontForSelection(bool& hasMultipleFonts) const
 NSDictionary* Editor::fontAttributesForSelectionStart() const
 {
     Node* nodeToRemove;
-    RenderStyle* style = styleForSelectionStart(&m_frame, nodeToRemove);
+    auto* style = styleForSelectionStart(&m_frame, nodeToRemove);
     if (!style)
         return nil;
 
@@ -155,8 +155,8 @@ NSDictionary* Editor::fontAttributesForSelectionStart() const
     if (style->visitedDependentColor(CSSPropertyBackgroundColor).isValid() && style->visitedDependentColor(CSSPropertyBackgroundColor).alpha() != 0)
         [result setObject:nsColor(style->visitedDependentColor(CSSPropertyBackgroundColor)) forKey:NSBackgroundColorAttributeName];
 
-    if (style->fontCascade().primaryFont().getNSFont())
-        [result setObject:style->fontCascade().primaryFont().getNSFont() forKey:NSFontAttributeName];
+    if (auto ctFont = style->fontCascade().primaryFont().getCTFont())
+        [result setObject:toNSFont(ctFont) forKey:NSFontAttributeName];
 
     if (style->visitedDependentColor(CSSPropertyColor).isValid() && style->visitedDependentColor(CSSPropertyColor) != Color::black)
         [result setObject:nsColor(style->visitedDependentColor(CSSPropertyColor)) forKey:NSForegroundColorAttributeName];
@@ -521,13 +521,13 @@ bool Editor::WebContentReader::readFilenames(const Vector<String>& paths)
 
     for (auto& text : paths) {
 #if ENABLE(ATTACHMENT_ELEMENT)
-        Ref<HTMLAttachmentElement> attachment = HTMLAttachmentElement::create(attachmentTag, document);
+        auto attachment = HTMLAttachmentElement::create(attachmentTag, document);
         attachment->setFile(File::create([[NSURL fileURLWithPath:text] path]).ptr());
-        fragment->appendChild(WTFMove(attachment));
+        fragment->appendChild(attachment);
 #else
-        Ref<HTMLElement> paragraph = createDefaultParagraphElement(document);
+        auto paragraph = createDefaultParagraphElement(document);
         paragraph->appendChild(document.createTextNode(frame.editor().client()->userVisibleString([NSURL fileURLWithPath:text])));
-        fragment->appendChild(WTFMove(paragraph));
+        fragment->appendChild(paragraph);
 #endif
     }
 
@@ -591,7 +591,7 @@ bool Editor::WebContentReader::readURL(const URL& url, const String& title)
     anchor->appendChild(frame.document()->createTextNode([title precomposedStringWithCanonicalMapping]));
 
     fragment = frame.document()->createDocumentFragment();
-    fragment->appendChild(WTFMove(anchor));
+    fragment->appendChild(anchor);
     return true;
 }
 
@@ -631,7 +631,7 @@ RefPtr<DocumentFragment> Editor::createFragmentForImageResourceAndAddResource(Re
         loader->addArchiveResource(resource.releaseNonNull());
 
     auto fragment = document().createDocumentFragment();
-    fragment->appendChild(WTFMove(imageElement));
+    fragment->appendChild(imageElement);
 
     return WTFMove(fragment);
 }

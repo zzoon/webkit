@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015, 2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,6 @@
 #include "ExceptionCode.h"
 #include "IDBBindingUtilities.h"
 #include "IDBConnectionProxy.h"
-#include "IDBConnectionToServer.h"
 #include "IDBDatabaseIdentifier.h"
 #include "IDBKey.h"
 #include "IDBOpenDBRequest.h"
@@ -77,24 +76,17 @@ IDBFactory::~IDBFactory()
 {
 }
 
-RefPtr<IDBOpenDBRequest> IDBFactory::open(ScriptExecutionContext& context, const String& name, ExceptionCodeWithMessage& ec)
+RefPtr<IDBOpenDBRequest> IDBFactory::open(ScriptExecutionContext& context, const String& name, Optional<uint64_t> version, ExceptionCodeWithMessage& ec)
 {
     LOG(IndexedDB, "IDBFactory::open");
     
-    return openInternal(context, name, 0, ec);
-}
-
-RefPtr<IDBOpenDBRequest> IDBFactory::open(ScriptExecutionContext& context, const String& name, unsigned long long version, ExceptionCodeWithMessage& ec)
-{
-    LOG(IndexedDB, "IDBFactory::open");
-    
-    if (!version) {
+    if (version && !version.value()) {
         ec.code = TypeError;
         ec.message = ASCIILiteral("IDBFactory.open() called with a version of 0");
         return nullptr;
     }
 
-    return openInternal(context, name, version, ec);
+    return openInternal(context, name, version.valueOr(0), ec);
 }
 
 RefPtr<IDBOpenDBRequest> IDBFactory::openInternal(ScriptExecutionContext& context, const String& name, unsigned long long version, ExceptionCodeWithMessage& ec)
@@ -152,11 +144,15 @@ RefPtr<IDBOpenDBRequest> IDBFactory::deleteDatabase(ScriptExecutionContext& cont
 
 short IDBFactory::cmp(ScriptExecutionContext& context, JSValue firstValue, JSValue secondValue, ExceptionCodeWithMessage& ec)
 {
-    RefPtr<IDBKey> first = scriptValueToIDBKey(context, firstValue);
-    RefPtr<IDBKey> second = scriptValueToIDBKey(context, secondValue);
+    auto exec = context.execState();
+    if (!exec) {
+        ec.code = IDBDatabaseException::UnknownError;
+        ec.message = ASCIILiteral("Failed to execute 'cmp' on 'IDBFactory': Script execution context does not have an execution state.");
+        return 0;
+    }
 
-    ASSERT(first);
-    ASSERT(second);
+    Ref<IDBKey> first = scriptValueToIDBKey(*exec, firstValue);
+    Ref<IDBKey> second = scriptValueToIDBKey(*exec, secondValue);
 
     if (!first->isValid() || !second->isValid()) {
         ec.code = IDBDatabaseException::DataError;
@@ -165,6 +161,11 @@ short IDBFactory::cmp(ScriptExecutionContext& context, JSValue firstValue, JSVal
     }
 
     return first->compare(second.get());
+}
+
+void IDBFactory::getAllDatabaseNames(const SecurityOrigin& mainFrameOrigin, const SecurityOrigin& openingOrigin, std::function<void (const Vector<String>&)> callback)
+{
+    m_connectionProxy->getAllDatabaseNames(mainFrameOrigin, openingOrigin, callback);
 }
 
 } // namespace WebCore

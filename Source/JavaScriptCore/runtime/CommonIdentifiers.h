@@ -28,6 +28,8 @@
 // MarkedArgumentBuffer of property names, passed to a macro so we can do set them up various
 // ways without repeating the list.
 #define JSC_COMMON_IDENTIFIERS_EACH_PROPERTY_NAME(macro) \
+    macro(Animation) \
+    macro(AnimationEffectReadOnly) \
     macro(AnimationTimeline) \
     macro(Array) \
     macro(ArrayBuffer) \
@@ -71,6 +73,9 @@
     macro(Number) \
     macro(NumberFormat) \
     macro(Object) \
+    macro(PerformanceEntry) \
+    macro(PerformanceEntryList) \
+    macro(PerformanceResourceTiming) \
     macro(Promise) \
     macro(Proxy) \
     macro(RangeError) \
@@ -123,6 +128,7 @@
     macro(collation) \
     macro(column) \
     macro(compilationKind) \
+    macro(compilationUID) \
     macro(compilations) \
     macro(compile) \
     macro(configurable) \
@@ -133,13 +139,14 @@
     macro(defineProperty) \
     macro(description) \
     macro(descriptions) \
+    macro(detail) \
     macro(displayName) \
     macro(document) \
     macro(done) \
-    macro(entries) \
     macro(enumerable) \
     macro(era) \
     macro(eval) \
+    macro(events) \
     macro(exec) \
     macro(executionCount) \
     macro(exitKind) \
@@ -177,7 +184,7 @@
     macro(isWatchpoint) \
     macro(jettisonReason) \
     macro(join) \
-    macro(keys) \
+    macro(KeyframeEffect) \
     macro(lastIndex) \
     macro(length) \
     macro(line) \
@@ -226,9 +233,11 @@
     macro(stack) \
     macro(sticky) \
     macro(subarray) \
+    macro(summary) \
     macro(target) \
     macro(test) \
     macro(then) \
+    macro(time) \
     macro(timeZone) \
     macro(timeZoneName) \
     macro(toExponential) \
@@ -239,11 +248,11 @@
     macro(toPrecision) \
     macro(toString) \
     macro(top) \
+    macro(uid) \
     macro(unicode) \
     macro(usage) \
     macro(value) \
     macro(valueOf) \
-    macro(values) \
     macro(webkit) \
     macro(webkitIDBCursor) \
     macro(webkitIDBDatabase) \
@@ -308,13 +317,13 @@
     macro(yield)
 
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL_NOT_IMPLEMENTED_YET(macro)\
-    macro(replace) \
+    macro(isConcatSpreadable) \
 
 #define JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_WELL_KNOWN_SYMBOL(macro) \
     macro(hasInstance) \
-    macro(isConcatSpreadable) \
     macro(iterator) \
     macro(match) \
+    macro(replace) \
     macro(search) \
     macro(species) \
     macro(split) \
@@ -328,6 +337,9 @@
     macro(iteratedObject) \
     macro(arrayIteratorNextIndex) \
     macro(arrayIterationKind) \
+    macro(arrayIteratorNext) \
+    macro(arrayIteratorIsDone) \
+    macro(arrayIteratorKind) \
     macro(charCodeAt) \
     macro(iteratedString) \
     macro(stringIteratorNextIndex) \
@@ -335,7 +347,6 @@
     macro(fulfillmentHandler) \
     macro(rejectionHandler) \
     macro(index) \
-    macro(values) \
     macro(deferred) \
     macro(countdownHolder) \
     macro(Object) \
@@ -412,12 +423,9 @@
     macro(hasInstanceBoundFunction) \
     macro(instanceOf) \
     macro(isArray) \
-    macro(isJSArray) \
     macro(isArrayConstructor) \
     macro(isConstructor) \
     macro(isRegExpObject) \
-    macro(concatMemcpy) \
-    macro(appendMemcpy) \
     macro(predictFinalLengthFromArgumunts) \
     macro(print) \
     macro(isSet) \
@@ -425,6 +433,8 @@
     macro(regExpCreate) \
     macro(SetIterator) \
     macro(setIteratorNext) \
+    macro(replaceUsingRegExp) \
+    macro(replaceUsingStringSearch) \
     macro(MapIterator) \
     macro(mapIteratorNext) \
     macro(regExpBuiltinExec) \
@@ -436,8 +446,11 @@
     macro(regExpProtoSourceGetter) \
     macro(regExpProtoStickyGetter) \
     macro(regExpProtoUnicodeGetter) \
+    macro(regExpPrototypeSymbolReplace) \
+    macro(regExpReplaceFast) \
     macro(regExpSearchFast) \
     macro(regExpSplitFast) \
+    macro(regExpTestFast) \
     macro(stringIncludesInternal) \
     macro(stringSplitFast) \
     macro(stringSubstrInternal) \

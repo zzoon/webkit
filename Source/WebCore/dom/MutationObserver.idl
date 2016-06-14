@@ -31,10 +31,19 @@
 [
     CustomConstructor(MutationCallback callback),
     CustomIsReachable,
-    UsePointersEvenForNonNullableObjectArguments,
     ImplementationLacksVTable,
 ] interface MutationObserver {
-    [RaisesException] void observe(Node target, Dictionary options);
+    [RaisesException] void observe(Node target, MutationObserverInit options);
     sequence<MutationRecord> takeRecords();
     void disconnect();
+};
+
+dictionary MutationObserverInit {
+    boolean childList = false;
+    boolean attributes;
+    boolean characterData;
+    boolean subtree = false;
+    boolean attributeOldValue;
+    boolean characterDataOldValue;
+    sequence<DOMString> attributeFilter;
 };

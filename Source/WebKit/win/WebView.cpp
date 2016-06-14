@@ -78,7 +78,6 @@
 #include <JavaScriptCore/InitializeThreading.h>
 #include <JavaScriptCore/JSCJSValue.h>
 #include <JavaScriptCore/JSLock.h>
-#include <JavaScriptCore/Profile.h>
 #include <WebCore/AXObjectCache.h>
 #include <WebCore/ApplicationCacheStorage.h>
 #include <WebCore/BString.h>
@@ -121,7 +120,6 @@
 #include <WebCore/HitTestResult.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/JSElement.h>
-#include <WebCore/JSScriptProfile.h>
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/Logging.h>
 #include <WebCore/MIMETypeRegistry.h>
@@ -404,6 +402,7 @@ WebView::WebView()
 {
     JSC::initializeThreading();
     WTF::initializeMainThread();
+    RunLoop::initializeMainRunLoop();
 
     m_backingStoreSize.cx = m_backingStoreSize.cy = 0;
 
@@ -1739,7 +1738,7 @@ bool WebView::gestureNotify(WPARAM wParam, LPARAM lParam)
     IntPoint logicalGestureBeginPoint(gestureBeginPoint);
     logicalGestureBeginPoint.scale(inverseScaleFactor, inverseScaleFactor);
 
-    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowUserAgentShadowContent);
     for (Frame* childFrame = &m_page->mainFrame(); childFrame; childFrame = EventHandler::subframeForTargetNode(m_gestureTargetNode.get())) {
         FrameView* frameView = childFrame->view();
         if (!frameView)
@@ -5034,10 +5033,25 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
         return hr;
     settings.setPluginsEnabled(!!enabled);
 
-    hr = preferences->isCSSRegionsEnabled(&enabled);
+    // FIXME: Add preferences for the runtime enabled features.
+
+#if ENABLE(INDEXED_DATABASE)
+    RuntimeEnabledFeatures::sharedFeatures().setWebkitIndexedDBEnabled(true);
+#endif
+
+#if ENABLE(FETCH_API)
+    hr = prefsPrivate->fetchAPIEnabled(&enabled);
     if (FAILED(hr))
         return hr;
-    RuntimeEnabledFeatures::sharedFeatures().setCSSRegionsEnabled(!!enabled);
+    RuntimeEnabledFeatures::sharedFeatures().setFetchAPIEnabled(!!enabled);
+#endif
+
+#if ENABLE(SHADOW_DOM)
+    hr = prefsPrivate->shadowDOMEnabled(&enabled);
+    if (FAILED(hr))
+        return hr;
+    RuntimeEnabledFeatures::sharedFeatures().setShadowDOMEnabled(!!enabled);
+#endif
 
     hr = preferences->privateBrowsingEnabled(&enabled);
     if (FAILED(hr))
@@ -6773,7 +6787,16 @@ HRESULT WebView::removeUserStyleSheetsFromGroup(_In_ BSTR groupName, _In_opt_ IW
 
 HRESULT WebView::removeAllUserContentFromGroup(_In_ BSTR groupName)
 {
-    return E_NOTIMPL;
+    String group = toString(groupName);
+    if (group.isEmpty())
+        return E_FAIL;
+
+    auto viewGroup = WebViewGroup::get(group);
+    if (!viewGroup)
+        return S_OK;
+
+    viewGroup->userContentController().removeAllUserContent();
+    return S_OK;
 }
 
 HRESULT WebView::invalidateBackingStore(_In_ const RECT* rect)

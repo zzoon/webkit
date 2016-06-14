@@ -44,13 +44,13 @@ public:
 
     const char* renderName() const override;
 
-    Text* textNode() const;
+    WEBCORE_EXPORT Text* textNode() const;
 
     virtual bool isTextFragment() const;
 
-    RenderStyle& style() const;
-    RenderStyle& firstLineStyle() const;
-    RenderStyle* getCachedPseudoStyle(PseudoId, RenderStyle* parentStyle = nullptr) const;
+    const RenderStyle& style() const;
+    const RenderStyle& firstLineStyle() const;
+    const RenderStyle* getCachedPseudoStyle(PseudoId, const RenderStyle* parentStyle = nullptr) const;
 
     Color selectionBackgroundColor() const;
     Color selectionForegroundColor() const;
@@ -205,6 +205,8 @@ private:
     LayoutRect collectSelectionRectsForLineBoxes(const RenderLayerModelObject* repaintContainer, bool clipToVisibleContent, Vector<LayoutRect>*);
 
     void node() const = delete;
+    void container() const = delete; // Use parent() instead.
+    void container(const RenderLayerModelObject&, bool&) const = delete; // Use parent() instead.
 
     // We put the bitfield first to minimize padding on 64-bit.
     unsigned m_hasBreakableChar : 1; // Whether or not we can be broken into multiple lines.
@@ -251,17 +253,17 @@ inline UChar RenderText::characterAt(unsigned i) const
     return uncheckedCharacterAt(i);
 }
 
-inline RenderStyle& RenderText::style() const
+inline const RenderStyle& RenderText::style() const
 {
     return parent()->style();
 }
 
-inline RenderStyle& RenderText::firstLineStyle() const
+inline const RenderStyle& RenderText::firstLineStyle() const
 {
     return parent()->firstLineStyle();
 }
 
-inline RenderStyle* RenderText::getCachedPseudoStyle(PseudoId pseudoId, RenderStyle* parentStyle) const
+inline const RenderStyle* RenderText::getCachedPseudoStyle(PseudoId pseudoId, const RenderStyle* parentStyle) const
 {
     return parent()->getCachedPseudoStyle(pseudoId, parentStyle);
 }

@@ -28,6 +28,7 @@
 
 #include "HTMLNames.h"
 #include "HTMLTableColElement.h"
+#include "RenderChildIterator.h"
 #include "RenderIterator.h"
 #include "RenderTable.h"
 #include "RenderTableCaption.h"
@@ -37,7 +38,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderTableCol::RenderTableCol(Element& element, Ref<RenderStyle>&& style)
+RenderTableCol::RenderTableCol(Element& element, RenderStyle&& style)
     : RenderBox(element, WTFMove(style), 0)
 {
     // init RenderObject attributes
@@ -131,8 +132,8 @@ void RenderTableCol::clearPreferredLogicalWidthsDirtyBits()
 {
     setPreferredLogicalWidthsDirty(false);
 
-    for (RenderObject* child = firstChild(); child; child = child->nextSibling())
-        child->setPreferredLogicalWidthsDirty(false);
+    for (auto& child : childrenOfType<RenderObject>(*this))
+        child.setPreferredLogicalWidthsDirty(false);
 }
 
 RenderTable* RenderTableCol::table() const

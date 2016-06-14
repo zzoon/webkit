@@ -26,8 +26,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef FetchResponse_h
-#define FetchResponse_h
+#pragma once
 
 #if ENABLE(FETCH_API)
 
@@ -49,21 +48,21 @@ typedef int ExceptionCode;
 
 class FetchResponse final : public FetchBodyOwner {
 public:
-    static Ref<FetchResponse> create(ScriptExecutionContext& context) { return adoptRef(*new FetchResponse(context, Type::Default, { }, FetchHeaders::create(FetchHeaders::Guard::Response), ResourceResponse())); }
+    using Type = ResourceResponse::Type;
+
+    static Ref<FetchResponse> create(ScriptExecutionContext& context) { return adoptRef(*new FetchResponse(context, { }, FetchHeaders::create(FetchHeaders::Guard::Response), ResourceResponse())); }
     static Ref<FetchResponse> error(ScriptExecutionContext&);
     static RefPtr<FetchResponse> redirect(ScriptExecutionContext&, const String&, int, ExceptionCode&);
-    // FIXME: Binding generator should not require below method to handle optional status parameter.
-    static RefPtr<FetchResponse> redirect(ScriptExecutionContext& context, const String& url, ExceptionCode& ec) { return redirect(context, url, 302, ec); }
 
-    using FetchPromise = DOMPromise<RefPtr<FetchResponse>, ExceptionCode>;
+    using FetchPromise = DOMPromise<FetchResponse>;
     static void fetch(ScriptExecutionContext&, FetchRequest&, const Dictionary&, FetchPromise&&);
     static void fetch(ScriptExecutionContext&, const String&, const Dictionary&, FetchPromise&&);
 
     void initializeWith(const Dictionary&, ExceptionCode&);
 
-    String type() const;
+    Type type() const { return m_response.type(); }
     const String& url() const { return m_response.url().string(); }
-    bool redirected() const { return m_isRedirected; }
+    bool redirected() const { return m_response.isRedirected(); }
     int status() const { return m_response.httpStatusCode(); }
     bool ok() const { return status() >= 200 && status() <= 299; }
     const String& statusText() const { return m_response.httpStatusText(); }
@@ -77,9 +76,7 @@ public:
 #endif
 
 private:
-    enum class Type { Basic, Cors, Default, Error, Opaque, OpaqueRedirect };
-
-    FetchResponse(ScriptExecutionContext&, Type, FetchBody&&, Ref<FetchHeaders>&&, ResourceResponse&&);
+    FetchResponse(ScriptExecutionContext&, FetchBody&&, Ref<FetchHeaders>&&, ResourceResponse&&);
 
     static void startFetching(ScriptExecutionContext&, const FetchRequest&, FetchPromise&&);
 
@@ -103,7 +100,7 @@ private:
         // FetchLoaderClient API
         void didSucceed() final;
         void didFail() final;
-        void didReceiveResponse(const ResourceResponse&);
+        void didReceiveResponse(const ResourceResponse&) final;
         void didReceiveData(const char*, size_t) final;
         void didFinishLoadingAsArrayBuffer(RefPtr<ArrayBuffer>&&) final;
 
@@ -112,15 +109,11 @@ private:
         std::unique_ptr<FetchLoader> m_loader;
     };
 
-    Type m_type;
     ResourceResponse m_response;
     Ref<FetchHeaders> m_headers;
-    bool m_isRedirected = false;
     Optional<BodyLoader> m_bodyLoader;
 };
 
 } // namespace WebCore
 
 #endif // ENABLE(FETCH_API)
-
-#endif // FetchResponse_h

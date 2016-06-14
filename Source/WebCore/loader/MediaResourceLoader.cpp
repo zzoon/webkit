@@ -64,11 +64,21 @@ RefPtr<PlatformMediaResource> MediaResourceLoader::requestResource(const Resourc
 
     DataBufferingPolicy bufferingPolicy = options & LoadOption::BufferData ? WebCore::BufferData : WebCore::DoNotBufferData;
     RequestOriginPolicy corsPolicy = !m_crossOriginMode.isNull() ? PotentiallyCrossOriginEnabled : UseDefaultOriginRestrictionsForType;
+    auto cachingPolicy = options & LoadOption::DisallowCaching ? CachingPolicy::DisallowCaching : CachingPolicy::AllowCaching;
     StoredCredentials allowCredentials = m_crossOriginMode.isNull() || equalLettersIgnoringASCIICase(m_crossOriginMode, "use-credentials") ? AllowStoredCredentials : DoNotAllowStoredCredentials;
+
+    auto updatedRequest = request;
+    updatedRequest.setRequester(ResourceRequest::Requester::Media);
+#if HAVE(AVFOUNDATION_LOADER_DELEGATE) && PLATFORM(MAC)
+    // FIXME: Workaround for <rdar://problem/26071607>. We are not able to do CORS checking on 304 responses because they
+    // are usually missing the headers we need.
+    if (corsPolicy == PotentiallyCrossOriginEnabled)
+        updatedRequest.makeUnconditional();
+#endif
 
     // FIXME: Skip Content Security Policy check if the element that inititated this request
     // is in a user-agent shadow tree. See <https://bugs.webkit.org/show_bug.cgi?id=155505>.
-    CachedResourceRequest cacheRequest(request, ResourceLoaderOptions(SendCallbacks, DoNotSniffContent, bufferingPolicy, allowCredentials, DoNotAskClientForCrossOriginCredentials, ClientDidNotRequestCredentials, DoSecurityCheck, corsPolicy, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck, DefersLoadingPolicy::AllowDefersLoading, CachingPolicy::AllowCaching));
+    CachedResourceRequest cacheRequest(updatedRequest, ResourceLoaderOptions(SendCallbacks, DoNotSniffContent, bufferingPolicy, allowCredentials, DoNotAskClientForCrossOriginCredentials, ClientDidNotRequestCredentials, DoSecurityCheck, corsPolicy, DoNotIncludeCertificateInfo, ContentSecurityPolicyImposition::DoPolicyCheck, DefersLoadingPolicy::AllowDefersLoading, cachingPolicy));
 
     if (!m_crossOriginMode.isNull())
         updateRequestForAccessControl(cacheRequest.mutableResourceRequest(), m_document->securityOrigin(), allowCredentials);
@@ -130,7 +140,7 @@ void MediaResource::responseReceived(CachedResource* resource, const ResourceRes
     if (!m_loader->document())
         return;
 
-    RefPtr<MediaResource> protect(this);
+    RefPtr<MediaResource> protectedThis(this);
     if (!m_loader->crossOriginMode().isNull() && !resource->passesSameOriginPolicyCheck(*m_loader->document()->securityOrigin())) {
         static NeverDestroyed<const String> consoleMessage("Cross-origin media resource load denied by Cross-Origin Resource Sharing policy.");
         m_loader->document()->addConsoleMessage(MessageSource::Security, MessageLevel::Error, consoleMessage.get());
@@ -150,7 +160,7 @@ bool MediaResource::shouldCacheResponse(CachedResource* resource, const Resource
 {
     ASSERT_UNUSED(resource, resource == m_resource);
 
-    RefPtr<MediaResource> protect(this);
+    RefPtr<MediaResource> protectedThis(this);
     if (m_client)
         return m_client->shouldCacheResponse(*this, response);
     return true;
@@ -160,7 +170,7 @@ void MediaResource::redirectReceived(CachedResource* resource, ResourceRequest& 
 {
     ASSERT_UNUSED(resource, resource == m_resource);
 
-    RefPtr<MediaResource> protect(this);
+    RefPtr<MediaResource> protectedThis(this);
     if (m_client)
         m_client->redirectReceived(*this, request, response);
 }
@@ -169,7 +179,7 @@ void MediaResource::dataSent(CachedResource* resource, unsigned long long bytesS
 {
     ASSERT_UNUSED(resource, resource == m_resource);
 
-    RefPtr<MediaResource> protect(this);
+    RefPtr<MediaResource> protectedThis(this);
     if (m_client)
         m_client->dataSent(*this, bytesSent, totalBytesToBeSent);
 }
@@ -178,7 +188,7 @@ void MediaResource::dataReceived(CachedResource* resource, const char* data, int
 {
     ASSERT_UNUSED(resource, resource == m_resource);
 
-    RefPtr<MediaResource> protect(this);
+    RefPtr<MediaResource> protectedThis(this);
     if (m_client)
         m_client->dataReceived(*this, data, dataLength);
 }
@@ -187,7 +197,7 @@ void MediaResource::notifyFinished(CachedResource* resource)
 {
     ASSERT(resource == m_resource);
 
-    RefPtr<MediaResource> protect(this);
+    RefPtr<MediaResource> protectedThis(this);
     if (m_client) {
         if (resource->loadFailedOrCanceled())
             m_client->loadFailed(*this, resource->resourceError());

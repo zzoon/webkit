@@ -39,11 +39,6 @@
 #include "ScheduledAction.h"
 #include "Settings.h"
 
-#if ENABLE(IOS_TOUCH_EVENTS)
-#include "JSTouchConstructorIOS.h"
-#include "JSTouchListConstructorIOS.h"
-#endif
-
 #if ENABLE(WEB_AUDIO)
 #include "JSAudioContext.h"
 #endif
@@ -59,6 +54,8 @@
 using namespace JSC;
 
 namespace WebCore {
+
+EncodedJSValue JSC_HOST_CALL jsDOMWindowInstanceFunctionShowModalDialog(ExecState*);
 
 void JSDOMWindow::visitAdditionalChildren(SlotVisitor& visitor)
 {
@@ -203,7 +200,7 @@ static bool jsDOMWindowGetOwnPropertySlotNamedItemGetter(JSDOMWindow* thisObject
             if (UNLIKELY(htmlDocument.windowNamedItemContainsMultipleElements(*atomicPropertyName))) {
                 Ref<HTMLCollection> collection = document->windowNamedItems(atomicPropertyName);
                 ASSERT(collection->length() > 1);
-                namedItem = toJS(exec, thisObject->globalObject(), collection.ptr());
+                namedItem = toJS(exec, thisObject->globalObject(), collection);
             } else
                 namedItem = toJS(exec, thisObject->globalObject(), htmlDocument.windowNamedItem(*atomicPropertyName));
             slot.setValue(thisObject, ReadOnly | DontDelete | DontEnum, namedItem);
@@ -237,16 +234,18 @@ bool JSDOMWindow::getOwnPropertySlot(JSObject* object, ExecState* exec, Property
     // (Particularly, is it correct that this exists here but not in getOwnPropertySlotByIndex?)
     slot.setWatchpointSet(thisObject->m_windowCloseWatchpoints);
 
-    if (propertyName == exec->propertyNames().showModalDialog) {
-        if (Base::getOwnPropertySlot(thisObject, exec, propertyName, slot))
-            return true;
-        if (!DOMWindow::canShowModalDialog(frame))
-            return jsDOMWindowGetOwnPropertySlotNamedItemGetter(thisObject, *frame, exec, propertyName, slot);
-    }
-
     // (2) Regular own properties.
-    if (getStaticPropertySlot<JSDOMWindow, Base>(exec, *JSDOMWindow::info()->staticPropHashTable, thisObject, propertyName, slot))
-        return true;
+    PropertySlot slotCopy = slot;
+    if (Base::getOwnPropertySlot(thisObject, exec, propertyName, slot)) {
+        // Detect when we're getting the property 'showModalDialog', this is disabled, and has its original value.
+        bool isShowModalDialogAndShouldHide = propertyName == exec->propertyNames().showModalDialog
+            && !DOMWindow::canShowModalDialog(frame)
+            && slot.isValue() && isHostFunction(slot.getValue(exec, propertyName), jsDOMWindowInstanceFunctionShowModalDialog);
+        // Unless we're in the showModalDialog special case, we're done.
+        if (!isShowModalDialogAndShouldHide)
+            return true;
+        slot = slotCopy;
+    }
 
 #if ENABLE(USER_MESSAGE_HANDLERS)
     if (propertyName == exec->propertyNames().webkit && thisObject->wrapped().shouldHaveWebKitNamespaceForWorld(thisObject->world())) {
@@ -438,18 +437,6 @@ JSValue JSDOMWindow::image(ExecState& state) const
     return createImageConstructor(state.vm(), *this);
 }
 
-#if ENABLE(IOS_TOUCH_EVENTS)
-JSValue JSDOMWindow::touch(ExecState& state) const
-{
-    return getDOMConstructor<JSTouchConstructor>(state.vm(), *this);
-}
-
-JSValue JSDOMWindow::touchList(ExecState& state) const
-{
-    return getDOMConstructor<JSTouchListConstructor>(state.vm(), *this);
-}
-#endif
-
 // Custom functions
 
 JSValue JSDOMWindow::open(ExecState& state)
@@ -612,16 +599,16 @@ JSValue JSDOMWindow::setInterval(ExecState& state)
     return jsNumber(result);
 }
 
-DOMWindow* JSDOMWindow::toWrapped(JSValue value)
+DOMWindow* JSDOMWindow::toWrapped(ExecState&, JSValue value)
 {
     if (!value.isObject())
-        return 0;
+        return nullptr;
     JSObject* object = asObject(value);
     if (object->inherits(JSDOMWindow::info()))
         return &jsCast<JSDOMWindow*>(object)->wrapped();
     if (object->inherits(JSDOMWindowShell::info()))
         return &jsCast<JSDOMWindowShell*>(object)->wrapped();
-    return 0;
+    return nullptr;
 }
 
 } // namespace WebCore

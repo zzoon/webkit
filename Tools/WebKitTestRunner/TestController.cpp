@@ -643,6 +643,7 @@ void TestController::resetPreferencesToConsistentValues(const TestOptions& optio
     // Reset preferences
     WKPreferencesRef preferences = platformPreferences();
     WKPreferencesResetTestRunnerOverrides(preferences);
+    WKPreferencesEnableAllExperimentalFeatures(preferences);
     WKPreferencesSetPageVisibilityBasedProcessSuppressionEnabled(preferences, false);
     WKPreferencesSetOfflineWebApplicationCacheEnabled(preferences, true);
     WKPreferencesSetFontSmoothingLevel(preferences, kWKFontSmoothingLevelNoSubpixelAntiAliasing);
@@ -666,6 +667,7 @@ void TestController::resetPreferencesToConsistentValues(const TestOptions& optio
     WKPreferencesSetTabToLinksEnabled(preferences, false);
     WKPreferencesSetInteractiveFormValidationEnabled(preferences, true);
     WKPreferencesSetMockScrollbarsEnabled(preferences, options.useMockScrollbars);
+    WKPreferencesSetNeedsSiteSpecificQuirks(preferences, options.needsSiteSpecificQuirks);
 
     static WKStringRef defaultTextEncoding = WKStringCreateWithUTF8CString("ISO-8859-1");
     WKPreferencesSetDefaultTextEncodingName(preferences, defaultTextEncoding);
@@ -953,10 +955,10 @@ static void updateTestOptionsFromTestHeader(TestOptions& testOptions, const std:
             testOptions.useFlexibleViewport = parseBooleanTestHeaderValue(value);
         if (key == "useDataDetection")
             testOptions.useDataDetection = parseBooleanTestHeaderValue(value);
-        if (key == "rtlScrollbars")
-            testOptions.useRTLScrollbars = parseBooleanTestHeaderValue(value);
         if (key == "useMockScrollbars")
             testOptions.useMockScrollbars = parseBooleanTestHeaderValue(value);
+        if (key == "needsSiteSpecificQuirks")
+            testOptions.needsSiteSpecificQuirks = parseBooleanTestHeaderValue(value);
         pairStart = pairEnd + 1;
     }
 }
@@ -1480,13 +1482,6 @@ WKRetainPtr<WKTypeRef> TestController::didReceiveSynchronousMessageFromInjectedB
 
 WKRetainPtr<WKTypeRef> TestController::getInjectedBundleInitializationUserData()
 {
-    if (m_currentInvocation->options().useRTLScrollbars) {
-        WKRetainPtr<WKStringRef> key = adoptWK(WKStringCreateWithUTF8CString("UseRTLScrollbars"));
-        WKRetainPtr<WKBooleanRef> value = adoptWK(WKBooleanCreate(true));
-        const WKStringRef keyArray[] = { key.get() };
-        const WKTypeRef valueArray[] = { value.get() };
-        return adoptWK(WKDictionaryCreate(keyArray, valueArray, WTF_ARRAY_LENGTH(keyArray)));
-    }
     return nullptr;
 }
 
@@ -2027,7 +2022,7 @@ void TestController::decidePolicyForNavigationAction(WKFramePolicyListenerRef li
 {
     WKRetainPtr<WKFramePolicyListenerRef> retainedListener { listener };
     const bool shouldIgnore { m_policyDelegateEnabled && !m_policyDelegatePermissive };
-    std::function<void()> decisionFunction = [shouldIgnore, retainedListener]() {
+    auto decisionFunction = [shouldIgnore, retainedListener]() {
         if (shouldIgnore)
             WKFramePolicyListenerIgnore(retainedListener.get());
         else
@@ -2035,7 +2030,7 @@ void TestController::decidePolicyForNavigationAction(WKFramePolicyListenerRef li
     };
 
     if (m_shouldDecideNavigationPolicyAfterDelay)
-        RunLoop::main().dispatch(decisionFunction);
+        RunLoop::main().dispatch(WTFMove(decisionFunction));
     else
         decisionFunction();
 }
@@ -2168,6 +2163,12 @@ void TestController::platformResetStateToConsistentValues()
 {
 
 }
+
+unsigned TestController::imageCountInGeneralPasteboard() const
+{
+    return 0;
+}
+
 #endif
 
 } // namespace WTR

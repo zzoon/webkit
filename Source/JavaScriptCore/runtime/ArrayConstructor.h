@@ -34,7 +34,7 @@ class GetterSetter;
 class ArrayConstructor : public InternalFunction {
 public:
     typedef InternalFunction Base;
-    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InternalFunction::StructureFlags;
+    static const unsigned StructureFlags = HasStaticPropertyTable | InternalFunction::StructureFlags;
 
     static ArrayConstructor* create(VM& vm, JSGlobalObject* globalObject, Structure* structure, ArrayPrototype* arrayPrototype, GetterSetter* speciesSymbol)
     {
@@ -55,7 +55,6 @@ protected:
 
 private:
     ArrayConstructor(VM&, Structure*);
-    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
 
     static ConstructType getConstructData(JSCell*, ConstructData&);
     static CallType getCallData(JSCell*, CallData&);
@@ -89,14 +88,6 @@ inline bool isArray(ExecState* exec, JSValue argumentValue)
     }
 
     ASSERT_NOT_REACHED();
-}
-
-inline bool isArrayConstructor(JSValue argumentValue)
-{
-    if (!argumentValue.isObject())
-        return false;
-
-    return jsCast<JSObject*>(argumentValue)->classInfo() == ArrayConstructor::info();
 }
 
 } // namespace JSC

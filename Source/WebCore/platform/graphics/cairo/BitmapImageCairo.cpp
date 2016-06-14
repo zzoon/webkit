@@ -38,29 +38,32 @@
 
 namespace WebCore {
 
-BitmapImage::BitmapImage(RefPtr<cairo_surface_t>&& nativeImage, ImageObserver* observer)
-    : Image(observer)
-    , m_size(cairoSurfaceSize(nativeImage.get()))
-    , m_currentFrame(0)
-    , m_repetitionCount(cAnimationNone)
-    , m_repetitionCountStatus(Unknown)
-    , m_repetitionsComplete(0)
-    , m_decodedSize(m_size.width() * m_size.height() * 4)
-    , m_frameCount(1)
-    , m_isSolidColor(false)
-    , m_checkedForSolidColor(false)
-    , m_animationFinished(true)
-    , m_allDataReceived(true)
-    , m_haveSize(true)
-    , m_sizeAvailable(true)
-    , m_haveFrameCount(true)
-{
-    m_frames.grow(1);
-    m_frames[0].m_hasAlpha = cairo_surface_get_content(nativeImage.get()) != CAIRO_CONTENT_COLOR;
-    m_frames[0].m_image = WTFMove(nativeImage);
-    m_frames[0].m_haveMetadata = true;
+namespace NativeImage {
 
-    checkForSolidColor();
+IntSize size(const RefPtr<cairo_surface_t>& image)
+{
+    return cairoSurfaceSize(image.get());
+}
+
+bool hasAlpha(const RefPtr<cairo_surface_t>& image)
+{
+    return cairo_surface_get_content(image.get()) != CAIRO_CONTENT_COLOR;
+}
+
+Color singlePixelSolidColor(const RefPtr<cairo_surface_t>& image)
+{
+    ASSERT(image);
+    
+    if (NativeImage::size(image) != IntSize(1, 1))
+        return Color();
+
+    if (cairo_surface_get_type(image.get()) != CAIRO_SURFACE_TYPE_IMAGE)
+        return Color();
+
+    RGBA32* pixel = reinterpret_cast_ptr<RGBA32*>(cairo_image_surface_get_data(image.get()));
+    return colorFromPremultipliedARGB(*pixel);
+}
+
 }
 
 void BitmapImage::draw(GraphicsContext& context, const FloatRect& dst, const FloatRect& src, CompositeOperator op,
@@ -75,8 +78,9 @@ void BitmapImage::draw(GraphicsContext& context, const FloatRect& dst, const Flo
     if (!surface) // If it's too early we won't have an image yet.
         return;
 
-    if (mayFillWithSolidColor()) {
-        fillWithSolidColor(context, dst, solidColor(), op);
+    Color color = singlePixelSolidColor();
+    if (color.isValid()) {
+        fillWithSolidColor(context, dst, color, op);
         return;
     }
 
@@ -119,32 +123,6 @@ void BitmapImage::draw(GraphicsContext& context, const FloatRect& dst, const Flo
 
     if (imageObserver())
         imageObserver()->didDraw(this);
-}
-
-void BitmapImage::checkForSolidColor()
-{
-    m_isSolidColor = false;
-    m_checkedForSolidColor = true;
-
-    if (frameCount() > 1)
-        return;
-
-    auto surface = frameImageAtIndex(m_currentFrame);
-    if (!surface) // If it's too early we won't have an image yet.
-        return;
-
-    if (cairo_surface_get_type(surface.get()) != CAIRO_SURFACE_TYPE_IMAGE)
-        return;
-
-    IntSize size = cairoSurfaceSize(surface.get());
-
-    if (size.width() != 1 || size.height() != 1)
-        return;
-
-    unsigned* pixelColor = reinterpret_cast_ptr<unsigned*>(cairo_image_surface_get_data(surface.get()));
-    m_solidColor = colorFromPremultipliedARGB(*pixelColor);
-
-    m_isSolidColor = true;
 }
 
 bool FrameData::clear(bool clearMetadata)

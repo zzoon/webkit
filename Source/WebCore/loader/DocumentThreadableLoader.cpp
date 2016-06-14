@@ -45,6 +45,7 @@
 #include "ProgressTracker.h"
 #include "ResourceError.h"
 #include "ResourceRequest.h"
+#include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
 #include "SecurityOrigin.h"
 #include "SubresourceLoader.h"
@@ -154,7 +155,7 @@ DocumentThreadableLoader::~DocumentThreadableLoader()
 
 void DocumentThreadableLoader::cancel()
 {
-    Ref<DocumentThreadableLoader> protect(*this);
+    Ref<DocumentThreadableLoader> protectedThis(*this);
 
     // Cancel can re-enter and m_resource might be null here as a result.
     if (m_client && m_resource) {
@@ -190,7 +191,7 @@ void DocumentThreadableLoader::redirectReceived(CachedResource* resource, Resour
     ASSERT(m_client);
     ASSERT_UNUSED(resource, resource == m_resource);
 
-    Ref<DocumentThreadableLoader> protect(*this);
+    Ref<DocumentThreadableLoader> protectedThis(*this);
     if (!isAllowedByContentSecurityPolicy(request.url(), !redirectResponse.isNull())) {
         m_client->didFailRedirectCheck();
         request = ResourceRequest();
@@ -385,9 +386,8 @@ void DocumentThreadableLoader::loadRequest(const ResourceRequest& request, Secur
         }
 
         CachedResourceRequest newRequest(request, options);
-#if ENABLE(RESOURCE_TIMING)
-        newRequest.setInitiator(m_options.initiator);
-#endif
+        if (RuntimeEnabledFeatures::sharedFeatures().resourceTimingEnabled())
+            newRequest.setInitiator(m_options.initiator);
         ASSERT(!m_resource);
         m_resource = m_document.cachedResourceLoader().requestRawResource(newRequest);
         if (m_resource)

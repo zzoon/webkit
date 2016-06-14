@@ -56,7 +56,10 @@ class ExecState;
 
 namespace DFG {
 
+class BackwardsCFG;
+class BackwardsDominators;
 class CFG;
+class ControlEquivalenceAnalysis;
 class Dominators;
 class NaturalLoops;
 class PrePostNumbering;
@@ -263,7 +266,7 @@ public:
         return addSpeculationMode(add, pass) != DontSpeculateInt32;
     }
     
-    bool addShouldSpeculateMachineInt(Node* add)
+    bool addShouldSpeculateAnyInt(Node* add)
     {
         if (!enableInt52())
             return false;
@@ -271,7 +274,7 @@ public:
         Node* left = add->child1().node();
         Node* right = add->child2().node();
 
-        bool speculation = Node::shouldSpeculateMachineInt(left, right);
+        bool speculation = Node::shouldSpeculateAnyInt(left, right);
         return speculation && !hasExitSite(add, Int52Overflow);
     }
     
@@ -284,7 +287,7 @@ public:
             && node->canSpeculateInt32(node->sourceFor(pass));
     }
     
-    bool binaryArithShouldSpeculateMachineInt(Node* node, PredictionPass pass)
+    bool binaryArithShouldSpeculateAnyInt(Node* node, PredictionPass pass)
     {
         if (!enableInt52())
             return false;
@@ -292,7 +295,7 @@ public:
         Node* left = node->child1().node();
         Node* right = node->child2().node();
 
-        return Node::shouldSpeculateMachineInt(left, right)
+        return Node::shouldSpeculateAnyInt(left, right)
             && node->canSpeculateInt52(pass)
             && !hasExitSite(node, Int52Overflow);
     }
@@ -303,16 +306,18 @@ public:
             && node->canSpeculateInt32(pass);
     }
     
-    bool unaryArithShouldSpeculateMachineInt(Node* node, PredictionPass pass)
+    bool unaryArithShouldSpeculateAnyInt(Node* node, PredictionPass pass)
     {
         if (!enableInt52())
             return false;
-        return node->child1()->shouldSpeculateMachineInt()
+        return node->child1()->shouldSpeculateAnyInt()
             && node->canSpeculateInt52(pass)
             && !hasExitSite(node, Int52Overflow);
     }
 
     bool canOptimizeStringObjectAccess(const CodeOrigin&);
+
+    bool getRegExpPrototypeProperty(JSObject* regExpPrototype, Structure* regExpPrototypeStructure, UniquedStringImpl* uid, JSValue& returnJSValue);
 
     bool roundShouldSpeculateInt32(Node* arithRound, PredictionPass pass)
     {
@@ -398,7 +403,6 @@ public:
         return hasExitSite(node->origin.semantic, exitKind);
     }
     
-    ValueProfile* valueProfileFor(Node*);
     MethodOfGettingAValueProfile methodOfGettingAValueProfileFor(Node*);
     
     BlockIndex numBlocks() const { return m_blocks.size(); }
@@ -799,9 +803,12 @@ public:
 
     bool hasDebuggerEnabled() const { return m_hasDebuggerEnabled; }
 
-    void ensureDominators();
-    void ensurePrePostNumbering();
-    void ensureNaturalLoops();
+    Dominators& ensureDominators();
+    PrePostNumbering& ensurePrePostNumbering();
+    NaturalLoops& ensureNaturalLoops();
+    BackwardsCFG& ensureBackwardsCFG();
+    BackwardsDominators& ensureBackwardsDominators();
+    ControlEquivalenceAnalysis& ensureControlEquivalenceAnalysis();
 
     // This function only makes sense to call after bytecode parsing
     // because it queries the m_hasExceptionHandlers boolean whose value
@@ -878,6 +885,9 @@ public:
     std::unique_ptr<PrePostNumbering> m_prePostNumbering;
     std::unique_ptr<NaturalLoops> m_naturalLoops;
     std::unique_ptr<CFG> m_cfg;
+    std::unique_ptr<BackwardsCFG> m_backwardsCFG;
+    std::unique_ptr<BackwardsDominators> m_backwardsDominators;
+    std::unique_ptr<ControlEquivalenceAnalysis> m_controlEquivalenceAnalysis;
     unsigned m_localVars;
     unsigned m_nextMachineLocal;
     unsigned m_parameterSlots;
@@ -900,7 +910,7 @@ public:
     bool m_hasExceptionHandlers { false };
 private:
 
-    bool isStringPrototypeMethodSane(JSObject* stringPrototype, Structure* stringPrototypeStructure, UniquedStringImpl*);
+    bool isStringPrototypeMethodSane(JSGlobalObject*, UniquedStringImpl*);
 
     void handleSuccessor(Vector<BasicBlock*, 16>& worklist, BasicBlock*, BasicBlock* successor);
     

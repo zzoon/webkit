@@ -150,7 +150,9 @@ inline JSObject* constructGenericTypedArrayViewWithArguments(ExecState* exec, St
         if (isTypedView(object->classInfo()->typedArrayStorageType))
             length = jsCast<JSArrayBufferView*>(object)->length();
         else {
-            PropertySlot lengthSlot(object, PropertySlot::InternalMethodType::Get);
+            // This getPropertySlot operation should not be observed by the Proxy.
+            // So we use VMInquiry. And purge the proxy case by isTaintedByProxy() guard.
+            PropertySlot lengthSlot(object, PropertySlot::InternalMethodType::VMInquiry);
             object->getPropertySlot(exec, vm.propertyNames->length, lengthSlot);
 
             JSValue iteratorFunc = object->get(exec, vm.propertyNames->iteratorSymbol);
@@ -165,7 +167,7 @@ inline JSObject* constructGenericTypedArrayViewWithArguments(ExecState* exec, St
 
             if (!iteratorFunc.isUndefined()
                 && (iteratorFunc != object->globalObject()->arrayProtoValuesFunction()
-                    || lengthSlot.isAccessor() || lengthSlot.isCustom()
+                    || lengthSlot.isAccessor() || lengthSlot.isCustom() || lengthSlot.isTaintedByProxy()
                     || hasAnyArrayStorage(object->indexingType()))) {
 
                     CallData callData;
@@ -221,7 +223,9 @@ EncodedJSValue JSC_HOST_CALL constructGenericTypedArrayView(ExecState*);
 template<typename ViewClass>
 EncodedJSValue JSC_HOST_CALL constructGenericTypedArrayView(ExecState* exec)
 {
-    Structure* structure = InternalFunction::createSubclassStructure(exec, exec->newTarget(), asInternalFunction(exec->callee())->globalObject()->typedArrayStructure(ViewClass::TypedArrayStorageType));
+    InternalFunction* function = asInternalFunction(exec->callee());
+    Structure* parentStructure = function->globalObject()->typedArrayStructure(ViewClass::TypedArrayStorageType);
+    Structure* structure = InternalFunction::createSubclassStructure(exec, exec->newTarget(), parentStructure);
     if (exec->hadException())
         return JSValue::encode(JSValue());
 

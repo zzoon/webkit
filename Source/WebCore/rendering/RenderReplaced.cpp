@@ -46,21 +46,21 @@ namespace WebCore {
 const int cDefaultWidth = 300;
 const int cDefaultHeight = 150;
 
-RenderReplaced::RenderReplaced(Element& element, Ref<RenderStyle>&& style)
+RenderReplaced::RenderReplaced(Element& element, RenderStyle&& style)
     : RenderBox(element, WTFMove(style), RenderReplacedFlag)
     , m_intrinsicSize(cDefaultWidth, cDefaultHeight)
 {
     setReplaced(true);
 }
 
-RenderReplaced::RenderReplaced(Element& element, Ref<RenderStyle>&& style, const LayoutSize& intrinsicSize)
+RenderReplaced::RenderReplaced(Element& element, RenderStyle&& style, const LayoutSize& intrinsicSize)
     : RenderBox(element, WTFMove(style), RenderReplacedFlag)
     , m_intrinsicSize(intrinsicSize)
 {
     setReplaced(true);
 }
 
-RenderReplaced::RenderReplaced(Document& document, Ref<RenderStyle>&& style, const LayoutSize& intrinsicSize)
+RenderReplaced::RenderReplaced(Document& document, RenderStyle&& style, const LayoutSize& intrinsicSize)
     : RenderBox(document, WTFMove(style), RenderReplacedFlag)
     , m_intrinsicSize(intrinsicSize)
 {
@@ -145,7 +145,7 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 #endif
     LayoutPoint adjustedPaintOffset = paintOffset + location();
     
-    if (hasBoxDecorations() && paintInfo.phase == PaintPhaseForeground)
+    if (hasVisibleBoxDecorations() && paintInfo.phase == PaintPhaseForeground)
         paintBoxDecorations(paintInfo, adjustedPaintOffset);
     
     if (paintInfo.phase == PaintPhaseMask) {
@@ -154,10 +154,13 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     }
 
     LayoutRect paintRect = LayoutRect(adjustedPaintOffset, size());
-    if ((paintInfo.phase == PaintPhaseOutline || paintInfo.phase == PaintPhaseSelfOutline) && style().outlineWidth())
-        paintOutline(paintInfo, paintRect);
-    
-    if (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection && !canHaveChildren())
+    if (paintInfo.phase == PaintPhaseOutline || paintInfo.phase == PaintPhaseSelfOutline) {
+        if (style().outlineWidth())
+            paintOutline(paintInfo, paintRect);
+        return;
+    }
+
+    if (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection)
         return;
     
     if (!paintInfo.shouldPaintWithinRoot(*this))
@@ -415,9 +418,11 @@ LayoutUnit RenderReplaced::computeReplacedLogicalWidth(ShouldComputePreferred sh
                 // The aforementioned 'constraint equation' used for block-level, non-replaced elements in normal flow:
                 // 'margin-left' + 'border-left-width' + 'padding-left' + 'width' + 'padding-right' + 'border-right-width' + 'margin-right' = width of containing block
                 LayoutUnit logicalWidth;
-                if (RenderBlock* blockWithWidth = firstContainingBlockWithLogicalWidth(this))
-                    logicalWidth = blockWithWidth->computeReplacedLogicalWidthRespectingMinMaxWidth(blockWithWidth->computeReplacedLogicalWidthUsing(MainOrPreferredSize, blockWithWidth->style().logicalWidth()), shouldComputePreferred);
-                else
+                if (auto* blockWithWidth = firstContainingBlockWithLogicalWidth(this)) {
+                    logicalWidth = blockWithWidth->computeReplacedLogicalWidthUsing(MainOrPreferredSize, blockWithWidth->style().logicalWidth());
+                    if (!blockWithWidth->style().logicalMaxWidth().isMaxContent() && !blockWithWidth->style().logicalMinWidth().isMinContent())
+                        logicalWidth = blockWithWidth->computeReplacedLogicalWidthRespectingMinMaxWidth(logicalWidth, shouldComputePreferred);
+                } else
                     logicalWidth = containingBlock()->availableLogicalWidth();
 
                 // This solves above equation for 'width' (== logicalWidth).

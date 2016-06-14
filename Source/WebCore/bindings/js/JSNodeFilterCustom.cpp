@@ -27,6 +27,7 @@
 #include "JSNodeFilter.h"
 
 #include "JSCallbackData.h"
+#include "JSDOMConvert.h"
 #include "JSNode.h"
 #include "NodeFilter.h"
 
@@ -39,27 +40,27 @@ using namespace JSC;
 // boolean.
 uint16_t JSNodeFilter::acceptNode(Node* node)
 {
-    Ref<JSNodeFilter> protect(*this);
+    Ref<JSNodeFilter> protectedThis(*this);
 
     JSLockHolder lock(m_data->globalObject()->vm());
 
-    ExecState* exec = m_data->globalObject()->globalExec();
+    ExecState* state = m_data->globalObject()->globalExec();
     MarkedArgumentBuffer args;
-    args.append(toJS(exec, m_data->globalObject(), node));
-    if (exec->hadException())
+    args.append(toJS(state, m_data->globalObject(), node));
+    if (state->hadException())
         return NodeFilter::FILTER_REJECT;
 
     NakedPtr<Exception> returnedException;
-    JSValue value = m_data->invokeCallback(args, JSCallbackData::CallbackType::FunctionOrObject, Identifier::fromString(exec, "acceptNode"), returnedException);
+    JSValue value = m_data->invokeCallback(args, JSCallbackData::CallbackType::FunctionOrObject, Identifier::fromString(state, "acceptNode"), returnedException);
     if (returnedException) {
         // Rethrow exception.
-        exec->vm().throwException(exec, returnedException);
+        state->vm().throwException(state, returnedException);
 
         return NodeFilter::FILTER_REJECT;
     }
 
-    uint16_t result = toUInt16(exec, value, NormalConversion);
-    if (exec->hadException())
+    uint16_t result = convert<uint16_t>(*state, value, NormalConversion);
+    if (state->hadException())
         return NodeFilter::FILTER_REJECT;
 
     return result;

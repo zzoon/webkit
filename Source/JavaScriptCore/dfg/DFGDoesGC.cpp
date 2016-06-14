@@ -50,7 +50,7 @@ bool doesGC(Graph& graph, Node* node)
     case LazyJSConstant:
     case Identity:
     case GetCallee:
-    case GetArgumentCount:
+    case GetArgumentCountIncludingThis:
     case GetRestLength:
     case GetLocal:
     case SetLocal:
@@ -99,8 +99,11 @@ bool doesGC(Graph& graph, Node* node)
     case TryGetById:
     case GetById:
     case GetByIdFlush:
+    case GetByIdWithThis:
     case PutById:
     case PutByIdFlush:
+    case PutByIdWithThis:
+    case PutByValWithThis:
     case PutByIdDirect:
     case PutGetterById:
     case PutSetterById:
@@ -108,6 +111,7 @@ bool doesGC(Graph& graph, Node* node)
     case PutGetterByVal:
     case PutSetterByVal:
     case DeleteById:
+    case DeleteByVal:
     case CheckStructure:
     case GetExecutable:
     case GetButterfly:
@@ -146,16 +150,12 @@ bool doesGC(Graph& graph, Node* node)
     case ConstructForwardVarargs:
     case TailCallForwardVarargs:
     case TailCallForwardVarargsInlinedCaller:
-    case ProfileWillCall:
-    case ProfileDidCall:
     case ProfileType:
     case ProfileControlFlow:
     case OverridesHasInstance:
     case InstanceOf:
     case InstanceOfCustom:
-    case IsArrayObject:
-    case IsJSArray:
-    case IsArrayConstructor:
+    case IsEmpty:
     case IsUndefined:
     case IsBoolean:
     case IsNumber:
@@ -201,6 +201,7 @@ bool doesGC(Graph& graph, Node* node)
     case GetGetter:
     case GetSetter:
     case GetByVal:
+    case GetByValWithThis:
     case GetIndexedPropertyStorage:
     case GetArrayLength:
     case ArrayPush:
@@ -231,6 +232,7 @@ bool doesGC(Graph& graph, Node* node)
     case PhantomDirectArguments:
     case PhantomClonedArguments:
     case GetMyArgumentByVal:
+    case GetMyArgumentByValOutOfBounds:
     case ForwardVarargs:
     case PutHint:
     case CheckStructureImmediate:
@@ -251,7 +253,6 @@ bool doesGC(Graph& graph, Node* node)
     case CreateDirectArguments:
     case CreateScopedArguments:
     case CreateClonedArguments:
-    case CallObjectConstructor:
     case ToThis:
     case CreateThis:
     case AllocatePropertyStorage:
@@ -278,6 +279,7 @@ bool doesGC(Graph& graph, Node* node)
     case SetFunctionName:
     case StrCat:
     case StringReplace:
+    case StringReplaceRegExp:
         return true;
         
     case MultiPutByOffset:

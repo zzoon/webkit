@@ -53,7 +53,7 @@ class WebVTTCueData;
 
 class VTTCueBox : public HTMLElement {
 public:
-    static PassRefPtr<VTTCueBox> create(Document&, VTTCue&);
+    static Ref<VTTCueBox> create(Document&, VTTCue&);
 
     VTTCue* getCue() const;
     virtual void applyCSSProperties(const IntSize& videoSize);
@@ -64,7 +64,7 @@ public:
 protected:
     VTTCueBox(Document&, VTTCue&);
 
-    RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) final;
+    RenderPtr<RenderElement> createElementRenderer(RenderStyle&&, const RenderTreePosition&) final;
 
     VTTCue& m_cue;
     int m_fontSizeFromCaptionUserPrefs;
@@ -114,8 +114,8 @@ public:
     const String& cueSettings() const { return m_settings; }
     void setCueSettings(const String&);
 
-    PassRefPtr<DocumentFragment> getCueAsHTML();
-    PassRefPtr<DocumentFragment> createCueRenderingTree();
+    RefPtr<DocumentFragment> getCueAsHTML();
+    RefPtr<DocumentFragment> createCueRenderingTree();
 
     const String& regionId() const { return m_regionId; }
     void setRegionId(const String&);

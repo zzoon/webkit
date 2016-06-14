@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013, 2014, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -67,7 +67,7 @@ void OSREntryData::dumpInContext(PrintStream& out, DumpContext* context) const
             out.print("overwritten");
         if (reg.isLocal() && m_localsForcedDouble.get(reg.toLocal()))
             out.print(", forced double");
-        if (reg.isLocal() && m_localsForcedMachineInt.get(reg.toLocal()))
+        if (reg.isLocal() && m_localsForcedAnyInt.get(reg.toLocal()))
             out.print(", forced machine int");
         out.print(")");
     };
@@ -213,8 +213,8 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
             }
             continue;
         }
-        if (entry->m_localsForcedMachineInt.get(local)) {
-            if (!exec->registers()[localOffset].asanUnsafeJSValue().isMachineInt()) {
+        if (entry->m_localsForcedAnyInt.get(local)) {
+            if (!exec->registers()[localOffset].asanUnsafeJSValue().isAnyInt()) {
                 if (Options::verboseOSR()) {
                     dataLog(
                         "    OSR failed because variable ", localOffset, " is ",
@@ -285,8 +285,8 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
                 continue;
             }
             
-            if (entry->m_localsForcedMachineInt.get(reg.toLocal())) {
-                *bitwise_cast<int64_t*>(pivot + index) = exec->registers()[reg.offset()].asanUnsafeJSValue().asMachineInt() << JSValue::int52ShiftAmount;
+            if (entry->m_localsForcedAnyInt.get(reg.toLocal())) {
+                *bitwise_cast<int64_t*>(pivot + index) = exec->registers()[reg.offset()].asanUnsafeJSValue().asAnyInt() << JSValue::int52ShiftAmount;
                 continue;
             }
         }
@@ -316,13 +316,14 @@ void* prepareOSREntry(ExecState* exec, CodeBlock* codeBlock, unsigned bytecodeIn
     RegisterSet dontSaveRegisters = RegisterSet(RegisterSet::stackRegisters(), RegisterSet::allFPRs());
 
     unsigned registerCount = registerSaveLocations->size();
+    VMEntryRecord* record = vmEntryRecord(vm->topVMEntryFrame);
     for (unsigned i = 0; i < registerCount; i++) {
         RegisterAtOffset currentEntry = registerSaveLocations->at(i);
         if (dontSaveRegisters.get(currentEntry.reg()))
             continue;
-        RegisterAtOffset* vmCalleeSavesEntry = allCalleeSaves->find(currentEntry.reg());
+        RegisterAtOffset* calleeSavesEntry = allCalleeSaves->find(currentEntry.reg());
         
-        *(bitwise_cast<intptr_t*>(pivot - 1) - currentEntry.offsetAsIndex()) = vm->calleeSaveRegistersBuffer[vmCalleeSavesEntry->offsetAsIndex()];
+        *(bitwise_cast<intptr_t*>(pivot - 1) - currentEntry.offsetAsIndex()) = record->calleeSaveRegistersBuffer[calleeSavesEntry->offsetAsIndex()];
     }
 #endif
     

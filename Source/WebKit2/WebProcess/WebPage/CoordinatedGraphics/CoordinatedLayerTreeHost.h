@@ -40,7 +40,7 @@ class WebPage;
 class CoordinatedLayerTreeHost : public LayerTreeHost, public WebCore::CompositingCoordinator::Client
 {
 public:
-    static Ref<CoordinatedLayerTreeHost> create(WebPage*);
+    static Ref<CoordinatedLayerTreeHost> create(WebPage&);
     virtual ~CoordinatedLayerTreeHost();
 
     const LayerTreeContext& layerTreeContext() override { return m_layerTreeContext; }
@@ -75,7 +75,7 @@ public:
     static RefPtr<WebCore::CoordinatedSurface> createCoordinatedSurface(const WebCore::IntSize&, WebCore::CoordinatedSurface::Flags);
 
 protected:
-    explicit CoordinatedLayerTreeHost(WebPage*);
+    explicit CoordinatedLayerTreeHost(WebPage&);
 
 private:
     // CoordinatedLayerTreeHost
@@ -87,8 +87,6 @@ private:
     void commitScrollOffset(uint32_t layerID, const WebCore::IntSize& offset);
 
     void layerFlushTimerFired();
-
-    void updateRootLayers();
 
     // CompositingCoordinator::Client
     void didFlushRootLayer(const WebCore::FloatRect& visibleContentRect) override;
@@ -109,7 +107,6 @@ private:
     bool m_layerFlushSchedulingEnabled;
     uint64_t m_forceRepaintAsyncCallbackID;
 
-    WebCore::GraphicsLayer* m_contentLayer;
     WebCore::GraphicsLayer* m_viewOverlayRootLayer;
 };
 

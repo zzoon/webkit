@@ -86,21 +86,21 @@ template<> EncodedJSValue JSC_HOST_CALL JSTestNamedConstructorNamedConstructor::
     if (UNLIKELY(state->argumentCount() < 1))
         return throwVMError(state, createNotEnoughArgumentsError(state));
     ExceptionCode ec = 0;
-    String str1 = state->argument(0).toString(state)->value(state);
+    auto str1 = state->argument(0).toWTFString(state);
     if (UNLIKELY(state->hadException()))
         return JSValue::encode(jsUndefined());
-    String str2 = state->argument(1).toString(state)->value(state);
+    auto str2 = state->argument(1).isUndefined() ? ASCIILiteral("defaultString") : state->uncheckedArgument(1).toWTFString(state);
     if (UNLIKELY(state->hadException()))
         return JSValue::encode(jsUndefined());
-    String str3 = state->argument(2).isUndefined() ? String() : state->uncheckedArgument(2).toString(state)->value(state);
+    auto str3 = state->argument(2).isUndefined() ? String() : state->uncheckedArgument(2).toWTFString(state);
     if (UNLIKELY(state->hadException()))
         return JSValue::encode(jsUndefined());
-    RefPtr<TestNamedConstructor> object = TestNamedConstructor::createForJSConstructor(*castedThis->document(), str1, str2, str3, ec);
-    if (ec) {
+    auto object = TestNamedConstructor::createForJSConstructor(*castedThis->document(), str1, str2, str3, ec);
+    if (UNLIKELY(ec)) {
         setDOMException(state, ec);
         return JSValue::encode(JSValue());
     }
-    return JSValue::encode(asObject(toJS(state, castedThis->globalObject(), object.get())));
+    return JSValue::encode(asObject(toJSNewlyCreated(state, castedThis->globalObject(), WTFMove(object))));
 }
 
 template<> JSValue JSTestNamedConstructorNamedConstructor::prototypeForStructure(JSC::VM& vm, const JSDOMGlobalObject& globalObject)
@@ -159,7 +159,7 @@ void JSTestNamedConstructor::destroy(JSC::JSCell* cell)
 EncodedJSValue jsTestNamedConstructorConstructor(ExecState* state, EncodedJSValue thisValue, PropertyName)
 {
     JSTestNamedConstructorPrototype* domObject = jsDynamicCast<JSTestNamedConstructorPrototype*>(JSValue::decode(thisValue));
-    if (!domObject)
+    if (UNLIKELY(!domObject))
         return throwVMTypeError(state);
     return JSValue::encode(JSTestNamedConstructor::getConstructor(state->vm(), domObject->globalObject()));
 }
@@ -211,22 +211,11 @@ extern "C" { extern void* _ZTVN7WebCore20TestNamedConstructorE[]; }
 #endif
 #endif
 
-JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestNamedConstructor* impl)
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, Ref<TestNamedConstructor>&& impl)
 {
-    if (!impl)
-        return jsNull();
-    return createNewWrapper<JSTestNamedConstructor>(globalObject, impl);
-}
-
-JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestNamedConstructor* impl)
-{
-    if (!impl)
-        return jsNull();
-    if (JSValue result = getExistingWrapper<JSTestNamedConstructor>(globalObject, impl))
-        return result;
 
 #if ENABLE(BINDING_INTEGRITY)
-    void* actualVTablePointer = *(reinterpret_cast<void**>(impl));
+    void* actualVTablePointer = *(reinterpret_cast<void**>(impl.ptr()));
 #if PLATFORM(WIN)
     void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestNamedConstructor@WebCore@@6B@"));
 #else
@@ -234,7 +223,7 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestNamedCon
 #if COMPILER(CLANG)
     // If this fails TestNamedConstructor does not have a vtable, so you need to add the
     // ImplementationLacksVTable attribute to the interface definition
-    COMPILE_ASSERT(__is_polymorphic(TestNamedConstructor), TestNamedConstructor_is_not_polymorphic);
+    static_assert(__is_polymorphic(TestNamedConstructor), "TestNamedConstructor is not polymorphic");
 #endif
 #endif
     // If you hit this assertion you either have a use after free bug, or
@@ -243,7 +232,12 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestNamedCon
     // by adding the SkipVTableValidation attribute to the interface IDL definition
     RELEASE_ASSERT(actualVTablePointer == expectedVTablePointer);
 #endif
-    return createNewWrapper<JSTestNamedConstructor>(globalObject, impl);
+    return createWrapper<JSTestNamedConstructor, TestNamedConstructor>(globalObject, WTFMove(impl));
+}
+
+JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestNamedConstructor& impl)
+{
+    return wrap(state, globalObject, impl);
 }
 
 TestNamedConstructor* JSTestNamedConstructor::toWrapped(JSC::JSValue value)

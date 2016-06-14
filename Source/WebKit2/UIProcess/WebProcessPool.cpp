@@ -352,9 +352,8 @@ NetworkProcessProxy& WebProcessPool::ensureNetworkProcess()
     parameters.diskCacheDirectory = m_configuration->diskCacheDirectory();
     if (!parameters.diskCacheDirectory.isEmpty())
         SandboxExtension::createHandleForReadWriteDirectory(parameters.diskCacheDirectory, parameters.diskCacheDirectoryExtensionHandle);
-
-#if ENABLE(SECCOMP_FILTERS)
-    parameters.cookieStorageDirectory = this->cookieStorageDirectory();
+#if ENABLE(NETWORK_CACHE_SPECULATIVE_REVALIDATION)
+    parameters.shouldEnableNetworkCacheSpeculativeRevalidation = m_configuration->diskCacheSpeculativeValidationEnabled();
 #endif
 
 #if PLATFORM(IOS)
@@ -551,10 +550,6 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
     parameters.mediaCacheDirectory = m_configuration->mediaCacheDirectory();
     if (!parameters.mediaCacheDirectory.isEmpty())
         SandboxExtension::createHandleForReadWriteDirectory(parameters.mediaCacheDirectory, parameters.mediaCacheDirectoryExtensionHandle);
-    
-#if ENABLE(SECCOMP_FILTERS)
-    parameters.cookieStorageDirectory = this->cookieStorageDirectory();
-#endif
 
 #if PLATFORM(IOS)
     String cookieStorageDirectory = this->cookieStorageDirectory();
@@ -627,7 +622,6 @@ WebProcessProxy& WebProcessPool::createNewWebProcess()
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     parameters.pluginLoadClientPolicies = m_pluginLoadClientPolicies;
-    parameters.pluginLoadClientPoliciesForPrivateBrowsing = m_pluginLoadClientPoliciesForPrivateBrowsing;
 #endif
 
 #if OS(LINUX)
@@ -1082,17 +1076,6 @@ String WebProcessPool::iconDatabasePath() const
     return platformDefaultIconDatabasePath();
 }
 
-#if ENABLE(SECCOMP_FILTERS)
-String WebProcessPool::cookieStorageDirectory() const
-{
-    if (!m_overrideCookieStorageDirectory.isEmpty())
-        return m_overrideCookieStorageDirectory;
-
-    // FIXME: This doesn't make much sense. Is this function used at all? We used to call platform code, but no existing platforms implemented that function.
-    return emptyString();
-}
-#endif
-
 void WebProcessPool::useTestingNetworkSession()
 {
     ASSERT(m_processes.isEmpty());
@@ -1322,37 +1305,29 @@ void WebProcessPool::pluginInfoStoreDidLoadPlugins(PluginInfoStore* store)
     m_client.plugInInformationBecameAvailable(this, API::Array::create(WTFMove(plugins)).ptr());
 }
 
-void WebProcessPool::setPluginLoadClientPolicyForPrivateBrowsing(PrivateBrowsing privateBrowsing, WebCore::PluginLoadClientPolicy policy, const String& host, const String& bundleIdentifier, const String& versionString)
+void WebProcessPool::setPluginLoadClientPolicy(WebCore::PluginLoadClientPolicy policy, const String& host, const String& bundleIdentifier, const String& versionString)
 {
 #if ENABLE(NETSCAPE_PLUGIN_API)
-    auto& pluginLoadClientPolicies = privateBrowsing == PrivateBrowsing::Yes ? m_pluginLoadClientPolicies : m_pluginLoadClientPoliciesForPrivateBrowsing;
+    HashMap<String, HashMap<String, uint8_t>> policiesByIdentifier;
+    if (m_pluginLoadClientPolicies.contains(host))
+        policiesByIdentifier = m_pluginLoadClientPolicies.get(host);
 
-    HashMap<String, HashMap<String, uint8_t>> policiesByIdentifier = pluginLoadClientPolicies.get(host);
-    HashMap<String, uint8_t> versionsToPolicies = policiesByIdentifier.get(bundleIdentifier);
+    HashMap<String, uint8_t> versionsToPolicies;
+    if (policiesByIdentifier.contains(bundleIdentifier))
+        versionsToPolicies = policiesByIdentifier.get(bundleIdentifier);
 
     versionsToPolicies.set(versionString, policy);
     policiesByIdentifier.set(bundleIdentifier, versionsToPolicies);
-    pluginLoadClientPolicies.set(host, policiesByIdentifier);
+    m_pluginLoadClientPolicies.set(host, policiesByIdentifier);
 #endif
-}
 
-void WebProcessPool::setPluginLoadClientPolicy(WebCore::PluginLoadClientPolicy policy, const String& host, const String& bundleIdentifier, const String& versionString)
-{
-    setPluginLoadClientPolicyForPrivateBrowsing(PrivateBrowsing::No, policy, host, bundleIdentifier, versionString);
     sendToAllProcesses(Messages::WebProcess::SetPluginLoadClientPolicy(policy, host, bundleIdentifier, versionString));
-}
-
-void WebProcessPool::setPrivateBrowsingPluginLoadClientPolicy(WebCore::PluginLoadClientPolicy policy, const String& host, const String& bundleIdentifier, const String& versionString)
-{
-    setPluginLoadClientPolicyForPrivateBrowsing(PrivateBrowsing::Yes, policy, host, bundleIdentifier, versionString);
-    sendToAllProcesses(Messages::WebProcess::SetPrivateBrowsingPluginLoadClientPolicy(policy, host, bundleIdentifier, versionString));
 }
 
 void WebProcessPool::clearPluginClientPolicies()
 {
 #if ENABLE(NETSCAPE_PLUGIN_API)
     m_pluginLoadClientPolicies.clear();
-    m_pluginLoadClientPoliciesForPrivateBrowsing.clear();
 #endif
     sendToAllProcesses(Messages::WebProcess::ClearPluginClientPolicies());
 }

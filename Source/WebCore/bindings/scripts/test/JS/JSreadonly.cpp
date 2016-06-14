@@ -118,7 +118,7 @@ void JSreadonly::destroy(JSC::JSCell* cell)
 EncodedJSValue jsreadonlyConstructor(ExecState* state, EncodedJSValue thisValue, PropertyName)
 {
     JSreadonlyPrototype* domObject = jsDynamicCast<JSreadonlyPrototype*>(JSValue::decode(thisValue));
-    if (!domObject)
+    if (UNLIKELY(!domObject))
         return throwVMTypeError(state);
     return JSValue::encode(JSreadonly::getConstructor(state->vm(), domObject->globalObject()));
 }
@@ -154,27 +154,21 @@ void JSreadonlyOwner::finalize(JSC::Handle<JSC::Unknown> handle, void* context)
     uncacheWrapper(world, &jsreadonly->wrapped(), jsreadonly);
 }
 
-JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, readonly* impl)
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, Ref<readonly>&& impl)
 {
-    if (!impl)
-        return jsNull();
-    return createNewWrapper<JSreadonly>(globalObject, impl);
-}
-
-JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, readonly* impl)
-{
-    if (!impl)
-        return jsNull();
-    if (JSValue result = getExistingWrapper<JSreadonly>(globalObject, impl))
-        return result;
 #if COMPILER(CLANG)
     // If you hit this failure the interface definition has the ImplementationLacksVTable
     // attribute. You should remove that attribute. If the class has subclasses
     // that may be passed through this toJS() function you should use the SkipVTableValidation
     // attribute to readonly.
-    COMPILE_ASSERT(!__is_polymorphic(readonly), readonly_is_polymorphic_but_idl_claims_not_to_be);
+    static_assert(!__is_polymorphic(readonly), "readonly is polymorphic but the IDL claims it is not");
 #endif
-    return createNewWrapper<JSreadonly>(globalObject, impl);
+    return createWrapper<JSreadonly, readonly>(globalObject, WTFMove(impl));
+}
+
+JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, readonly& impl)
+{
+    return wrap(state, globalObject, impl);
 }
 
 readonly* JSreadonly::toWrapped(JSC::JSValue value)

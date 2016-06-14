@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2015-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -138,17 +138,6 @@ EncodedJSValue JSC_HOST_CALL genericTypedArrayViewProtoFuncSet(ExecState* exec)
 }
 
 template<typename ViewClass>
-EncodedJSValue JSC_HOST_CALL genericTypedArrayViewProtoFuncEntries(ExecState* exec)
-{
-    // 22.2.3.6
-    ViewClass* thisObject = jsCast<ViewClass*>(exec->thisValue());
-    if (thisObject->isNeutered())
-        return throwVMTypeError(exec, typedArrayBufferHasBeenDetachedErrorMessage);
-
-    return JSValue::encode(JSArrayIterator::create(exec, exec->callee()->globalObject()->arrayIteratorStructure(), ArrayIterateKeyValue, thisObject));
-}
-
-template<typename ViewClass>
 EncodedJSValue JSC_HOST_CALL genericTypedArrayViewProtoFuncCopyWithin(ExecState* exec)
 {
     // 22.2.3.5
@@ -268,17 +257,6 @@ EncodedJSValue JSC_HOST_CALL genericTypedArrayViewProtoFuncJoin(ExecState* exec)
 }
 
 template<typename ViewClass>
-EncodedJSValue JSC_HOST_CALL genericTypedArrayViewProtoFuncKeys(ExecState* exec)
-{
-    // 22.2.3.15
-    ViewClass* thisObject = jsCast<ViewClass*>(exec->thisValue());
-    if (thisObject->isNeutered())
-        return throwVMTypeError(exec, typedArrayBufferHasBeenDetachedErrorMessage);
-
-    return JSValue::encode(JSArrayIterator::create(exec, exec->callee()->globalObject()->arrayIteratorStructure(), ArrayIterateKey, thisObject));
-}
-
-template<typename ViewClass>
 EncodedJSValue JSC_HOST_CALL genericTypedArrayViewProtoFuncLastIndexOf(ExecState* exec)
 {
     // 22.2.3.16
@@ -392,9 +370,6 @@ EncodedJSValue JSC_HOST_CALL genericTypedArrayViewProtoFuncSlice(ExecState* exec
     if (thisObject->isNeutered())
         return throwVMTypeError(exec, typedArrayBufferHasBeenDetachedErrorMessage);
 
-    if (!exec->argumentCount())
-        return throwVMError(exec, createTypeError(exec, "Expected at least one argument"));
-
     unsigned thisLength = thisObject->length();
 
     unsigned begin = argumentClampedIndexFromStartOrEnd(exec, 0, thisLength);
@@ -505,17 +480,6 @@ EncodedJSValue JSC_HOST_CALL genericTypedArrayViewProtoFuncSubarray(ExecState* e
         return JSValue::encode(JSValue());
 
     return JSValue::encode(result);
-}
-
-template<typename ViewClass>
-EncodedJSValue JSC_HOST_CALL typedArrayViewProtoFuncValues(ExecState* exec)
-{
-    // 22.2.3.29
-    ViewClass* thisObject = jsCast<ViewClass*>(exec->thisValue());
-    if (thisObject->isNeutered())
-        return throwVMTypeError(exec, typedArrayBufferHasBeenDetachedErrorMessage);
-
-    return JSValue::encode(JSArrayIterator::create(exec, exec->callee()->globalObject()->arrayIteratorStructure(), ArrayIterateValue, thisObject));
 }
 
 } // namespace JSC

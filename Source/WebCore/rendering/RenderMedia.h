@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef RenderMedia_h
-#define RenderMedia_h
+#pragma once
 
 #if ENABLE(VIDEO)
 
@@ -35,8 +34,8 @@ namespace WebCore {
 
 class RenderMedia : public RenderImage {
 public:
-    RenderMedia(HTMLMediaElement&, Ref<RenderStyle>&&);
-    RenderMedia(HTMLMediaElement&, Ref<RenderStyle>&&, const IntSize& intrinsicSize);
+    RenderMedia(HTMLMediaElement&, RenderStyle&&);
+    RenderMedia(HTMLMediaElement&, RenderStyle&&, const IntSize& intrinsicSize);
     virtual ~RenderMedia();
 
     HTMLMediaElement& mediaElement() const { return downcast<HTMLMediaElement>(nodeForNonAnonymous()); }
@@ -60,10 +59,13 @@ private:
     void styleDidChange(StyleDifference, const RenderStyle* oldStyle) final;
 };
 
+inline RenderMedia* HTMLMediaElement::renderer() const
+{
+    return downcast<RenderMedia>(HTMLElement::renderer());
+}
+
 } // namespace WebCore
 
 SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderMedia, isMedia())
 
 #endif // ENABLE(VIDEO)
-
-#endif // RenderMedia_h

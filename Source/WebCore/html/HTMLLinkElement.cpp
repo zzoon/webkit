@@ -227,7 +227,7 @@ void HTMLLinkElement::process()
         if (m_cachedSheet) {
             removePendingSheet();
             m_cachedSheet->removeClient(this);
-            m_cachedSheet = 0;
+            m_cachedSheet = nullptr;
         }
 
         if (!shouldLoadLink())
@@ -237,12 +237,11 @@ void HTMLLinkElement::process()
 
         bool mediaQueryMatches = true;
         if (!m_media.isEmpty()) {
-            RefPtr<RenderStyle> documentStyle;
+            Optional<RenderStyle> documentStyle;
             if (document().hasLivingRenderTree())
                 documentStyle = Style::resolveForDocument(document());
-            RefPtr<MediaQuerySet> media = MediaQuerySet::createAllowingDescriptionSyntax(m_media);
-            MediaQueryEvaluator evaluator(document().frame()->view()->mediaType(), document().frame(), documentStyle.get());
-            mediaQueryMatches = evaluator.eval(media.get());
+            auto media = MediaQuerySet::createAllowingDescriptionSyntax(m_media);
+            mediaQueryMatches = MediaQueryEvaluator { document().frame()->view()->mediaType(), document(), documentStyle ? &*documentStyle : nullptr }.evaluate(media.get());
         }
 
         // Don't hold up render tree construction and script execution on stylesheets
@@ -254,7 +253,7 @@ void HTMLLinkElement::process()
         Optional<ResourceLoadPriority> priority;
         if (!isActive)
             priority = ResourceLoadPriority::VeryLow;
-        CachedResourceRequest request(ResourceRequest(document().completeURL(url)), charset, priority);
+        CachedResourceRequest request(url, charset, priority);
         request.setInitiator(this);
 
         if (document().contentSecurityPolicy()->allowStyleWithNonce(fastGetAttribute(HTMLNames::nonceAttr))) {
@@ -342,7 +341,7 @@ void HTMLLinkElement::setCSSStyleSheet(const String& href, const URL& baseURL, c
         return;
 
     // Completing the sheet load may cause scripts to execute.
-    Ref<HTMLLinkElement> protect(*this);
+    Ref<HTMLLinkElement> protectedThis(*this);
 
     CSSParserContext parserContext(document(), baseURL, charset);
     auto cachePolicy = frame->loader().subresourceCachePolicy();
@@ -361,7 +360,7 @@ void HTMLLinkElement::setCSSStyleSheet(const String& href, const URL& baseURL, c
         return;
     }
 
-    Ref<StyleSheetContents> styleSheet(StyleSheetContents::create(href, parserContext));
+    auto styleSheet = StyleSheetContents::create(href, parserContext);
     m_sheet = CSSStyleSheet::create(styleSheet.copyRef(), this);
     m_sheet->setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(m_media));
     m_sheet->setTitle(title());
@@ -495,7 +494,7 @@ const AtomicString& HTMLLinkElement::type() const
     return getAttribute(typeAttr);
 }
 
-IconType HTMLLinkElement::iconType() const
+Optional<LinkIconType> HTMLLinkElement::iconType() const
 {
     return m_relAttribute.iconType;
 }
@@ -510,7 +509,7 @@ void HTMLLinkElement::addSubresourceAttributeURLs(ListHashSet<URL>& urls) const
     HTMLElement::addSubresourceAttributeURLs(urls);
 
     // Favicons are handled by a special case in LegacyWebArchive::create()
-    if (m_relAttribute.iconType != InvalidIcon)
+    if (m_relAttribute.iconType)
         return;
 
     if (!m_relAttribute.isStyleSheet)

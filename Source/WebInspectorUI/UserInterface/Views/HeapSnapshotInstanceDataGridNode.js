@@ -25,7 +25,7 @@
 
 WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGridNode extends WebInspector.DataGridNode
 {
-    constructor(node, tree, edge)
+    constructor(node, tree, edge, base)
     {
         // Don't treat strings as having child nodes, even if they have a Structure.
         let hasChildren = node.hasChildren && node.className !== "string";
@@ -34,10 +34,12 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
 
         console.assert(node instanceof WebInspector.HeapSnapshotNodeProxy);
         console.assert(!edge || edge instanceof WebInspector.HeapSnapshotEdgeProxy);
+        console.assert(!base || base instanceof WebInspector.HeapSnapshotInstanceDataGridNode);
 
         this._node = node;
         this._tree = tree;
         this._edge = edge || null;
+        this._base = base || null;
 
         // FIXME: Make instance grid nodes copyable.
         this.copyable = false;
@@ -51,7 +53,7 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
     static logHeapSnapshotNode(node)
     {
         let heapObjectIdentifier = node.id;
-        let synthetic = true;
+        let shouldRevealConsole = true;
         let text = WebInspector.UIString("Heap Snapshot Object (@%d)").format(heapObjectIdentifier);
 
         node.shortestGCRootPath((gcRootPath) => {
@@ -71,21 +73,19 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
                         heapSnapshotRootPath = heapSnapshotRootPath.appendEdge(component);
                 }
 
-                if (!heapSnapshotRootPath.isFullPathImpossible()) {
-                    synthetic = false;
+                if (!heapSnapshotRootPath.isFullPathImpossible())
                     text = heapSnapshotRootPath.fullPath;
-                }
             }
 
             if (node.className === "string") {
                 HeapAgent.getPreview(heapObjectIdentifier, function(error, string, functionDetails, objectPreviewPayload) {
                     let remoteObject = error ? WebInspector.RemoteObject.fromPrimitiveValue(undefined) : WebInspector.RemoteObject.fromPrimitiveValue(string);
-                    WebInspector.consoleLogViewController.appendImmediateExecutionWithResult(text, remoteObject, synthetic);                
+                    WebInspector.consoleLogViewController.appendImmediateExecutionWithResult(text, remoteObject, shouldRevealConsole);
                 });
             } else {
                 HeapAgent.getRemoteObject(heapObjectIdentifier, WebInspector.RuntimeManager.ConsoleObjectGroup, function(error, remoteObjectPayload) {
                     let remoteObject = error ? WebInspector.RemoteObject.fromPrimitiveValue(undefined) : WebInspector.RemoteObject.fromPayload(remoteObjectPayload);
-                    WebInspector.consoleLogViewController.appendImmediateExecutionWithResult(text, remoteObject, synthetic);
+                    WebInspector.consoleLogViewController.appendImmediateExecutionWithResult(text, remoteObject, shouldRevealConsole);
                 });
             }
         });
@@ -94,6 +94,7 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
     // Protected
 
     get data() { return this._node; }
+    get node() { return this._node; }
     get selectable() { return false; }
 
     createCells()
@@ -106,6 +107,14 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
     createCellContent(columnIdentifier)
     {
         if (columnIdentifier === "retainedSize") {
+            let subRetainedSize = false;
+            if (this._base && !this._tree.alwaysShowRetainedSize) {
+                if (this._isDominatedByNonBaseParent())
+                    subRetainedSize = true;
+                else if (!this._isDominatedByBase())
+                    return emDash;
+            }
+
             let size = this._node.retainedSize;
             let fragment = document.createDocumentFragment();
             let sizeElement = fragment.appendChild(document.createElement("span"));
@@ -115,6 +124,12 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
             let percentElement = fragment.appendChild(document.createElement("span"));
             percentElement.classList.add("percentage");
             percentElement.textContent = Number.percentageString(fraction);
+
+            if (subRetainedSize) {
+                sizeElement.classList.add("sub-retained");
+                percentElement.classList.add("sub-retained");
+            }
+
             return fragment;
         }
 
@@ -147,47 +162,11 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
             let spacerElement = containerElement.appendChild(document.createElement("span"));
             spacerElement.textContent = " ";
 
-            HeapAgent.getPreview(id, (error, string, functionDetails, objectPreviewPayload) => {
-                if (error) {
-                    let previewErrorElement = containerElement.appendChild(document.createElement("span"));
-                    previewErrorElement.classList.add("preview-error");
-                    previewErrorElement.textContent = internal ? WebInspector.UIString("Internal object") : WebInspector.UIString("No preview available");
-                    return;
-                }
-
-                if (string) {
-                    let primitiveRemoteObject = WebInspector.RemoteObject.fromPrimitiveValue(string);
-                    containerElement.appendChild(WebInspector.FormattedValue.createElementForRemoteObject(primitiveRemoteObject));
-                    return;
-                }
-
-                if (functionDetails) {
-                    let {location, name, displayName} = functionDetails;
-                    let functionNameElement = containerElement.appendChild(document.createElement("span"));
-                    functionNameElement.classList.add("function-name");
-                    functionNameElement.textContent = name || displayName || WebInspector.UIString("(anonymous function)");
-                    let sourceCode = WebInspector.debuggerManager.scriptForIdentifier(location.scriptId);
-                    if (sourceCode) {
-                        let locationElement = containerElement.appendChild(document.createElement("span"));
-                        locationElement.classList.add("location");
-                        let sourceCodeLocation = sourceCode.createSourceCodeLocation(location.lineNumber, location.columnNumber);
-                        sourceCodeLocation.populateLiveDisplayLocationString(locationElement, "textContent", WebInspector.SourceCodeLocation.ColumnStyle.Hidden, WebInspector.SourceCodeLocation.NameStyle.Short);
-
-                        const dontFloat = true;
-                        const useGoToArrowButton = true;
-                        let goToArrowButtonLink = WebInspector.createSourceCodeLocationLink(sourceCodeLocation, dontFloat, useGoToArrowButton);
-                        containerElement.appendChild(goToArrowButtonLink);
-                    }
-                    return;
-                }
-
-                if (objectPreviewPayload) {
-                    let objectPreview = WebInspector.ObjectPreview.fromPayload(objectPreviewPayload);
-                    let previewElement = WebInspector.FormattedValue.createObjectPreviewOrFormattedValueForObjectPreview(objectPreview);
-                    containerElement.appendChild(previewElement);
-                    return;
-                }
-            });
+            if (className === "Window" && this._node.dominatorNodeIdentifier === 0) {
+                containerElement.append("Window ");
+                this._populateWindowPreview(containerElement);
+            } else
+                this._populatePreview(containerElement);
 
             return containerElement;
         }
@@ -208,6 +187,23 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
 
     // Private
 
+    _isDominatedByBase()
+    {
+        return this._node.dominatorNodeIdentifier === this._base.node.id;
+    }
+
+    _isDominatedByNonBaseParent()
+    {
+        for (let p = this.parent; p; p = p.parent) {
+            if (p === this._base)
+                return false;
+            if (this._node.dominatorNodeIdentifier === p.node.id)
+                return true;
+        }
+
+        return false;
+    }
+
     _populate()
     {
         this.removeEventListener("populate", this._populate, this);
@@ -226,8 +222,8 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
             // FIXME: This should gracefully handle a node that references many objects.
 
             for (let instance of instances)
-                this.appendChild(new WebInspector.HeapSnapshotInstanceDataGridNode(instance, this._tree, instance.__edge));
-        });        
+                this.appendChild(new WebInspector.HeapSnapshotInstanceDataGridNode(instance, this._tree, instance.__edge, this._base || this));
+        });
     }
 
     _contextMenuHandler(event)
@@ -235,6 +231,85 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
         let contextMenu = WebInspector.ContextMenu.createFromEvent(event);
         contextMenu.appendSeparator();
         contextMenu.appendItem(WebInspector.UIString("Log Value"), WebInspector.HeapSnapshotInstanceDataGridNode.logHeapSnapshotNode.bind(null, this._node));
+    }
+
+    _populateError(containerElement)
+    {
+        if (this._node.internal)
+            return;
+
+        let previewErrorElement = containerElement.appendChild(document.createElement("span"));
+        previewErrorElement.classList.add("preview-error");
+        previewErrorElement.textContent = WebInspector.UIString("No preview available");
+    }
+
+    _populateWindowPreview(containerElement)
+    {
+        HeapAgent.getRemoteObject(this._node.id, (error, remoteObjectPayload) => {
+            if (error) {
+                this._populateError(containerElement)
+                return;
+            }
+
+            function inspectedPage_window_getLocationHref() {
+                return this.location.href;
+            }
+
+            let remoteObject = WebInspector.RemoteObject.fromPayload(remoteObjectPayload);
+            remoteObject.callFunctionJSON(inspectedPage_window_getLocationHref, undefined, (href) => {
+                remoteObject.release();
+
+                if (!href)
+                    this._populateError(containerElement);
+                else {
+                    let primitiveRemoteObject = WebInspector.RemoteObject.fromPrimitiveValue(href);
+                    containerElement.appendChild(WebInspector.FormattedValue.createElementForRemoteObject(primitiveRemoteObject));
+                }
+            });
+        });
+    }
+
+    _populatePreview(containerElement)
+    {
+        HeapAgent.getPreview(this._node.id, (error, string, functionDetails, objectPreviewPayload) => {
+            if (error) {
+                this._populateError(containerElement);
+                return;
+            }
+
+            if (string) {
+                let primitiveRemoteObject = WebInspector.RemoteObject.fromPrimitiveValue(string);
+                containerElement.appendChild(WebInspector.FormattedValue.createElementForRemoteObject(primitiveRemoteObject));
+                return;
+            }
+
+            if (functionDetails) {
+                let {location, name, displayName} = functionDetails;
+                let functionNameElement = containerElement.appendChild(document.createElement("span"));
+                functionNameElement.classList.add("function-name");
+                functionNameElement.textContent = name || displayName || WebInspector.UIString("(anonymous function)");
+                let sourceCode = WebInspector.debuggerManager.scriptForIdentifier(location.scriptId);
+                if (sourceCode) {
+                    let locationElement = containerElement.appendChild(document.createElement("span"));
+                    locationElement.classList.add("location");
+                    let sourceCodeLocation = sourceCode.createSourceCodeLocation(location.lineNumber, location.columnNumber);
+                    sourceCodeLocation.populateLiveDisplayLocationString(locationElement, "textContent", WebInspector.SourceCodeLocation.ColumnStyle.Hidden, WebInspector.SourceCodeLocation.NameStyle.Short);
+
+                    const dontFloat = true;
+                    const useGoToArrowButton = true;
+                    let goToArrowButtonLink = WebInspector.createSourceCodeLocationLink(sourceCodeLocation, dontFloat, useGoToArrowButton);
+                    containerElement.appendChild(goToArrowButtonLink);
+                }
+                return;
+            }
+
+            if (objectPreviewPayload) {
+                let objectPreview = WebInspector.ObjectPreview.fromPayload(objectPreviewPayload);
+                let previewElement = WebInspector.FormattedValue.createObjectPreviewOrFormattedValueForObjectPreview(objectPreview);
+                containerElement.appendChild(previewElement);
+                return;
+            }
+        });
     }
 
     _mouseoverHandler(event)
@@ -322,6 +397,26 @@ WebInspector.HeapSnapshotInstanceDataGridNode = class HeapSnapshotInstanceDataGr
             idElement.classList.add("object-id");
             idElement.textContent = "@" + node.id;
             idElement.addEventListener("click", WebInspector.HeapSnapshotInstanceDataGridNode.logHeapSnapshotNode.bind(null, node));
+
+            // Extra.
+            if (node.className === "Function") {
+                let goToArrowPlaceHolderElement = containerElement.appendChild(document.createElement("span"));
+                goToArrowPlaceHolderElement.style.display = "inline-block";
+                goToArrowPlaceHolderElement.style.width = "10px";
+                HeapAgent.getPreview(node.id, function(error, string, functionDetails, objectPreviewPayload) {
+                    if (functionDetails) {
+                        let location = functionDetails.location;
+                        let sourceCode = WebInspector.debuggerManager.scriptForIdentifier(location.scriptId);
+                        if (sourceCode) {
+                            const dontFloat = true;
+                            const useGoToArrowButton = true;
+                            let sourceCodeLocation = sourceCode.createSourceCodeLocation(location.lineNumber, location.columnNumber);
+                            let goToArrowButtonLink = WebInspector.createSourceCodeLocationLink(sourceCodeLocation, dontFloat, useGoToArrowButton);
+                            containerElement.replaceChild(goToArrowButtonLink, goToArrowPlaceHolderElement);
+                        }
+                    }
+                });
+            }
         }
 
         function sanitizeClassName(className) {

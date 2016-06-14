@@ -51,7 +51,9 @@ static inline bool isNullBodyStatus(int status)
 
 Ref<FetchResponse> FetchResponse::error(ScriptExecutionContext& context)
 {
-    return adoptRef(*new FetchResponse(context, Type::Error, { }, FetchHeaders::create(FetchHeaders::Guard::Immutable), ResourceResponse()));
+    auto response = adoptRef(*new FetchResponse(context, { }, FetchHeaders::create(FetchHeaders::Guard::Immutable), { }));
+    response->m_response.setType(Type::Error);
+    return response;
 }
 
 RefPtr<FetchResponse> FetchResponse::redirect(ScriptExecutionContext& context, const String& url, int status, ExceptionCode& ec)
@@ -66,10 +68,10 @@ RefPtr<FetchResponse> FetchResponse::redirect(ScriptExecutionContext& context, c
         ec = TypeError;
         return nullptr;
     }
-    RefPtr<FetchResponse> redirectResponse = adoptRef(*new FetchResponse(context, Type::Default, { }, FetchHeaders::create(FetchHeaders::Guard::Immutable), ResourceResponse()));
+    auto redirectResponse = adoptRef(*new FetchResponse(context, { }, FetchHeaders::create(FetchHeaders::Guard::Immutable), { }));
     redirectResponse->m_response.setHTTPStatusCode(status);
     redirectResponse->m_headers->fastSet(HTTPHeaderName::Location, requestURL.string());
-    return redirectResponse;
+    return WTFMove(redirectResponse);
 }
 
 void FetchResponse::initializeWith(const Dictionary& init, ExceptionCode& ec)
@@ -109,9 +111,8 @@ void FetchResponse::initializeWith(const Dictionary& init, ExceptionCode& ec)
     }
 }
 
-FetchResponse::FetchResponse(ScriptExecutionContext& context, Type type, FetchBody&& body, Ref<FetchHeaders>&& headers, ResourceResponse&& response)
+FetchResponse::FetchResponse(ScriptExecutionContext& context, FetchBody&& body, Ref<FetchHeaders>&& headers, ResourceResponse&& response)
     : FetchBodyOwner(context, WTFMove(body))
-    , m_type(type)
     , m_response(WTFMove(response))
     , m_headers(WTFMove(headers))
 {
@@ -123,34 +124,12 @@ RefPtr<FetchResponse> FetchResponse::clone(ScriptExecutionContext& context, Exce
         ec = TypeError;
         return nullptr;
     }
-    RefPtr<FetchResponse> cloned = adoptRef(*new FetchResponse(context, m_type, FetchBody(m_body), FetchHeaders::create(headers()), ResourceResponse(m_response)));
-    cloned->m_isRedirected = m_isRedirected;
-    return cloned;
-}
-
-String FetchResponse::type() const
-{
-    switch (m_type) {
-    case Type::Basic:
-        return ASCIILiteral("basic");
-    case Type::Cors:
-        return ASCIILiteral("cors");
-    case Type::Default:
-        return ASCIILiteral("default");
-    case Type::Error:
-        return ASCIILiteral("error");
-    case Type::Opaque:
-        return ASCIILiteral("opaque");
-    case Type::OpaqueRedirect:
-        return ASCIILiteral("opaqueredirect");
-    };
-    ASSERT_NOT_REACHED();
-    return String();
+    return adoptRef(*new FetchResponse(context, FetchBody(m_body), FetchHeaders::create(headers()), ResourceResponse(m_response)));
 }
 
 void FetchResponse::startFetching(ScriptExecutionContext& context, const FetchRequest& request, FetchPromise&& promise)
 {
-    Ref<FetchResponse> response = adoptRef(*new FetchResponse(context, Type::Basic, FetchBody::loadingBody(), FetchHeaders::create(FetchHeaders::Guard::Immutable), ResourceResponse()));
+    auto response = adoptRef(*new FetchResponse(context, FetchBody::loadingBody(), FetchHeaders::create(FetchHeaders::Guard::Immutable), { }));
 
     // Setting pending activity until BodyLoader didFail or didSucceed callback is called.
     response->setPendingActivity(response.ptr());
@@ -193,7 +172,8 @@ void FetchResponse::BodyLoader::didSucceed()
         m_response.m_readableStreamSource = nullptr;
     }
 #endif
-    m_response.m_bodyLoader = Nullopt;
+    if (m_loader->isStarted())
+        m_response.m_bodyLoader = Nullopt;
     m_response.unsetPendingActivity(&m_response);
 }
 
@@ -233,7 +213,7 @@ void FetchResponse::BodyLoader::didReceiveResponse(const ResourceResponse& resou
     m_response.m_response = resourceResponse;
     m_response.m_headers->filterAndFill(resourceResponse.httpHeaderFields(), FetchHeaders::Guard::Response);
 
-    std::exchange(m_promise, Nullopt)->resolve(&m_response);
+    std::exchange(m_promise, Nullopt)->resolve(m_response);
 }
 
 void FetchResponse::BodyLoader::didReceiveData(const char* data, size_t size)
@@ -293,7 +273,9 @@ void FetchResponse::consumeBodyAsStream()
 ReadableStreamSource* FetchResponse::createReadableStreamSource()
 {
     ASSERT(!m_readableStreamSource);
-    if (body().isEmpty() || isDisturbed())
+    ASSERT(!isDisturbed());
+
+    if (body().isEmpty())
         return nullptr;
 
     m_readableStreamSource = adoptRef(*new FetchResponseSource(*this));
@@ -309,7 +291,7 @@ RefPtr<SharedBuffer> FetchResponse::BodyLoader::startStreaming()
 
 void FetchResponse::stop()
 {
-    RefPtr<FetchResponse> protect(this);
+    RefPtr<FetchResponse> protectedThis(this);
     FetchBodyOwner::stop();
     if (m_bodyLoader) {
         m_bodyLoader->stop();

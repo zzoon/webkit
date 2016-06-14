@@ -49,7 +49,7 @@ static const float gFractionBarWidth = 0.05f;
 static const float gNumeratorGap = 0.2f;
 static const float gDenominatorGap = 0.2f;
 
-RenderMathMLFraction::RenderMathMLFraction(MathMLInlineContainerElement& element, Ref<RenderStyle>&& style)
+RenderMathMLFraction::RenderMathMLFraction(MathMLInlineContainerElement& element, RenderStyle&& style)
     : RenderMathMLBlock(element, WTFMove(style))
     , m_defaultLineThickness(1)
     , m_lineThickness(0)
@@ -187,7 +187,7 @@ void RenderMathMLFraction::layoutBlock(bool relayoutChildren, LayoutUnit)
     numerator().layoutIfNeeded();
     denominator().layoutIfNeeded();
 
-    setLogicalWidth(std::max<LayoutUnit>(numerator().logicalWidth(), denominator().logicalWidth()));
+    setLogicalWidth(std::max(numerator().logicalWidth(), denominator().logicalWidth()));
 
     LayoutPoint numeratorLocation(horizontalOffset(numerator(), m_numeratorAlign), verticalOffset);
     numerator().setLocation(numeratorLocation);

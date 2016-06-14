@@ -33,8 +33,8 @@ WebInspector.HeapAllocationsTimelineDataGridNode = class HeapAllocationsTimeline
         this._heapAllocationsView = heapAllocationsView;
 
         this._data = {
-            name: WebInspector.TimelineTabContentView.displayNameForRecord(heapAllocationsTimelineRecord),
-            timestamp: this._record.timestamp - zeroTime,
+            name: this.displayName(),
+            timestamp: zeroTime ? this._record.timestamp - zeroTime : NaN,
             size: this._record.heapSnapshot.totalSize,
         };
     }
@@ -48,9 +48,9 @@ WebInspector.HeapAllocationsTimelineDataGridNode = class HeapAllocationsTimeline
     {
         switch (columnIdentifier) {
         case "name":
+            cell.classList.add(...this.iconClassNames());
+
             let fragment = document.createDocumentFragment();
-            let iconElement = fragment.appendChild(document.createElement("img"));
-            iconElement.classList.add("icon", "heap-snapshot");
             let titleElement = fragment.appendChild(document.createElement("span"));
             titleElement.textContent = this._data.name;
             let goToButton = fragment.appendChild(WebInspector.createGoToArrowButton());
@@ -60,7 +60,7 @@ WebInspector.HeapAllocationsTimelineDataGridNode = class HeapAllocationsTimeline
             return fragment;
 
         case "timestamp":
-            return Number.secondsToString(this._data.timestamp, true);
+            return isNaN(this._data.timestamp) ? emDash : Number.secondsToString(this._data.timestamp, true);
 
         case "size":
             return Number.bytesToString(this._data.size);
@@ -77,5 +77,12 @@ WebInspector.HeapAllocationsTimelineDataGridNode = class HeapAllocationsTimeline
     clearBaseline()
     {
         this.element.classList.remove("baseline");
+    }
+
+    updateTimestamp(zeroTime)
+    {
+        console.assert(isNaN(this._data.timestamp));
+        this._data.timestamp = this._record.timestamp - zeroTime;
+        this.needsRefresh();
     }
 };

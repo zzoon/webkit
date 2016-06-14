@@ -175,6 +175,18 @@ void JIT::emit_op_instanceof_custom(Instruction*)
     // This always goes to slow path since we expect it to be rare.
     addSlowCase(jump());
 }
+    
+void JIT::emit_op_is_empty(Instruction* currentInstruction)
+{
+    int dst = currentInstruction[1].u.operand;
+    int value = currentInstruction[2].u.operand;
+
+    emitGetVirtualRegister(value, regT0);
+    compare64(Equal, regT0, TrustedImm32(JSValue::encode(JSValue())), regT0);
+
+    emitTagBool(regT0);
+    emitPutVirtualRegister(dst);
+}
 
 void JIT::emit_op_is_undefined(Instruction* currentInstruction)
 {
@@ -430,7 +442,7 @@ void JIT::emit_op_neq(Instruction* currentInstruction)
 void JIT::emit_op_throw(Instruction* currentInstruction)
 {
     ASSERT(regT0 == returnValueGPR);
-    copyCalleeSavesToVMCalleeSavesBuffer();
+    copyCalleeSavesToVMEntryFrameCalleeSavesBuffer();
     emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
     callOperationNoExceptionCheck(operationThrow, regT0);
     jumpToExceptionHandler();
@@ -506,7 +518,7 @@ void JIT::emit_op_to_string(Instruction* currentInstruction)
 
 void JIT::emit_op_catch(Instruction* currentInstruction)
 {
-    restoreCalleeSavesFromVMCalleeSavesBuffer();
+    restoreCalleeSavesFromVMEntryFrameCalleeSavesBuffer();
 
     move(TrustedImmPtr(m_vm), regT3);
     load64(Address(regT3, VM::callFrameForCatchOffset()), callFrameRegister);
@@ -762,22 +774,6 @@ void JIT::emitSlow_op_check_tdz(Instruction* currentInstruction, Vector<SlowCase
     slowPathCall.call();
 }
 
-void JIT::emit_op_profile_will_call(Instruction* currentInstruction)
-{
-    Jump profilerDone = branchTestPtr(Zero, AbsoluteAddress(m_vm->enabledProfilerAddress()));
-    emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
-    callOperation(operationProfileWillCall, regT0);
-    profilerDone.link(this);
-}
-
-void JIT::emit_op_profile_did_call(Instruction* currentInstruction)
-{
-    Jump profilerDone = branchTestPtr(Zero, AbsoluteAddress(m_vm->enabledProfilerAddress()));
-    emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
-    callOperation(operationProfileDidCall, regT0);
-    profilerDone.link(this);
-}
-
 
 // Slow cases
 
@@ -923,7 +919,7 @@ void JIT::emitSlow_op_loop_hint(Instruction*, Vector<SlowCaseEntry>::iterator& i
     if (canBeOptimized()) {
         linkSlowCase(iter);
 
-        copyCalleeSavesFromFrameOrRegisterToVMCalleeSavesBuffer();
+        copyCalleeSavesFromFrameOrRegisterToVMEntryFrameCalleeSavesBuffer();
 
         callOperation(operationOptimize, m_bytecodeOffset);
         Jump noOptimizedEntry = branchTestPtr(Zero, returnValueGPR);
@@ -1010,7 +1006,7 @@ void JIT::emitNewFuncExprCommon(Instruction* currentInstruction)
     FunctionExecutable* function = m_codeBlock->functionExpr(currentInstruction[3].u.operand);
     OpcodeID opcodeID = m_vm->interpreter->getOpcodeID(currentInstruction->u.opcode);
 
-    if (opcodeID == op_new_func_exp || opcodeID == op_new_arrow_func_exp)
+    if (opcodeID == op_new_func_exp)
         callOperation(operationNewFunction, dst, regT0, function);
     else {
         ASSERT(opcodeID == op_new_generator_func_exp);
@@ -1030,11 +1026,6 @@ void JIT::emit_op_new_generator_func_exp(Instruction* currentInstruction)
     emitNewFuncExprCommon(currentInstruction);
 }
 
-void JIT::emit_op_new_arrow_func_exp(Instruction* currentInstruction)
-{
-    emitNewFuncExprCommon(currentInstruction);
-}
-    
 void JIT::emit_op_new_array(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
@@ -1297,7 +1288,7 @@ void JIT::emit_op_profile_type(Instruction* currentInstruction)
         move(regT0, regT1);
         and64(TrustedImm32(~1), regT1);
         jumpToEnd.append(branch64(Equal, regT1, TrustedImm64(ValueFalse)));
-    } else if (cachedTypeLocation->m_lastSeenType == TypeMachineInt)
+    } else if (cachedTypeLocation->m_lastSeenType == TypeAnyInt)
         jumpToEnd.append(emitJumpIfInt(regT0));
     else if (cachedTypeLocation->m_lastSeenType == TypeNumber)
         jumpToEnd.append(emitJumpIfNumber(regT0));
@@ -1338,6 +1329,31 @@ void JIT::emit_op_profile_type(Instruction* currentInstruction)
     skipClearLog.link(this);
 
     jumpToEnd.link(this);
+}
+
+void JIT::emit_op_log_shadow_chicken_prologue(Instruction* currentInstruction)
+{
+    updateTopCallFrame();
+    static_assert(nonArgGPR0 != regT0 && nonArgGPR0 != regT2, "we will have problems if this is true.");
+    GPRReg shadowPacketReg = regT0;
+    GPRReg scratch1Reg = nonArgGPR0; // This must be a non-argument register.
+    GPRReg scratch2Reg = regT2;
+    ensureShadowChickenPacket(shadowPacketReg, scratch1Reg, scratch2Reg);
+    emitGetVirtualRegister(currentInstruction[1].u.operand, regT3);
+    logShadowChickenProloguePacket(shadowPacketReg, scratch1Reg, regT3);
+}
+
+void JIT::emit_op_log_shadow_chicken_tail(Instruction* currentInstruction)
+{
+    updateTopCallFrame();
+    static_assert(nonArgGPR0 != regT0 && nonArgGPR0 != regT2, "we will have problems if this is true.");
+    GPRReg shadowPacketReg = regT0;
+    GPRReg scratch1Reg = nonArgGPR0; // This must be a non-argument register.
+    GPRReg scratch2Reg = regT2;
+    ensureShadowChickenPacket(shadowPacketReg, scratch1Reg, scratch2Reg);
+    emitGetVirtualRegister(currentInstruction[1].u.operand, regT2);
+    emitGetVirtualRegister(currentInstruction[2].u.operand, regT3);
+    logShadowChickenTailPacket(shadowPacketReg, JSValueRegs(regT2), regT3, m_codeBlock, CallSiteIndex(m_bytecodeOffset));
 }
 
 #endif // USE(JSVALUE64)
@@ -1403,6 +1419,16 @@ void JIT::emit_op_create_cloned_arguments(Instruction* currentInstruction)
     slowPathCall.call();
 }
 
+void JIT::emit_op_argument_count(Instruction* currentInstruction)
+{
+    int dst = currentInstruction[1].u.operand;
+    load32(payloadFor(JSStack::ArgumentCount), regT0);
+    sub32(TrustedImm32(1), regT0);
+    JSValueRegs result = JSValueRegs::withTwoAvailableRegs(regT0, regT1);
+    boxInt32(regT0, result);
+    emitPutVirtualRegister(dst, result);
+}
+
 void JIT::emit_op_copy_rest(Instruction* currentInstruction)
 {
     JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_copy_rest);
@@ -1448,18 +1474,6 @@ void JIT::emit_op_resume(Instruction* currentInstruction)
 {
     JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_resume);
     slowPathCall.call();
-}
-
-void JIT::emit_op_log_shadow_chicken_prologue(Instruction*)
-{
-    updateTopCallFrame();
-    logShadowChickenProloguePacket();
-}
-
-void JIT::emit_op_log_shadow_chicken_tail(Instruction*)
-{
-    updateTopCallFrame();
-    logShadowChickenTailPacket();
 }
 
 } // namespace JSC

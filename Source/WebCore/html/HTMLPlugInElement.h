@@ -103,7 +103,7 @@ protected:
     void defaultEventHandler(Event*) override;
 
     virtual bool requestObject(const String& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues);
-    RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
+    RenderPtr<RenderElement> createElementRenderer(RenderStyle&&, const RenderTreePosition&) override;
     void didAddUserAgentShadowRoot(ShadowRoot*) override;
 
     // Subclasses should use guardedDispatchBeforeLoadEvent instead of calling dispatchBeforeLoadEvent directly.
@@ -116,9 +116,6 @@ private:
     bool shouldOverridePlugin(const String& url, const String& mimeType);
 
     bool dispatchBeforeLoadEvent(const String& sourceURL); // Not implemented, generates a compile error if subclasses call this by mistake.
-
-    // FIXME: Shadow DOM spec says we should be able to create shadow root on applet, embed, and object.
-    bool canHaveUserAgentShadowRoot() const final { return true; }
 
     // This will load the plugin if necessary.
     virtual RenderWidget* renderWidgetLoadingPlugin() const = 0;

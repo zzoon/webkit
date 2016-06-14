@@ -70,7 +70,6 @@ public:
     bool isFocused() const override;
     bool isLoaded() const override;
     bool isOffScreen() const override;
-    bool isReadOnly() const override;
     bool isUnvisited() const override;
     bool isVisited() const override;
     bool isLinked() const override;
@@ -83,7 +82,6 @@ public:
     bool hasUnderline() const override;
 
     bool canSetTextRangeAttributes() const override;
-    bool canSetValueAttribute() const override;
     bool canSetExpandedAttribute() const override;
 
     void setAccessibleName(const AtomicString&) override;
@@ -247,7 +245,8 @@ private:
     
     bool isSVGImage() const;
     void detachRemoteSVGRoot();
-    AccessibilitySVGRoot* remoteSVGRootElement() const;
+    enum CreationChoice { Create, Retrieve };
+    AccessibilitySVGRoot* remoteSVGRootElement(CreationChoice createIfNecessary) const;
     AccessibilityObject* remoteSVGElementHitTest(const IntPoint&) const;
     void offsetBoundingBoxForRemoteSVGElement(LayoutRect&) const;
     bool supportsPath() const override;

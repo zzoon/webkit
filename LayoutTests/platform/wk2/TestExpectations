@@ -382,6 +382,8 @@ plugins/windowless_plugin_paint_test.html
 editing/pasteboard/emacs-cntl-y-001.html
 
 # No CORS support for media elements is implemented yet.
+http/tests/security/canvas-remote-read-remote-video-allowed-anonymous.html [ Failure ]
+http/tests/security/canvas-remote-read-remote-video-allowed-with-credentials.html [ Failure ]
 http/tests/security/video-cross-origin-readback.html
 
 # X-Content-Type-Options (ENABLE_NOSNIFF) is not enabled.
@@ -619,6 +621,7 @@ platform/mac/fast/events/objc-event-api.html
 editing/pasteboard/file-drag-to-editable.html
 editing/pasteboard/file-input-files-access.html
 fast/dom/HTMLImageElement/image-with-blob-url-blocked-by-csp-img-src-star.html
+fast/dom/HTMLImageElement/image-with-blob-url-allowed-by-csp-img-src-star-with-AllowContentSecurityPolicySourceStarToMatchAnyProtocol-enabled.html
 fast/dom/Window/window-postmessage-clone-frames.html
 fast/dom/Window/window-postmessage-clone.html
 fast/events/data-transfer-files-attribute-identity.html

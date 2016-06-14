@@ -104,27 +104,27 @@ void FTPDirectoryDocumentParser::appendEntry(const String& filename, const Strin
     RefPtr<Element> rowElement = m_tableElement->insertRow(-1, IGNORE_EXCEPTION);
     rowElement->setAttribute(HTMLNames::classAttr, "ftpDirectoryEntryRow");
 
-    Ref<Element> element = document()->createElement(tdTag, false);
-    element->appendChild(Text::create(*document(), String(&noBreakSpace, 1)), IGNORE_EXCEPTION);
+    auto typeElement = document()->createElement(tdTag, false);
+    typeElement->appendChild(Text::create(*document(), String(&noBreakSpace, 1)), IGNORE_EXCEPTION);
     if (isDirectory)
-        element->setAttribute(HTMLNames::classAttr, "ftpDirectoryIcon ftpDirectoryTypeDirectory");
+        typeElement->setAttribute(HTMLNames::classAttr, "ftpDirectoryIcon ftpDirectoryTypeDirectory");
     else
-        element->setAttribute(HTMLNames::classAttr, "ftpDirectoryIcon ftpDirectoryTypeFile");
-    rowElement->appendChild(WTFMove(element), IGNORE_EXCEPTION);
+        typeElement->setAttribute(HTMLNames::classAttr, "ftpDirectoryIcon ftpDirectoryTypeFile");
+    rowElement->appendChild(typeElement, IGNORE_EXCEPTION);
 
-    element = createTDForFilename(filename);
-    element->setAttribute(HTMLNames::classAttr, "ftpDirectoryFileName");
-    rowElement->appendChild(WTFMove(element), IGNORE_EXCEPTION);
+    auto nameElement = createTDForFilename(filename);
+    nameElement->setAttribute(HTMLNames::classAttr, "ftpDirectoryFileName");
+    rowElement->appendChild(nameElement, IGNORE_EXCEPTION);
 
-    element = document()->createElement(tdTag, false);
-    element->appendChild(Text::create(*document(), date), IGNORE_EXCEPTION);
-    element->setAttribute(HTMLNames::classAttr, "ftpDirectoryFileDate");
-    rowElement->appendChild(WTFMove(element), IGNORE_EXCEPTION);
+    auto dateElement = document()->createElement(tdTag, false);
+    dateElement->appendChild(Text::create(*document(), date), IGNORE_EXCEPTION);
+    dateElement->setAttribute(HTMLNames::classAttr, "ftpDirectoryFileDate");
+    rowElement->appendChild(dateElement, IGNORE_EXCEPTION);
 
-    element = document()->createElement(tdTag, false);
-    element->appendChild(Text::create(*document(), size), IGNORE_EXCEPTION);
-    element->setAttribute(HTMLNames::classAttr, "ftpDirectoryFileSize");
-    rowElement->appendChild(WTFMove(element), IGNORE_EXCEPTION);
+    auto sizeElement = document()->createElement(tdTag, false);
+    sizeElement->appendChild(Text::create(*document(), size), IGNORE_EXCEPTION);
+    sizeElement->setAttribute(HTMLNames::classAttr, "ftpDirectoryFileSize");
+    rowElement->appendChild(sizeElement, IGNORE_EXCEPTION);
 }
 
 Ref<Element> FTPDirectoryDocumentParser::createTDForFilename(const String& filename)
@@ -135,12 +135,12 @@ Ref<Element> FTPDirectoryDocumentParser::createTDForFilename(const String& filen
     else
         fullURL = fullURL + '/' + filename;
 
-    Ref<Element> anchorElement = document()->createElement(aTag, false);
+    auto anchorElement = document()->createElement(aTag, false);
     anchorElement->setAttribute(HTMLNames::hrefAttr, fullURL);
     anchorElement->appendChild(Text::create(*document(), filename), IGNORE_EXCEPTION);
 
     Ref<Element> tdElement = document()->createElement(tdTag, false);
-    tdElement->appendChild(WTFMove(anchorElement), IGNORE_EXCEPTION);
+    tdElement->appendChild(anchorElement, IGNORE_EXCEPTION);
 
     return tdElement;
 }
@@ -327,14 +327,14 @@ void FTPDirectoryDocumentParser::createBasicDocument()
 
     Ref<Element> bodyElement = document()->createElement(bodyTag, false);
 
-    document()->appendChild(bodyElement.copyRef(), IGNORE_EXCEPTION);
+    document()->appendChild(bodyElement, IGNORE_EXCEPTION);
 
-    Ref<Element> tableElement = document()->createElement(tableTag, false);
+    auto tableElement = document()->createElement(tableTag, false);
     m_tableElement = downcast<HTMLTableElement>(tableElement.ptr());
     m_tableElement->setAttribute(HTMLNames::idAttr, "ftpDirectoryTable");
     m_tableElement->setAttribute(HTMLNames::styleAttr, "width:100%");
 
-    bodyElement->appendChild(WTFMove(tableElement), IGNORE_EXCEPTION);
+    bodyElement->appendChild(tableElement, IGNORE_EXCEPTION);
 
     document()->processViewport("width=device-width", ViewportArguments::ViewportMeta);
 }

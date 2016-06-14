@@ -188,13 +188,7 @@ VM::VM(VMType vmType, HeapType heapType)
 #if !ENABLE(JIT)
     , m_jsStackLimit(0)
 #endif
-#if ENABLE(FTL_JIT)
-    , m_ftlStackLimit(0)
-    , m_largestFTLStackSize(0)
-#endif
-    , m_inDefineOwnProperty(false)
     , m_codeCache(std::make_unique<CodeCache>())
-    , m_enabledProfiler(nullptr)
     , m_builtinExecutables(std::make_unique<BuiltinExecutables>(*this))
     , m_typeProfilerEnabledCount(0)
     , m_controlFlowProfilerEnabledCount(0)
@@ -217,7 +211,6 @@ VM::VM(VMType vmType, HeapType heapType)
     terminatedExecutionErrorStructure.set(*this, TerminatedExecutionError::createStructure(*this, 0, jsNull()));
     stringStructure.set(*this, JSString::createStructure(*this, 0, jsNull()));
     propertyNameEnumeratorStructure.set(*this, JSPropertyNameEnumerator::createStructure(*this, 0, jsNull()));
-    getterSetterStructure.set(*this, GetterSetter::createStructure(*this, 0, jsNull()));
     customGetterSetterStructure.set(*this, CustomGetterSetter::createStructure(*this, 0, jsNull()));
     scopedArgumentsTableStructure.set(*this, ScopedArgumentsTable::createStructure(*this, 0, jsNull()));
     apiWrapperStructure.set(*this, JSAPIValueWrapper::createStructure(*this, 0, jsNull()));
@@ -321,6 +314,8 @@ VM::VM(VMType vmType, HeapType heapType)
         Ref<Stopwatch> stopwatch = Stopwatch::create();
         stopwatch->start();
         m_samplingProfiler = adoptRef(new SamplingProfiler(*this, WTFMove(stopwatch)));
+        if (Options::samplingProfilerPath())
+            m_samplingProfiler->registerForReportAtExit();
         m_samplingProfiler->start();
     }
 #endif // ENABLE(SAMPLING_PROFILER)
@@ -341,8 +336,10 @@ VM::~VM()
     heap.incrementDeferralDepth();
 
 #if ENABLE(SAMPLING_PROFILER)
-    if (m_samplingProfiler)
+    if (m_samplingProfiler) {
+        m_samplingProfiler->reportDataToOptionFile();
         m_samplingProfiler->shutdown();
+    }
 #endif // ENABLE(SAMPLING_PROFILER)
     
 #if ENABLE(DFG_JIT)
@@ -454,10 +451,11 @@ HeapProfiler& VM::ensureHeapProfiler()
 }
 
 #if ENABLE(SAMPLING_PROFILER)
-void VM::ensureSamplingProfiler(RefPtr<Stopwatch>&& stopwatch)
+SamplingProfiler& VM::ensureSamplingProfiler(RefPtr<Stopwatch>&& stopwatch)
 {
     if (!m_samplingProfiler)
         m_samplingProfiler = adoptRef(new SamplingProfiler(*this, WTFMove(stopwatch)));
+    return *m_samplingProfiler;
 }
 #endif // ENABLE(SAMPLING_PROFILER)
 
@@ -475,8 +473,6 @@ static ThunkGenerator thunkGeneratorForIntrinsic(Intrinsic intrinsic)
         return fromCharCodeThunkGenerator;
     case SqrtIntrinsic:
         return sqrtThunkGenerator;
-    case PowIntrinsic:
-        return powThunkGenerator;
     case AbsIntrinsic:
         return absThunkGenerator;
     case FloorIntrinsic:
@@ -495,32 +491,37 @@ static ThunkGenerator thunkGeneratorForIntrinsic(Intrinsic intrinsic)
         return imulThunkGenerator;
     case RandomIntrinsic:
         return randomThunkGenerator;
+    case BoundThisNoArgsFunctionCallIntrinsic:
+        return boundThisNoArgsFunctionCallGenerator;
     default:
-        return 0;
+        return nullptr;
     }
 }
 
-NativeExecutable* VM::getHostFunction(NativeFunction function, NativeFunction constructor, const String& name)
-{
-    return jitStubs->hostFunctionStub(this, function, constructor, name);
-}
-NativeExecutable* VM::getHostFunction(NativeFunction function, Intrinsic intrinsic, const String& name)
-{
-    ASSERT(canUseJIT());
-    return jitStubs->hostFunctionStub(this, function, intrinsic != NoIntrinsic ? thunkGeneratorForIntrinsic(intrinsic) : 0, intrinsic, name);
-}
-
-#else // !ENABLE(JIT)
+#endif // ENABLE(JIT)
 
 NativeExecutable* VM::getHostFunction(NativeFunction function, NativeFunction constructor, const String& name)
 {
+    return getHostFunction(function, NoIntrinsic, constructor, name);
+}
+
+NativeExecutable* VM::getHostFunction(NativeFunction function, Intrinsic intrinsic, NativeFunction constructor, const String& name)
+{
+#if ENABLE(JIT)
+    if (canUseJIT()) {
+        return jitStubs->hostFunctionStub(
+            this, function, constructor,
+            intrinsic != NoIntrinsic ? thunkGeneratorForIntrinsic(intrinsic) : 0,
+            intrinsic, name);
+    }
+#else // ENABLE(JIT)
+    UNUSED_PARAM(intrinsic);
+#endif // ENABLE(JIT)
     return NativeExecutable::create(*this,
         adoptRef(new NativeJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_native_call_trampoline), JITCode::HostCallThunk)), function,
         adoptRef(new NativeJITCode(MacroAssemblerCodeRef::createLLIntCodeRef(llint_native_construct_trampoline), JITCode::HostCallThunk)), constructor,
         NoIntrinsic, name);
 }
-
-#endif // !ENABLE(JIT)
 
 VM::ClientData::~ClientData()
 {
@@ -548,15 +549,6 @@ void VM::deleteAllLinkedCode()
 {
     whenIdle([this]() {
         heap.deleteAllCodeBlocks();
-        heap.reportAbandonedObjectGraph();
-    });
-}
-
-void VM::deleteAllRegExpCode()
-{
-    whenIdle([this]() {
-        m_regExpCache->deleteAllCode();
-        heap.reportAbandonedObjectGraph();
     });
 }
 
@@ -663,19 +655,9 @@ inline void VM::updateStackLimit()
     if (m_stackPointerAtVMEntry) {
         ASSERT(wtfThreadData().stack().isGrowingDownward());
         char* startOfStack = reinterpret_cast<char*>(m_stackPointerAtVMEntry);
-#if ENABLE(FTL_JIT)
-        m_stackLimit = wtfThreadData().stack().recursionLimit(startOfStack, Options::maxPerThreadStackUsage(), m_reservedZoneSize + m_largestFTLStackSize);
-        m_ftlStackLimit = wtfThreadData().stack().recursionLimit(startOfStack, Options::maxPerThreadStackUsage(), m_reservedZoneSize + 2 * m_largestFTLStackSize);
-#else
         m_stackLimit = wtfThreadData().stack().recursionLimit(startOfStack, Options::maxPerThreadStackUsage(), m_reservedZoneSize);
-#endif
     } else {
-#if ENABLE(FTL_JIT)
-        m_stackLimit = wtfThreadData().stack().recursionLimit(m_reservedZoneSize + m_largestFTLStackSize);
-        m_ftlStackLimit = wtfThreadData().stack().recursionLimit(m_reservedZoneSize + 2 * m_largestFTLStackSize);
-#else
         m_stackLimit = wtfThreadData().stack().recursionLimit(m_reservedZoneSize);
-#endif
     }
 
 #if PLATFORM(WIN)
@@ -683,16 +665,6 @@ inline void VM::updateStackLimit()
         preCommitStackMemory(m_stackLimit);
 #endif
 }
-
-#if ENABLE(FTL_JIT)
-void VM::updateFTLLargestStackSize(size_t stackSize)
-{
-    if (stackSize > m_largestFTLStackSize) {
-        m_largestFTLStackSize = stackSize;
-        updateStackLimit();
-    }
-}
-#endif
 
 #if ENABLE(DFG_JIT)
 void VM::gatherConservativeRoots(ConservativeRoots& conservativeRoots)
@@ -772,25 +744,6 @@ void VM::addImpureProperty(const String& propertyName)
 {
     if (RefPtr<WatchpointSet> watchpointSet = m_impurePropertyWatchpointSets.take(propertyName))
         watchpointSet->fireAll("Impure property added");
-}
-
-class SetEnabledProfilerFunctor {
-public:
-    bool operator()(CodeBlock* codeBlock) const
-    {
-        if (JITCode::isOptimizingJIT(codeBlock->jitType()))
-            codeBlock->jettison(Profiler::JettisonDueToLegacyProfiler);
-        return false;
-    }
-};
-
-void VM::setEnabledProfiler(LegacyProfiler* profiler)
-{
-    m_enabledProfiler = profiler;
-    if (m_enabledProfiler) {
-        SetEnabledProfilerFunctor functor;
-        heap.forEachCodeBlock(functor);
-    }
 }
 
 static bool enableProfilerWithRespectToCount(unsigned& counter, std::function<void()> doEnableWork)

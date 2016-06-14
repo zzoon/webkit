@@ -397,6 +397,7 @@ public:
     bool attachmentElementEnabled = MacApplication::isAppleMail();
 #else
     bool allowsInlineMediaPlayback = WebCore::deviceClass() == MGDeviceClassiPad;
+    bool allowsInlineMediaPlaybackAfterFullscreen = WebCore::deviceClass() != MGDeviceClassiPad;
     bool requiresPlaysInlineAttribute = !allowsInlineMediaPlayback;
     bool attachmentElementEnabled = IOSApplication::isMobileMail();
 #endif
@@ -490,8 +491,6 @@ public:
         [NSNumber numberWithBool:NO],   WebKitJavaScriptCanAccessClipboardPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitXSSAuditorEnabledPreferenceKey,
         [NSNumber numberWithBool:YES],  WebKitAcceleratedCompositingEnabledPreferenceKey,
-        [NSNumber numberWithBool:YES], WebKitCSSRegionsEnabledPreferenceKey,
-        [NSNumber numberWithBool:YES], WebKitCSSCompositingEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitDisplayListDrawingEnabledPreferenceKey,
 #if PLATFORM(IOS) && !PLATFORM(IOS_SIMULATOR)
         [NSNumber numberWithBool:YES],  WebKitAcceleratedDrawingEnabledPreferenceKey,
@@ -525,6 +524,7 @@ public:
         [NSNumber numberWithBool:attachmentElementEnabled], WebKitAttachmentElementEnabledPreferenceKey,
 #if !PLATFORM(IOS)
         [NSNumber numberWithBool:YES],  WebKitAllowsInlineMediaPlaybackPreferenceKey,
+        [NSNumber numberWithBool:NO],   WebKitAllowsInlineMediaPlaybackAfterFullscreenPreferenceKey,
         [NSNumber numberWithBool:NO],  WebKitInlineMediaPlaybackRequiresPlaysInlineAttributeKey,
         [NSNumber numberWithBool:YES],  WebKitMediaControlsScaleWithPageZoomPreferenceKey,
         [NSNumber numberWithBool:NO],   WebKitWebAudioEnabledPreferenceKey,
@@ -537,6 +537,7 @@ public:
         [NSNumber numberWithBool:YES],  WebKitMediaDataLoadsAutomaticallyPreferenceKey,
 #else
         [NSNumber numberWithBool:allowsInlineMediaPlayback],   WebKitAllowsInlineMediaPlaybackPreferenceKey,
+        [NSNumber numberWithBool:allowsInlineMediaPlaybackAfterFullscreen],   WebKitAllowsInlineMediaPlaybackAfterFullscreenPreferenceKey,
         [NSNumber numberWithBool:requiresPlaysInlineAttribute], WebKitInlineMediaPlaybackRequiresPlaysInlineAttributeKey,
         [NSNumber numberWithBool:NO],   WebKitMediaControlsScaleWithPageZoomPreferenceKey,
         [NSNumber numberWithUnsignedInt:AudioSession::None],  WebKitAudioSessionCategoryOverride,
@@ -581,6 +582,7 @@ public:
 #endif
 #if ENABLE(IOS_TEXT_AUTOSIZING)
         [NSNumber numberWithFloat:Settings::defaultMinimumZoomFontSize()], WebKitMinimumZoomFontSizePreferenceKey,
+        [NSNumber numberWithBool:Settings::defaultTextAutosizingEnabled()], WebKitTextAutosizingEnabledPreferenceKey,
 #endif
         [NSNumber numberWithLongLong:ApplicationCacheStorage::noQuota()], WebKitApplicationCacheTotalQuota,
         [NSNumber numberWithLongLong:ApplicationCacheStorage::noQuota()], WebKitApplicationCacheDefaultOriginQuota,
@@ -618,6 +620,12 @@ public:
 #endif
 #if ENABLE(DOWNLOAD_ATTRIBUTE)
         [NSNumber numberWithBool:NO], WebKitDownloadAttributeEnabledPreferenceKey,
+#endif
+#if ENABLE(CSS_GRID_LAYOUT)
+        [NSNumber numberWithBool:YES], WebKitCSSGridLayoutEnabledPreferenceKey,
+#endif
+#if ENABLE(WEB_ANIMATIONS)
+        [NSNumber numberWithBool:NO], WebKitWebAnimationsEnabledPreferenceKey,
 #endif
         nil];
 
@@ -1474,6 +1482,16 @@ public:
 {
     return [self _floatValueForKey:WebKitMinimumZoomFontSizePreferenceKey];
 }
+
+- (void)_setTextAutosizingEnabled:(BOOL)enabled
+{
+    [self _setBoolValue:enabled forKey:WebKitTextAutosizingEnabledPreferenceKey];
+}
+
+- (BOOL)_textAutosizingEnabled
+{
+    return [self _boolValueForKey:WebKitTextAutosizingEnabledPreferenceKey];
+}
 #endif
 
 #if PLATFORM(IOS)
@@ -1875,26 +1893,6 @@ static NSString *classIBCreatorID = nil;
 - (void)setAcceleratedCompositingEnabled:(BOOL)enabled
 {
     [self _setBoolValue:enabled forKey:WebKitAcceleratedCompositingEnabledPreferenceKey];
-}
-
-- (BOOL)cssRegionsEnabled
-{
-    return [self _boolValueForKey:WebKitCSSRegionsEnabledPreferenceKey];
-}
-
-- (void)setCSSRegionsEnabled:(BOOL)enabled
-{
-    [self _setBoolValue:enabled forKey:WebKitCSSRegionsEnabledPreferenceKey];
-}
-
-- (BOOL)cssCompositingEnabled
-{
-    return [self _boolValueForKey:WebKitCSSCompositingEnabledPreferenceKey];
-}
-
-- (void)setCSSCompositingEnabled:(BOOL)enabled
-{
-    [self _setBoolValue:enabled forKey:WebKitCSSCompositingEnabledPreferenceKey];
 }
 
 - (BOOL)showDebugBorders
@@ -2689,6 +2687,16 @@ static NSString *classIBCreatorID = nil;
     [self _setBoolValue:flag forKey:WebKitAttachmentElementEnabledPreferenceKey];
 }
 
+- (BOOL)allowsInlineMediaPlaybackAfterFullscreen
+{
+    return [self _boolValueForKey:WebKitAllowsInlineMediaPlaybackAfterFullscreenPreferenceKey];
+}
+
+- (void)setAllowsInlineMediaPlaybackAfterFullscreen:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitAllowsInlineMediaPlaybackAfterFullscreenPreferenceKey];
+}
+
 - (BOOL)mockCaptureDevicesEnabled
 {
     return [self _boolValueForKey:WebKitMockCaptureDevicesEnabledPreferenceKey];
@@ -2737,6 +2745,26 @@ static NSString *classIBCreatorID = nil;
 - (void)setDownloadAttributeEnabled:(BOOL)flag
 {
     [self _setBoolValue:flag forKey:WebKitDownloadAttributeEnabledPreferenceKey];
+}
+
+- (BOOL)isCSSGridLayoutEnabled
+{
+    return [self _boolValueForKey:WebKitCSSGridLayoutEnabledPreferenceKey];
+}
+
+- (void)setCSSGridLayoutEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitCSSGridLayoutEnabledPreferenceKey];
+}
+
+- (BOOL)webAnimationsEnabled
+{
+    return [self _boolValueForKey:WebKitWebAnimationsEnabledPreferenceKey];
+}
+
+- (void)setWebAnimationsEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitWebAnimationsEnabledPreferenceKey];
 }
 
 @end

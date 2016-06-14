@@ -26,7 +26,6 @@
 #include "config.h"
 #include "ScrollbarThemeMac.h"
 
-#include "BlockExceptions.h"
 #include "ColorMac.h"
 #include "GraphicsLayer.h"
 #include "ImageBuffer.h"
@@ -38,6 +37,7 @@
 #include "ScrollView.h"
 #include "WebCoreSystemInterface.h"
 #include <Carbon/Carbon.h>
+#include <wtf/BlockObjCExceptions.h>
 #include <wtf/HashMap.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
@@ -158,7 +158,7 @@ void ScrollbarThemeMac::didCreateScrollerImp(Scrollbar& scrollbar)
 #if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
     NSScrollerImp *scrollerImp = painterForScrollbar(scrollbar);
     ASSERT(scrollerImp);
-    scrollerImp.userInterfaceLayoutDirection = scrollbar.scrollableArea().verticalScrollbarIsOnLeft() ? NSUserInterfaceLayoutDirectionRightToLeft : NSUserInterfaceLayoutDirectionLeftToRight;
+    scrollerImp.userInterfaceLayoutDirection = scrollbar.scrollableArea().shouldPlaceBlockDirectionScrollbarOnLeft() ? NSUserInterfaceLayoutDirectionRightToLeft : NSUserInterfaceLayoutDirectionLeftToRight;
 #else
     UNUSED_PARAM(scrollbar);
 #endif

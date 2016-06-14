@@ -123,6 +123,7 @@ public:
     void setCacheModel(int);
     void setAsynchronousSpellCheckingEnabled(bool);
     void setDownloadAttributeEnabled(bool);
+    void setAllowsAnySSLCertificate(bool);
 
     // Special DOM functions.
     void clearBackForwardList();
@@ -319,6 +320,10 @@ public:
     void callDidRemoveSwipeSnapshotCallback();
 
     void clearTestRunnerCallbacks();
+
+    void accummulateLogsForChannel(JSStringRef channel);
+
+    unsigned imageCountInGeneralPasteboard() const;
 
 private:
     TestRunner();

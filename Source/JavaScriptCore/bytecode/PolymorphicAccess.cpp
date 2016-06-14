@@ -48,14 +48,6 @@ namespace JSC {
 
 static const bool verbose = false;
 
-// EncodedJSValue in JSVALUE32_64 is a 64-bit integer. When being compiled in ARM EABI, it must be aligned on an even-numbered register (r0, r2 or [sp]).
-// To prevent the assembler from using wrong registers, let's occupy r1 or r3 with a dummy argument when necessary.
-#if (COMPILER_SUPPORTS(EABI) && CPU(ARM)) || CPU(MIPS)
-#define EABI_32BIT_DUMMY_ARG      CCallHelpers::TrustedImm32(0),
-#else
-#define EABI_32BIT_DUMMY_ARG
-#endif
-
 void AccessGenerationResult::dump(PrintStream& out) const
 {
     out.print(m_kind);
@@ -172,7 +164,7 @@ CallSiteIndex AccessGenerationState::originalCallSiteIndex() const { return stub
 void AccessGenerationState::emitExplicitExceptionHandler()
 {
     restoreScratch();
-    jit->copyCalleeSavesToVMCalleeSavesBuffer();
+    jit->copyCalleeSavesToVMEntryFrameCalleeSavesBuffer();
     if (needsToRestoreRegistersIfException()) {
         // To the JIT that produces the original exception handling
         // call site, they will expect the OSR exit to be arrived
@@ -552,6 +544,27 @@ bool AccessCase::visitWeak(VM& vm) const
             return false;
     }
     return true;
+}
+
+bool AccessCase::propagateTransitions(SlotVisitor& visitor) const
+{
+    bool result = true;
+    
+    if (m_structure)
+        result &= m_structure->markIfCheap(visitor);
+    
+    switch (m_type) {
+    case Transition:
+        if (Heap::isMarked(m_structure->previousID()))
+            visitor.appendUnbarrieredReadOnlyPointer(m_structure.get());
+        else
+            result = false;
+        break;
+    default:
+        break;
+    }
+    
+    return result;
 }
 
 void AccessCase::generateWithGuard(
@@ -1074,6 +1087,8 @@ void AccessCase::generateImpl(AccessGenerationState& state)
             // getter: EncodedJSValue (*GetValueFunc)(ExecState*, EncodedJSValue thisValue, PropertyName);
             // setter: void (*PutValueFunc)(ExecState*, EncodedJSValue thisObject, EncodedJSValue value);
             // Custom values are passed the slotBase (the property holder), custom accessors are passed the thisVaule (reciever).
+            // FIXME: Remove this differences in custom values and custom accessors.
+            // https://bugs.webkit.org/show_bug.cgi?id=158014
             GPRReg baseForCustomValue = m_type == CustomValueGetter || m_type == CustomValueSetter ? baseForAccessGPR : baseForGetGPR;
 #if USE(JSVALUE64)
             if (m_type == CustomValueGetter || m_type == CustomAccessorGetter) {
@@ -1125,8 +1140,7 @@ void AccessCase::generateImpl(AccessGenerationState& state)
             if (verbose)
                 dataLog("Have type: ", type->descriptor(), "\n");
             state.failAndRepatch.append(
-                jit.branchIfNotType(
-                    valueRegs, scratchGPR, type->descriptor(), CCallHelpers::HaveTagRegisters));
+                jit.branchIfNotType(valueRegs, scratchGPR, type->descriptor()));
         } else if (verbose)
             dataLog("Don't have type.\n");
         
@@ -1156,8 +1170,7 @@ void AccessCase::generateImpl(AccessGenerationState& state)
             if (verbose)
                 dataLog("Have type: ", type->descriptor(), "\n");
             state.failAndRepatch.append(
-                jit.branchIfNotType(
-                    valueRegs, scratchGPR, type->descriptor(), CCallHelpers::HaveTagRegisters));
+                jit.branchIfNotType(valueRegs, scratchGPR, type->descriptor()));
         } else if (verbose)
             dataLog("Don't have type.\n");
         
@@ -1406,7 +1419,7 @@ PolymorphicAccess::~PolymorphicAccess() { }
 
 AccessGenerationResult PolymorphicAccess::addCases(
     VM& vm, CodeBlock* codeBlock, StructureStubInfo& stubInfo, const Identifier& ident,
-    Vector<std::unique_ptr<AccessCase>> originalCasesToAdd)
+    Vector<std::unique_ptr<AccessCase>, 2> originalCasesToAdd)
 {
     SuperSamplerScope superSamplerScope(false);
     
@@ -1467,7 +1480,7 @@ AccessGenerationResult PolymorphicAccess::addCase(
     VM& vm, CodeBlock* codeBlock, StructureStubInfo& stubInfo, const Identifier& ident,
     std::unique_ptr<AccessCase> newAccess)
 {
-    Vector<std::unique_ptr<AccessCase>> newAccesses;
+    Vector<std::unique_ptr<AccessCase>, 2> newAccesses;
     newAccesses.append(WTFMove(newAccess));
     return addCases(vm, codeBlock, stubInfo, ident, WTFMove(newAccesses));
 }
@@ -1485,6 +1498,14 @@ bool PolymorphicAccess::visitWeak(VM& vm) const
         }
     }
     return true;
+}
+
+bool PolymorphicAccess::propagateTransitions(SlotVisitor& visitor) const
+{
+    bool result = true;
+    for (unsigned i = 0; i < size(); ++i)
+        result &= at(i).propagateTransitions(visitor);
+    return result;
 }
 
 void PolymorphicAccess::dump(PrintStream& out) const

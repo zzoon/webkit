@@ -29,6 +29,7 @@
 #include "HitTestResult.h"
 #include "HTMLNames.h"
 #include "PaintInfo.h"
+#include "RenderChildIterator.h"
 #include "RenderNamedFlowFragment.h"
 #include "RenderTableCell.h"
 #include "RenderTableCol.h"
@@ -82,13 +83,13 @@ static inline void updateLogicalHeightForCell(RenderTableSection::RowStruct& row
     }
 }
 
-RenderTableSection::RenderTableSection(Element& element, Ref<RenderStyle>&& style)
+RenderTableSection::RenderTableSection(Element& element, RenderStyle&& style)
     : RenderBox(element, WTFMove(style), 0)
 {
     setInline(false);
 }
 
-RenderTableSection::RenderTableSection(Document& document, Ref<RenderStyle>&& style)
+RenderTableSection::RenderTableSection(Document& document, RenderStyle&& style)
     : RenderBox(document, WTFMove(style), 0)
 {
     setInline(false);
@@ -570,11 +571,11 @@ void RenderTableSection::layoutRows()
             bool flexAllChildren = cell->style().logicalHeight().isFixed()
                 || (!table()->style().logicalHeight().isAuto() && rHeight != cell->logicalHeight());
 
-            for (RenderObject* renderer = cell->firstChild(); renderer; renderer = renderer->nextSibling()) {
-                if (!is<RenderText>(*renderer) && renderer->style().logicalHeight().isPercentOrCalculated() && (flexAllChildren || ((renderer->isReplaced() || (is<RenderBox>(*renderer) && downcast<RenderBox>(*renderer).scrollsOverflow())) && !is<RenderTextControl>(*renderer)))) {
+            for (auto& renderer : childrenOfType<RenderObject>(*cell)) {
+                if (!is<RenderText>(renderer) && renderer.style().logicalHeight().isPercentOrCalculated() && (flexAllChildren || ((renderer.isReplaced() || (is<RenderBox>(renderer) && downcast<RenderBox>(renderer).scrollsOverflow())) && !is<RenderTextControl>(renderer)))) {
                     // Tables with no sections do not flex.
-                    if (!is<RenderTable>(*renderer) || downcast<RenderTable>(*renderer).hasSections()) {
-                        renderer->setNeedsLayout(MarkOnlyThis);
+                    if (!is<RenderTable>(renderer) || downcast<RenderTable>(renderer).hasSections()) {
+                        renderer.setNeedsLayout(MarkOnlyThis);
                         cellChildrenFlex = true;
                     }
                 }
@@ -1198,7 +1199,7 @@ void RenderTableSection::paintRowGroupBorderIfRequired(const PaintInfo& paintInf
 
 }
 
-static BoxSide physicalBorderForDirection(RenderStyle* styleForCellFlow, CollapsedBorderSide side)
+static BoxSide physicalBorderForDirection(const RenderStyle* styleForCellFlow, CollapsedBorderSide side)
 {
 
     switch (side) {
@@ -1578,7 +1579,7 @@ CollapsedBorderValue RenderTableSection::cachedCollapsedBorder(const RenderTable
 
 RenderTableSection* RenderTableSection::createAnonymousWithParentRenderer(const RenderObject* parent)
 {
-    auto section = new RenderTableSection(parent->document(), RenderStyle::createAnonymousStyleWithDisplay(&parent->style(), TABLE_ROW_GROUP));
+    auto section = new RenderTableSection(parent->document(), RenderStyle::createAnonymousStyleWithDisplay(parent->style(), TABLE_ROW_GROUP));
     section->initializeStyle();
     return section;
 }

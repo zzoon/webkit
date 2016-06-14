@@ -53,7 +53,7 @@ namespace JSC { namespace DFG {
     macro(ToThis, NodeResultJS) \
     macro(CreateThis, NodeResultJS) /* Note this is not MustGenerate since we're returning it anyway. */ \
     macro(GetCallee, NodeResultJS) \
-    macro(GetArgumentCount, NodeResultInt32) \
+    macro(GetArgumentCountIncludingThis, NodeResultInt32) \
     \
     /* Nodes for local variable access. These nodes are linked together using Phi nodes. */\
     /* Any two nodes that are part of the same Phi graph will share the same */\
@@ -153,7 +153,7 @@ namespace JSC { namespace DFG {
     macro(ArithMin, NodeResultNumber) \
     macro(ArithMax, NodeResultNumber) \
     macro(ArithFRound, NodeResultNumber) \
-    macro(ArithPow, NodeResultNumber) \
+    macro(ArithPow, NodeResultDouble) \
     macro(ArithRandom, NodeResultDouble | NodeMustGenerate) \
     macro(ArithRound, NodeResultNumber) \
     macro(ArithFloor, NodeResultNumber) \
@@ -176,7 +176,9 @@ namespace JSC { namespace DFG {
     /* this must be the directly subsequent property put. Note that PutByVal */\
     /* opcodes use VarArgs beause they may have up to 4 children. */\
     macro(GetByVal, NodeResultJS | NodeMustGenerate) \
+    macro(GetByValWithThis, NodeResultJS | NodeMustGenerate) \
     macro(GetMyArgumentByVal, NodeResultJS | NodeMustGenerate) \
+    macro(GetMyArgumentByValOutOfBounds, NodeResultJS | NodeMustGenerate) \
     macro(LoadVarargs, NodeMustGenerate) \
     macro(ForwardVarargs, NodeMustGenerate) \
     macro(PutByValDirect, NodeMustGenerate | NodeHasVarArgs) \
@@ -185,15 +187,19 @@ namespace JSC { namespace DFG {
     macro(TryGetById, NodeResultJS) \
     macro(GetById, NodeResultJS | NodeMustGenerate) \
     macro(GetByIdFlush, NodeResultJS | NodeMustGenerate) \
+    macro(GetByIdWithThis, NodeResultJS | NodeMustGenerate) \
     macro(PutById, NodeMustGenerate) \
     macro(PutByIdFlush, NodeMustGenerate) \
     macro(PutByIdDirect, NodeMustGenerate) \
+    macro(PutByIdWithThis, NodeMustGenerate) \
+    macro(PutByValWithThis, NodeMustGenerate | NodeHasVarArgs) \
     macro(PutGetterById, NodeMustGenerate) \
     macro(PutSetterById, NodeMustGenerate) \
     macro(PutGetterSetterById, NodeMustGenerate) \
     macro(PutGetterByVal, NodeMustGenerate) \
     macro(PutSetterByVal, NodeMustGenerate) \
     macro(DeleteById, NodeResultBoolean | NodeMustGenerate) \
+    macro(DeleteByVal, NodeResultBoolean | NodeMustGenerate) \
     macro(CheckStructure, NodeMustGenerate) \
     macro(GetExecutable, NodeResultJS) \
     macro(PutStructure, NodeMustGenerate) \
@@ -245,6 +251,7 @@ namespace JSC { namespace DFG {
     macro(RegExpExec, NodeResultJS | NodeMustGenerate) \
     macro(RegExpTest, NodeResultJS | NodeMustGenerate) \
     macro(StringReplace, NodeResultJS | NodeMustGenerate) \
+    macro(StringReplaceRegExp, NodeResultJS | NodeMustGenerate) \
     \
     /* Optimizations for string access */ \
     macro(StringCharCodeAt, NodeResultInt32) \
@@ -296,16 +303,10 @@ namespace JSC { namespace DFG {
     macro(MaterializeCreateActivation, NodeResultJS | NodeHasVarArgs) \
     \
     /* Nodes for misc operations. */\
-    macro(ProfileWillCall, NodeMustGenerate) \
-    macro(ProfileDidCall, NodeMustGenerate) \
     macro(OverridesHasInstance, NodeMustGenerate | NodeResultBoolean) \
     macro(InstanceOf, NodeResultBoolean) \
     macro(InstanceOfCustom, NodeMustGenerate | NodeResultBoolean) \
-    \
-    /* I'd like to call this IsArray but then we get namespace problems with the indexing type name. Also, it is marked must generate because it can throw. */ \
-    macro(IsArrayObject, NodeMustGenerate | NodeResultBoolean) \
-    macro(IsJSArray, NodeResultBoolean) \
-    macro(IsArrayConstructor, NodeResultBoolean) \
+    macro(IsEmpty, NodeResultBoolean) \
     macro(IsUndefined, NodeResultBoolean) \
     macro(IsBoolean, NodeResultBoolean) \
     macro(IsNumber, NodeResultBoolean) \
@@ -318,7 +319,6 @@ namespace JSC { namespace DFG {
     macro(LogicalNot, NodeResultBoolean) \
     macro(ToPrimitive, NodeResultJS | NodeMustGenerate) \
     macro(ToString, NodeResultJS | NodeMustGenerate) \
-    macro(CallObjectConstructor, NodeResultJS) \
     macro(CallStringConstructor, NodeResultJS | NodeMustGenerate) \
     macro(NewStringObject, NodeResultJS) \
     macro(MakeRope, NodeResultJS) \

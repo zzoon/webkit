@@ -61,6 +61,8 @@
 #include "HTMLElement.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLNames.h"
+#include "HTMLScriptElement.h"
+#include "HTMLStyleElement.h"
 #include "HTMLTemplateElement.h"
 #include "HitTestResult.h"
 #include "InspectorClient.h"
@@ -712,7 +714,7 @@ void InspectorDOMAgent::removeNode(ErrorString& errorString, int nodeId)
         return;
     }
 
-    m_domEditor->removeChild(parentNode, node, errorString);
+    m_domEditor->removeChild(*parentNode, *node, errorString);
 }
 
 void InspectorDOMAgent::setNodeName(ErrorString& errorString, int nodeId, const String& tagName, int* newId)
@@ -724,7 +726,7 @@ void InspectorDOMAgent::setNodeName(ErrorString& errorString, int nodeId, const 
         return;
 
     ExceptionCode ec = 0;
-    RefPtr<Element> newElement = oldNode->document().createElementForBindings(tagName, ec);
+    auto newElement = oldNode->document().createElementForBindings(tagName, ec);
     if (ec)
         return;
 
@@ -734,15 +736,15 @@ void InspectorDOMAgent::setNodeName(ErrorString& errorString, int nodeId, const 
     // Copy over the original node's children.
     RefPtr<Node> child;
     while ((child = oldNode->firstChild())) {
-        if (!m_domEditor->insertBefore(newElement.get(), child.get(), 0, errorString))
+        if (!m_domEditor->insertBefore(*newElement, *child, 0, errorString))
             return;
     }
 
     // Replace the old node with the new node
     RefPtr<ContainerNode> parent = oldNode->parentNode();
-    if (!m_domEditor->insertBefore(parent.get(), newElement.get(), oldNode->nextSibling(), errorString))
+    if (!m_domEditor->insertBefore(*parent, *newElement, oldNode->nextSibling(), errorString))
         return;
-    if (!m_domEditor->removeChild(parent.get(), oldNode.get(), errorString))
+    if (!m_domEditor->removeChild(*parent, *oldNode, errorString))
         return;
 
     *newId = pushNodePathToFrontend(newElement.get());
@@ -1180,7 +1182,7 @@ void InspectorDOMAgent::moveTo(ErrorString& errorString, int nodeId, int targetE
         }
     }
 
-    if (!m_domEditor->insertBefore(targetElement, node, anchorNode, errorString))
+    if (!m_domEditor->insertBefore(*targetElement, *node, anchorNode, errorString))
         return;
 
     *newNodeId = pushNodePathToFrontend(node);
@@ -1359,10 +1361,8 @@ Ref<Inspector::Protocol::DOM::Node> InspectorDOMAgent::buildObjectForNode(Node* 
             value->setShadowRoots(WTFMove(shadowRoots));
         }
 
-#if ENABLE(TEMPLATE_ELEMENT)
         if (is<HTMLTemplateElement>(element))
-            value->setTemplateContent(buildObjectForNode(downcast<HTMLTemplateElement>(element).content(), 0, nodesMap));
-#endif
+            value->setTemplateContent(buildObjectForNode(&downcast<HTMLTemplateElement>(element).content(), 0, nodesMap));
 
         if (is<HTMLStyleElement>(element) || (is<HTMLScriptElement>(element) && !element.fastHasAttribute(HTMLNames::srcAttr)))
             value->setContentSecurityPolicyHash(computeContentSecurityPolicySHA256Hash(element));
@@ -1466,18 +1466,20 @@ Ref<Inspector::Protocol::DOM::EventListener> InspectorDOMAgent::buildObjectForEv
     JSC::JSObject* handler = nullptr;
     String body;
     int lineNumber = 0;
+    int columnNumber = 0;
     String scriptID;
     String sourceName;
     if (auto scriptListener = JSEventListener::cast(eventListener.get())) {
         JSC::JSLockHolder lock(scriptListener->isolatedWorld().vm());
         state = execStateFromNode(scriptListener->isolatedWorld(), &node->document());
         handler = scriptListener->jsFunction(&node->document());
-        if (handler) {
+        if (handler && state) {
             body = handler->toString(state)->value(state);
             if (auto function = JSC::jsDynamicCast<JSC::JSFunction*>(handler)) {
                 if (!function->isHostOrBuiltinFunction()) {
                     if (auto executable = function->jsExecutable()) {
                         lineNumber = executable->firstLine() - 1;
+                        columnNumber = executable->startColumn() - 1;
                         scriptID = executable->sourceID() == JSC::SourceProvider::nullID ? emptyString() : String::number(executable->sourceID());
                         sourceName = executable->sourceURL();
                     }
@@ -1503,6 +1505,7 @@ Ref<Inspector::Protocol::DOM::EventListener> InspectorDOMAgent::buildObjectForEv
             .setScriptId(scriptID)
             .setLineNumber(lineNumber)
             .release();
+        location->setColumnNumber(columnNumber);
         value->setLocation(WTFMove(location));
         if (!sourceName.isEmpty())
             value->setSourceName(sourceName);
@@ -1725,7 +1728,7 @@ RefPtr<Inspector::Protocol::DOM::AccessibilityProperties> InspectorDOMAgent::bui
                 pressed = axObject->isPressed();
             
             if (axObject->isTextControl())
-                readonly = axObject->isReadOnly();
+                readonly = !axObject->canSetValueAttribute();
 
             supportsRequired = axObject->supportsRequiredAttribute();
             if (supportsRequired)
@@ -1849,6 +1852,8 @@ Node* InspectorDOMAgent::innerParentNode(Node* node)
     ASSERT(node);
     if (is<Document>(*node))
         return downcast<Document>(*node).ownerElement();
+    if (is<ShadowRoot>(*node))
+        return downcast<ShadowRoot>(*node).host();
     return node->parentNode();
 }
 
@@ -1868,7 +1873,7 @@ void InspectorDOMAgent::mainFrameDOMContentLoaded()
 
 void InspectorDOMAgent::didCommitLoad(Document* document)
 {
-    Element* frameOwner = document->ownerElement();
+    RefPtr<Element> frameOwner = document->ownerElement();
     if (!frameOwner)
         return;
 
@@ -1877,12 +1882,12 @@ void InspectorDOMAgent::didCommitLoad(Document* document)
         return;
 
     // Re-add frame owner element together with its new children.
-    int parentId = m_documentNodeToIdMap.get(innerParentNode(frameOwner));
+    int parentId = m_documentNodeToIdMap.get(innerParentNode(frameOwner.get()));
     m_frontendDispatcher->childNodeRemoved(parentId, frameOwnerId);
-    unbind(frameOwner, &m_documentNodeToIdMap);
+    unbind(frameOwner.get(), &m_documentNodeToIdMap);
 
-    Ref<Inspector::Protocol::DOM::Node> value = buildObjectForNode(frameOwner, 0, &m_documentNodeToIdMap);
-    Node* previousSibling = innerPreviousSibling(frameOwner);
+    Ref<Inspector::Protocol::DOM::Node> value = buildObjectForNode(frameOwner.get(), 0, &m_documentNodeToIdMap);
+    Node* previousSibling = innerPreviousSibling(frameOwner.get());
     int prevId = previousSibling ? m_documentNodeToIdMap.get(previousSibling) : 0;
     m_frontendDispatcher->childNodeInserted(parentId, prevId, WTFMove(value));
 }

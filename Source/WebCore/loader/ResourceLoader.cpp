@@ -53,25 +53,16 @@
 #include <wtf/Ref.h>
 
 #if ENABLE(CONTENT_EXTENSIONS)
-#include "ResourceLoadInfo.h"
 #include "UserContentController.h"
 #endif
 
 namespace WebCore {
 
-ResourceLoader::ResourceLoader(Frame* frame, ResourceLoaderOptions options)
-    : m_frame(frame)
-    , m_documentLoader(frame->loader().activeDocumentLoader())
-    , m_identifier(0)
-    , m_reachedTerminalState(false)
-    , m_notifiedLoadComplete(false)
-    , m_cancellationStatus(NotCancelled)
-    , m_defersLoading(options.defersLoadingPolicy() == DefersLoadingPolicy::AllowDefersLoading && frame->page()->defersLoading())
+ResourceLoader::ResourceLoader(Frame& frame, ResourceLoaderOptions options)
+    : m_frame(&frame)
+    , m_documentLoader(frame.loader().activeDocumentLoader())
+    , m_defersLoading(options.defersLoadingPolicy() == DefersLoadingPolicy::AllowDefersLoading && frame.page()->defersLoading())
     , m_options(options)
-    , m_isQuickLookResource(false)
-#if ENABLE(CONTENT_EXTENSIONS)
-    , m_resourceType(ResourceType::Invalid)
-#endif
 {
 }
 
@@ -99,7 +90,7 @@ void ResourceLoader::releaseResources()
     // deallocated and release the last reference to this object.
     // We need to retain to avoid accessing the object after it
     // has been deallocated and also to avoid reentering this method.
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
 
     m_frame = nullptr;
     m_documentLoader = nullptr;
@@ -171,7 +162,7 @@ bool ResourceLoader::init(const ResourceRequest& r)
 
 void ResourceLoader::deliverResponseAndData(const ResourceResponse& response, RefPtr<SharedBuffer>&& buffer)
 {
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
 
     didReceiveResponse(response);
     if (reachedTerminalState())
@@ -179,7 +170,7 @@ void ResourceLoader::deliverResponseAndData(const ResourceResponse& response, Re
 
     if (buffer) {
         unsigned size = buffer->size();
-        didReceiveBuffer(buffer.release(), size, DataPayloadWholeResource);
+        didReceiveBuffer(buffer.releaseNonNull(), size, DataPayloadWholeResource);
         if (reachedTerminalState())
             return;
     }
@@ -195,11 +186,11 @@ void ResourceLoader::start()
     ASSERT(frameLoader());
 
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
-    if (m_documentLoader->scheduleArchiveLoad(this, m_request))
+    if (m_documentLoader->scheduleArchiveLoad(*this, m_request))
         return;
 #endif
 
-    if (m_documentLoader->applicationCacheHost()->maybeLoadResource(this, m_request, m_request.url()))
+    if (m_documentLoader->applicationCacheHost()->maybeLoadResource(*this, m_request, m_request.url()))
         return;
 
     if (m_defersLoading) {
@@ -247,32 +238,32 @@ void ResourceLoader::loadDataURL()
     auto url = m_request.url();
     ASSERT(url.protocolIsData());
 
-    RefPtr<ResourceLoader> loader(this);
+    RefPtr<ResourceLoader> protectedThis(this);
     DataURLDecoder::ScheduleContext scheduleContext;
 #if HAVE(RUNLOOP_TIMER)
     if (auto* scheduledPairs = m_frame->page()->scheduledRunLoopPairs())
         scheduleContext.scheduledPairs = *scheduledPairs;
 #endif
-    DataURLDecoder::decode(url, scheduleContext, [loader, url] (Optional<DataURLDecoder::Result> decodeResult) {
-        if (loader->reachedTerminalState())
+    DataURLDecoder::decode(url, scheduleContext, [protectedThis, url](auto decodeResult) {
+        if (protectedThis->reachedTerminalState())
             return;
         if (!decodeResult) {
-            loader->didFail(ResourceError(errorDomainWebKitInternal, 0, url, "Data URL decoding failed"));
+            protectedThis->didFail(ResourceError(errorDomainWebKitInternal, 0, url, "Data URL decoding failed"));
             return;
         }
-        if (loader->wasCancelled())
+        if (protectedThis->wasCancelled())
             return;
         auto& result = decodeResult.value();
-        auto dataSize = result.data->size();
+        auto dataSize = result.data ? result.data->size() : 0;
 
         ResourceResponse dataResponse { url, result.mimeType, dataSize, result.charset };
-        loader->didReceiveResponse(dataResponse);
+        protectedThis->didReceiveResponse(dataResponse);
 
-        if (!loader->reachedTerminalState() && dataSize)
-            loader->didReceiveBuffer(result.data.get(), dataSize, DataPayloadWholeResource);
+        if (!protectedThis->reachedTerminalState() && dataSize)
+            protectedThis->didReceiveBuffer(result.data.releaseNonNull(), dataSize, DataPayloadWholeResource);
 
-        if (!loader->reachedTerminalState())
-            loader->didFinishLoading(currentTime());
+        if (!protectedThis->reachedTerminalState())
+            protectedThis->didFinishLoading(currentTime());
     });
 }
 
@@ -298,19 +289,18 @@ void ResourceLoader::addDataOrBuffer(const char* data, unsigned length, SharedBu
     if (m_options.dataBufferingPolicy() == DoNotBufferData)
         return;
 
-    if (dataPayloadType == DataPayloadWholeResource) {
-        m_resourceData = buffer ? buffer : SharedBuffer::create(data, length);
+    if (!m_resourceData || dataPayloadType == DataPayloadWholeResource) {
+        if (buffer)
+            m_resourceData = buffer;
+        else
+            m_resourceData = SharedBuffer::create(data, length);
         return;
     }
-        
-    if (!m_resourceData)
-        m_resourceData = buffer ? buffer : SharedBuffer::create(data, length);
-    else {
-        if (buffer)
-            m_resourceData->append(buffer);
-        else
-            m_resourceData->append(data, length);
-    }
+    
+    if (buffer)
+        m_resourceData->append(*buffer);
+    else
+        m_resourceData->append(data, length);
 }
 
 void ResourceLoader::clearResourceData()
@@ -328,7 +318,7 @@ void ResourceLoader::willSendRequestInternal(ResourceRequest& request, const Res
 {
     // Protect this in this delegate method since the additional processing can do
     // anything including possibly derefing this; one example of this is Radar 3266216.
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
 
     ASSERT(!m_reachedTerminalState);
 #if ENABLE(CONTENT_EXTENSIONS)
@@ -346,8 +336,11 @@ void ResourceLoader::willSendRequestInternal(ResourceRequest& request, const Res
     if (frameLoader()) {
         Page* page = frameLoader()->frame().page();
         if (page && m_documentLoader) {
-            if (page->userContentProvider().processContentExtensionRulesForLoad(request, m_resourceType, *m_documentLoader) == ContentExtensions::BlockedStatus::Blocked)
+            if (page->userContentProvider().processContentExtensionRulesForLoad(request, m_resourceType, *m_documentLoader) == ContentExtensions::BlockedStatus::Blocked) {
                 request = { };
+                didFail(blockedByContentBlockerError());
+                return;
+            }
         }
     }
 #endif
@@ -403,7 +396,7 @@ void ResourceLoader::didSendData(unsigned long long, unsigned long long)
 
 static void logResourceResponseSource(Frame* frame, ResourceResponse::Source source)
 {
-    if (!frame)
+    if (!frame || !frame->page())
         return;
 
     String sourceKey;
@@ -423,7 +416,7 @@ static void logResourceResponseSource(Frame* frame, ResourceResponse::Source sou
         return;
     }
 
-    frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceResponseKey(), DiagnosticLoggingKeys::sourceKey(), sourceKey, ShouldSample::Yes);
+    frame->page()->diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceResponseKey(), DiagnosticLoggingKeys::sourceKey(), sourceKey, ShouldSample::Yes);
 }
 
 void ResourceLoader::didReceiveResponse(const ResourceResponse& r)
@@ -432,7 +425,7 @@ void ResourceLoader::didReceiveResponse(const ResourceResponse& r)
 
     // Protect this in this delegate method since the additional processing can do
     // anything including possibly derefing this; one example of this is Radar 3266216.
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
 
     logResourceResponseSource(m_frame.get(), r.source());
 
@@ -459,23 +452,22 @@ void ResourceLoader::didReceiveData(const char* data, unsigned length, long long
     // ASSERT(con == connection);
     // ASSERT(!m_reachedTerminalState);
 
-    didReceiveDataOrBuffer(data, length, 0, encodedDataLength, dataPayloadType);
+    didReceiveDataOrBuffer(data, length, nullptr, encodedDataLength, dataPayloadType);
 }
 
-void ResourceLoader::didReceiveBuffer(PassRefPtr<SharedBuffer> buffer, long long encodedDataLength, DataPayloadType dataPayloadType)
+void ResourceLoader::didReceiveBuffer(Ref<SharedBuffer>&& buffer, long long encodedDataLength, DataPayloadType dataPayloadType)
 {
-    didReceiveDataOrBuffer(0, 0, buffer, encodedDataLength, dataPayloadType);
+    didReceiveDataOrBuffer(nullptr, 0, WTFMove(buffer), encodedDataLength, dataPayloadType);
 }
 
-void ResourceLoader::didReceiveDataOrBuffer(const char* data, unsigned length, PassRefPtr<SharedBuffer> prpBuffer, long long encodedDataLength, DataPayloadType dataPayloadType)
+void ResourceLoader::didReceiveDataOrBuffer(const char* data, unsigned length, RefPtr<SharedBuffer>&& buffer, long long encodedDataLength, DataPayloadType dataPayloadType)
 {
     // This method should only get data+length *OR* a SharedBuffer.
-    ASSERT(!prpBuffer || (!data && !length));
+    ASSERT(!buffer || (!data && !length));
 
     // Protect this in this delegate method since the additional processing can do
     // anything including possibly derefing this; one example of this is Radar 3266216.
-    Ref<ResourceLoader> protect(*this);
-    RefPtr<SharedBuffer> buffer = prpBuffer;
+    Ref<ResourceLoader> protectedThis(*this);
 
     addDataOrBuffer(data, length, buffer.get(), dataPayloadType);
     
@@ -520,7 +512,7 @@ void ResourceLoader::didFail(const ResourceError& error)
 
     // Protect this in this delegate method since the additional processing can do
     // anything including possibly derefing this; one example of this is Radar 3266216.
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
 
     cleanupForError(error);
     releaseResources();
@@ -553,7 +545,7 @@ void ResourceLoader::cancel(const ResourceError& error)
     
     // willCancel() and didFailToLoad() both call out to clients that might do 
     // something causing the last reference to this object to go away.
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
     
     // If we re-enter cancel() from inside willCancel(), we want to pick up from where we left 
     // off without re-running willCancel()
@@ -603,16 +595,22 @@ ResourceError ResourceLoader::blockedError()
     return frameLoader()->client().blockedError(m_request);
 }
 
+ResourceError ResourceLoader::blockedByContentBlockerError()
+{
+    return frameLoader()->client().blockedByContentBlockerError(m_request);
+}
+
 ResourceError ResourceLoader::cannotShowURLError()
 {
     return frameLoader()->client().cannotShowURLError(m_request);
 }
 
-void ResourceLoader::willSendRequest(ResourceHandle*, ResourceRequest& request, const ResourceResponse& redirectResponse)
+ResourceRequest ResourceLoader::willSendRequest(ResourceHandle*, ResourceRequest&& request, ResourceResponse&& redirectResponse)
 {
     if (documentLoader()->applicationCacheHost()->maybeLoadFallbackForRedirect(this, request, redirectResponse))
-        return;
+        return WTFMove(request);
     willSendRequestInternal(request, redirectResponse);
+    return WTFMove(request);
 }
 
 void ResourceLoader::didSendData(ResourceHandle*, unsigned long long bytesSent, unsigned long long totalBytesToBeSent)
@@ -632,9 +630,9 @@ void ResourceLoader::didReceiveData(ResourceHandle*, const char* data, unsigned 
     didReceiveData(data, length, encodedDataLength, DataPayloadBytes);
 }
 
-void ResourceLoader::didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer> buffer, int encodedDataLength)
+void ResourceLoader::didReceiveBuffer(ResourceHandle*, Ref<SharedBuffer>&& buffer, int encodedDataLength)
 {
-    didReceiveBuffer(buffer, encodedDataLength, DataPayloadBytes);
+    didReceiveBuffer(WTFMove(buffer), encodedDataLength, DataPayloadBytes);
 }
 
 void ResourceLoader::didFinishLoading(ResourceHandle*, double finishTime)
@@ -664,7 +662,7 @@ bool ResourceLoader::shouldUseCredentialStorage()
     if (m_options.allowCredentials() == DoNotAllowStoredCredentials)
         return false;
     
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
     return frameLoader()->client().shouldUseCredentialStorage(documentLoader(), identifier());
 }
 
@@ -679,7 +677,7 @@ void ResourceLoader::didReceiveAuthenticationChallenge(const AuthenticationChall
 
     // Protect this in this delegate method since the additional processing can do
     // anything including possibly derefing this; one example of this is Radar 3266216.
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
 
     if (m_options.allowCredentials() == AllowStoredCredentials) {
         if (isAllowedToAskUserForCredentials()) {
@@ -701,7 +699,7 @@ void ResourceLoader::didCancelAuthenticationChallenge(const AuthenticationChalle
 {
     // Protect this in this delegate method since the additional processing can do
     // anything including possibly derefing this; one example of this is Radar 3266216.
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
     frameLoader()->notifier().didCancelAuthenticationChallenge(this, challenge);
 }
 
@@ -709,7 +707,7 @@ void ResourceLoader::didCancelAuthenticationChallenge(const AuthenticationChalle
 
 bool ResourceLoader::canAuthenticateAgainstProtectionSpace(const ProtectionSpace& protectionSpace)
 {
-    Ref<ResourceLoader> protect(*this);
+    Ref<ResourceLoader> protectedThis(*this);
     return frameLoader()->client().canAuthenticateAgainstProtectionSpace(documentLoader(), identifier(), protectionSpace);
 }
 

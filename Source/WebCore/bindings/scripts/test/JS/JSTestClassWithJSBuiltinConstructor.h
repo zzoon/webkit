@@ -18,8 +18,7 @@
     Boston, MA 02110-1301, USA.
 */
 
-#ifndef JSTestClassWithJSBuiltinConstructor_h
-#define JSTestClassWithJSBuiltinConstructor_h
+#pragma once
 
 #include "JSDOMWrapper.h"
 #include "TestClassWithJSBuiltinConstructor.h"
@@ -82,11 +81,10 @@ inline void* wrapperKey(TestClassWithJSBuiltinConstructor* wrappableObject)
     return wrappableObject;
 }
 
-JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestClassWithJSBuiltinConstructor*);
-inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestClassWithJSBuiltinConstructor& impl) { return toJS(state, globalObject, &impl); }
-JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject*, TestClassWithJSBuiltinConstructor*);
+JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestClassWithJSBuiltinConstructor&);
+inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestClassWithJSBuiltinConstructor* impl) { return impl ? toJS(state, globalObject, *impl) : JSC::jsNull(); }
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject*, Ref<TestClassWithJSBuiltinConstructor>&&);
+inline JSC::JSValue toJSNewlyCreated(JSC::ExecState* state, JSDOMGlobalObject* globalObject, RefPtr<TestClassWithJSBuiltinConstructor>&& impl) { return impl ? toJSNewlyCreated(state, globalObject, impl.releaseNonNull()) : JSC::jsNull(); }
 
 
 } // namespace WebCore
-
-#endif

@@ -275,8 +275,8 @@ void DocumentLoader::mainReceivedError(const ResourceError& error)
 // but not loads initiated by child frames' data sources -- that's the WebFrame's job.
 void DocumentLoader::stopLoading()
 {
-    RefPtr<Frame> protectFrame(m_frame);
-    Ref<DocumentLoader> protectLoader(*this);
+    RefPtr<Frame> protectedFrame(m_frame);
+    Ref<DocumentLoader> protectedThis(*this);
 
     // In some rare cases, calling FrameLoader::stopLoading could cause isLoading() to return false.
     // (This can happen when there's a single XMLHttpRequest currently loading and stopLoading causes it
@@ -400,7 +400,7 @@ void DocumentLoader::finishedLoading(double finishTime)
     ASSERT(!m_frame->page()->defersLoading() || InspectorInstrumentation::isDebuggerPaused(m_frame));
 #endif
 
-    Ref<DocumentLoader> protect(*this);
+    Ref<DocumentLoader> protectedThis(*this);
 
     if (m_identifierForLoadWithoutResourceLoader) {
         // A didFinishLoading delegate might try to cancel the load (despite it
@@ -637,7 +637,7 @@ void DocumentLoader::responseReceived(CachedResource* resource, const ResourceRe
 #endif
 
     ASSERT_UNUSED(resource, m_mainResource == resource);
-    Ref<DocumentLoader> protect(*this);
+    Ref<DocumentLoader> protectedThis(*this);
     bool willLoadFallback = m_applicationCacheHost->maybeLoadFallbackForMainResponse(request(), response);
 
     // The memory cache doesn't understand the application cache or its caching rules. So if a main resource is served
@@ -805,8 +805,9 @@ void DocumentLoader::continueAfterContentPolicy(PolicyAction policy)
     }
 
     if (!isStopping() && m_substituteData.isValid() && isLoadingMainResource()) {
-        if (m_substituteData.content()->size())
-            dataReceived(0, m_substituteData.content()->data(), m_substituteData.content()->size());
+        auto content = m_substituteData.content();
+        if (content && content->size())
+            dataReceived(nullptr, content->data(), content->size());
         if (isLoadingMainResource())
             finishedLoading(0);
     }
@@ -816,8 +817,8 @@ void DocumentLoader::commitLoad(const char* data, int length)
 {
     // Both unloading the old page and parsing the new page may execute JavaScript which destroys the datasource
     // by starting a new load, so retain temporarily.
-    RefPtr<Frame> protectFrame(m_frame);
-    Ref<DocumentLoader> protectLoader(*this);
+    RefPtr<Frame> protectedFrame(m_frame);
+    Ref<DocumentLoader> protectedThis(*this);
 
     commitIfReady();
     FrameLoader* frameLoader = DocumentLoader::frameLoader();
@@ -999,8 +1000,8 @@ void DocumentLoader::detachFromFrame()
     else
         ASSERT_WITH_MESSAGE(m_frame, "detachFromFrame() is being called on a DocumentLoader that has never attached to any Frame");
 #endif
-    RefPtr<Frame> protectFrame(m_frame);
-    Ref<DocumentLoader> protectLoader(*this);
+    RefPtr<Frame> protectedFrame(m_frame);
+    Ref<DocumentLoader> protectedThis(*this);
 
     // It never makes sense to have a document loader that is detached from its
     // frame have any loads active, so kill all the loads.
@@ -1232,10 +1233,10 @@ void DocumentLoader::cancelPendingSubstituteLoad(ResourceLoader* loader)
 }
 
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
-bool DocumentLoader::scheduleArchiveLoad(ResourceLoader* loader, const ResourceRequest& request)
+bool DocumentLoader::scheduleArchiveLoad(ResourceLoader& loader, const ResourceRequest& request)
 {
     if (ArchiveResource* resource = archiveResourceForURL(request.url())) {
-        scheduleSubstituteResourceLoad(*loader, *resource);
+        scheduleSubstituteResourceLoad(loader, *resource);
         return true;
     }
 
@@ -1475,7 +1476,7 @@ void DocumentLoader::startLoadingMainResource()
     ASSERT(!timing().fetchStart());
     timing().markFetchStart();
 
-    Ref<DocumentLoader> protect(*this); // willSendRequest() may deallocate the provisional loader (which may be us) if it cancels the load.
+    Ref<DocumentLoader> protectedThis(*this); // willSendRequest() may deallocate the provisional loader (which may be us) if it cancels the load.
     willSendRequest(m_request, ResourceResponse());
 
     // willSendRequest() may lead to our Frame being detached or cancelling the load via nulling the ResourceRequest.
@@ -1504,10 +1505,8 @@ void DocumentLoader::startLoadingMainResource()
 
 #if ENABLE(CONTENT_EXTENSIONS)
     if (m_mainResource && m_mainResource->errorOccurred() && m_frame->page() && m_mainResource->resourceError().domain() == ContentExtensions::WebKitContentBlockerDomain) {
-        m_identifierForLoadWithoutResourceLoader = m_frame->page()->progress().createUniqueIdentifier();
-        frameLoader()->notifier().assignIdentifierToInitialRequest(m_identifierForLoadWithoutResourceLoader, this, request);
-        frameLoader()->notifier().dispatchDidFailLoading(this, m_identifierForLoadWithoutResourceLoader, frameLoader()->blockedByContentBlockerError(m_request));
-        m_mainResource = nullptr;
+        cancelMainResourceLoad(frameLoader()->blockedByContentBlockerError(m_request));
+        return;
     }
 #endif
 
@@ -1557,7 +1556,7 @@ void DocumentLoader::cancelPolicyCheckIfNeeded()
 
 void DocumentLoader::cancelMainResourceLoad(const ResourceError& resourceError)
 {
-    Ref<DocumentLoader> protect(*this);
+    Ref<DocumentLoader> protectedThis(*this);
     ResourceError error = resourceError.isNull() ? frameLoader()->cancelledError(m_request) : resourceError;
 
     m_dataLoadTimer.stop();
@@ -1705,10 +1704,9 @@ void DocumentLoader::installContentFilterUnblockHandler(ContentFilter& contentFi
     String unblockRequestDeniedScript { contentFilter.unblockRequestDeniedScript() };
     if (!unblockRequestDeniedScript.isEmpty() && frame) {
         static_assert(std::is_base_of<ThreadSafeRefCounted<Frame>, Frame>::value, "Frame must be ThreadSafeRefCounted.");
-        StringCapture capturedScript { unblockRequestDeniedScript };
-        unblockHandler.wrapWithDecisionHandler([frame, capturedScript](bool unblocked) {
+        unblockHandler.wrapWithDecisionHandler([frame = WTFMove(frame), script = unblockRequestDeniedScript.isolatedCopy()](bool unblocked) {
             if (!unblocked)
-                frame->script().executeScript(capturedScript.string());
+                frame->script().executeScript(script);
         });
     }
     frameLoader()->client().contentFilterDidBlockLoad(WTFMove(unblockHandler));

@@ -411,10 +411,6 @@ input::-webkit-textfield-decoration-container {
     content: none !important;
 }
 
-input[type="search"]::-webkit-textfield-decoration-container {
-    direction: ltr;
-}
-
 input::-webkit-clear-button {
     -webkit-appearance: searchfield-cancel-button;
     display: inline-block;
@@ -1209,11 +1205,9 @@ summary::-webkit-details-marker {
     margin-right: 0.4em;
 }
 
-#if defined(ENABLE_TEMPLATE_ELEMENT) && ENABLE_TEMPLATE_ELEMENT
 template {
     display: none;
 }
-#endif
 
 bdi, output {
     unicode-bidi: -webkit-isolate;

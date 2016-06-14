@@ -112,7 +112,7 @@ public:
     void synchronizeAnimatedSVGAttribute(const QualifiedName&) const;
     static void synchronizeAllAnimatedSVGAttribute(SVGElement*);
  
-    Optional<ElementStyle> resolveCustomStyle(RenderStyle& parentStyle, RenderStyle* shadowHostStyle) override;
+    Optional<ElementStyle> resolveCustomStyle(const RenderStyle& parentStyle, const RenderStyle* shadowHostStyle) override;
 
     static void synchronizeRequiredFeatures(SVGElement* contextElement);
     static void synchronizeRequiredExtensions(SVGElement* contextElement);
@@ -133,8 +133,8 @@ public:
 
     virtual bool haveLoadedRequiredResources();
 
-    bool addEventListener(const AtomicString& eventType, RefPtr<EventListener>&&, bool useCapture) override;
-    bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture) override;
+    bool addEventListener(const AtomicString& eventType, Ref<EventListener>&&, const AddEventListenerOptions&) override;
+    bool removeEventListener(const AtomicString& eventType, EventListener&, const ListenerOptions&) override;
     bool hasFocusEventListeners() const;
 
 #if ENABLE(CSS_REGIONS)
@@ -181,7 +181,7 @@ protected:
     class InstanceInvalidationGuard;
 
 private:
-    RenderStyle* computedStyle(PseudoId = NOPSEUDO) final;
+    const RenderStyle* computedStyle(PseudoId = NOPSEUDO) final;
 
     virtual bool isSupported(StringImpl* feature, StringImpl* version) const;
 

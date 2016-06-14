@@ -52,14 +52,30 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
         this.rowHeight = 20;
         this.resizers = [];
         this._columnWidthsInitialized = false;
+        this._scrollbarWidth = 0;
+
+        this._cachedScrollTop = NaN;
+        this._cachedScrollableOffsetHeight = NaN;
+        this._previousRevealedRowCount = NaN;
+        this._topDataTableMarginHeight = NaN;
+        this._bottomDataTableMarginHeight = NaN;
+
+        this._filterText = "";
+        this._filterDelegate = null;
+        this._filterDidModifyNodeWhileProcessingItems = false;
 
         this.element.className = "data-grid";
         this.element.tabIndex = 0;
         this.element.addEventListener("keydown", this._keyDown.bind(this), false);
         this.element.copyHandler = this;
 
+        this._headerWrapperElement = document.createElement("div");
+        this._headerWrapperElement.classList.add("header-wrapper");
+
         this._headerTableElement = document.createElement("table");
         this._headerTableElement.className = "header";
+        this._headerWrapperElement.appendChild(this._headerTableElement);
+
         this._headerTableColumnGroupElement = this._headerTableElement.createChild("colgroup");
         this._headerTableBodyElement = this._headerTableElement.createChild("tbody");
         this._headerTableRowElement = this._headerTableBodyElement.createChild("tr");
@@ -69,8 +85,8 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
         this._scrollContainerElement = document.createElement("div");
         this._scrollContainerElement.className = "data-container";
 
-        this._scrollListener = () => this.needsLayout();
-        this._scrollContainerElement.addEventListener("scroll", this._scrollListener);
+        this._scrollListener = () => this._noteScrollPositionChanged();
+        this._updateScrollListeners();
 
         this._topDataTableMarginElement = this._scrollContainerElement.createChild("div");
 
@@ -100,7 +116,7 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
 
         this._fillerRowElement = this.dataTableBodyElement.createChild("tr", "filler");
 
-        this.element.appendChild(this._headerTableElement);
+        this.element.appendChild(this._headerWrapperElement);
         this.element.appendChild(this._scrollContainerElement);
 
         if (preferredColumnOrder) {
@@ -110,6 +126,21 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
             for (var columnIdentifier in columnsData)
                 this.insertColumn(columnIdentifier, columnsData[columnIdentifier]);
         }
+
+        this._updateScrollbarPadding();
+    }
+
+    _updateScrollbarPadding()
+    {
+        if (this._inline)
+            return;
+
+        let scrollbarWidth = this._scrollContainerElement.offsetWidth - this._scrollContainerElement.scrollWidth;
+        if (this._scrollbarWidth === scrollbarWidth)
+            return;
+
+        this._headerWrapperElement.style.paddingRight = scrollbarWidth + "px";
+        this._scrollbarWidth = scrollbarWidth;
     }
 
     static createSortableDataGrid(columnNames, values)
@@ -258,10 +289,7 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
 
         this._element.classList.toggle("inline", this._inline);
 
-        if (this._inline || this._variableHeightRows)
-            this._scrollContainerElement.removeEventListener("scroll", this._scrollListener);
-        else
-            this._scrollContainerElement.addEventListener("scroll", this._scrollListener);
+        this._updateScrollListeners();
     }
 
     get variableHeightRows() { return this._variableHeightRows; }
@@ -275,10 +303,131 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
 
         this._element.classList.toggle("variable-height-rows", this._variableHeightRows);
 
-        if (this._inline || this._variableHeightRows)
+        this._updateScrollListeners();
+    }
+
+    get filterText() { return this._filterText; }
+
+    set filterText(x)
+    {
+        if (this._filterText === x)
+            return;
+
+        this._filterText = x;
+        this.filterDidChange();
+    }
+
+    get filterDelegate() { return this._filterDelegate; }
+
+    set filterDelegate(delegate)
+    {
+        this._filterDelegate = delegate;
+        this.filterDidChange();
+    }
+
+    filterDidChange()
+    {
+        if (this._scheduledFilterUpdateIdentifier)
+            return;
+
+        if (this._applyFilterToNodesTask) {
+            this._applyFilterToNodesTask.cancel();
+            this._applyFilterToNodesTask = null;
+        }
+
+        this._scheduledFilterUpdateIdentifier = requestAnimationFrame(this._updateFilter.bind(this));
+    }
+
+    hasCustomFilters()
+    {
+        return this._hasFilterDelegate();
+    }
+
+    matchNodeAgainstCustomFilters(node)
+    {
+        if (!this._hasFilterDelegate())
+            return true;
+        return this._filterDelegate.dataGridMatchNodeAgainstCustomFilters(node);
+    }
+
+    _updateScrollListeners()
+    {
+        if (this._inline || this._variableHeightRows) {
             this._scrollContainerElement.removeEventListener("scroll", this._scrollListener);
-        else
+            this._scrollContainerElement.removeEventListener("mousewheel", this._scrollListener);
+        } else {
             this._scrollContainerElement.addEventListener("scroll", this._scrollListener);
+            this._scrollContainerElement.addEventListener("mousewheel", this._scrollListener);
+        }
+    }
+
+    _applyFiltersToNode(node)
+    {
+        if (!this._textFilterRegex && !this.hasCustomFilters()) {
+            // No filters, so make everything visible.
+            node.hidden = false;
+
+            // If the node was expanded during filtering, collapse it again.
+            if (node.expanded && node[WebInspector.DataGrid.WasExpandedDuringFilteringSymbol]) {
+                node[WebInspector.DataGrid.WasExpandedDuringFilteringSymbol] = false;
+                node.collapse();
+            }
+
+            return;
+        }
+
+        let filterableData = node.filterableData || [];
+        let flags = {expandNode: false};
+        let filterRegex = this._textFilterRegex;
+
+        function matchTextFilter()
+        {
+            if (!filterableData.length || !filterRegex)
+                return true;
+
+            if (filterableData.some((value) => filterRegex.test(value))) {
+                flags.expandNode = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        function makeVisible()
+        {
+            // Make this element visible.
+            node.hidden = false;
+
+            // Make the ancestors visible and expand them.
+            let currentAncestor = node.parent;
+            while (currentAncestor && !currentAncestor.root) {
+                currentAncestor.hidden = false;
+
+                // Only expand if the built-in filters matched, not custom filters.
+                if (flags.expandNode && !currentAncestor.expanded) {
+                    currentAncestor[WebInspector.DataGrid.WasExpandedDuringFilteringSymbol] = true;
+                    currentAncestor.expand();
+                }
+
+                currentAncestor = currentAncestor.parent;
+            }
+        }
+
+        if (matchTextFilter() && this.matchNodeAgainstCustomFilters(node)) {
+            // Make the node visible since it matches.
+            makeVisible();
+
+            // If the node didn't match a built-in filter and was expanded earlier during filtering, collapse it again.
+            if (!flags.expandNode && node.expanded && node[WebInspector.DataGrid.WasExpandedDuringFilteringSymbol]) {
+                node[WebInspector.DataGrid.WasExpandedDuringFilteringSymbol] = false;
+                node.collapse();
+            }
+
+            return;
+        }
+
+        // Make the node invisible since it does not match.
+        node.hidden = true;
     }
 
     _updateSortedColumn(oldSortColumnIdentifier)
@@ -299,6 +448,11 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
         }
 
         this.dispatchEventToListeners(WebInspector.DataGrid.Event.SortChanged);
+    }
+
+    _hasFilterDelegate()
+    {
+        return this._filterDelegate && typeof this._filterDelegate.dataGridMatchNodeAgainstCustomFilters === "function";
     }
 
     _ondblclick(event)
@@ -638,50 +792,58 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
     //
     // If this function is not called after the DataGrid is attached to its
     // parent element, then the DataGrid's columns will not be resizable.
-    layout(layoutReason)
+    layout()
     {
-        let firstUpdate = false;
-
         // Do not attempt to use offsets if we're not attached to the document tree yet.
         if (!this._columnWidthsInitialized && this.element.offsetWidth) {
             // Give all the columns initial widths now so that during a resize,
             // when the two columns that get resized get a percent value for
             // their widths, all the other columns already have percent values
             // for their widths.
-            var headerTableColumnElements = this._headerTableColumnGroupElement.children;
-            var tableWidth = this._dataTableElement.offsetWidth;
-            var numColumns = headerTableColumnElements.length;
-            var cells = this._headerTableBodyElement.rows[0].cells;
+            let headerTableColumnElements = this._headerTableColumnGroupElement.children;
+            let tableWidth = this._dataTableElement.offsetWidth;
+            let numColumns = headerTableColumnElements.length;
+            let cells = this._headerTableBodyElement.rows[0].cells;
 
             // Calculate widths.
-            var columnWidths = [];
-            for (var i = 0; i < numColumns; ++i) {
-                var headerCellElement = cells[i];
+            let columnWidths = [];
+            for (let i = 0; i < numColumns; ++i) {
+                let headerCellElement = cells[i];
                 if (this._isColumnVisible(headerCellElement.columnIdentifier)) {
-                    var columnWidth = headerCellElement.offsetWidth;
-                    var percentWidth = ((columnWidth / tableWidth) * 100) + "%";
+                    let columnWidth = headerCellElement.offsetWidth;
+                    let percentWidth = ((columnWidth / tableWidth) * 100) + "%";
                     columnWidths.push(percentWidth);
                 } else
                     columnWidths.push(0);
             }
 
             // Apply widths.
-            for (var i = 0; i < numColumns; i++) {
+            for (let i = 0; i < numColumns; i++) {
                 let percentWidth = columnWidths[i];
                 this._headerTableColumnGroupElement.children[i].style.width = percentWidth;
                 this._dataTableColumnGroupElement.children[i].style.width = percentWidth;
             }
 
             this._columnWidthsInitialized = true;
-            firstUpdate = true;
-        }
-
-        if (layoutReason == WebInspector.View.LayoutReason.Resize || firstUpdate) {
-            this._positionResizerElements();
-            this._positionHeaderViews();
+            this._updateHeaderAndScrollbar();
         }
 
         this._updateVisibleRows();
+    }
+
+    sizeDidChange()
+    {
+        this._updateHeaderAndScrollbar();
+    }
+
+    _updateHeaderAndScrollbar()
+    {
+        this._positionResizerElements();
+        this._positionHeaderViews();
+        this._updateScrollbarPadding();
+
+        this._cachedScrollTop = NaN;
+        this._cachedScrollableOffsetHeight = NaN;
     }
 
     columnWidthsMap()
@@ -842,6 +1004,13 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
         this.needsLayout();
     }
 
+    _noteScrollPositionChanged()
+    {
+        this._cachedScrollTop = NaN;
+
+        this.needsLayout();
+    }
+
     _updateVisibleRows()
     {
         if (this._inline || this._variableHeightRows) {
@@ -866,35 +1035,48 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
 
         let rowHeight = this.rowHeight;
         let updateOffsetThreshold = rowHeight * 5;
+        let overflowPadding = updateOffsetThreshold * 3;
 
-        let revealedRows = this._rows.filter((row) => row.revealed);
+        if (isNaN(this._cachedScrollTop))
+            this._cachedScrollTop = this._scrollContainerElement.scrollTop;
 
-        let scrollTop = this._scrollContainerElement.scrollTop;
-        let scrollHeight = this._scrollContainerElement.offsetHeight;
+        if (isNaN(this._cachedScrollableOffsetHeight))
+            this._cachedScrollableOffsetHeight = this._scrollContainerElement.offsetHeight;
 
-        let currentTopMargin = this._topDataTableMarginElement.offsetHeight;
-        let currentBottomMargin = this._bottomDataTableMarginElement.offsetHeight;
-        let currentTableBottom = currentTopMargin + this._dataTableElement.offsetHeight;
+        let scrollTop = this._cachedScrollTop;
+        let scrollableOffsetHeight = this._cachedScrollableOffsetHeight;
+
+        let visibleRowCount = Math.ceil((scrollableOffsetHeight + (overflowPadding * 2)) / rowHeight);
+
+        let currentTopMargin = this._topDataTableMarginHeight;
+        let currentBottomMargin = this._bottomDataTableMarginHeight;
+        let currentTableBottom = currentTopMargin + (visibleRowCount * rowHeight);
 
         let belowTopThreshold = !currentTopMargin || scrollTop > currentTopMargin + updateOffsetThreshold;
-        let aboveBottomThreshold = !currentBottomMargin || scrollTop + scrollHeight < currentTableBottom - updateOffsetThreshold;
+        let aboveBottomThreshold = !currentBottomMargin || scrollTop + scrollableOffsetHeight < currentTableBottom - updateOffsetThreshold;
 
-        if (belowTopThreshold && aboveBottomThreshold && this._previousRevealedRowCount === revealedRows.length)
+        if (belowTopThreshold && aboveBottomThreshold && !isNaN(this._previousRevealedRowCount))
             return;
+
+        let revealedRows = this._rows.filter((row) => row.revealed && !row.hidden);
 
         this._previousRevealedRowCount = revealedRows.length;
 
-        let overflowPadding = updateOffsetThreshold * 3;
-
         let topHiddenRowCount = Math.max(0, Math.floor((scrollTop - overflowPadding) / rowHeight));
-        let visibleRowCount = Math.ceil((scrollHeight + (overflowPadding * 2)) / rowHeight);
-        let bottomHiddenRowCount = Math.max(0, revealedRows.length - topHiddenRowCount - visibleRowCount);
+        let bottomHiddenRowCount = Math.max(0, this._previousRevealedRowCount - topHiddenRowCount - visibleRowCount);
 
         let marginTop = topHiddenRowCount * rowHeight;
         let marginBottom = bottomHiddenRowCount * rowHeight;
 
-        this._topDataTableMarginElement.style.height = marginTop + "px";
-        this._bottomDataTableMarginElement.style.height = marginBottom + "px";
+        if (this._topDataTableMarginHeight !== marginTop) {
+            this._topDataTableMarginHeight = marginTop;
+            this._topDataTableMarginElement.style.height = marginTop + "px";
+        }
+
+        if (this._bottomDataTableMarginElement !== marginBottom) {
+            this._bottomDataTableMarginHeight = marginBottom;
+            this._bottomDataTableMarginElement.style.height = marginBottom + "px";
+        }
 
         this._dataTableElement.classList.toggle("odd-first-zebra-stripe", !!(topHiddenRowCount % 2));
 
@@ -1040,6 +1222,23 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
         }
 
         this.children = [];
+    }
+
+    findNode(comparator, skipHidden, stayWithin, dontPopulate)
+    {
+        console.assert(typeof comparator === "function");
+
+        let currentNode = this._rows[0];
+        while (currentNode && !currentNode.root) {
+            if (!currentNode.isPlaceholderNode && !(skipHidden && currentNode.hidden)) {
+                if (comparator(currentNode))
+                    return currentNode;
+            }
+
+            currentNode = currentNode.traverseNextNode(skipHidden, stayWithin, dontPopulate);
+        }
+
+        return null;
     }
 
     sortNodes(comparator)
@@ -1552,13 +1751,79 @@ WebInspector.DataGrid = class DataGrid extends WebInspector.View
 
         this._currentResizer = null;
     }
+
+    _updateFilter()
+    {
+        if (this._scheduledFilterUpdateIdentifier) {
+            cancelAnimationFrame(this._scheduledFilterUpdateIdentifier);
+            this._scheduledFilterUpdateIdentifier = undefined;
+        }
+
+        if (!this._rows.length)
+            return;
+
+        this._textFilterRegex = simpleGlobStringToRegExp(this._filterText, "i");
+
+        if (this._applyFilterToNodesTask && this._applyFilterToNodesTask.processing)
+            this._applyFilterToNodesTask.cancel();
+
+        function *createIteratorForNodesToBeFiltered()
+        {
+            // Don't populate if we don't have any active filters.
+            // We only need to populate when a filter needs to reveal.
+            let dontPopulate = !this._textFilterRegex && !this.hasCustomFilters();
+
+            let currentNode = this._rows[0];
+            while (currentNode && !currentNode.root) {
+                yield currentNode;
+                currentNode = currentNode.traverseNextNode(false, null, dontPopulate);
+            }
+        }
+
+        let items = createIteratorForNodesToBeFiltered.call(this);
+        this._applyFilterToNodesTask = new WebInspector.YieldableTask(this, items, {workInterval: 100});
+
+        this._filterDidModifyNodeWhileProcessingItems = false;
+
+        this._applyFilterToNodesTask.start();
+    }
+
+    // YieldableTask delegate
+
+    yieldableTaskWillProcessItem(task, node)
+    {
+        const nodeWasHidden = node.hidden;
+        this._applyFiltersToNode(node);
+        if (nodeWasHidden === node.hidden)
+            return;
+
+        this.dispatchEventToListeners(WebInspector.DataGrid.Event.NodeWasFiltered, {node});
+        this._filterDidModifyNodeWhileProcessingItems = true;
+    }
+
+    yieldableTaskDidYield(task, processedItems, elapsedTime)
+    {
+        if (!this._filterDidModifyNodeWhileProcessingItems)
+            return;
+
+        this._filterDidModifyNodeWhileProcessingItems = false;
+
+        this.dispatchEventToListeners(WebInspector.DataGrid.Event.FilterDidChange);
+    }
+
+    yieldableTaskDidFinish(task)
+    {
+        this._applyFilterToNodesTask = null;
+    }
 };
 
 WebInspector.DataGrid.Event = {
     SortChanged: "datagrid-sort-changed",
     SelectedNodeChanged: "datagrid-selected-node-changed",
     ExpandedNode: "datagrid-expanded-node",
-    CollapsedNode: "datagrid-collapsed-node"
+    CollapsedNode: "datagrid-collapsed-node",
+    FilterDidChange: "datagrid-filter-did-change",
+    NodeWasFiltered: "datagrid-node-was-filtered"
 };
 
 WebInspector.DataGrid.ResizeMethod = {
@@ -1575,6 +1840,7 @@ WebInspector.DataGrid.SortOrder = {
 
 WebInspector.DataGrid.PreviousColumnOrdinalSymbol = Symbol("previous-column-ordinal");
 WebInspector.DataGrid.NextColumnOrdinalSymbol = Symbol("next-column-ordinal");
+WebInspector.DataGrid.WasExpandedDuringFilteringSymbol = Symbol("was-expanded-during-filtering");
 
 WebInspector.DataGrid.ColumnResizePadding = 10;
 WebInspector.DataGrid.CenterResizerOverBorderAdjustment = 3;
@@ -1619,6 +1885,9 @@ WebInspector.DataGridNode = class DataGridNode extends WebInspector.Object
         this._hidden = x;
         if (this._element)
             this._element.classList.toggle("hidden", this._hidden);
+
+        if (this.dataGrid)
+            this.dataGrid._noteRowsChanged();
     }
 
     get selectable()
@@ -1707,6 +1976,33 @@ WebInspector.DataGridNode = class DataGridNode extends WebInspector.Object
 
         this._data = x;
         this.needsRefresh();
+    }
+
+    get filterableData()
+    {
+        if (this._cachedFilterableData)
+            return this._cachedFilterableData;
+
+        this._cachedFilterableData = [];
+
+        for (let column of this.dataGrid.columns.values()) {
+            if (column.hidden)
+                continue;
+
+            let value = this.filterableDataForColumn(column.columnIdentifier);
+            if (!value)
+                continue;
+
+            if (!(value instanceof Array))
+                value = [value];
+
+            if (!value.length)
+                continue;
+
+            this._cachedFilterableData = this._cachedFilterableData.concat(value);
+        }
+
+        return this._cachedFilterableData;
     }
 
     get revealed()
@@ -1829,6 +2125,22 @@ WebInspector.DataGridNode = class DataGridNode extends WebInspector.Object
             this.collapse();
     }
 
+    hasAncestor(ancestor)
+    {
+        if (!ancestor)
+            return false;
+
+        let currentAncestor = this.parent;
+        while (currentAncestor) {
+            if (ancestor === currentAncestor)
+                return true;
+
+            currentAncestor = currentAncestor.parent;
+        }
+
+        return false;
+    }
+
     refresh()
     {
         if (!this._element || !this.dataGrid)
@@ -1839,6 +2151,7 @@ WebInspector.DataGridNode = class DataGridNode extends WebInspector.Object
             this._scheduledRefreshIdentifier = undefined;
         }
 
+        this._cachedFilterableData = null;
         this._needsRefresh = false;
 
         this._element.removeChildren();
@@ -1870,7 +2183,7 @@ WebInspector.DataGridNode = class DataGridNode extends WebInspector.Object
         if (column["group"])
             cellElement.classList.add("column-group-" + column["group"]);
 
-        var div = cellElement.createChild("div");
+        var div = cellElement.createChild("div", "cell-content");
         var content = this.createCellContent(columnIdentifier, cellElement);
         div.append(content);
 
@@ -1949,7 +2262,7 @@ WebInspector.DataGridNode = class DataGridNode extends WebInspector.Object
 
         if (this.dataGrid) {
             this.dataGrid.dispatchEventToListeners(WebInspector.DataGrid.Event.CollapsedNode, {dataGridNode: this});
-            this.dataGrid.needsLayout();
+            this.dataGrid._noteRowsChanged();
         }
     }
 
@@ -1999,7 +2312,7 @@ WebInspector.DataGridNode = class DataGridNode extends WebInspector.Object
 
         if (this.dataGrid) {
             this.dataGrid.dispatchEventToListeners(WebInspector.DataGrid.Event.ExpandedNode, {dataGridNode: this});
-            this.dataGrid.needsLayout();
+            this.dataGrid._noteRowsChanged();
         }
     }
 
@@ -2153,7 +2466,7 @@ WebInspector.DataGridNode = class DataGridNode extends WebInspector.Object
         if (!this.hasChildren)
             return false;
         let cell = event.target.enclosingNodeOrSelfWithNodeName("td");
-        if (!cell.classList.contains("disclosure"))
+        if (!cell || !cell.classList.contains("disclosure"))
             return false;
 
         let computedLeftPadding = window.getComputedStyle(cell).getPropertyCSSValue("padding-left").getFloatValue(CSSPrimitiveValue.CSS_PX);
@@ -2236,6 +2549,14 @@ WebInspector.DataGridNode = class DataGridNode extends WebInspector.Object
     {
         // Subclasses may override
         return null;
+    }
+
+    // Protected
+
+    filterableDataForColumn(columnIdentifier)
+    {
+        let value = this.data[columnIdentifier];
+        return typeof value === "string" ? value : null;
     }
 };
 

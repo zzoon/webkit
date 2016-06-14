@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2006, 2007, 2008, 2009, 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2003-2016 Apple Inc. All rights reserved.
  *           (C) 2006 Graham Dennis (graham.dennis@gmail.com)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,6 +35,7 @@
 #include "TextFlags.h"
 #include "Timer.h"
 #include "URL.h"
+#include "WritingMode.h"
 #include <chrono>
 #include <runtime/RuntimeFlags.h>
 #include <unicode/uscript.h>
@@ -71,6 +72,11 @@ enum DebugOverlayRegionFlags {
     WheelEventHandlerRegion = 1 << 1,
 };
 
+enum class UserInterfaceDirectionPolicy {
+    Content,
+    System
+};
+
 typedef unsigned DebugOverlayRegions;
 
 class Settings : public RefCounted<Settings> {
@@ -103,16 +109,12 @@ public:
     WEBCORE_EXPORT const AtomicString& pictographFontFamily(UScriptCode = USCRIPT_COMMON) const;
 
 #if ENABLE(TEXT_AUTOSIZING)
-    void setTextAutosizingEnabled(bool);
-    bool textAutosizingEnabled() const { return m_textAutosizingEnabled; }
-
     void setTextAutosizingFontScaleFactor(float);
     float textAutosizingFontScaleFactor() const { return m_textAutosizingFontScaleFactor; }
-
-    // Only set by Layout Tests, and only used if textAutosizingEnabled() returns true.
-    void setTextAutosizingWindowSizeOverride(const IntSize&);
-    const IntSize& textAutosizingWindowSizeOverride() const { return m_textAutosizingWindowSizeOverride; }
 #endif
+
+    WEBCORE_EXPORT static bool defaultTextAutosizingEnabled();
+    WEBCORE_EXPORT static float defaultMinimumZoomFontSize();
 
     // Only set by Layout Tests.
     WEBCORE_EXPORT void setMediaTypeOverride(const String&);
@@ -183,6 +185,8 @@ public:
     static bool shouldUseHighResolutionTimers() { return gShouldUseHighResolutionTimers; }
 #endif
 
+    static bool globalConstRedeclarationShouldThrow();
+
     WEBCORE_EXPORT void setBackgroundShouldExtendBeyondPage(bool);
     bool backgroundShouldExtendBeyondPage() const { return m_backgroundShouldExtendBeyondPage; }
 
@@ -204,6 +208,7 @@ public:
 #endif
 
     static const unsigned defaultMaximumHTMLParserDOMTreeDepth = 512;
+    static const unsigned defaultMaximumRenderTreeDepth = 512;
 
     WEBCORE_EXPORT static void setMockScrollbarsEnabled(bool flag);
     WEBCORE_EXPORT static bool mockScrollbarsEnabled();
@@ -236,6 +241,9 @@ public:
 
     WEBCORE_EXPORT void setFontFallbackPrefersPictographs(bool);
     bool fontFallbackPrefersPictographs() const { return m_fontFallbackPrefersPictographs; }
+
+    WEBCORE_EXPORT void setWebFontsAlwaysFallBack(bool);
+    bool webFontsAlwaysFallBack() const { return m_webFontsAlwaysFallBack; }
 
     static bool lowPowerVideoAudioBufferSizeEnabled() { return gLowPowerVideoAudioBufferSizeEnabled; }
     WEBCORE_EXPORT static void setLowPowerVideoAudioBufferSizeEnabled(bool);
@@ -280,10 +288,9 @@ public:
 
     WEBCORE_EXPORT void setForcePendingWebGLPolicy(bool);
     bool isForcePendingWebGLPolicy() const { return m_forcePendingWebGLPolicy; }
-    
-#if PLATFORM(IOS)
-    WEBCORE_EXPORT static float defaultMinimumZoomFontSize();
-#endif
+
+    WEBCORE_EXPORT static void setAllowsAnySSLCertificate(bool);
+    static bool allowsAnySSLCertificate();
 
 #if USE(APPLE_INTERNAL_SDK)
 #import <WebKitAdditions/SettingsGettersAndSetters.h>
@@ -305,8 +312,6 @@ private:
 
 #if ENABLE(TEXT_AUTOSIZING)
     float m_textAutosizingFontScaleFactor;
-    IntSize m_textAutosizingWindowSizeOverride;
-    bool m_textAutosizingEnabled : 1;
 #endif
 
     SETTINGS_MEMBER_VARIABLES
@@ -337,6 +342,7 @@ private:
     bool m_hiddenPageDOMTimerThrottlingEnabled : 1;
     bool m_hiddenPageCSSAnimationSuspensionEnabled : 1;
     bool m_fontFallbackPrefersPictographs : 1;
+    bool m_webFontsAlwaysFallBack : 1;
 
     bool m_forcePendingWebGLPolicy : 1;
 
@@ -382,6 +388,7 @@ private:
 
     static bool gLowPowerVideoAudioBufferSizeEnabled;
     static bool gResourceLoadStatisticsEnabledEnabled;
+    static bool gAllowsAnySSLCertificate;
 
 #if USE(APPLE_INTERNAL_SDK)
 #import <WebKitAdditions/SettingsMembers.h>

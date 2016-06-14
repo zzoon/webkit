@@ -46,7 +46,7 @@ enum GridAxisPosition {GridAxisStart, GridAxisEnd, GridAxisCenter};
 
 class RenderGrid final : public RenderBlock {
 public:
-    RenderGrid(Element&, Ref<RenderStyle>&&);
+    RenderGrid(Element&, RenderStyle&&);
     virtual ~RenderGrid();
 
     Element& element() const { return downcast<Element>(nodeForNonAnonymous()); }
@@ -60,7 +60,10 @@ public:
     const Vector<LayoutUnit>& columnPositions() const { return m_columnPositions; }
     const Vector<LayoutUnit>& rowPositions() const { return m_rowPositions; }
 
-    LayoutUnit guttersSize(GridTrackSizingDirection, size_t span) const;
+    LayoutUnit guttersSize(GridTrackSizingDirection, unsigned span) const;
+    LayoutUnit offsetBetweenTracks(GridTrackSizingDirection) const;
+
+    size_t autoRepeatCountForDirection(GridTrackSizingDirection) const;
 
 private:
     const char* renderName() const override;
@@ -78,6 +81,9 @@ private:
 
     void ensureGridSize(unsigned maximumRowSize, unsigned maximumColumnSize);
     void insertItemIntoGrid(RenderBox&, const GridArea&);
+
+    unsigned computeAutoRepeatTracksCount(GridTrackSizingDirection) const;
+
     void placeItemsOnGrid();
     void populateExplicitGridAndOrderIterator();
     std::unique_ptr<GridArea> createEmptyGridAreaAtSpecifiedPositionsOutsideGrid(const RenderBox&, GridTrackSizingDirection, const GridSpan&) const;
@@ -97,7 +103,7 @@ private:
     void computeTrackSizesForDirection(GridTrackSizingDirection, GridSizingData&, LayoutUnit freeSpace);
 
     void layoutGridItems(GridSizingData&);
-    void populateGridPositions(GridSizingData&);
+    void populateGridPositionsForDirection(GridSizingData&, GridTrackSizingDirection);
     void clearGrid();
 
     enum TrackSizeRestriction {
@@ -128,6 +134,7 @@ private:
     double computeFlexFactorUnitSize(const Vector<GridTrack>&, GridTrackSizingDirection, double flexFactorSum, LayoutUnit leftOverSpace, const Vector<unsigned, 8>& flexibleTracksIndexes, std::unique_ptr<TrackIndexSet> tracksToTreatAsInflexible = nullptr) const;
     double findFlexFactorUnitSize(const Vector<GridTrack>&, const GridSpan&, GridTrackSizingDirection, LayoutUnit spaceToFill) const;
 
+    const GridTrackSize& rawGridTrackSize(GridTrackSizingDirection, unsigned) const;
     GridTrackSize gridTrackSize(GridTrackSizingDirection, unsigned) const;
 
     bool updateOverrideContainingBlockContentLogicalWidthForChild(RenderBox&, GridSizingData&);
@@ -166,20 +173,10 @@ private:
     bool tracksAreWiderThanMinTrackBreadth(GridTrackSizingDirection, GridSizingData&);
 #endif
 
-    bool gridWasPopulated() const { return !m_grid.isEmpty() && !m_grid[0].isEmpty(); }
-
     bool spanningItemCrossesFlexibleSizedTracks(const GridSpan&, GridTrackSizingDirection) const;
 
-    unsigned gridColumnCount() const
-    {
-        ASSERT(gridWasPopulated());
-        return m_grid[0].size();
-    }
-    unsigned gridRowCount() const
-    {
-        ASSERT(gridWasPopulated());
-        return m_grid.size();
-    }
+    unsigned gridColumnCount() const;
+    unsigned gridRowCount() const;
 
     bool hasDefiniteLogicalSize(GridTrackSizingDirection) const;
     LayoutUnit translateRTLCoordinate(LayoutUnit) const;
@@ -197,7 +194,17 @@ private:
 
     int m_smallestColumnStart;
     int m_smallestRowStart;
+
+    unsigned m_autoRepeatColumns { 0 };
+    unsigned m_autoRepeatRows { 0 };
+
+    bool m_gridIsDirty { true };
 };
+
+size_t inline RenderGrid::autoRepeatCountForDirection(GridTrackSizingDirection direction) const
+{
+    return direction == ForColumns ? m_autoRepeatColumns : m_autoRepeatRows;
+}
 
 } // namespace WebCore
 

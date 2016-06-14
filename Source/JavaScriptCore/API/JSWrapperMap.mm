@@ -41,10 +41,16 @@
 #import <wtf/HashSet.h>
 #import <wtf/Vector.h>
 #import <wtf/spi/cocoa/NSMapTableSPI.h>
+#import <wtf/spi/darwin/dyldSPI.h>
 
 #include <mach-o/dyld.h>
 
-static const int32_t webkitFirstVersionWithInitConstructorSupport = 0x21A0400; // 538.4.0
+#if PLATFORM(APPLETV)
+#elif PLATFORM(IOS)
+static const uint32_t firstSDKVersionWithInitConstructorSupport = 0x80000; // iOS 8.0.0
+#elif PLATFORM(MAC)
+static const uint32_t firstSDKVersionWithInitConstructorSupport = 0xA0A00; // OSX 10.10.0
+#endif
 
 @class JSObjCClassInfo;
 
@@ -650,12 +656,12 @@ bool supportsInitMethodConstructors()
 #if PLATFORM(APPLETV)
     // There are no old clients on Apple TV, so there's no need for backwards compatibility.
     return true;
+#else
+    static uint32_t programSDKVersion = 0;
+    if (!programSDKVersion)
+        programSDKVersion = dyld_get_program_sdk_version();
+    return programSDKVersion >= firstSDKVersionWithInitConstructorSupport;
 #endif
-
-    static int32_t versionOfLinkTimeLibrary = 0;
-    if (!versionOfLinkTimeLibrary)
-        versionOfLinkTimeLibrary = NSVersionOfLinkTimeLibrary("JavaScriptCore");
-    return versionOfLinkTimeLibrary >= webkitFirstVersionWithInitConstructorSupport;
 }
 
 Protocol *getJSExportProtocol()

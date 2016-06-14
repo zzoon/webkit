@@ -37,10 +37,13 @@
 #include "Timer.h"
 #include "UniqueIDBDatabaseConnection.h"
 #include "UniqueIDBDatabaseTransaction.h"
+#include <wtf/CrossThreadQueue.h>
+#include <wtf/CrossThreadTask.h>
 #include <wtf/Deque.h>
 #include <wtf/HashCountedSet.h>
 #include <wtf/HashSet.h>
 #include <wtf/ListHashSet.h>
+#include <wtf/MessageQueue.h>
 #include <wtf/Ref.h>
 #include <wtf/ThreadSafeRefCounted.h>
 
@@ -96,14 +99,18 @@ public:
     void iterateCursor(const IDBRequestData&, const IDBKeyData&, unsigned long count, GetResultCallback);
     void commitTransaction(UniqueIDBDatabaseTransaction&, ErrorCallback);
     void abortTransaction(UniqueIDBDatabaseTransaction&, ErrorCallback);
-    void didFinishHandlingVersionChange(UniqueIDBDatabaseTransaction&);
+    void didFinishHandlingVersionChange(UniqueIDBDatabaseConnection&, const IDBResourceIdentifier& transactionIdentifier);
     void transactionDestroyed(UniqueIDBDatabaseTransaction&);
     void connectionClosedFromClient(UniqueIDBDatabaseConnection&);
+    void confirmConnectionClosedOnServer(UniqueIDBDatabaseConnection&);
     void didFireVersionChangeEvent(UniqueIDBDatabaseConnection&, const IDBResourceIdentifier& requestIdentifier);
+    void openDBRequestCancelled(const IDBResourceIdentifier& requestIdentifier);
+    void confirmDidCloseFromServer(UniqueIDBDatabaseConnection&);
 
     void enqueueTransaction(Ref<UniqueIDBDatabaseTransaction>&&);
 
     void handleDelete(IDBConnectionToClient&, const IDBRequestData&);
+    void immediateCloseForUserDelete();
 
     static JSC::VM& databaseThreadVM();
     static JSC::ExecState& databaseThreadExecState();
@@ -124,7 +131,9 @@ private:
     bool isVersionChangeInProgress();
 
     void activateTransactionInBackingStore(UniqueIDBDatabaseTransaction&);
-    void inProgressTransactionCompleted(const IDBResourceIdentifier&);
+    void transactionCompleted(RefPtr<UniqueIDBDatabaseTransaction>&&);
+
+    void connectionClosedFromServer(UniqueIDBDatabaseConnection&);
 
     // Database thread operations
     void deleteBackingStore(const IDBDatabaseIdentifier&);
@@ -145,6 +154,7 @@ private:
     void performOpenCursor(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, const IDBCursorInfo&);
     void performIterateCursor(uint64_t callbackIdentifier, const IDBResourceIdentifier& transactionIdentifier, const IDBResourceIdentifier& cursorIdentifier, const IDBKeyData&, unsigned long count);
     void performActivateTransactionInBackingStore(uint64_t callbackIdentifier, const IDBTransactionInfo&);
+    void performUnconditionalDeleteBackingStore();
 
     // Main thread callbacks
     void didDeleteBackingStore(uint64_t deletedVersion);
@@ -164,31 +174,44 @@ private:
     void didPerformAbortTransaction(uint64_t callbackIdentifier, const IDBError&, const IDBResourceIdentifier& transactionIdentifier);
     void didPerformActivateTransactionInBackingStore(uint64_t callbackIdentifier, const IDBError&);
 
-    uint64_t storeCallback(ErrorCallback);
-    uint64_t storeCallback(KeyDataCallback);
-    uint64_t storeCallback(GetResultCallback);
-    uint64_t storeCallback(CountCallback);
+    uint64_t storeCallbackOrFireError(ErrorCallback);
+    uint64_t storeCallbackOrFireError(KeyDataCallback);
+    uint64_t storeCallbackOrFireError(GetResultCallback);
+    uint64_t storeCallbackOrFireError(CountCallback);
 
     void performErrorCallback(uint64_t callbackIdentifier, const IDBError&);
     void performKeyDataCallback(uint64_t callbackIdentifier, const IDBError&, const IDBKeyData&);
     void performGetResultCallback(uint64_t callbackIdentifier, const IDBError&, const IDBGetResult&);
     void performCountCallback(uint64_t callbackIdentifier, const IDBError&, uint64_t);
 
+    void forgetErrorCallback(uint64_t callbackIdentifier);
+
     bool hasAnyPendingCallbacks() const;
     bool isCurrentlyInUse() const;
+    bool hasUnfinishedTransactions() const;
 
     void invokeOperationAndTransactionTimer();
     void operationAndTransactionTimerFired();
     RefPtr<UniqueIDBDatabaseTransaction> takeNextRunnableTransaction(bool& hadDeferredTransactions);
 
+    bool prepareToFinishTransaction(UniqueIDBDatabaseTransaction&);
+
+    void postDatabaseTask(CrossThreadTask&&);
+    void postDatabaseTaskReply(CrossThreadTask&&);
+    void executeNextDatabaseTask();
+    void executeNextDatabaseTaskReply();
+
+    bool doneWithHardClose();
+
     IDBServer& m_server;
     IDBDatabaseIdentifier m_identifier;
     
-    Deque<Ref<ServerOpenDBRequest>> m_pendingOpenDBRequests;
+    ListHashSet<RefPtr<ServerOpenDBRequest>> m_pendingOpenDBRequests;
     RefPtr<ServerOpenDBRequest> m_currentOpenDBRequest;
 
     ListHashSet<RefPtr<UniqueIDBDatabaseConnection>> m_openDatabaseConnections;
-    HashSet<RefPtr<UniqueIDBDatabaseConnection>> m_closePendingDatabaseConnections;
+    HashSet<RefPtr<UniqueIDBDatabaseConnection>> m_clientClosePendingDatabaseConnections;
+    HashSet<RefPtr<UniqueIDBDatabaseConnection>> m_serverClosePendingDatabaseConnections;
 
     RefPtr<UniqueIDBDatabaseConnection> m_versionChangeDatabaseConnection;
     RefPtr<UniqueIDBDatabaseTransaction> m_versionChangeTransaction;
@@ -211,6 +234,7 @@ private:
 
     Deque<RefPtr<UniqueIDBDatabaseTransaction>> m_pendingTransactions;
     HashMap<IDBResourceIdentifier, RefPtr<UniqueIDBDatabaseTransaction>> m_inProgressTransactions;
+    HashMap<IDBResourceIdentifier, RefPtr<UniqueIDBDatabaseTransaction>> m_finishingTransactions;
 
     // The keys into these sets are the object store ID.
     // These sets help to decide which transactions can be started and which must be deferred.
@@ -218,6 +242,13 @@ private:
     HashSet<uint64_t> m_objectStoreWriteTransactions;
 
     bool m_deleteBackingStoreInProgress { false };
+
+    CrossThreadQueue<CrossThreadTask> m_databaseQueue;
+    CrossThreadQueue<CrossThreadTask> m_databaseReplyQueue;
+    std::atomic<uint64_t> m_queuedTaskCount { 0 };
+
+    bool m_hardClosedForUserDelete { false };
+    RefPtr<UniqueIDBDatabase> m_hardCloseProtector;
 };
 
 } // namespace IDBServer

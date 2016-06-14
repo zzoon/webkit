@@ -61,6 +61,8 @@ WebInspector.ScriptClusterTimelineView = class ScriptClusterTimelineView extends
     // TimelineView
 
     // FIXME: Determine a better way to bridge TimelineView methods to the sub-timeline views.
+    get showsLiveRecordingData() { return this._contentViewContainer.currentContentView.showsLiveRecordingData; }
+    get showsFilterBar() { return this._contentViewContainer.currentContentView.showsFilterBar; }
     get zeroTime() { return this._contentViewContainer.currentContentView.zeroTime; }
     set zeroTime(x) { this._contentViewContainer.currentContentView.zeroTime = x; }
     get startTime() { return this._contentViewContainer.currentContentView.startTime; }
@@ -69,10 +71,19 @@ WebInspector.ScriptClusterTimelineView = class ScriptClusterTimelineView extends
     set endTime(x) { this._contentViewContainer.currentContentView.endTime = x; }
     get currentTime() { return this._contentViewContainer.currentContentView.currentTime; }
     set currentTime(x) { this._contentViewContainer.currentContentView.currentTime = x; }
-    get navigationSidebarTreeOutline() { return this._contentViewContainer.currentContentView.navigationSidebarTreeOutline; }
-    reset() { return this._contentViewContainer.currentContentView.reset(); }
+    get scrollableElements() { return this._contentViewContainer.currentContentView.scrollableElements; }
+    selectRecord(record) { this._contentViewContainer.currentContentView.selectRecord(record); }
+    updateFilter(filters) { return this._contentViewContainer.currentContentView.updateFilter(filters); }
     filterDidChange() { return this._contentViewContainer.currentContentView.filterDidChange(); }
-    matchTreeElementAgainstCustomFilters(treeElement) { return this._contentViewContainer.currentContentView.matchTreeElementAgainstCustomFilters(treeElement); }
+    matchDataGridNodeAgainstCustomFilters(node) { return this._contentViewContainer.currentContentView.matchDataGridNodeAgainstCustomFilters(node); }
+
+    reset()
+    {
+        this._eventsContentView.reset();
+
+        if (this._profileContentView)
+            this._profileContentView.reset();
+    }
 
     // Public
 
@@ -196,8 +207,6 @@ WebInspector.ScriptClusterTimelineView = class ScriptClusterTimelineView extends
         currentContentView.startTime = previousContentView.startTime;
         currentContentView.endTime = previousContentView.endTime;
         currentContentView.currentTime = previousContentView.currentTime;
-
-        // FIXME: <https://webkit.org/b/154924> Web Inspector: hook up grid row filtering in the new Timelines UI
     }
 };
 

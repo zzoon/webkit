@@ -74,7 +74,6 @@ list(APPEND WebCore_SOURCES
 
     platform/crypto/win/CryptoDigestWin.cpp
 
-    platform/graphics/FontPlatformData.cpp
     platform/graphics/GraphicsContext3DPrivate.cpp
 
     platform/graphics/egl/GLContextEGL.cpp
@@ -124,7 +123,6 @@ list(APPEND WebCore_SOURCES
     platform/win/GDIObjectCounter.cpp
     platform/win/GDIUtilities.cpp
     platform/win/KeyEventWin.cpp
-    platform/win/LanguageWin.cpp
     platform/win/LocalizedStringsWin.cpp
     platform/win/LoggingWin.cpp
     platform/win/MemoryPressureHandlerWin.cpp
@@ -186,7 +184,10 @@ set(WebCore_FORWARDING_HEADERS_DIRECTORIES
 
     Modules/geolocation
     Modules/indexeddb
+
+    Modules/indexeddb/client
     Modules/indexeddb/legacy
+    Modules/indexeddb/server
     Modules/indexeddb/shared
     Modules/notifications
     Modules/webdatabase

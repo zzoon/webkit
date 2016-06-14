@@ -499,7 +499,7 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
     if (!renderer)
         return emptyQuad();
 
-    RenderStyle& style = renderer->style();
+    auto& style = renderer->style();
     IntRect boundingBox = renderer->absoluteBoundingBoxRect(true /* use transforms*/);
 
     boundingBox.move(style.borderLeftWidth(), style.borderTopWidth());
@@ -513,7 +513,7 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
 - (float)computedFontSize
 {
     WebCore::Node *node = core(self);
-    RenderStyle *style = node->renderStyle();
+    auto *style = node->renderStyle();
     if (!style)
         return 0.0f;
     return style->fontDescription().computedSize();
@@ -707,10 +707,10 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
 - (NSImage*)image
 {
     // FIXME: Could we move this function to WebCore::Node and autogenerate?
-    WebCore::RenderObject* renderer = core(self)->renderer();
+    auto* renderer = core(self)->renderer();
     if (!is<RenderImage>(renderer))
         return nil;
-    WebCore::CachedImage* cachedImage = downcast<RenderImage>(*renderer).cachedImage();
+    auto* cachedImage = downcast<RenderImage>(*renderer).cachedImage();
     if (!cachedImage || cachedImage->errorOccurred())
         return nil;
     return cachedImage->imageForRenderer(renderer)->getNSImage();
@@ -721,24 +721,13 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
 
 @implementation DOMElement (WebPrivate)
 
-#if !PLATFORM(IOS)
-- (NSFont *)_font
-{
-    // FIXME: Could we move this function to WebCore::Element and autogenerate?
-    auto renderer = core(self)->renderer();
-    if (!renderer)
-        return nil;
-    return renderer->style().fontCascade().primaryFont().getNSFont();
-}
-#else
 - (CTFontRef)_font
 {
-    RenderObject* renderer = core(self)->renderer();
+    auto* renderer = core(self)->renderer();
     if (!renderer)
         return nil;
     return renderer->style().fontCascade().primaryFont().getCTFont();
 }
-#endif
 
 #if !PLATFORM(IOS)
 - (NSData *)_imageTIFFRepresentation
@@ -773,7 +762,9 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
 @end
 
 #if PLATFORM(IOS)
+
 @implementation DOMHTMLLinkElement (WebPrivate)
+
 - (BOOL)_mediaQueryMatchesForOrientation:(int)orientation
 {
     Document& document = static_cast<HTMLLinkElement*>(core(self))->document();
@@ -801,18 +792,19 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
 
 - (BOOL)_mediaQueryMatches
 {
-    HTMLLinkElement* link = static_cast<HTMLLinkElement*>(core(self));
-    String media = link->getAttribute(HTMLNames::mediaAttr);
+    HTMLLinkElement& link = *static_cast<HTMLLinkElement*>(core(self));
+
+    auto& media = link.fastGetAttribute(HTMLNames::mediaAttr);
     if (media.isEmpty())
         return true;
-    Document& document = link->document();
 
-    RefPtr<MediaQuerySet> mediaQuerySet = MediaQuerySet::createAllowingDescriptionSyntax(media);
-    MediaQueryEvaluator screenEval("screen", document.frame(), document.renderView() ? &document.renderView()->style() : 0);
-
-    return screenEval.eval(mediaQuerySet.get());
+    Document& document = link.document();
+    auto mediaQuerySet = MediaQuerySet::createAllowingDescriptionSyntax(media);
+    return MediaQueryEvaluator { "screen", document, document.renderView() ? &document.renderView()->style() : nullptr }.evaluate(mediaQuerySet.get());
 }
+
 @end
+
 #endif
 
 //------------------------------------------------------------------------------------------

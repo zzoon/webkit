@@ -50,6 +50,7 @@
 #include "JSLexicalEnvironment.h"
 #include "JSModuleEnvironment.h"
 #include "LLIntEntrypoint.h"
+#include "LLIntPrototypeLoadAdaptiveStructureWatchpoint.h"
 #include "LowLevelInterpreter.h"
 #include "JSCInlines.h"
 #include "PCToCodeOriginMap.h"
@@ -63,6 +64,7 @@
 #include "TypeLocationCache.h"
 #include "TypeProfiler.h"
 #include "UnlinkedInstructionStream.h"
+#include "VMInlines.h"
 #include <wtf/BagToHashMap.h>
 #include <wtf/CommaPrinter.h>
 #include <wtf/StringExtras.h>
@@ -344,6 +346,12 @@ void CodeBlock::printGetByIdOp(PrintStream& out, ExecState* exec, int location, 
     case op_get_by_id:
         op = "get_by_id";
         break;
+    case op_get_by_id_proto_load:
+        op = "get_by_id_proto_load";
+        break;
+    case op_get_by_id_unset:
+        op = "get_by_id_unset";
+        break;
     case op_get_array_length:
         op = "array_length";
         break;
@@ -404,6 +412,8 @@ void CodeBlock::printGetByIdCacheStatus(PrintStream& out, ExecState* exec, int l
         out.printf(" llint(");
         dumpStructure(out, "struct", structure, ident);
         out.printf(")");
+        if (exec->interpreter()->getOpcodeID(instruction[0].u.opcode) == op_get_by_id_proto_load)
+            out.printf(" proto(%p)", instruction[6].u.pointer);
     }
 
 #if ENABLE(JIT)
@@ -808,6 +818,11 @@ void CodeBlock::dumpBytecode(
             out.printf("%s", registerName(r0).data());
             break;
         }
+        case op_argument_count: {
+            int r0 = (++it)->u.operand;
+            printLocationOpAndRegisterOperand(out, exec, location, it, "argument_count", r0);
+            break;
+        }
         case op_copy_rest: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
@@ -1066,6 +1081,10 @@ void CodeBlock::dumpBytecode(
             printUnaryOp(out, exec, location, it, "typeof");
             break;
         }
+        case op_is_empty: {
+            printUnaryOp(out, exec, location, it, "is_empty");
+            break;
+        }
         case op_is_undefined: {
             printUnaryOp(out, exec, location, it, "is_undefined");
             break;
@@ -1107,15 +1126,53 @@ void CodeBlock::dumpBytecode(
             break;
         }
         case op_get_by_id:
+        case op_get_by_id_proto_load:
+        case op_get_by_id_unset:
         case op_get_array_length: {
             printGetByIdOp(out, exec, location, it);
             printGetByIdCacheStatus(out, exec, location, stubInfos);
             dumpValueProfiling(out, it, hasPrintedProfiling);
             break;
         }
+        case op_get_by_id_with_this: {
+            printLocationAndOp(out, exec, location, it, "get_by_id_with_this");
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            int r2 = (++it)->u.operand;
+            int id0 = (++it)->u.operand;
+            out.printf("%s, %s, %s, %s", registerName(r0).data(), registerName(r1).data(), registerName(r2).data(), idName(id0, identifier(id0)).data());
+            break;
+        }
+        case op_get_by_val_with_this: {
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            int r2 = (++it)->u.operand;
+            int r3 = (++it)->u.operand;
+            printLocationAndOp(out, exec, location, it, "get_by_val_with_this");
+            out.printf("%s, %s, %s, %s", registerName(r0).data(), registerName(r1).data(), registerName(r2).data(), registerName(r3).data());
+            break;
+        }
         case op_put_by_id: {
             printPutByIdOp(out, exec, location, it, "put_by_id");
             printPutByIdCacheStatus(out, location, stubInfos);
+            break;
+        }
+        case op_put_by_id_with_this: {
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            int id0 = (++it)->u.operand;
+            int r2 = (++it)->u.operand;
+            printLocationAndOp(out, exec, location, it, "put_by_id_with_this");
+            out.printf("%s, %s, %s, %s", registerName(r0).data(), registerName(r1).data(), idName(id0, identifier(id0)).data(), registerName(r2).data());
+            break;
+        }
+        case op_put_by_val_with_this: {
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            int r2 = (++it)->u.operand;
+            int r3 = (++it)->u.operand;
+            printLocationAndOp(out, exec, location, it, "put_by_val_with_this");
+            out.printf("%s, %s, %s, %s", registerName(r0).data(), registerName(r1).data(), registerName(r2).data(), registerName(r3).data());
             break;
         }
         case op_put_getter_by_id: {
@@ -1319,11 +1376,16 @@ void CodeBlock::dumpBytecode(
             break;
         }
         case op_log_shadow_chicken_prologue: {
+            int r0 = (++it)->u.operand;
             printLocationAndOp(out, exec, location, it, "log_shadow_chicken_prologue");
+            out.printf("%s", registerName(r0).data());
             break;
         }
         case op_log_shadow_chicken_tail: {
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
             printLocationAndOp(out, exec, location, it, "log_shadow_chicken_tail");
+            out.printf("%s, %s", registerName(r0).data(), registerName(r1).data());
             break;
         }
         case op_switch_imm: {
@@ -1363,14 +1425,6 @@ void CodeBlock::dumpBytecode(
             int r1 = (++it)->u.operand;
             int f0 = (++it)->u.operand;
             printLocationAndOp(out, exec, location, it, "new_generator_func");
-            out.printf("%s, %s, f%d", registerName(r0).data(), registerName(r1).data(), f0);
-            break;
-        }
-        case op_new_arrow_func_exp: {
-            int r0 = (++it)->u.operand;
-            int r1 = (++it)->u.operand;
-            int f0 = (++it)->u.operand;
-            printLocationAndOp(out, exec, location, it, "op_new_arrow_func_exp");
             out.printf("%s, %s, f%d", registerName(r0).data(), registerName(r1).data(), f0);
             break;
         }
@@ -1611,16 +1665,6 @@ void CodeBlock::dumpBytecode(
             int line = (++it)->u.operand;
             printLocationAndOp(out, exec, location, it, "assert");
             out.printf("%s, %d", registerName(condition).data(), line);
-            break;
-        }
-        case op_profile_will_call: {
-            int function = (++it)->u.operand;
-            printLocationOpAndRegisterOperand(out, exec, location, it, "profile_will_call", function);
-            break;
-        }
-        case op_profile_did_call: {
-            int function = (++it)->u.operand;
-            printLocationOpAndRegisterOperand(out, exec, location, it, "profile_did_call", function);
             break;
         }
         case op_end: {
@@ -2612,32 +2656,16 @@ void CodeBlock::propagateTransitions(SlotVisitor& visitor)
 
 #if ENABLE(JIT)
     if (JITCode::isJIT(jitType())) {
-        for (Bag<StructureStubInfo>::iterator iter = m_stubInfos.begin(); !!iter; ++iter) {
-            StructureStubInfo& stubInfo = **iter;
-            if (stubInfo.cacheType != CacheType::Stub)
-                continue;
-            PolymorphicAccess* list = stubInfo.u.stub;
-            JSCell* origin = stubInfo.codeOrigin.codeOriginOwner();
-            if (origin && !Heap::isMarked(origin)) {
-                allAreMarkedSoFar = false;
-                continue;
-            }
-            for (unsigned j = list->size(); j--;) {
-                const AccessCase& access = list->at(j);
-                if (access.type() != AccessCase::Transition)
-                    continue;
-                if (Heap::isMarked(access.structure()))
-                    visitor.appendUnbarrieredReadOnlyPointer(access.newStructure());
-                else
-                    allAreMarkedSoFar = false;
-            }
-        }
+        for (Bag<StructureStubInfo>::iterator iter = m_stubInfos.begin(); !!iter; ++iter)
+            allAreMarkedSoFar &= (*iter)->propagateTransitions(visitor);
     }
 #endif // ENABLE(JIT)
     
 #if ENABLE(DFG_JIT)
     if (JITCode::isOptimizingJIT(jitType())) {
         DFG::CommonData* dfgCommon = m_jitCode->dfgCommon();
+        for (auto& weakReference : dfgCommon->weakStructureReferences)
+            allAreMarkedSoFar &= weakReference->markIfCheap(visitor);
         
         for (unsigned i = 0; i < dfgCommon->transitions.size(); ++i) {
             if (shouldMarkTransition(dfgCommon->transitions[i])) {
@@ -2734,14 +2762,15 @@ void CodeBlock::finalizeLLIntInlineCaches()
     for (size_t size = propertyAccessInstructions.size(), i = 0; i < size; ++i) {
         Instruction* curInstruction = &instructions()[propertyAccessInstructions[i]];
         switch (interpreter->getOpcodeID(curInstruction[0].u.opcode)) {
-        case op_get_by_id: {
+        case op_get_by_id:
+        case op_get_by_id_proto_load:
+        case op_get_by_id_unset: {
             StructureID oldStructureID = curInstruction[4].u.structureID;
             if (!oldStructureID || Heap::isMarked(m_vm->heap.structureIDTable().get(oldStructureID)))
                 break;
             if (Options::verboseOSR())
                 dataLogF("Clearing LLInt property access.\n");
-            curInstruction[4].u.structureID = 0;
-            curInstruction[5].u.operand = 0;
+            clearLLIntGetByIdCache(curInstruction);
             break;
         }
         case op_put_by_id: {
@@ -2814,6 +2843,12 @@ void CodeBlock::finalizeLLIntInlineCaches()
             ASSERT_WITH_MESSAGE_UNUSED(opcodeID, false, "Unhandled opcode in CodeBlock::finalizeUnconditionally, %s(%d) at bc %u", opcodeNames[opcodeID], opcodeID, propertyAccessInstructions[i]);
         }
     }
+
+    // We can't just remove all the sets when we clear the caches since we might have created a watchpoint set
+    // then cleared the cache without GCing in between.
+    m_llintGetByIdWatchpointMap.removeIf([](const StructureWatchpointMap::KeyValuePairType& pair) -> bool {
+        return !Heap::isMarked(pair.key);
+    });
 
     for (unsigned i = 0; i < m_llintCallLinkInfos.size(); ++i) {
         if (m_llintCallLinkInfos[i].isLinked() && !Heap::isMarked(m_llintCallLinkInfos[i].callee.get())) {
@@ -3286,6 +3321,8 @@ void CodeBlock::jettison(Profiler::JettisonReason reason, ReoptimizationMode mod
     UNUSED_PARAM(mode);
     UNUSED_PARAM(detail);
 #endif
+    
+    CODEBLOCK_LOG_EVENT(this, "jettison", ("due to ", reason, ", counting = ", mode == CountReoptimization, ", detail = ", pointerDump(detail)));
 
     RELEASE_ASSERT(reason != Profiler::NotJettisoned);
     
@@ -4359,5 +4396,29 @@ Optional<CodeOrigin> CodeBlock::findPC(void* pc)
     return Nullopt;
 }
 #endif // ENABLE(JIT)
+
+Optional<unsigned> CodeBlock::bytecodeOffsetFromCallSiteIndex(CallSiteIndex callSiteIndex)
+{
+    Optional<unsigned> bytecodeOffset;
+    JITCode::JITType jitType = this->jitType();
+    if (jitType == JITCode::InterpreterThunk || jitType == JITCode::BaselineJIT) {
+#if USE(JSVALUE64)
+        bytecodeOffset = callSiteIndex.bits();
+#else
+        Instruction* instruction = bitwise_cast<Instruction*>(callSiteIndex.bits());
+        bytecodeOffset = instruction - instructions().begin();
+#endif
+    } else if (jitType == JITCode::DFGJIT || jitType == JITCode::FTLJIT) {
+#if ENABLE(DFG_JIT)
+        RELEASE_ASSERT(canGetCodeOrigin(callSiteIndex));
+        CodeOrigin origin = codeOrigin(callSiteIndex);
+        bytecodeOffset = origin.bytecodeIndex;
+#else
+        RELEASE_ASSERT_NOT_REACHED();
+#endif
+    }
+
+    return bytecodeOffset;
+}
 
 } // namespace JSC

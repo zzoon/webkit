@@ -78,26 +78,26 @@ inline static bool hasVerticalAppearance(HTMLInputElement& input)
 
 // --------------------------------
 
-RenderSliderThumb::RenderSliderThumb(SliderThumbElement& element, Ref<RenderStyle>&& style)
+RenderSliderThumb::RenderSliderThumb(SliderThumbElement& element, RenderStyle&& style)
     : RenderBlockFlow(element, WTFMove(style))
 {
 }
 
-void RenderSliderThumb::updateAppearance(RenderStyle* parentStyle)
+void RenderSliderThumb::updateAppearance(const RenderStyle* parentStyle)
 {
     if (parentStyle->appearance() == SliderVerticalPart)
-        style().setAppearance(SliderThumbVerticalPart);
+        mutableStyle().setAppearance(SliderThumbVerticalPart);
     else if (parentStyle->appearance() == SliderHorizontalPart)
-        style().setAppearance(SliderThumbHorizontalPart);
+        mutableStyle().setAppearance(SliderThumbHorizontalPart);
     else if (parentStyle->appearance() == MediaSliderPart)
-        style().setAppearance(MediaSliderThumbPart);
+        mutableStyle().setAppearance(MediaSliderThumbPart);
     else if (parentStyle->appearance() == MediaVolumeSliderPart)
-        style().setAppearance(MediaVolumeSliderThumbPart);
+        mutableStyle().setAppearance(MediaVolumeSliderThumbPart);
     else if (parentStyle->appearance() == MediaFullScreenVolumeSliderPart)
-        style().setAppearance(MediaFullScreenVolumeSliderThumbPart);
+        mutableStyle().setAppearance(MediaFullScreenVolumeSliderThumbPart);
     if (style().hasAppearance()) {
         ASSERT(element());
-        theme().adjustSliderThumbSize(style(), element());
+        theme().adjustSliderThumbSize(mutableStyle(), element());
     }
 }
 
@@ -112,7 +112,7 @@ bool RenderSliderThumb::isSliderThumb() const
 // http://webkit.org/b/62535
 class RenderSliderContainer final : public RenderFlexibleBox {
 public:
-    RenderSliderContainer(SliderContainerElement& element, Ref<RenderStyle>&& style)
+    RenderSliderContainer(SliderContainerElement& element, RenderStyle&& style)
         : RenderFlexibleBox(element, WTFMove(style))
     {
     }
@@ -159,13 +159,13 @@ void RenderSliderContainer::layout()
     ASSERT(element()->shadowHost());
     auto& input = downcast<HTMLInputElement>(*element()->shadowHost());
     bool isVertical = hasVerticalAppearance(input);
-    style().setFlexDirection(isVertical ? FlowColumn : FlowRow);
+    mutableStyle().setFlexDirection(isVertical ? FlowColumn : FlowRow);
     TextDirection oldTextDirection = style().direction();
     if (isVertical) {
         // FIXME: Work around rounding issues in RTL vertical sliders. We want them to
         // render identically to LTR vertical sliders. We can remove this work around when
         // subpixel rendering is enabled on all ports.
-        style().setDirection(LTR);
+        mutableStyle().setDirection(LTR);
     }
 
     RenderBox* thumb = input.sliderThumbElement() ? input.sliderThumbElement()->renderBox() : nullptr;
@@ -177,7 +177,7 @@ void RenderSliderContainer::layout()
 
     RenderFlexibleBox::layout();
 
-    style().setDirection(oldTextDirection);
+    mutableStyle().setDirection(oldTextDirection);
     // These should always exist, unless someone mutates the shadow DOM (e.g., in the inspector).
     if (!thumb || !track)
         return;
@@ -219,7 +219,7 @@ void SliderThumbElement::setPositionFromValue()
         renderer()->setNeedsLayout();
 }
 
-RenderPtr<RenderElement> SliderThumbElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> SliderThumbElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderSliderThumb>(*this, WTFMove(style));
 }
@@ -243,7 +243,7 @@ Element* SliderThumbElement::focusDelegate()
 
 void SliderThumbElement::dragFrom(const LayoutPoint& point)
 {
-    Ref<SliderThumbElement> protect(*this);
+    Ref<SliderThumbElement> protectedThis(*this);
     setPositionFromPoint(point);
 #if !PLATFORM(IOS)
     startDragging();
@@ -253,39 +253,46 @@ void SliderThumbElement::dragFrom(const LayoutPoint& point)
 void SliderThumbElement::setPositionFromPoint(const LayoutPoint& absolutePoint)
 {
     RefPtr<HTMLInputElement> input = hostInput();
-    if (!input || !input->renderer() || !renderBox())
+    if (!input)
         return;
 
-    HTMLElement* trackElement = input->sliderTrackElement();
-    if (!trackElement->renderBox())
+    auto* inputRenderer = input->renderBox();
+    if (!inputRenderer)
+        return;
+
+    auto* thumbRenderer = renderBox();
+    if (!thumbRenderer)
+        return;
+
+    ASSERT(input->sliderTrackElement());
+    auto* trackRenderer = input->sliderTrackElement()->renderBox();
+    if (!trackRenderer)
         return;
 
     // Do all the tracking math relative to the input's renderer's box.
-    RenderBox& inputRenderer = downcast<RenderBox>(*input->renderer());
-    RenderBox& trackRenderer = *trackElement->renderBox();
 
     bool isVertical = hasVerticalAppearance(*input);
-    bool isLeftToRightDirection = renderBox()->style().isLeftToRightDirection();
+    bool isLeftToRightDirection = thumbRenderer->style().isLeftToRightDirection();
     
-    LayoutPoint offset(inputRenderer.absoluteToLocal(absolutePoint, UseTransforms));
-    FloatRect trackBoundingBox = trackRenderer.localToContainerQuad(FloatRect(0, 0, trackRenderer.width(), trackRenderer.height()), &inputRenderer).enclosingBoundingBox();
+    auto offset = inputRenderer->absoluteToLocal(absolutePoint, UseTransforms);
+    auto trackBoundingBox = trackRenderer->localToContainerQuad(FloatRect { { }, trackRenderer->size() }, inputRenderer).enclosingBoundingBox();
 
     LayoutUnit trackLength;
     LayoutUnit position;
     if (isVertical) {
-        trackLength = trackRenderer.contentHeight() - renderBox()->height();
-        position = offset.y() - renderBox()->height() / 2 - trackBoundingBox.y() - renderBox()->marginBottom();
+        trackLength = trackRenderer->contentHeight() - thumbRenderer->height();
+        position = offset.y() - thumbRenderer->height() / 2 - trackBoundingBox.y() - thumbRenderer->marginBottom();
     } else {
-        trackLength = trackRenderer.contentWidth() - renderBox()->width();
-        position = offset.x() - renderBox()->width() / 2 - trackBoundingBox.x();
-        position -= isLeftToRightDirection ? renderBox()->marginLeft() : renderBox()->marginRight();
+        trackLength = trackRenderer->contentWidth() - thumbRenderer->width();
+        position = offset.x() - thumbRenderer->width() / 2 - trackBoundingBox.x();
+        position -= isLeftToRightDirection ? thumbRenderer->marginLeft() : thumbRenderer->marginRight();
     }
 
     position = std::max<LayoutUnit>(0, std::min(position, trackLength));
-    const Decimal ratio = Decimal::fromDouble(static_cast<double>(position) / trackLength);
-    const Decimal fraction = isVertical || !isLeftToRightDirection ? Decimal(1) - ratio : ratio;
-    StepRange stepRange(input->createStepRange(RejectAny));
-    Decimal value = stepRange.clampValue(stepRange.valueFromProportion(fraction));
+    auto ratio = Decimal::fromDouble(static_cast<double>(position) / trackLength);
+    auto fraction = isVertical || !isLeftToRightDirection ? Decimal(1) - ratio : ratio;
+    auto stepRange = input->createStepRange(RejectAny);
+    auto value = stepRange.clampValue(stepRange.valueFromProportion(fraction));
 
 #if ENABLE(DATALIST_ELEMENT)
     const LayoutUnit snappingThreshold = renderer()->theme().sliderTickSnappingThreshold();
@@ -574,7 +581,7 @@ HTMLInputElement* SliderThumbElement::hostInput() const
     return downcast<HTMLInputElement>(shadowHost());
 }
 
-Optional<ElementStyle> SliderThumbElement::resolveCustomStyle(RenderStyle&, RenderStyle* hostStyle)
+Optional<ElementStyle> SliderThumbElement::resolveCustomStyle(const RenderStyle&, const RenderStyle* hostStyle)
 {
     // This doesn't actually compute style. This is just a hack to pick shadow pseudo id when host style is known.
 
@@ -623,12 +630,12 @@ Ref<SliderContainerElement> SliderContainerElement::create(Document& document)
     return adoptRef(*new SliderContainerElement(document));
 }
 
-RenderPtr<RenderElement> SliderContainerElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> SliderContainerElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderSliderContainer>(*this, WTFMove(style));
 }
 
-Optional<ElementStyle> SliderContainerElement::resolveCustomStyle(RenderStyle&, RenderStyle* hostStyle)
+Optional<ElementStyle> SliderContainerElement::resolveCustomStyle(const RenderStyle&, const RenderStyle* hostStyle)
 {
     // This doesn't actually compute style. This is just a hack to pick shadow pseudo id when host style is known.
 

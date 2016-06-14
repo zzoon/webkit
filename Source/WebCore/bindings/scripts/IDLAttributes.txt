@@ -50,7 +50,6 @@ CustomPutFunction
 CustomReturn
 CustomSetter
 CustomToJSObject
-Default=NullString|Undefined
 Deletable
 DoNotCheckConstants
 DoNotCheckSecurity
@@ -126,5 +125,4 @@ TreatReturnedNaNDateAs=Null|NaN
 TypedArray=*
 URL
 Unforgeable
-UsePointersEvenForNonNullableObjectArguments
 WindowEventHandler

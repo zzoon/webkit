@@ -468,7 +468,7 @@ void WebFrameLoaderClient::dispatchDidCommitLoad()
 
     // Notify the UIProcess.
 
-    webPage->send(Messages::WebPageProxy::DidCommitLoadForFrame(m_frame->frameID(), documentLoader.navigationID(), documentLoader.response().mimeType(), m_frameHasCustomContentProvider, m_frame->handlesPageScaleGesture(), static_cast<uint32_t>(m_frame->coreFrame()->loader().loadType()), documentLoader.response().certificateInfo(), m_frame->coreFrame()->document()->isPluginDocument(), UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
+    webPage->send(Messages::WebPageProxy::DidCommitLoadForFrame(m_frame->frameID(), documentLoader.navigationID(), documentLoader.response().mimeType(), m_frameHasCustomContentProvider, static_cast<uint32_t>(m_frame->coreFrame()->loader().loadType()), documentLoader.response().certificateInfo(), m_frame->coreFrame()->document()->isPluginDocument(), UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
     webPage->didCommitLoad(m_frame);
 }
 
@@ -1199,11 +1199,11 @@ void WebFrameLoaderClient::frameLoadCompleted()
     }
 }
 
-void WebFrameLoaderClient::saveViewStateToItem(HistoryItem* historyItem)
+void WebFrameLoaderClient::saveViewStateToItem(HistoryItem& historyItem)
 {
 #if PLATFORM(IOS) || PLATFORM(EFL)
     if (m_frame->isMainFrame())
-        m_frame->page()->savePageState(*historyItem);
+        m_frame->page()->savePageState(historyItem);
 #else
     UNUSED_PARAM(historyItem);
 #endif
@@ -1581,7 +1581,9 @@ void WebFrameLoaderClient::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld& 
 
     webPage->injectedBundleLoaderClient().didClearWindowObjectForFrame(webPage, m_frame, world);
 
-    if (auto automationSessionProxy = WebProcess::singleton().automationSessionProxy())
+
+    WebAutomationSessionProxy* automationSessionProxy = WebProcess::singleton().automationSessionProxy();
+    if (automationSessionProxy && world.isNormal())
         automationSessionProxy->didClearWindowObjectForFrame(*m_frame);
 
 #if HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL))

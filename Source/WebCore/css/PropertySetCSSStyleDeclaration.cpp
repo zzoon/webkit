@@ -24,6 +24,7 @@
 
 #include "CSSCustomPropertyValue.h"
 #include "CSSParser.h"
+#include "CSSRule.h"
 #include "CSSStyleSheet.h"
 #include "HTMLNames.h"
 #include "InspectorInstrumentation.h"
@@ -77,7 +78,7 @@ public:
             return;
 
         if (m_mutation && s_shouldDeliver)
-            m_mutationRecipients->enqueueMutationRecord(m_mutation);
+            m_mutationRecipients->enqueueMutationRecord(m_mutation.releaseNonNull());
 
         s_shouldDeliver = false;
         if (!s_shouldNotifyInspector) {
@@ -137,7 +138,7 @@ unsigned PropertySetCSSStyleDeclaration::length() const
 String PropertySetCSSStyleDeclaration::item(unsigned i) const
 {
     if (i >= m_propertySet->propertyCount())
-        return "";
+        return String();
     return m_propertySet->propertyAt(i).cssName();
 }
 
@@ -171,7 +172,7 @@ RefPtr<CSSValue> PropertySetCSSStyleDeclaration::getPropertyCSSValue(const Strin
     CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
         return nullptr;
-    return cloneAndCacheForCSSOM(m_propertySet->getPropertyCSSValue(propertyID).get());
+    return cloneAndCacheForCSSOM(getPropertyCSSValueInternal(propertyID).get());
 }
 
 String PropertySetCSSStyleDeclaration::getPropertyValue(const String& propertyName)
@@ -182,7 +183,7 @@ String PropertySetCSSStyleDeclaration::getPropertyValue(const String& propertyNa
     CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
         return String();
-    return m_propertySet->getPropertyValue(propertyID);
+    return getPropertyValueInternal(propertyID);
 }
 
 String PropertySetCSSStyleDeclaration::getPropertyPriority(const String& propertyName)
@@ -264,12 +265,28 @@ String PropertySetCSSStyleDeclaration::removeProperty(const String& propertyName
 
 RefPtr<CSSValue> PropertySetCSSStyleDeclaration::getPropertyCSSValueInternal(CSSPropertyID propertyID)
 {
-    return m_propertySet->getPropertyCSSValue(propertyID);
+    RefPtr<CSSValue> value = m_propertySet->getPropertyCSSValue(propertyID);
+    if (value)
+        return value;
+
+    CSSPropertyID prefixingVariant = prefixingVariantForPropertyId(propertyID);
+    if (prefixingVariant != propertyID)
+        return m_propertySet->getPropertyCSSValue(prefixingVariant);
+
+    return nullptr;
 }
 
 String PropertySetCSSStyleDeclaration::getPropertyValueInternal(CSSPropertyID propertyID)
-{ 
-    return m_propertySet->getPropertyValue(propertyID);
+{
+    String value = m_propertySet->getPropertyValue(propertyID);
+    if (!value.isEmpty())
+        return value;
+
+    CSSPropertyID prefixingVariant = prefixingVariantForPropertyId(propertyID);
+    if (prefixingVariant != propertyID)
+        return m_propertySet->getPropertyValue(prefixingVariant);
+
+    return String();
 }
 
 bool PropertySetCSSStyleDeclaration::setPropertyInternal(CSSPropertyID propertyID, const String& value, bool important, ExceptionCode& ec)

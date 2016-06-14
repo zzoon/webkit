@@ -224,7 +224,6 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/mediastream/MediaTrackSupportedConstraints.idl
     Modules/mediastream/NavigatorMediaDevices.idl
     Modules/mediastream/NavigatorUserMedia.idl
-    Modules/mediastream/NavigatorUserMediaError.idl
     Modules/mediastream/RTCConfiguration.idl
     Modules/mediastream/RTCDTMFSender.idl
     Modules/mediastream/RTCDTMFToneChangeEvent.idl
@@ -236,6 +235,7 @@ set(WebCore_NON_SVG_IDL_FILES
     Modules/mediastream/RTCPeerConnection.idl
     Modules/mediastream/RTCRtpReceiver.idl
     Modules/mediastream/RTCRtpSender.idl
+    Modules/mediastream/RTCRtpTransceiver.idl
     Modules/mediastream/RTCSessionDescription.idl
     Modules/mediastream/RTCStatsReport.idl
     Modules/mediastream/RTCStatsResponse.idl
@@ -592,8 +592,6 @@ set(WebCore_NON_SVG_IDL_FILES
 
     inspector/CommandLineAPIHost.idl
     inspector/InspectorFrontendHost.idl
-    inspector/ScriptProfile.idl
-    inspector/ScriptProfileNode.idl
 
     loader/appcache/DOMApplicationCache.idl
 
@@ -913,6 +911,7 @@ set(WebCore_SOURCES
     Modules/mediastream/MediaDevices.cpp
     Modules/mediastream/MediaDevicesRequest.cpp
     Modules/mediastream/MediaEndpointPeerConnection.cpp
+    Modules/mediastream/MediaEndpointSessionDescription.cpp
     Modules/mediastream/MediaSourceSettings.cpp
     Modules/mediastream/MediaStream.cpp
     Modules/mediastream/MediaStreamEvent.cpp
@@ -923,7 +922,6 @@ set(WebCore_SOURCES
     Modules/mediastream/MediaTrackConstraintSet.cpp
     Modules/mediastream/MediaTrackConstraints.cpp
     Modules/mediastream/NavigatorMediaDevices.cpp
-    Modules/mediastream/NavigatorUserMediaError.cpp
     Modules/mediastream/RTCConfiguration.cpp
     Modules/mediastream/RTCDTMFSender.cpp
     Modules/mediastream/RTCDTMFToneChangeEvent.cpp
@@ -935,6 +933,7 @@ set(WebCore_SOURCES
     Modules/mediastream/RTCPeerConnection.cpp
     Modules/mediastream/RTCRtpReceiver.cpp
     Modules/mediastream/RTCRtpSender.cpp
+    Modules/mediastream/RTCRtpTransceiver.cpp
     Modules/mediastream/RTCSessionDescription.cpp
     Modules/mediastream/RTCStatsReport.cpp
     Modules/mediastream/RTCStatsResponse.cpp
@@ -1124,7 +1123,6 @@ set(WebCore_SOURCES
     bindings/js/JSDOMPromise.cpp
     bindings/js/JSDOMStringListCustom.cpp
     bindings/js/JSDOMStringMapCustom.cpp
-    bindings/js/JSDOMTokenListCustom.cpp
     bindings/js/JSDOMWindowBase.cpp
     bindings/js/JSDOMWindowCustom.cpp
     bindings/js/JSDOMWindowShell.cpp
@@ -1145,6 +1143,7 @@ set(WebCore_SOURCES
     bindings/js/JSEventTargetCustom.cpp
     bindings/js/JSExceptionBase.cpp
     bindings/js/JSFetchResponseCustom.cpp
+    bindings/js/JSFileCustom.cpp
     bindings/js/JSFileReaderCustom.cpp
     bindings/js/JSGeolocationCustom.cpp
     bindings/js/JSHTMLAllCollectionCustom.cpp
@@ -1198,9 +1197,7 @@ set(WebCore_SOURCES
     bindings/js/JSPopStateEventCustom.cpp
     bindings/js/JSReadableStreamPrivateConstructors.cpp
     bindings/js/JSReadableStreamSourceCustom.cpp
-    bindings/js/JSRTCIceCandidateCustom.cpp
     bindings/js/JSRTCPeerConnectionCustom.cpp
-    bindings/js/JSRTCSessionDescriptionCustom.cpp
     bindings/js/JSRTCStatsResponseCustom.cpp
     bindings/js/JSSQLResultSetRowListCustom.cpp
     bindings/js/JSSQLTransactionCustom.cpp
@@ -1210,6 +1207,7 @@ set(WebCore_SOURCES
     bindings/js/JSStyleSheetCustom.cpp
     bindings/js/JSStyleSheetListCustom.cpp
     bindings/js/JSSubtleCryptoCustom.cpp
+    bindings/js/JSTextCustom.cpp
     bindings/js/JSTextTrackCueCustom.cpp
     bindings/js/JSTextTrackCustom.cpp
     bindings/js/JSTextTrackListCustom.cpp
@@ -1225,7 +1223,9 @@ set(WebCore_SOURCES
     bindings/js/JSWorkerCustom.cpp
     bindings/js/JSWorkerGlobalScopeBase.cpp
     bindings/js/JSWorkerGlobalScopeCustom.cpp
+    bindings/js/JSXMLDocumentCustom.cpp
     bindings/js/JSXMLHttpRequestCustom.cpp
+    bindings/js/JSXPathNSResolverCustom.cpp
     bindings/js/JSXPathResultCustom.cpp
     bindings/js/JSXSLTProcessorCustom.cpp
     bindings/js/ReadableStreamController.cpp
@@ -1398,7 +1398,6 @@ set(WebCore_SOURCES
     dom/BeforeUnloadEvent.cpp
     dom/CDATASection.cpp
     dom/CharacterData.cpp
-    dom/CheckedRadioButtons.cpp
     dom/ChildListMutationScope.cpp
     dom/ChildNodeList.cpp
     dom/ClassCollection.cpp
@@ -1493,6 +1492,7 @@ set(WebCore_SOURCES
     dom/ProgressEvent.cpp
     dom/PseudoElement.cpp
     dom/QualifiedName.cpp
+    dom/RadioButtonGroups.cpp
     dom/Range.cpp
     dom/RegisteredEventListener.cpp
     dom/ScopedEventQueue.cpp
@@ -1737,6 +1737,7 @@ set(WebCore_SOURCES
     html/InputTypeNames.cpp
     html/LabelableElement.cpp
     html/LabelsNodeList.cpp
+    html/LinkIconCollector.cpp
     html/LinkRelAttribute.cpp
     html/MediaController.cpp
     html/MediaDocument.cpp
@@ -1931,6 +1932,7 @@ set(WebCore_SOURCES
     loader/ResourceLoadStatistics.cpp
     loader/ResourceLoadStatisticsStore.cpp
     loader/ResourceLoader.cpp
+    loader/ResourceTimingInformation.cpp
     loader/SinkDocument.cpp
     loader/SubframeLoader.cpp
     loader/SubresourceLoader.cpp
@@ -2099,7 +2101,6 @@ set(WebCore_SOURCES
     platform/ContentType.cpp
     platform/ContextMenu.cpp
     platform/ContextMenuItem.cpp
-    platform/CrossThreadCopier.cpp
     platform/Cursor.cpp
     platform/DateComponents.cpp
     platform/Decimal.cpp
@@ -2109,8 +2110,10 @@ set(WebCore_SOURCES
     platform/FileChooser.cpp
     platform/FileStream.cpp
     platform/FileSystem.cpp
+    platform/GenericTaskQueue.cpp
     platform/Language.cpp
     platform/Length.cpp
+    platform/LengthBox.cpp
     platform/LengthPoint.cpp
     platform/LengthSize.cpp
     platform/LinkHash.cpp
@@ -2142,6 +2145,7 @@ set(WebCore_SOURCES
     platform/URL.cpp
     platform/UUID.cpp
     platform/UserActivity.cpp
+    platform/WebCoreCrossThreadCopier.cpp
     platform/Widget.cpp
 
     platform/animation/Animation.cpp
@@ -2206,6 +2210,7 @@ set(WebCore_SOURCES
     platform/graphics/FontDescription.cpp
     platform/graphics/FontFeatureSettings.cpp
     platform/graphics/FontGenericFamilies.cpp
+    platform/graphics/FontPlatformData.cpp
     platform/graphics/FontRanges.cpp
     platform/graphics/GeneratedImage.cpp
     platform/graphics/GeometryUtilities.cpp
@@ -2285,6 +2290,7 @@ set(WebCore_SOURCES
     platform/graphics/transforms/RotateTransformOperation.cpp
     platform/graphics/transforms/ScaleTransformOperation.cpp
     platform/graphics/transforms/SkewTransformOperation.cpp
+    platform/graphics/transforms/TransformOperation.cpp
     platform/graphics/transforms/TransformOperations.cpp
     platform/graphics/transforms/TransformState.cpp
     platform/graphics/transforms/TransformationMatrix.cpp
@@ -3013,15 +3019,22 @@ list(APPEND WebCore_CSS_VALUE_KEYWORDS
 
 if (ENABLE_WEB_ANIMATIONS)
     list(APPEND WebCore_IDL_FILES
+        "animation/Animatable.idl"
+        "animation/AnimationEffect.idl"
         "animation/AnimationTimeline.idl"
         "animation/DocumentAnimation.idl"
         "animation/DocumentTimeline.idl"
+        "animation/KeyframeEffect.idl"
+        "animation/WebAnimation.idl"
     )
 
     list(APPEND WebCore_SOURCES
+        "animation/AnimationEffect.cpp"
         "animation/AnimationTimeline.cpp"
         "animation/DocumentAnimation.cpp"
         "animation/DocumentTimeline.cpp"
+        "animation/KeyframeEffect.cpp"
+        "animation/WebAnimation.cpp"
     )
 endif ()
 
@@ -3277,6 +3290,7 @@ if (ENABLE_GRAPHICS_CONTEXT_3D)
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/PruneEmptyDeclarations.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/RecordConstantPrecision.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/RegenerateStructNames.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/RemoveDynamicIndexing.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/RemovePow.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/RemoveSwitchFallThrough.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/RewriteDoWhile.cpp
@@ -3284,6 +3298,7 @@ if (ENABLE_GRAPHICS_CONTEXT_3D)
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/ScalarizeVecAndMatConstructorArgs.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/SearchSymbol.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/SeparateArrayInitialization.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/SeparateExpressionsReturningArrays.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/SeparateDeclarations.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/ShaderLang.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/ShaderVars.cpp
@@ -3294,6 +3309,7 @@ if (ENABLE_GRAPHICS_CONTEXT_3D)
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/TranslatorHLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/Types.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/UnfoldShortCircuitAST.cpp
+        ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/UnfoldShortCircuitToIf.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/UniformHLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/util.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/translator/UtilsHLSL.cpp
@@ -3405,6 +3421,7 @@ set(WebCoreTestSupport_IDL_INCLUDES
 )
 
 set(WebCoreTestSupport_IDL_FILES
+    testing/GCObservation.idl
     testing/InternalSettings.idl
     testing/Internals.idl
     testing/MallocStatistics.idl
@@ -3423,6 +3440,7 @@ list(APPEND WebCoreTestSupport_SOURCES
     platform/mock/mediasource/MockSourceBufferPrivate.cpp
     platform/mock/mediasource/MockTracks.cpp
 
+    testing/GCObservation.cpp
     testing/InternalSettings.cpp
     testing/Internals.cpp
     testing/MockPageOverlay.cpp
@@ -3477,7 +3495,7 @@ add_custom_command(
     OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/CommandLineAPIModuleSource.h ${DERIVED_SOURCES_WEBCORE_DIR}/CommandLineAPIModuleSource.min.js
     MAIN_DEPENDENCY inspector/CommandLineAPIModuleSource.js
     DEPENDS ${JavaScriptCore_SCRIPTS_DIR}/xxd.pl ${JavaScriptCore_SCRIPTS_DIR}/jsmin.py
-    COMMAND ${CMAKE_COMMAND} -E echo "//# sourceURL=__WebInspectorCommandLineAPIModuleSource__" > ${DERIVED_SOURCES_WEBCORE_DIR}/CommandLineAPIModuleSource.min.js
+    COMMAND ${CMAKE_COMMAND} -E echo "//# sourceURL=__InjectedScript_CommandLineAPIModuleSource.js" > ${DERIVED_SOURCES_WEBCORE_DIR}/CommandLineAPIModuleSource.min.js
     COMMAND ${PYTHON_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/jsmin.py < ${WEBCORE_DIR}/inspector/CommandLineAPIModuleSource.js >> ${DERIVED_SOURCES_WEBCORE_DIR}/CommandLineAPIModuleSource.min.js
     COMMAND ${PERL_EXECUTABLE} ${JavaScriptCore_SCRIPTS_DIR}/xxd.pl CommandLineAPIModuleSource_js ${DERIVED_SOURCES_WEBCORE_DIR}/CommandLineAPIModuleSource.min.js ${DERIVED_SOURCES_WEBCORE_DIR}/CommandLineAPIModuleSource.h
     VERBATIM)
@@ -3588,14 +3606,12 @@ if (WebCore_USER_AGENT_SCRIPTS)
     # WebCore_USER_AGENT_SCRIPTS_DEPENDENCIES containing the source file that will load the scripts to add the proper
     #   dependency and having them built at the right moment
 
-    add_custom_command(
-        OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentScriptsData.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentScripts.h
-        MAIN_DEPENDENCY ${WEBCORE_DIR}/Scripts/make-js-file-arrays.py
-        DEPENDS ${WebCore_USER_AGENT_SCRIPTS}
-        COMMAND "PYTHONPATH=${JavaScriptCore_SCRIPTS_DIR}" ${PYTHON_EXECUTABLE} ${WEBCORE_DIR}/Scripts/make-js-file-arrays.py ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentScripts.h ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentScriptsData.cpp ${WebCore_USER_AGENT_SCRIPTS}
-        VERBATIM)
-    list(APPEND WebCore_DERIVED_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentScriptsData.cpp)
-    ADD_SOURCE_WEBCORE_DERIVED_DEPENDENCIES(${WebCore_USER_AGENT_SCRIPTS_DEPENDENCIES} UserAgentScriptsData.cpp UserAgentScripts.h)
+    MAKE_JS_FILE_ARRAYS(
+        ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentScriptsData.cpp
+        ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentScripts.h
+        WebCore_USER_AGENT_SCRIPTS
+        WebCore_USER_AGENT_SCRIPTS_DEPENDENCIES
+    )
 endif ()
 
 if (WebCore_SDP_PROCESSOR_SCRIPTS)
@@ -3604,14 +3620,12 @@ if (WebCore_SDP_PROCESSOR_SCRIPTS)
     # WebCore_SDP_PROCESSOR_SCRIPTS_DEPENDENCIES containing the source file that will load the scripts to add the proper
     #   dependency and having them built at the right moment
 
-    add_custom_command(
-        OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/SDPProcessorScriptsData.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/SDPProcessorScripts.h
-        MAIN_DEPENDENCY ${WEBCORE_DIR}/Scripts/make-js-file-arrays.py
-        DEPENDS ${WebCore_SDP_PROCESSOR_SCRIPTS}
-        COMMAND "PYTHONPATH=${JavaScriptCore_SCRIPTS_DIR}" ${PYTHON_EXECUTABLE} ${WEBCORE_DIR}/Scripts/make-js-file-arrays.py ${DERIVED_SOURCES_WEBCORE_DIR}/SDPProcessorScripts.h ${DERIVED_SOURCES_WEBCORE_DIR}/SDPProcessorScriptsData.cpp ${WebCore_SDP_PROCESSOR_SCRIPTS}
-        VERBATIM)
-    list(APPEND WebCore_DERIVED_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/SDPProcessorScriptsData.cpp)
-    ADD_SOURCE_WEBCORE_DERIVED_DEPENDENCIES(${WebCore_SDP_PROCESSOR_SCRIPTS_DEPENDENCIES} SDPProcessorScriptsData.cpp SDPProcessorScripts.h)
+    MAKE_JS_FILE_ARRAYS(
+        ${DERIVED_SOURCES_WEBCORE_DIR}/SDPProcessorScriptsData.cpp
+        ${DERIVED_SOURCES_WEBCORE_DIR}/SDPProcessorScripts.h
+        WebCore_SDP_PROCESSOR_SCRIPTS
+        WebCore_SDP_PROCESSOR_SCRIPTS_DEPENDENCIES
+    )
 endif ()
 
 # Generate plug-in resources
@@ -3800,7 +3814,7 @@ list(APPEND WebCore_DERIVED_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/XMLNSNames.cp
 GENERATE_DOM_NAMES(XML ${WEBCORE_DIR}/xml/xmlattrs.in)
 list(APPEND WebCore_DERIVED_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/XMLNames.cpp)
 
-if (ENABLE_ALLINONE_BUILD)
+if (ENABLE_ALLINONE_BUILD AND WIN32)
     message(STATUS "All-in-One DerivedSources build is enabled.")
     PROCESS_ALLINONE_FILE("${WebCore_DERIVED_SOURCES}" DerivedSources.cpp newSources TRUE)
     set(WebCore_DERIVED_SOURCES DerivedSources.cpp ${newSources})
@@ -3868,11 +3882,16 @@ if (ENABLE_GRAPHICS_CONTEXT_3D AND NOT WIN32)
         ADD_TARGET_PROPERTIES(ANGLESupport COMPILE_FLAGS "-Wno-null-conversion")
     endif ()
 
+    set(ANGLE_PLATFORM_DEFINITIONS )
+    if (PORT STREQUAL "WPE")
+        list(APPEND ANGLE_PLATFORM_DEFINITIONS "USE_WPE")
+    endif ()
     # Enable the ESSL and GLSL translators.
     set_property(TARGET ANGLESupport
         PROPERTY COMPILE_DEFINITIONS
         ANGLE_ENABLE_ESSL
-        ANGLE_ENABLE_GLSL)
+        ANGLE_ENABLE_GLSL
+        ${ANGLE_PLATFORM_DEFINITIONS})
 
     target_include_directories(ANGLESupport PRIVATE
         "${THIRDPARTY_DIR}/ANGLE/include"

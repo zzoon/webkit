@@ -77,8 +77,6 @@ public:
         : m_debugger(debugger)
     {
         ASSERT(!m_debugger.m_currentDebuggerCallFrame);
-        if (m_debugger.m_currentCallFrame)
-            m_debugger.m_currentDebuggerCallFrame = DebuggerCallFrame::create(debugger.m_currentCallFrame);
     }
 
     ~DebuggerPausedScope()
@@ -453,7 +451,8 @@ bool Debugger::hasBreakpoint(SourceID sourceID, const TextPosition& position, Br
 
     NakedPtr<Exception> exception;
     DebuggerCallFrame* debuggerCallFrame = currentDebuggerCallFrame();
-    JSValue result = debuggerCallFrame->evaluate(breakpoint->condition, exception);
+    JSObject* scopeExtensionObject = nullptr;
+    JSValue result = debuggerCallFrame->evaluateWithScopeExtension(breakpoint->condition, scopeExtensionObject, exception);
 
     // We can lose the debugger while executing JavaScript.
     if (!m_currentCallFrame)
@@ -769,9 +768,10 @@ void Debugger::didReachBreakpoint(CallFrame* callFrame)
     updateCallFrameAndPauseIfNeeded(callFrame);
 }
 
-DebuggerCallFrame* Debugger::currentDebuggerCallFrame() const
+DebuggerCallFrame* Debugger::currentDebuggerCallFrame()
 {
-    ASSERT(m_currentDebuggerCallFrame);
+    if (!m_currentDebuggerCallFrame)
+        m_currentDebuggerCallFrame = DebuggerCallFrame::create(m_currentCallFrame);
     return m_currentDebuggerCallFrame.get();
 }
 

@@ -67,7 +67,6 @@
 #include <inspector/ScriptArguments.h>
 #include <inspector/ScriptCallStack.h>
 #include <inspector/agents/InspectorDebuggerAgent.h>
-#include <profiler/Profile.h>
 #include <runtime/ConsoleTypes.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
@@ -775,6 +774,8 @@ void InspectorInstrumentation::frameStartedLoadingImpl(InstrumentingAgents& inst
     if (frame.isMainFrame()) {
         if (PageDebuggerAgent* pageDebuggerAgent = instrumentingAgents.pageDebuggerAgent())
             pageDebuggerAgent->mainFrameStartedLoading();
+        if (InspectorTimelineAgent* timelineAgent = instrumentingAgents.persistentInspectorTimelineAgent())
+            timelineAgent->mainFrameStartedLoading();
     }
 
     if (InspectorPageAgent* inspectorPageAgent = instrumentingAgents.inspectorPageAgent())
@@ -892,11 +893,10 @@ void InspectorInstrumentation::startProfilingImpl(InstrumentingAgents& instrumen
         timelineAgent->startFromConsole(exec, title);
 }
 
-RefPtr<JSC::Profile> InspectorInstrumentation::stopProfilingImpl(InstrumentingAgents& instrumentingAgents, JSC::ExecState* exec, const String& title)
+void InspectorInstrumentation::stopProfilingImpl(InstrumentingAgents& instrumentingAgents, JSC::ExecState* exec, const String& title)
 {
     if (InspectorTimelineAgent* timelineAgent = instrumentingAgents.persistentInspectorTimelineAgent())
-        return timelineAgent->stopFromConsole(exec, title);
-    return nullptr;
+        timelineAgent->stopFromConsole(exec, title);
 }
 
 void InspectorInstrumentation::didOpenDatabaseImpl(InstrumentingAgents& instrumentingAgents, RefPtr<Database>&& database, const String& domain, const String& name, const String& version)

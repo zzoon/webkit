@@ -232,7 +232,7 @@ class IOSSimulatorPort(Port):
                 '--args', '-CurrentDeviceUDID', device_udid])
 
             if mac_os_version in ['elcapitan', 'yosemite', 'mavericks']:
-                time.sleep(2)
+                time.sleep(2.5)
 
         _log.info('Waiting for all iOS Simulators to finish booting.')
         for i in xrange(self.child_processes()):
@@ -254,11 +254,15 @@ class IOSSimulatorPort(Port):
                 pass
 
         for i in xrange(self.child_processes()):
+            if not os.path.exists(self.get_simulator_path(i)):
+                continue
             try:
                 subprocess.call([self.LSREGISTER_PATH, "-v", "-u", self.get_simulator_path(i)])
                 shutil.rmtree(self.get_simulator_path(i), ignore_errors=True)
                 shutil.rmtree(os.path.join(os.path.expanduser("~"), "Library/Logs/CoreSimulator/",
                     self.testing_device(i).udid), ignore_errors=True)
+                shutil.rmtree(os.path.join(os.path.expanduser("~"), "Library/Saved Application State/",
+                    self.SIMULATOR_BUNDLE_ID + str(i) + ".savedState"), ignore_errors=True)
                 Simulator().delete_device(self.testing_device(i).udid)
             except:
                 _log.warning('Unable to remove Simulator' + str(i))

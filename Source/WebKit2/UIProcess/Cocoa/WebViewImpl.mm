@@ -90,6 +90,7 @@
 #import <WebCore/WebCoreNSStringExtras.h>
 #import <WebKitSystemInterface.h>
 #import <sys/stat.h>
+#import <wtf/NeverDestroyed.h>
 
 #if USE(APPLE_INTERNAL_SDK)
 #import <WebKitAdditions/WebViewImplIncludes.h>
@@ -437,6 +438,11 @@ namespace WebKit {
 
 void WebViewImpl::updateWebViewImplAdditions()
 {
+}
+
+bool WebViewImpl::shouldRequestCandidates() const
+{
+    return false;
 }
 
 void WebViewImpl::showCandidates(NSArray *candidates, NSString *string, NSRect rectOfTypedString, NSRange selectedRange, NSView *view, void (^completionHandler)(NSTextCheckingResult *acceptedCandidate))
@@ -1083,7 +1089,7 @@ void WebViewImpl::windowDidChangeBackingProperties(CGFloat oldBackingScaleFactor
 void WebViewImpl::windowDidChangeScreen()
 {
     NSWindow *window = m_targetWindowForMovePreparation ? m_targetWindowForMovePreparation : m_view.window;
-    m_page->windowScreenDidChange((PlatformDisplayID)[[[[window screen] deviceDescription] objectForKey:@"NSScreenNumber"] intValue]);
+    m_page->windowScreenDidChange([[[[window screen] deviceDescription] objectForKey:@"NSScreenNumber"] intValue]);
 }
 
 void WebViewImpl::windowDidChangeLayerHosting()
@@ -1225,8 +1231,11 @@ void WebViewImpl::viewDidMoveToWindow()
 
         dismissContentRelativeChildWindowsWithAnimation(false);
 
-        if (m_immediateActionGestureRecognizer)
+        if (m_immediateActionGestureRecognizer) {
+            // Work around <rdar://problem/22646404> by explicitly cancelling the animation.
+            cancelImmediateActionAnimation();
             [m_view removeGestureRecognizer:m_immediateActionGestureRecognizer.get()];
+        }
     }
 
     m_page->setIntrinsicDeviceScaleFactor(intrinsicDeviceScaleFactor());
@@ -2147,6 +2156,9 @@ void WebViewImpl::capitalizeWord()
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 101200
 void WebViewImpl::requestCandidatesForSelectionIfNeeded()
 {
+    if (!shouldRequestCandidates())
+        return;
+
     const EditorState& editorState = m_page->editorState();
     if (!editorState.isContentEditable)
         return;
@@ -2161,7 +2173,7 @@ void WebViewImpl::requestCandidatesForSelectionIfNeeded()
     NSRange selectedRange = NSMakeRange(postLayoutData.candidateRequestStartPosition, postLayoutData.selectedTextLength);
     NSTextCheckingTypes checkingTypes = NSTextCheckingTypeSpelling | NSTextCheckingTypeReplacement | NSTextCheckingTypeCorrection;
     auto weakThis = createWeakPtr();
-    [[NSSpellChecker sharedSpellChecker] requestCandidatesForSelectedRange:selectedRange inString:postLayoutData.paragraphContextForCandidateRequest types:checkingTypes options:nil inSpellDocumentWithTag:spellCheckerDocumentTag() completionHandler:[weakThis](NSInteger sequenceNumber, NSArray<NSTextCheckingResult *> *candidates) {
+    m_lastCandidateRequestSequenceNumber = [[NSSpellChecker sharedSpellChecker] requestCandidatesForSelectedRange:selectedRange inString:postLayoutData.paragraphContextForCandidateRequest types:checkingTypes options:nil inSpellDocumentWithTag:spellCheckerDocumentTag() completionHandler:[weakThis](NSInteger sequenceNumber, NSArray<NSTextCheckingResult *> *candidates) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (!weakThis)
                 return;
@@ -2173,6 +2185,12 @@ void WebViewImpl::requestCandidatesForSelectionIfNeeded()
 
 void WebViewImpl::handleRequestedCandidates(NSInteger sequenceNumber, NSArray<NSTextCheckingResult *> *candidates)
 {
+    if (!shouldRequestCandidates())
+        return;
+
+    if (m_lastCandidateRequestSequenceNumber != sequenceNumber)
+        return;
+
     const EditorState& editorState = m_page->editorState();
     if (!editorState.isContentEditable)
         return;
@@ -2760,7 +2778,7 @@ void WebViewImpl::draggedImage(NSImage *image, CGPoint endPoint, NSDragOperation
     // Prevent queued mouseDragged events from coming after the drag and fake mouseUp event.
     m_ignoresMouseDraggedEvents = true;
 
-    m_page->dragEnded(WebCore::IntPoint(windowMouseLoc), WebCore::globalPoint(windowMouseLoc, m_view.window), operation);
+    m_page->dragEnded(WebCore::IntPoint(windowMouseLoc), WebCore::IntPoint(WebCore::globalPoint(windowMouseLoc, m_view.window)), operation);
 }
 
 static WebCore::DragApplicationFlags applicationFlagsForDrag(NSView *view, id <NSDraggingInfo> draggingInfo)
@@ -2900,6 +2918,7 @@ void WebViewImpl::registerDraggedTypes()
 {
     auto types = adoptNS([[NSMutableSet alloc] initWithArray:PasteboardTypes::forEditing()]);
     [types addObjectsFromArray:PasteboardTypes::forURL()];
+    [types addObject:PasteboardTypes::WebDummyPboardType];
     [m_view registerForDraggedTypes:[types allObjects]];
 }
 #endif // ENABLE(DRAG_SUPPORT)
@@ -2915,14 +2934,15 @@ void WebViewImpl::dragImageForView(NSView *view, NSImage *image, CGPoint clientP
 {
     // The call below could release the view.
     RetainPtr<NSView> protector(m_view);
-
+    NSPasteboard *pasteboard = [NSPasteboard pasteboardWithName:NSDragPboard];
+    [pasteboard setString:@"" forType:PasteboardTypes::WebDummyPboardType];
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [view dragImage:image
                  at:NSPointFromCGPoint(clientPoint)
              offset:NSZeroSize
               event:linkDrag ? [NSApp currentEvent] : m_lastMouseDownEvent.get()
-         pasteboard:[NSPasteboard pasteboardWithName:NSDragPboard]
+         pasteboard:pasteboard
              source:m_view
           slideBack:YES];
 #pragma clang diagnostic pop

@@ -61,10 +61,6 @@ class ScriptArguments;
 class ScriptCallStack;
 }
 
-namespace JSC {
-class Profile;
-}
-
 namespace WebCore {
 
 class CSSRule;
@@ -218,7 +214,7 @@ public:
     static void didFireAnimationFrame(const InspectorInstrumentationCookie&);
 
     static void startProfiling(Page&, JSC::ExecState*, const String& title);
-    static RefPtr<JSC::Profile> stopProfiling(Page&, JSC::ExecState*, const String& title);
+    static void stopProfiling(Page&, JSC::ExecState*, const String& title);
 
     static void didOpenDatabase(ScriptExecutionContext*, RefPtr<Database>&&, const String& domain, const String& name, const String& version);
 
@@ -387,7 +383,7 @@ private:
     static void didFireAnimationFrameImpl(const InspectorInstrumentationCookie&);
 
     static void startProfilingImpl(InstrumentingAgents&, JSC::ExecState*, const String& title);
-    static RefPtr<JSC::Profile> stopProfilingImpl(InstrumentingAgents&, JSC::ExecState*, const String& title);
+    static void stopProfilingImpl(InstrumentingAgents&, JSC::ExecState*, const String& title);
 
     static void didOpenDatabaseImpl(InstrumentingAgents&, RefPtr<Database>&&, const String& domain, const String& name, const String& version);
 
@@ -1044,7 +1040,6 @@ inline void InspectorInstrumentation::willDestroyCachedResource(CachedResource& 
 
 inline void InspectorInstrumentation::didOpenDatabase(ScriptExecutionContext* context, RefPtr<Database>&& database, const String& domain, const String& name, const String& version)
 {
-    FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForContext(context))
         didOpenDatabaseImpl(*instrumentingAgents, WTFMove(database), domain, name, version);
 }
@@ -1277,10 +1272,8 @@ inline InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForDocu
 inline InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForDocument(Document& document)
 {
     Page* page = document.page();
-#if ENABLE(TEMPLATE_ELEMENT)
     if (!page && document.templateDocumentHost())
         page = document.templateDocumentHost()->page();
-#endif
     return instrumentingAgentsForPage(page);
 }
 

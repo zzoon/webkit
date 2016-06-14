@@ -58,6 +58,7 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <JavaScriptCore/HeapStatistics.h>
 #import <JavaScriptCore/Options.h>
+#import <WebCore/Logging.h>
 #import <WebKit/DOMElement.h>
 #import <WebKit/DOMExtensions.h>
 #import <WebKit/DOMRange.h>
@@ -86,6 +87,7 @@
 #import <getopt.h>
 #import <wtf/Assertions.h>
 #import <wtf/FastMalloc.h>
+#import <wtf/LoggingAccumulator.h>
 #import <wtf/ObjcRuntimeExtras.h>
 #import <wtf/RetainPtr.h>
 #import <wtf/Threading.h>
@@ -951,10 +953,7 @@ static void resetWebPreferencesToConsistentValues()
     [preferences setStorageTrackerEnabled:YES];
 #endif
 
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-    // Disable text autosizing by default.
-    [preferences _setMinimumZoomFontSize:0];
-#endif
+    [preferences _setTextAutosizingEnabled:NO];
 
     // The back/forward cache is causing problems due to layouts during transition from one page to another.
     // So, turn it off for now, but we might want to turn it back on some day.
@@ -964,25 +963,14 @@ static void resetWebPreferencesToConsistentValues()
     [preferences setCanvasUsesAcceleratedDrawing:YES];
     [preferences setAcceleratedDrawingEnabled:useAcceleratedDrawing];
 #endif
-    [preferences setCSSRegionsEnabled:YES];
     [preferences setUsePreHTML5ParserQuirks:NO];
     [preferences setAsynchronousSpellCheckingEnabled:NO];
 #if !PLATFORM(IOS)
     ASSERT([preferences mockScrollbarsEnabled]);
 #endif
 
-#if ENABLE(WEB_AUDIO)
     [preferences setWebAudioEnabled:YES];
-#endif
-
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-    // Disable text autosizing by default.
-    [preferences _setMinimumZoomFontSize:0];
-#endif
-
-#if ENABLE(MEDIA_SOURCE)
     [preferences setMediaSourceEnabled:YES];
-#endif
 
     [preferences setShadowDOMEnabled:YES];
     [preferences setCustomElementsEnabled:YES];
@@ -1858,6 +1846,7 @@ static void resetWebViewToConsistentStateBeforeTesting()
     resetWebPreferencesToConsistentValues();
 
     TestRunner::setSerializeHTTPLoads(false);
+    TestRunner::setAllowsAnySSLCertificate(false);
 
     setlocale(LC_ALL, "");
 
@@ -1894,6 +1883,9 @@ static void resetWebViewToConsistentStateBeforeTesting()
 #endif
 
     [mainFrame _clearOpener];
+
+    resetAccumulatedLogs();
+    WebCoreTestSupport::initializeLoggingChannelsIfNecessary();
 }
 
 #if PLATFORM(IOS)

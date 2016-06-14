@@ -44,13 +44,15 @@ class MediaStreamTrack;
 
 class RTCRtpSenderReceiverBase : public RefCounted<RTCRtpSenderReceiverBase>, public ScriptWrappable {
 public:
-    virtual ~RTCRtpSenderReceiverBase() { }
+    virtual ~RTCRtpSenderReceiverBase() = default;
 
-    MediaStreamTrack* track() const {  return m_track.get(); }
+    MediaStreamTrack* track() { return m_track.get(); }
 
 protected:
-    RTCRtpSenderReceiverBase(RefPtr<MediaStreamTrack>&& track)
-        : m_track(track)
+    RTCRtpSenderReceiverBase() = default;
+
+    RTCRtpSenderReceiverBase(Ref<MediaStreamTrack>&& track)
+        : m_track(WTFMove(track))
     { }
 
     RefPtr<MediaStreamTrack> m_track;

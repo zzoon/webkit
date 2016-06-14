@@ -38,7 +38,7 @@ namespace WebCore {
 
 class RenderImageControls final : public RenderBlockFlow {
 public:
-    RenderImageControls(HTMLElement&, Ref<RenderStyle>&&);
+    RenderImageControls(HTMLElement&, RenderStyle&&);
     virtual ~RenderImageControls();
 
 private:
@@ -49,7 +49,7 @@ private:
     bool requiresForcedStyleRecalcPropagation() const override { return true; }
 };
 
-RenderImageControls::RenderImageControls(HTMLElement& element, Ref<RenderStyle>&& style)
+RenderImageControls::RenderImageControls(HTMLElement& element, RenderStyle&& style)
     : RenderBlockFlow(element, WTFMove(style))
 {
 }
@@ -89,7 +89,7 @@ RefPtr<ImageControlsRootElement> ImageControlsRootElement::tryCreate(Document& d
     controls->setAttribute(HTMLNames::classAttr, "x-webkit-image-controls");
 
     if (RefPtr<ImageControlsButtonElementMac> button = ImageControlsButtonElementMac::tryCreate(document))
-        controls->appendChild(button.releaseNonNull());
+        controls->appendChild(*button);
 
     return WTFMove(controls);
 }
@@ -103,7 +103,7 @@ ImageControlsRootElementMac::~ImageControlsRootElementMac()
 {
 }
 
-RenderPtr<RenderElement> ImageControlsRootElementMac::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> ImageControlsRootElementMac::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderImageControls>(*this, WTFMove(style));
 }

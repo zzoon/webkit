@@ -61,7 +61,7 @@ class WebPage;
 class ThreadedCoordinatedLayerTreeHost : public LayerTreeHost, public WebCore::CompositingCoordinator::Client, public ThreadedCompositor::Client {
     WTF_MAKE_NONCOPYABLE(ThreadedCoordinatedLayerTreeHost); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static Ref<ThreadedCoordinatedLayerTreeHost> create(WebPage*);
+    static Ref<ThreadedCoordinatedLayerTreeHost> create(WebPage&);
     virtual ~ThreadedCoordinatedLayerTreeHost();
 
     const LayerTreeContext& layerTreeContext() override { return m_layerTreeContext; };
@@ -101,14 +101,12 @@ public:
     static RefPtr<WebCore::CoordinatedSurface> createCoordinatedSurface(const WebCore::IntSize&, WebCore::CoordinatedSurface::Flags);
 
 protected:
-    explicit ThreadedCoordinatedLayerTreeHost(WebPage*);
+    explicit ThreadedCoordinatedLayerTreeHost(WebPage&);
 
 private:
 
     void compositorDidFlushLayers();
     void didScaleFactorChanged(float scale, const WebCore::IntPoint& origin);
-
-    void updateRootLayers();
 
     void cancelPendingLayerFlush();
     void performScheduledLayerFlush();
@@ -128,15 +126,12 @@ private:
     void paintLayerContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, const WebCore::IntRect& clipRect) override;
 
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
-    virtual RefPtr<WebCore::DisplayRefreshMonitor> createDisplayRefreshMonitor(PlatformDisplayID) override;
+    virtual RefPtr<WebCore::DisplayRefreshMonitor> createDisplayRefreshMonitor(WebCore::PlatformDisplayID) override;
 #endif
 
     LayerTreeContext m_layerTreeContext;
 
     WebCore::IntPoint m_prevScrollPosition;
-
-    WebCore::GraphicsLayer* m_contentLayer;
-    WebCore::GraphicsLayer* m_viewOverlayRootLayer;
 
     std::unique_ptr<WebCore::CompositingCoordinator> m_coordinator;
     RefPtr<ThreadedCompositor> m_compositor;

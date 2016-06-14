@@ -31,6 +31,7 @@
 #import "CustomProtocolManager.h"
 #import "DataReference.h"
 #import "Download.h"
+#import "Logging.h"
 #import "NetworkCache.h"
 #import "NetworkLoad.h"
 #import "NetworkProcess.h"
@@ -50,6 +51,8 @@
 #import <WebCore/WebCoreURLResponse.h>
 #import <wtf/MainThread.h>
 #import <wtf/NeverDestroyed.h>
+
+using namespace WebKit;
 
 static NSURLSessionResponseDisposition toNSURLSessionResponseDisposition(WebCore::PolicyAction disposition)
 {
@@ -114,15 +117,38 @@ static NSURLSessionAuthChallengeDisposition toNSURLSessionAuthChallengeDispositi
 
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task willPerformHTTPRedirection:(NSHTTPURLResponse *)response newRequest:(NSURLRequest *)request completionHandler:(void (^)(NSURLRequest *))completionHandler
 {
+    auto taskIdentifier = task.taskIdentifier;
+    LOG(NetworkSession, "%llu willPerformHTTPRedirection from %s to %s", taskIdentifier, response.URL.absoluteString.UTF8String, request.URL.absoluteString.UTF8String);
+    
     auto storedCredentials = _withCredentials ? WebCore::StoredCredentials::AllowStoredCredentials : WebCore::StoredCredentials::DoNotAllowStoredCredentials;
     if (auto* networkDataTask = _session->dataTaskForIdentifier(task.taskIdentifier, storedCredentials)) {
         auto completionHandlerCopy = Block_copy(completionHandler);
-        networkDataTask->willPerformHTTPRedirection(response, request, [completionHandlerCopy](const WebCore::ResourceRequest& request) {
+        networkDataTask->willPerformHTTPRedirection(response, request, [completionHandlerCopy, taskIdentifier](auto& request) {
+            LOG(NetworkSession, "%llu willPerformHTTPRedirection completionHandler (%s)", taskIdentifier, request.url().string().utf8().data());
             completionHandlerCopy(request.nsURLRequest(WebCore::UpdateHTTPBody));
             Block_release(completionHandlerCopy);
         });
     } else {
-        ASSERT_NOT_REACHED();
+        LOG(NetworkSession, "%llu willPerformHTTPRedirection completionHandler (nil)", taskIdentifier);
+        completionHandler(nil);
+    }
+}
+
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask*)task _schemeUpgraded:(NSURLRequest*)request completionHandler:(void (^)(NSURLRequest*))completionHandler
+{
+    auto taskIdentifier = task.taskIdentifier;
+    LOG(NetworkSession, "%llu _schemeUpgraded %s", taskIdentifier, request.URL.absoluteString.UTF8String);
+    
+    auto storedCredentials = _withCredentials ? WebCore::StoredCredentials::AllowStoredCredentials : WebCore::StoredCredentials::DoNotAllowStoredCredentials;
+    if (auto* networkDataTask = _session->dataTaskForIdentifier(taskIdentifier, storedCredentials)) {
+        auto completionHandlerCopy = Block_copy(completionHandler);
+        networkDataTask->willPerformHTTPRedirection(WebCore::synthesizeRedirectResponseIfNecessary([task currentRequest], request, nil), request, [completionHandlerCopy, taskIdentifier](auto& request) {
+            LOG(NetworkSession, "%llu _schemeUpgraded completionHandler (%s)", taskIdentifier, request.url().string().utf8().data());
+            completionHandlerCopy(request.nsURLRequest(WebCore::UpdateHTTPBody));
+            Block_release(completionHandlerCopy);
+        });
+    } else {
+        LOG(NetworkSession, "%llu _schemeUpgraded completionHandler (nil)", taskIdentifier);
         completionHandler(nil);
     }
 }
@@ -139,18 +165,22 @@ static NSURLSessionAuthChallengeDisposition toNSURLSessionAuthChallengeDispositi
 
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler
 {
+    auto taskIdentifier = task.taskIdentifier;
+    LOG(NetworkSession, "%llu didReceiveChallenge", taskIdentifier);
+    
     auto storedCredentials = _withCredentials ? WebCore::StoredCredentials::AllowStoredCredentials : WebCore::StoredCredentials::DoNotAllowStoredCredentials;
     if (auto* networkDataTask = _session->dataTaskForIdentifier(task.taskIdentifier, storedCredentials)) {
         WebCore::AuthenticationChallenge authenticationChallenge(challenge);
         auto completionHandlerCopy = Block_copy(completionHandler);
         auto sessionID = _session->sessionID();
-        auto challengeCompletionHandler = [completionHandlerCopy, sessionID, authenticationChallenge](WebKit::AuthenticationChallengeDisposition disposition, const WebCore::Credential& credential)
+        auto challengeCompletionHandler = [completionHandlerCopy, sessionID, authenticationChallenge, taskIdentifier](WebKit::AuthenticationChallengeDisposition disposition, const WebCore::Credential& credential)
         {
+            LOG(NetworkSession, "%llu didReceiveChallenge completionHandler", taskIdentifier);
 #if !USE(CREDENTIAL_STORAGE_WITH_NETWORK_SESSION)
             UNUSED_PARAM(sessionID);
             UNUSED_PARAM(authenticationChallenge);
 #else
-            if (credential.persistence() == WebCore::CredentialPersistenceForSession && authenticationChallenge.protectionSpace().authenticationScheme() != WebCore::ProtectionSpaceAuthenticationSchemeServerTrustEvaluationRequested) {
+            if (credential.persistence() == WebCore::CredentialPersistenceForSession && authenticationChallenge.protectionSpace().isPasswordBased()) {
 
                 WebCore::Credential nonPersistentCredential(credential.user(), credential.password(), WebCore::CredentialPersistenceNone);
                 WebCore::URL urlToStore;
@@ -169,13 +199,14 @@ static NSURLSessionAuthChallengeDisposition toNSURLSessionAuthChallengeDispositi
         };
         networkDataTask->didReceiveChallenge(challenge, challengeCompletionHandler);
     } else {
-        ASSERT_NOT_REACHED();
-        completionHandler(NSURLSessionAuthChallengePerformDefaultHandling, nil);
+        LOG(NetworkSession, "%llu didReceiveChallenge completionHandler (cancel)", taskIdentifier);
+        completionHandler(NSURLSessionAuthChallengeCancelAuthenticationChallenge, nil);
     }
 }
 
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error
 {
+    LOG(NetworkSession, "%llu didCompleteWithError", task.taskIdentifier);
     auto storedCredentials = _withCredentials ? WebCore::StoredCredentials::AllowStoredCredentials : WebCore::StoredCredentials::DoNotAllowStoredCredentials;
     if (auto* networkDataTask = _session->dataTaskForIdentifier(task.taskIdentifier, storedCredentials))
         networkDataTask->didCompleteWithError(error);
@@ -200,8 +231,10 @@ static NSURLSessionAuthChallengeDisposition toNSURLSessionAuthChallengeDispositi
 
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveResponse:(NSURLResponse *)response completionHandler:(void (^)(NSURLSessionResponseDisposition disposition))completionHandler
 {
+    auto taskIdentifier = dataTask.taskIdentifier;
+    LOG(NetworkSession, "%llu didReceiveResponse", taskIdentifier);
     auto storedCredentials = _withCredentials ? WebCore::StoredCredentials::AllowStoredCredentials : WebCore::StoredCredentials::DoNotAllowStoredCredentials;
-    if (auto* networkDataTask = _session->dataTaskForIdentifier(dataTask.taskIdentifier, storedCredentials)) {
+    if (auto* networkDataTask = _session->dataTaskForIdentifier(taskIdentifier, storedCredentials)) {
         ASSERT(isMainThread());
         
         // Avoid MIME type sniffing if the response comes back as 304 Not Modified.
@@ -214,12 +247,15 @@ static NSURLSessionAuthChallengeDisposition toNSURLSessionAuthChallengeDispositi
         WebCore::ResourceResponse resourceResponse(response);
         copyTimingData([dataTask _timingData], resourceResponse.resourceLoadTiming());
         auto completionHandlerCopy = Block_copy(completionHandler);
-        networkDataTask->didReceiveResponse(resourceResponse, [completionHandlerCopy](WebCore::PolicyAction policyAction) {
+        networkDataTask->didReceiveResponse(resourceResponse, [completionHandlerCopy, taskIdentifier](WebCore::PolicyAction policyAction) {
+            LOG(NetworkSession, "%llu didReceiveResponse completionHandler (cancel)", taskIdentifier);
             completionHandlerCopy(toNSURLSessionResponseDisposition(policyAction));
             Block_release(completionHandlerCopy);
         });
-    } else
+    } else {
+        LOG(NetworkSession, "%llu didReceiveResponse completionHandler (cancel)", taskIdentifier);
         completionHandler(NSURLSessionResponseCancel);
+    }
 }
 
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveData:(NSData *)data
@@ -383,7 +419,7 @@ void NetworkSession::clearCredentials()
     ASSERT(m_dataTaskMapWithCredentials.isEmpty());
     ASSERT(m_dataTaskMapWithoutCredentials.isEmpty());
     ASSERT(m_downloadMap.isEmpty());
-    m_sessionWithCredentialStorage = [NSURLSession sessionWithConfiguration:m_sessionWithCredentialStorage.get().configuration delegate:static_cast<id>(m_sessionDelegate.get()) delegateQueue:[NSOperationQueue mainQueue]];
+    m_sessionWithCredentialStorage = [NSURLSession sessionWithConfiguration:m_sessionWithCredentialStorage.get().configuration delegate:static_cast<id>(m_sessionWithCredentialStorageDelegate.get()) delegateQueue:[NSOperationQueue mainQueue]];
 }
 #endif
 

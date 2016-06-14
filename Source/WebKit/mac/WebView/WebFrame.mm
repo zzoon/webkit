@@ -914,9 +914,9 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     RefPtr<DocumentFragment> fragment = document->createDocumentFragment();
 
     for (auto* node : nodesVector) {
-        Ref<Element> element = createDefaultParagraphElement(*document);
+        auto element = createDefaultParagraphElement(*document);
         element->appendChild(*node);
-        fragment->appendChild(WTFMove(element));
+        fragment->appendChild(element);
     }
 
     return kit(fragment.release().get());
@@ -976,7 +976,7 @@ static inline WebDataSource *dataSource(DocumentLoader* loader)
     if (!view)
         return;
     // FIXME: These are fake modifier keys here, but they should be real ones instead.
-    PlatformMouseEvent event(IntPoint(windowLoc), globalPoint(windowLoc, [view->platformWidget() window]),
+    PlatformMouseEvent event(IntPoint(windowLoc), IntPoint(globalPoint(windowLoc, [view->platformWidget() window])),
         LeftButton, PlatformEvent::MouseMoved, 0, false, false, false, false, currentTime(), WebCore::ForceAtClick);
     _private->coreFrame->eventHandler().dragSourceEndedAt(event, (DragOperation)operation);
 }
@@ -1300,7 +1300,9 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
 {
     ASSERT(!WebThreadIsEnabled() || WebThreadIsLocked());
     FrameLoader& frameLoader = _private->coreFrame->loader();
-    frameLoader.client().saveViewStateToItem(frameLoader.history().currentItem());
+    auto* item = frameLoader.history().currentItem();
+    if (item)
+        frameLoader.client().saveViewStateToItem(*item);
 }
 
 - (void)deviceOrientationChanged
@@ -1691,7 +1693,7 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     if (!frame || !frame->document())
         return;
         
-    frame->editor().setTextAsChildOfElement(text, core(element));
+    frame->editor().setTextAsChildOfElement(text, *core(element));
 }
 
 - (void)setDictationPhrases:(NSArray *)dictationPhrases metadata:(id)metadata asChildOfElement:(DOMElement *)element
@@ -2360,7 +2362,7 @@ static WebFrameLoadType toWebFrameLoadType(FrameLoadType frameLoadType)
     Frame* coreFrame = _private->coreFrame;
     if (!coreFrame)
         return nil;
-    return [[[WebElementDictionary alloc] initWithHitTestResult:coreFrame->eventHandler().hitTestResultAtPoint(IntPoint(point), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent)] autorelease];
+    return [[[WebElementDictionary alloc] initWithHitTestResult:coreFrame->eventHandler().hitTestResultAtPoint(IntPoint(point), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowUserAgentShadowContent)] autorelease];
 }
 
 - (NSURL *)_unreachableURL

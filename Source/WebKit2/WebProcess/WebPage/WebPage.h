@@ -393,7 +393,7 @@ public:
 
     void setUseFixedLayout(bool);
     bool useFixedLayout() const { return m_useFixedLayout; }
-    void setFixedLayoutSize(const WebCore::IntSize&);
+    bool setFixedLayoutSize(const WebCore::IntSize&);
     WebCore::IntSize fixedLayoutSize() const;
 
     void listenForLayoutMilestones(uint32_t /* LayoutMilestones */);
@@ -583,7 +583,7 @@ public:
 #endif
 
     void setLayerTreeStateIsFrozen(bool);
-    void markLayersVolatile(std::function<void()> completionHandler = {});
+    void markLayersVolatile(std::function<void ()> completionHandler = { });
     void cancelMarkLayersVolatile();
 
     NotificationPermissionRequestManager* notificationPermissionRequestManager();
@@ -976,9 +976,11 @@ private:
     void handleSyntheticClick(WebCore::Node* nodeRespondingToClick, const WebCore::FloatPoint& location);
     void completeSyntheticClick(WebCore::Node* nodeRespondingToClick, const WebCore::FloatPoint& location);
     void sendTapHighlightForNodeIfNecessary(uint64_t requestID, WebCore::Node*);
-    void resetTextAutosizingBeforeLayoutIfNeeded(const WebCore::FloatSize& oldSize, const WebCore::FloatSize& newSize);
+    void resetTextAutosizing();
     WebCore::VisiblePosition visiblePositionInFocusedNodeForPoint(const WebCore::Frame&, const WebCore::IntPoint&, bool isInteractingWithAssistedNode);
     PassRefPtr<WebCore::Range> rangeForGranularityAtPoint(const WebCore::Frame&, const WebCore::IntPoint&, uint32_t granularity, bool isInteractingWithAssistedNode);
+    bool shouldSwitchToBlockModeForHandle(const WebCore::IntPoint& handlePoint, SelectionHandlePosition);
+    RefPtr<WebCore::Range> switchToBlockSelectionAtPoint(const WebCore::IntPoint&, SelectionHandlePosition);
 #endif
 #if !PLATFORM(COCOA) && !PLATFORM(WPE)
     static const char* interpretKeyEvent(const WebCore::KeyboardEvent*);
@@ -991,6 +993,7 @@ private:
 
     bool markLayersVolatileImmediatelyIfPossible();
     void layerVolatilityTimerFired();
+    void callVolatilityCompletionHandlers();
 
     String sourceForFrame(WebFrame*);
 
@@ -1310,7 +1313,7 @@ private:
 
     RefPtr<WebInspector> m_inspector;
     RefPtr<WebInspectorUI> m_inspectorUI;
-#if PLATFORM(IOS) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
+#if (PLATFORM(IOS) && HAVE(AVKIT)) || (PLATFORM(MAC) && ENABLE(VIDEO_PRESENTATION_MODE))
     RefPtr<WebPlaybackSessionManager> m_playbackSessionManager;
     RefPtr<WebVideoFullscreenManager> m_videoFullscreenManager;
 #endif
@@ -1375,6 +1378,9 @@ private:
     WebCore::IntSize m_minimumLayoutSize;
     bool m_autoSizingShouldExpandToViewHeight;
 
+    bool m_userIsInteracting;
+    bool m_hasFocusedDueToUserInteraction { false };
+
 #if ENABLE(CONTEXT_MENUS)
     bool m_isShowingContextMenu;
 #endif
@@ -1399,8 +1405,6 @@ private:
     bool m_scaleWasSetByUIProcess;
     bool m_userHasChangedPageScaleFactor;
     bool m_hasStablePageScaleFactor;
-    bool m_userIsInteracting;
-    bool m_hasFocusedDueToUserInteraction { false };
     bool m_hasPendingBlurNotification;
     bool m_useTestingViewportConfiguration;
     bool m_isInStableState;
@@ -1410,6 +1414,8 @@ private:
     WebCore::FloatSize m_screenSize;
     WebCore::FloatSize m_availableScreenSize;
     RefPtr<WebCore::Range> m_currentBlockSelection;
+    WebCore::IntRect m_blockRectForTextSelection;
+
     RefPtr<WebCore::Range> m_initialSelection;
     WebCore::IntSize m_blockSelectionDesiredSize;
     WebCore::FloatSize m_maximumUnobscuredSize;
@@ -1422,7 +1428,8 @@ private:
 #endif
 
     WebCore::Timer m_layerVolatilityTimer;
-    Vector<std::function<void()>> m_markLayersAsVolatileCompletionHandlers;
+    Vector<std::function<void ()>> m_markLayersAsVolatileCompletionHandlers;
+    bool m_isSuspendedUnderLock { false };
 
     HashSet<String, ASCIICaseInsensitiveHash> m_mimeTypesWithCustomContentProviders;
     WebCore::Color m_backgroundColor;

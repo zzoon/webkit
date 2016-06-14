@@ -134,6 +134,9 @@ void PlatformCALayerRemote::updateClonedLayerProperties(PlatformCALayerRemote& c
     clone.setContentsScale(contentsScale());
     clone.setCornerRadius(cornerRadius());
 
+    if (!m_properties.shapePath.isNull())
+        clone.setShapePath(m_properties.shapePath);
+
     if (m_properties.shapeRoundedRect)
         clone.setShapeRoundedRect(*m_properties.shapeRoundedRect);
 
@@ -350,7 +353,7 @@ void PlatformCALayerRemote::addAnimationForKey(const String& key, PlatformCAAnim
 void PlatformCALayerRemote::removeAnimationForKey(const String& key)
 {
     if (m_animations.remove(key)) {
-        m_properties.addedAnimations.removeFirstMatching([&key] (const std::pair<String, PlatformCAAnimationRemote::Properties>& pair) {
+        m_properties.addedAnimations.removeFirstMatching([&key](auto& pair) {
             return pair.first == key;
         });
     }
@@ -503,8 +506,25 @@ bool PlatformCALayerRemote::isHidden() const
 
 void PlatformCALayerRemote::setHidden(bool value)
 {
+    if (m_properties.hidden == value)
+        return;
+
     m_properties.hidden = value;
     m_properties.notePropertiesChanged(RemoteLayerTreeTransaction::HiddenChanged);
+}
+
+bool PlatformCALayerRemote::contentsHidden() const
+{
+    return m_properties.contentsHidden;
+}
+
+void PlatformCALayerRemote::setContentsHidden(bool value)
+{
+    if (m_properties.contentsHidden == value)
+        return;
+
+    m_properties.contentsHidden = value;
+    m_properties.notePropertiesChanged(RemoteLayerTreeTransaction::ContentsHiddenChanged);
 }
 
 void PlatformCALayerRemote::setBackingStoreAttached(bool value)

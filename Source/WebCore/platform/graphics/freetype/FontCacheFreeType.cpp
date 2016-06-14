@@ -65,20 +65,12 @@ static RefPtr<FcPattern> createFontConfigPatternForCharacters(const UChar* chara
 
 static RefPtr<FcPattern> findBestFontGivenFallbacks(const FontPlatformData& fontData, FcPattern* pattern)
 {
-    if (!fontData.m_pattern)
+    FcFontSet* fallbacks = fontData.fallbacks();
+    if (!fallbacks)
         return nullptr;
 
-    if (!fontData.m_fallbacks) {
-        FcResult fontConfigResult;
-        fontData.m_fallbacks = FcFontSort(nullptr, fontData.m_pattern.get(), FcTrue, nullptr, &fontConfigResult);
-    }
-
-    if (!fontData.m_fallbacks)
-        return nullptr;
-
-    FcFontSet* sets[] = { fontData.m_fallbacks };
     FcResult fontConfigResult;
-    return FcFontSetMatch(nullptr, sets, 1, pattern, &fontConfigResult);
+    return FcFontSetMatch(nullptr, &fallbacks, 1, pattern, &fontConfigResult);
 }
 
 using SystemFallbackMap = HashMap<FcChar32, RefPtr<FcPattern>>;

@@ -26,12 +26,7 @@
 #include "config.h"
 #include "ArrayIteratorPrototype.h"
 
-namespace JSC {
-
-}
-
 #include "ArrayIteratorPrototype.lut.h"
-
 #include "IteratorOperations.h"
 #include "JSArrayIterator.h"
 #include "JSCInlines.h"
@@ -58,11 +53,6 @@ void ArrayIteratorPrototype::finishCreation(VM& vm, JSGlobalObject*)
     ASSERT(inherits(info()));
     putDirectWithoutTransition(vm, vm.propertyNames->toStringTagSymbol, jsString(&vm, "Array Iterator"), DontEnum | ReadOnly);
     vm.prototypeMap.addPrototype(this);
-}
-
-bool ArrayIteratorPrototype::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
-{
-    return getStaticFunctionSlot<Base>(exec, arrayIteratorPrototypeTable, jsCast<ArrayIteratorPrototype*>(object), propertyName, slot);
 }
 
 // ------------------------------ Array Functions ----------------------------

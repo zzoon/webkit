@@ -100,7 +100,7 @@ using namespace WebCore;
     ASSERT(!isMainThread());
     UNUSED_PARAM(connection);
 
-    redirectResponse = synthesizeRedirectResponseIfNecessary(connection, newRequest, redirectResponse);
+    redirectResponse = synthesizeRedirectResponseIfNecessary([connection currentRequest], newRequest, redirectResponse);
 
     // See <rdar://problem/5380697>. This is a workaround for a behavior change in CFNetwork where willSendRequest gets called more often.
     if (!redirectResponse)
@@ -122,9 +122,7 @@ using namespace WebCore;
             return;
         }
 
-        ResourceRequest request = newRequest;
-
-        m_handle->willSendRequest(request, redirectResponse);
+        m_handle->willSendRequest(newRequest, redirectResponse);
     });
 
     dispatch_semaphore_wait(m_semaphore, DISPATCH_TIME_FOREVER);

@@ -33,10 +33,12 @@
 #include "HTMLAreaElement.h"
 #include "HTMLAttachmentElement.h"
 #include "HTMLAudioElement.h"
+#include "HTMLEmbedElement.h"
 #include "HTMLImageElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLMediaElement.h"
 #include "HTMLNames.h"
+#include "HTMLObjectElement.h"
 #include "HTMLParserIdioms.h"
 #include "HTMLPlugInImageElement.h"
 #include "HTMLTextAreaElement.h"
@@ -121,16 +123,27 @@ HitTestResult& HitTestResult::operator=(const HitTestResult& other)
     return *this;
 }
 
-void HitTestResult::setToNonShadowAncestor()
+static Node* moveOutOfUserAgentShadowTree(Node& node)
 {
-    Node* node = innerNode();
-    if (node)
-        node = node->document().ancestorInThisScope(node);
-    setInnerNode(node);
-    node = innerNonSharedNode();
-    if (node)
-        node = node->document().ancestorInThisScope(node);
-    setInnerNonSharedNode(node);
+    if (node.isInShadowTree()) {
+        if (ShadowRoot* root = node.containingShadowRoot()) {
+            if (root->type() == ShadowRoot::Type::UserAgent)
+                return root->host();
+        }
+    }
+    return &node;
+}
+
+void HitTestResult::setToNonUserAgentShadowAncestor()
+{
+    if (Node* node = innerNode()) {
+        node = moveOutOfUserAgentShadowTree(*node);
+        setInnerNode(node);
+    }
+    if (Node *node = innerNonSharedNode()) {
+        node = moveOutOfUserAgentShadowTree(*node);
+        setInnerNonSharedNode(node);
+    }
 }
 
 void HitTestResult::setInnerNode(Node* node)
@@ -246,7 +259,7 @@ String HitTestResult::title(TextDirection& dir) const
     dir = LTR;
     // Find the title in the nearest enclosing DOM node.
     // For <area> tags in image maps, walk the tree for the <area>, not the <img> using it.
-    for (Node* titleNode = m_innerNode.get(); titleNode; titleNode = titleNode->parentNode()) {
+    for (Node* titleNode = m_innerNode.get(); titleNode; titleNode = titleNode->parentInComposedTree()) {
         if (is<Element>(*titleNode)) {
             Element& titleElement = downcast<Element>(*titleNode);
             String title = titleElement.title();
@@ -262,7 +275,7 @@ String HitTestResult::title(TextDirection& dir) const
 
 String HitTestResult::innerTextIfTruncated(TextDirection& dir) const
 {
-    for (Node* truncatedNode = m_innerNode.get(); truncatedNode; truncatedNode = truncatedNode->parentNode()) {
+    for (Node* truncatedNode = m_innerNode.get(); truncatedNode; truncatedNode = truncatedNode->parentInComposedTree()) {
         if (!is<Element>(*truncatedNode))
             continue;
 
@@ -657,7 +670,7 @@ bool HitTestResult::addNodeToRectBasedTestResult(Node* node, const HitTestReques
     if (!node)
         return true;
 
-    if (request.disallowsShadowContent())
+    if (request.disallowsUserAgentShadowContent())
         node = node->document().ancestorInThisScope(node);
 
     mutableRectBasedTestResult().add(node);
@@ -677,7 +690,7 @@ bool HitTestResult::addNodeToRectBasedTestResult(Node* node, const HitTestReques
     if (!node)
         return true;
 
-    if (request.disallowsShadowContent())
+    if (request.disallowsUserAgentShadowContent())
         node = node->document().ancestorInThisScope(node);
 
     mutableRectBasedTestResult().add(node);

@@ -27,7 +27,6 @@
 #import "PlatformCALayerCocoa.h"
 
 #import "AnimationUtilities.h"
-#import "BlockExceptions.h"
 #import "GraphicsContext.h"
 #import "GraphicsLayerCA.h"
 #import "LengthFunctions.h"
@@ -48,6 +47,7 @@
 #import <AVFoundation/AVFoundation.h>
 #import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
+#import <wtf/BlockObjCExceptions.h>
 #import <wtf/CurrentTime.h>
 #import <wtf/RetainPtr.h>
 
@@ -325,6 +325,9 @@ PassRefPtr<PlatformCALayer> PlatformCALayerCocoa::clone(PlatformCALayerClient* o
         break;
     case LayerTypeShapeLayer:
         type = LayerTypeShapeLayer;
+        break;
+    case LayerTypeBackdropLayer:
+        type = LayerTypeBackdropLayer;
         break;
     case LayerTypeLayer:
     default:
@@ -614,6 +617,15 @@ void PlatformCALayerCocoa::setHidden(bool value)
     BEGIN_BLOCK_OBJC_EXCEPTIONS
     [m_layer setHidden:value];
     END_BLOCK_OBJC_EXCEPTIONS
+}
+
+bool PlatformCALayerCocoa::contentsHidden() const
+{
+    return false;
+}
+
+void PlatformCALayerCocoa::setContentsHidden(bool)
+{
 }
 
 void PlatformCALayerCocoa::setBackingStoreAttached(bool)

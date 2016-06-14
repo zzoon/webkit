@@ -47,9 +47,13 @@
 #include "GraphicsContext.h"
 #include "HTMLBodyElement.h"
 #include "HTMLDocument.h"
+#include "HTMLEmbedElement.h"
 #include "HTMLFrameElement.h"
 #include "HTMLFrameSetElement.h"
+#include "HTMLHtmlElement.h"
+#include "HTMLIFrameElement.h"
 #include "HTMLNames.h"
+#include "HTMLObjectElement.h"
 #include "HTMLPlugInImageElement.h"
 #include "ImageDocument.h"
 #include "InspectorClient.h"
@@ -475,7 +479,7 @@ void FrameView::invalidateRect(const IntRect& rect)
 
 void FrameView::setFrameRect(const IntRect& newRect)
 {
-    Ref<FrameView> protect(*this);
+    Ref<FrameView> protectedThis(*this);
     IntRect oldRect = frameRect();
     if (newRect == oldRect)
         return;
@@ -970,7 +974,7 @@ bool FrameView::isScrollSnapInProgress() const
     // ScrollingCoordinator::isScrollSnapInProgress().
     if (Page* page = frame().page()) {
         if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator()) {
-            if (!scrollingCoordinator->shouldUpdateScrollLayerPositionSynchronously())
+            if (!scrollingCoordinator->shouldUpdateScrollLayerPositionSynchronously(*this))
                 return scrollingCoordinator->isScrollSnapInProgress();
         }
     }
@@ -1218,7 +1222,7 @@ void FrameView::layout(bool allowSubtree)
     }
 
     // Protect the view from being deleted during layout (in recalcStyle).
-    Ref<FrameView> protect(*this);
+    Ref<FrameView> protectedThis(*this);
 
     // Many of the tasks performed during layout can cause this function to be re-entered,
     // so save the layout phase now and restore it on exit.
@@ -1402,11 +1406,17 @@ void FrameView::layout(bool allowSubtree)
         ASSERT(m_layoutPhase == InRenderTreeLayout);
 
         root->layout();
+
 #if ENABLE(IOS_TEXT_AUTOSIZING)
-        if (Page* page = frame().page()) {
+        if (frame().settings().textAutosizingEnabled() && !root->view().printing()) {
             float minimumZoomFontSize = frame().settings().minimumZoomFontSize();
-            float textAutosizingWidth = page->textAutosizingWidth();
-            if (minimumZoomFontSize && textAutosizingWidth && !root->view().printing()) {
+            float textAutosizingWidth = frame().page() ? frame().page()->textAutosizingWidth() : 0;
+            if (int overrideWidth = frame().settings().textAutosizingWindowSizeOverride().width())
+                textAutosizingWidth = overrideWidth;
+
+            LOG(TextAutosizing, "Text Autosizing: minimumZoomFontSize=%.2f textAutosizingWidth=%.2f", minimumZoomFontSize, textAutosizingWidth);
+            
+            if (minimumZoomFontSize && textAutosizingWidth) {
                 root->adjustComputedFontSizesOnBlocks(minimumZoomFontSize, textAutosizingWidth);
                 if (root->needsLayout())
                     root->layout();
@@ -2307,7 +2317,7 @@ bool FrameView::shouldUpdateCompositingLayersAfterScrolling() const
     if (!scrollingCoordinator->supportsFixedPositionLayers())
         return true;
 
-    if (scrollingCoordinator->shouldUpdateScrollLayerPositionSynchronously())
+    if (scrollingCoordinator->shouldUpdateScrollLayerPositionSynchronously(*this))
         return true;
 
     if (inProgrammaticScroll())
@@ -2340,7 +2350,7 @@ bool FrameView::isRubberBandInProgress() const
     // ScrollingCoordinator::isRubberBandInProgress().
     if (Page* page = frame().page()) {
         if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator()) {
-            if (!scrollingCoordinator->shouldUpdateScrollLayerPositionSynchronously())
+            if (!scrollingCoordinator->shouldUpdateScrollLayerPositionSynchronously(*this))
                 return scrollingCoordinator->isRubberBandInProgress();
         }
     }
@@ -2487,7 +2497,7 @@ void FrameView::adjustTiledBackingScrollability()
 
 #if PLATFORM(IOS)
     if (Page* page = frame().page())
-        clippedByAncestorView |= page->enclosedInScrollView();
+        clippedByAncestorView |= page->enclosedInScrollableAncestorView();
 #endif
 
     if (delegatesScrolling()) {
@@ -3107,7 +3117,7 @@ bool FrameView::updateEmbeddedObjects()
 
 void FrameView::updateEmbeddedObjectsTimerFired()
 {
-    RefPtr<FrameView> protect(this);
+    RefPtr<FrameView> protectedThis(this);
     m_updateEmbeddedObjectsTimer.stop();
     for (unsigned i = 0; i < maxUpdateEmbeddedObjectsIterations; i++) {
         if (updateEmbeddedObjects())
@@ -3123,9 +3133,9 @@ void FrameView::flushAnyPendingPostLayoutTasks()
         updateEmbeddedObjectsTimerFired();
 }
 
-void FrameView::queuePostLayoutCallback(std::function<void()> callback)
+void FrameView::queuePostLayoutCallback(NoncopyableFunction<void()>&& callback)
 {
-    m_postLayoutCallbackQueue.append(callback);
+    m_postLayoutCallbackQueue.append(WTFMove(callback));
 }
 
 void FrameView::flushPostLayoutTasksQueue()
@@ -3136,10 +3146,9 @@ void FrameView::flushPostLayoutTasksQueue()
     if (!m_postLayoutCallbackQueue.size())
         return;
 
-    const auto queue = m_postLayoutCallbackQueue;
-    m_postLayoutCallbackQueue.clear();
-    for (size_t i = 0; i < queue.size(); ++i)
-        queue[i]();
+    Vector<NoncopyableFunction<void()>> queue = WTFMove(m_postLayoutCallbackQueue);
+    for (auto& task : queue)
+        task();
 }
 
 void FrameView::performPostLayoutTasks()
@@ -3184,7 +3193,7 @@ void FrameView::performPostLayoutTasks()
 
     // layout() protects FrameView, but it still can get destroyed when updateEmbeddedObjects()
     // is called through the post layout timer.
-    Ref<FrameView> protect(*this);
+    Ref<FrameView> protectedThis(*this);
 
     m_updateEmbeddedObjectsTimer.startOneShot(0);
 
@@ -3527,16 +3536,6 @@ bool FrameView::isActive() const
     return page && page->focusController().isActive();
 }
 
-bool FrameView::updatesScrollLayerPositionOnMainThread() const
-{
-    if (Page* page = frame().page()) {
-        if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-            return scrollingCoordinator->shouldUpdateScrollLayerPositionSynchronously();
-    }
-
-    return true;
-}
-
 bool FrameView::forceUpdateScrollbarsOnMainThreadForPerformanceTesting() const
 {
     Page* page = frame().page();
@@ -3767,7 +3766,7 @@ void FrameView::updateAnnotatedRegions()
 void FrameView::updateScrollCorner()
 {
     RenderElement* renderer = nullptr;
-    RefPtr<RenderStyle> cornerStyle;
+    std::unique_ptr<RenderStyle> cornerStyle;
     IntRect cornerRect = scrollCornerRect();
     
     if (!cornerRect.isEmpty()) {
@@ -3799,10 +3798,10 @@ void FrameView::updateScrollCorner()
         m_scrollCorner = nullptr;
     else {
         if (!m_scrollCorner) {
-            m_scrollCorner = createRenderer<RenderScrollbarPart>(renderer->document(), cornerStyle.releaseNonNull());
+            m_scrollCorner = createRenderer<RenderScrollbarPart>(renderer->document(), WTFMove(*cornerStyle));
             m_scrollCorner->initializeStyle();
         } else
-            m_scrollCorner->setStyle(cornerStyle.releaseNonNull());
+            m_scrollCorner->setStyle(WTFMove(*cornerStyle));
         invalidateScrollCorner(cornerRect);
     }
 
@@ -4967,6 +4966,11 @@ IntSize FrameView::viewportSizeForCSSViewportUnits() const
     // FIXME: the value returned should take into account the value of the overflow
     // property on the root element.
     return visibleContentRectIncludingScrollbars().size();
+}
+
+bool FrameView::shouldPlaceBlockDirectionScrollbarOnLeft() const
+{
+    return renderView() && renderView()->shouldPlaceBlockDirectionScrollbarOnLeft();
 }
     
 } // namespace WebCore

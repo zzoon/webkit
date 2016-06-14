@@ -143,6 +143,7 @@ public:
     virtual String nodeValue() const;
     virtual void setNodeValue(const String&, ExceptionCode&);
     virtual NodeType nodeType() const = 0;
+    virtual size_t approximateMemoryCost() const { return sizeof(*this); }
     ContainerNode* parentNode() const;
     static ptrdiff_t parentNodeMemoryOffset() { return OBJECT_OFFSETOF(Node, m_parentNode); }
     Element* parentElement() const;
@@ -167,10 +168,10 @@ public:
     // These should all actually return a node, but this is only important for language bindings,
     // which will already know and hold a ref on the right node to return. Returning bool allows
     // these methods to be more efficient since they don't need to return a ref
-    WEBCORE_EXPORT bool insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode&);
-    bool replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionCode&);
-    WEBCORE_EXPORT bool removeChild(Node* child, ExceptionCode&);
-    WEBCORE_EXPORT bool appendChild(PassRefPtr<Node> newChild, ExceptionCode&);
+    WEBCORE_EXPORT bool insertBefore(Node& newChild, Node* refChild, ExceptionCode&);
+    bool replaceChild(Node& newChild, Node& oldChild, ExceptionCode&);
+    WEBCORE_EXPORT bool removeChild(Node& child, ExceptionCode&);
+    WEBCORE_EXPORT bool appendChild(Node& newChild, ExceptionCode&);
 
     bool hasChildNodes() const { return firstChild(); }
 
@@ -259,9 +260,11 @@ public:
     WEBCORE_EXPORT Node* deprecatedShadowAncestorNode() const;
     ShadowRoot* containingShadowRoot() const;
     ShadowRoot* shadowRoot() const;
+    bool isUnclosedNode(const Node&) const;
 
-#if ENABLE(SHADOW_DOM)
+#if ENABLE(SHADOW_DOM) || ENABLE(DETAILS_ELEMENT)
     HTMLSlotElement* assignedSlot() const;
+    HTMLSlotElement* assignedSlotForBindings() const;
 #endif
 
 #if ENABLE(CUSTOM_ELEMENTS)
@@ -278,6 +281,7 @@ public:
 
     // Node's parent or shadow tree host.
     ContainerNode* parentOrShadowHostNode() const;
+    ContainerNode* parentInComposedTree() const;
     Element* parentOrShadowHostElement() const;
     void setParentNode(ContainerNode*);
     Node* rootNode() const;
@@ -443,9 +447,9 @@ public:
     RenderBoxModelObject* renderBoxModelObject() const;
     
     // Wrapper for nodes that don't have a renderer, but still cache the style (like HTMLOptionElement).
-    RenderStyle* renderStyle() const;
+    const RenderStyle* renderStyle() const;
 
-    virtual RenderStyle* computedStyle(PseudoId pseudoElementSpecifier = NOPSEUDO);
+    virtual const RenderStyle* computedStyle(PseudoId pseudoElementSpecifier = NOPSEUDO);
 
     // -----------------------------------------------------------------------------
     // Notification of document structure changes (see ContainerNode.h for more notification methods)
@@ -503,8 +507,8 @@ public:
     EventTargetInterface eventTargetInterface() const override;
     ScriptExecutionContext* scriptExecutionContext() const final; // Implemented in Document.h
 
-    bool addEventListener(const AtomicString& eventType, RefPtr<EventListener>&&, bool useCapture) override;
-    bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture) override;
+    bool addEventListener(const AtomicString& eventType, Ref<EventListener>&&, const AddEventListenerOptions&) override;
+    bool removeEventListener(const AtomicString& eventType, EventListener&, const ListenerOptions&) override;
 
     using EventTarget::dispatchEvent;
     bool dispatchEvent(Event&) override;
@@ -673,8 +677,6 @@ private:
 
     void refEventTarget() override;
     void derefEventTarget() override;
-
-    Element* ancestorElement() const;
 
     void trackForDebugging();
     void materializeRareData();

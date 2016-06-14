@@ -37,6 +37,7 @@ enum CachePolicy {
     "ReturnCacheDataDontLoad"
 };
 
+// FIXME: Strings in an enum should not have the name of the enum as a prefix.
 enum ResourceLoadPriority {
     "ResourceLoadPriorityVeryLow",
     "ResourceLoadPriorityLow",
@@ -45,18 +46,19 @@ enum ResourceLoadPriority {
     "ResourceLoadPriorityVeryHigh"
 };
 
-enum MediaSessionInterruptingCategory {
+[Conditional=MEDIA_SESSION] enum MediaSessionInterruptingCategory {
     "content",
     "transient",
     "transient-solo"
 };
 
-enum MediaControlEvent {
+[Conditional=MEDIA_SESSION] enum MediaControlEvent {
     "play-pause",
     "next-track",
     "previous-track"
 };
 
+// FIXME: Strings in an enum should not have the name of the enum as a prefix.
 enum AutoFillButtonType {
     "AutoFillButtonTypeNone",
     "AutoFillButtonTypeContacts",
@@ -144,7 +146,7 @@ enum AutoFillButtonType {
 
     [RaisesException] void setViewBaseBackgroundColor(DOMString colorValue);
 
-    [RaisesException] void setPagination(DOMString mode, long gap, optional long pageLength);
+    [RaisesException] void setPagination(DOMString mode, long gap, optional long pageLength = 0);
     [RaisesException] void setPaginationLineGridEnabled(boolean enabled);
 
     [RaisesException] DOMString configurationForViewport(unrestricted float devicePixelRatio,
@@ -159,6 +161,7 @@ enum AutoFillButtonType {
     void setAutofilled(HTMLInputElement inputElement, boolean enabled);
     void setShowAutoFillButton(HTMLInputElement inputElement, AutoFillButtonType autoFillButtonType);
     [RaisesException] unsigned long countMatchesForText(DOMString text, unsigned long findOptions, DOMString markMatches);
+    [RaisesException] unsigned long countFindMatches(DOMString text, unsigned long findOptions);
 
     [RaisesException] DOMString autofillFieldName(Element formControlElement);
 
@@ -226,7 +229,7 @@ enum AutoFillButtonType {
     const unsigned short LAYER_TREE_INCLUDES_REPAINT_RECTS = 4;
     const unsigned short LAYER_TREE_INCLUDES_PAINTING_PHASES = 8;
     const unsigned short LAYER_TREE_INCLUDES_CONTENT_LAYERS = 16;
-    [RaisesException] DOMString layerTreeAsText(Document document, optional unsigned short flags);
+    [RaisesException] DOMString layerTreeAsText(Document document, optional unsigned short flags = 0);
 
     [RaisesException] DOMString scrollingStateTreeAsText();
     [RaisesException] DOMString mainThreadScrollingReasons(); // FIXME: rename to synchronousScrollingReasons().
@@ -241,9 +244,9 @@ enum AutoFillButtonType {
     // Flags for displayListForElement.
     const unsigned short DISPLAY_LIST_INCLUDES_PLATFORM_OPERATIONS = 1;
     // Returns the recorded display list.
-    [RaisesException] DOMString displayListForElement(Element element, optional unsigned short flags);
+    [RaisesException] DOMString displayListForElement(Element element, optional unsigned short flags = 0);
     // Returns the display list that was actually painted.
-    [RaisesException] DOMString replayDisplayListForElement(Element element, optional unsigned short flags);
+    [RaisesException] DOMString replayDisplayListForElement(Element element, optional unsigned short flags = 0);
 
     [RaisesException] void garbageCollectDocumentResources();
 
@@ -258,22 +261,16 @@ enum AutoFillButtonType {
     [RaisesException] void setDeviceProximity(DOMString eventType, unrestricted double value, unrestricted double min, unrestricted double max);
 #endif
 
-    // As per spec: http://www.w3.org/TR/WebIDL/#idl-sequence
-    // "Sequences must not be used as the type of an attribute, constant or exception field."
-    // FIXME: this will lead to BUG internals.consoleProfiles !== internals.consoleProfiles as profile will always returns new array.
-    readonly attribute ScriptProfile[] consoleProfiles;
-
     unsigned long numberOfLiveNodes();
     unsigned long numberOfLiveDocuments();
     DOMWindow openDummyInspectorFrontend(DOMString url);
     void closeDummyInspectorFrontend();
-    [RaisesException] void setLegacyJavaScriptProfilingEnabled(boolean enabled);
     [RaisesException] void setInspectorIsUnderTest(boolean isUnderTest);
 
     DOMString counterValue(Element element);
-    long pageNumber(Element element, optional unrestricted float pageWidth, optional unrestricted float pageHeight);
+    long pageNumber(Element element, optional unrestricted float pageWidth = 800, optional unrestricted float pageHeight = 600);
     DOMString[] shortcutIconURLs();
-    long numberOfPages(optional unrestricted double pageWidthInPixels, optional unrestricted double pageHeightInPixels);
+    long numberOfPages(optional unrestricted double pageWidthInPixels = 800, optional unrestricted double pageHeightInPixels = 600);
     [RaisesException] DOMString pageProperty(DOMString propertyName, long pageNumber);
     [RaisesException] DOMString pageSizeAndMarginsInPixels(long pageIndex, long width, long height, long marginTop, long marginRight, long marginBottom, long marginLeft);
 
@@ -332,7 +329,7 @@ enum AutoFillButtonType {
     // |node| should be Document, HTMLIFrameElement, or unspecified.
     // If |node| is an HTMLIFrameElement, it assumes node.contentDocument is
     // specified without security checks. Unspecified or null means this document.
-    [RaisesException] void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(optional Node? node);
+    [RaisesException] void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(optional Node? node = null);
 
     readonly attribute unsigned long layoutCount;
 
@@ -446,4 +443,19 @@ enum AutoFillButtonType {
 
     void setViewportForceAlwaysUserScalable(boolean scalable);
     void setLinkPreloadSupport(boolean scalable);
+
+#if defined(ENABLE_CSS_GRID_LAYOUT) && ENABLE_CSS_GRID_LAYOUT
+    void setCSSGridLayoutEnabled(boolean enable);
+#endif
+
+#if defined(ENABLE_WEBGL2) && ENABLE_WEBGL2
+    boolean webGL2Enabled();
+    void setWebGL2Enabled(boolean enable);
+#endif
+
+    void setResourceTimingSupport(boolean scalable);
+    
+    boolean isProcessingUserGesture();
+
+    GCObservation observeGC(any observed);
 };

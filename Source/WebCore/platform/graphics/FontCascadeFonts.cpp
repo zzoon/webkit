@@ -122,7 +122,7 @@ void FontCascadeFonts::determinePitch(const FontCascadeDescription& description)
     auto& primaryRanges = realizeFallbackRangesAt(description, 0);
     unsigned numRanges = primaryRanges.size();
     if (numRanges == 1)
-        m_pitch = primaryRanges.rangeAt(0).font().pitch();
+        m_pitch = primaryRanges.fontForFirstRange().pitch();
     else
         m_pitch = VariablePitch;
 }
@@ -410,14 +410,11 @@ static RefPtr<GlyphPage> glyphPageFromFontRanges(unsigned pageNumber, const Font
         auto& range = fontRanges.rangeAt(i);
         if (range.to()) {
             if (range.from() <= pageRangeFrom && pageRangeTo <= range.to())
-                font = &range.font();
+                font = range.font();
             break;
         }
     }
-    if (!font)
-        return nullptr;
-
-    if (font->platformData().orientation() == Vertical)
+    if (!font || font->platformData().orientation() == Vertical)
         return nullptr;
 
     return const_cast<GlyphPage*>(font->glyphPage(pageNumber));
@@ -457,7 +454,7 @@ void FontCascadeFonts::pruneSystemFallbacks()
     // Mutable glyph pages may reference fallback fonts.
     if (m_cachedPageZero.isMixedFont())
         m_cachedPageZero = { };
-    m_cachedPages.removeIf([](decltype(m_cachedPages)::KeyValuePairType& keyAndValue) {
+    m_cachedPages.removeIf([](auto& keyAndValue) {
         return keyAndValue.value.isMixedFont();
     });
     m_systemFallbackFontSet.clear();

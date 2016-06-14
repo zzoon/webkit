@@ -17,12 +17,8 @@
  * Boston, MA 02110-1301, USA.
  */
 
-#ifndef RenderSVGResourceClipper_h
-#define RenderSVGResourceClipper_h
+#pragma once
 
-#include "GraphicsContext.h"
-#include "ImageBuffer.h"
-#include "IntSize.h"
 #include "RenderSVGResourceContainer.h"
 #include "SVGClipPathElement.h"
 #include "SVGUnitTypes.h"
@@ -31,11 +27,14 @@
 
 namespace WebCore {
 
+class GraphicsContext;
+class ImageBuffer;
+
 typedef std::unique_ptr<ImageBuffer> ClipperMaskImage;
 
 class RenderSVGResourceClipper final : public RenderSVGResourceContainer {
 public:
-    RenderSVGResourceClipper(SVGClipPathElement&, Ref<RenderStyle>&&);
+    RenderSVGResourceClipper(SVGClipPathElement&, RenderStyle&&);
     virtual ~RenderSVGResourceClipper();
 
     SVGClipPathElement& clipPathElement() const { return downcast<SVGClipPathElement>(nodeForNonAnonymous()); }
@@ -80,5 +79,3 @@ SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::RenderSVGResourceClipper)
 static bool isType(const WebCore::RenderObject& renderer) { return renderer.isSVGResourceClipper(); }
 static bool isType(const WebCore::RenderSVGResource& resource) { return resource.resourceType() == WebCore::ClipperResourceType; }
 SPECIALIZE_TYPE_TRAITS_END()
-
-#endif

@@ -24,7 +24,13 @@ list(APPEND NetworkProcess_SOURCES
     NetworkProcess/EntryPoint/unix/NetworkProcessMain.cpp
 )
 
+list(APPEND DatabaseProcess_SOURCES
+    DatabaseProcess/EntryPoint/unix/DatabaseProcessMain.cpp
+)
+
 list(APPEND WebKit2_SOURCES
+    DatabaseProcess/wpe/DatabaseProcessMainWPE.cpp
+
     NetworkProcess/CustomProtocols/soup/CustomProtocolManagerImpl.cpp
     NetworkProcess/CustomProtocols/soup/CustomProtocolManagerSoup.cpp
 
@@ -35,20 +41,19 @@ list(APPEND WebKit2_SOURCES
     NetworkProcess/cache/NetworkCacheDataSoup.cpp
     NetworkProcess/cache/NetworkCacheIOChannelSoup.cpp
 
+    NetworkProcess/soup/NetworkProcessMainSoup.cpp
     NetworkProcess/soup/NetworkProcessSoup.cpp
     NetworkProcess/soup/RemoteNetworkingContextSoup.cpp
 
-    NetworkProcess/wpe/NetworkProcessMainWPE.cpp
+    Platform/glib/ModuleGlib.cpp
 
     Platform/IPC/glib/GSocketMonitor.cpp
 
     Platform/IPC/unix/AttachmentUnix.cpp
     Platform/IPC/unix/ConnectionUnix.cpp
 
+    Platform/unix/LoggingUnix.cpp
     Platform/unix/SharedMemoryUnix.cpp
-
-    Platform/wpe/LoggingWPE.cpp
-    Platform/wpe/ModuleWPE.cpp
 
     PluginProcess/unix/PluginControllerProxyUnix.cpp
     PluginProcess/unix/PluginProcessMainUnix.cpp
@@ -136,7 +141,7 @@ list(APPEND WebKit2_SOURCES
     WebProcess/Cookies/soup/WebCookieManagerSoup.cpp
     WebProcess/Cookies/soup/WebKitSoupCookieJarSqlite.cpp
 
-    WebProcess/InjectedBundle/wpe/InjectedBundleWPE.cpp
+    WebProcess/InjectedBundle/glib/InjectedBundleGlib.cpp
 
     WebProcess/MediaCache/WebMediaKeyStorageManager.cpp
 
@@ -164,8 +169,6 @@ list(APPEND WebKit2_SOURCES
 
 list(APPEND WebKit2_MESSAGES_IN_FILES
     UIProcess/API/wpe/CompositingManagerProxy.messages.in
-
-    WebProcess/WebPage/wpe/CompositingManager.messages.in
 )
 
 list(APPEND WebKit2_DERIVED_SOURCES
@@ -201,9 +204,11 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${FORWARDING_HEADERS_DIR}"
     "${DERIVED_SOURCES_DIR}"
     "${WEBCORE_DIR}/platform/graphics/cairo"
+    "${WEBCORE_DIR}/platform/graphics/freetype"
     "${WEBCORE_DIR}/platform/graphics/opentype"
     "${WEBCORE_DIR}/platform/graphics/texmap/coordinated"
     "${WEBCORE_DIR}/platform/network/soup"
+    "${WEBKIT2_DIR}/DatabaseProcess/unix"
     "${WEBKIT2_DIR}/NetworkProcess/CustomProtocols/soup"
     "${WEBKIT2_DIR}/NetworkProcess/Downloads/soup"
     "${WEBKIT2_DIR}/NetworkProcess/unix"
@@ -230,6 +235,7 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WTF_DIR}"
     ${CAIRO_INCLUDE_DIRS}
     ${EGL_INCLUDE_DIRS}
+    ${FREETYPE2_INCLUDE_DIRS}
     ${GLIB_INCLUDE_DIRS}
     ${GSTREAMER_INCLUDE_DIRS}
     ${HARFBUZZ_INCLUDE_DIRS}
@@ -239,6 +245,7 @@ list(APPEND WebKit2_INCLUDE_DIRECTORIES
 
 list(APPEND WebKit2_LIBRARIES
     ${CAIRO_LIBRARIES}
+    ${FREETYPE2_LIBRARIES}
     ${GLIB_LIBRARIES}
     ${GSTREAMER_LIBRARIES}
     ${HARFBUZZ_LIBRARIES}

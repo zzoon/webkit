@@ -29,6 +29,7 @@
 #if WK_API_ENABLED
 
 #import "APIPageConfiguration.h"
+#import "VersionChecks.h"
 #import "WKPreferences.h"
 #import "WKProcessPool.h"
 #import "WKUserContentController.h"
@@ -107,19 +108,19 @@ private:
     BOOL _alwaysRunsAtForegroundPriority;
     BOOL _allowsInlineMediaPlayback;
     BOOL _inlineMediaPlaybackRequiresPlaysInlineAttribute;
+    BOOL _allowsInlineMediaPlaybackAfterFullscreen;
 #endif
 
     BOOL _invisibleAutoplayNotPermitted;
     BOOL _mediaDataLoadsAutomatically;
     BOOL _attachmentElementEnabled;
-    BOOL _requiresUserActionForVideoPlayback;
-    BOOL _requiresUserActionForAudioPlayback;
     BOOL _mainContentUserGestureOverrideEnabled;
 
 #if PLATFORM(MAC)
     BOOL _showsURLsInToolTips;
     BOOL _serviceControlsEnabled;
     BOOL _imageControlsEnabled;
+    BOOL _requiresUserActionForEditingControlsManager;
 #endif
 
 #if USE(APPLE_INTERNAL_SDK)
@@ -133,16 +134,20 @@ private:
         return nil;
     
 #if PLATFORM(IOS)
-    _requiresUserActionForMediaPlayback = YES;
     _allowsPictureInPictureMediaPlayback = YES;
     _allowsInlineMediaPlayback = WebCore::deviceClass() == MGDeviceClassiPad;
     _inlineMediaPlaybackRequiresPlaysInlineAttribute = !_allowsInlineMediaPlayback;
+    _allowsInlineMediaPlaybackAfterFullscreen = !_allowsInlineMediaPlayback;
     _mediaDataLoadsAutomatically = NO;
+    if (linkedOnOrAfter(WebKit::LibraryVersion::FirstWithMediaTypesRequiringUserActionForPlayback))
+        _mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeAudio;
+    else
+        _mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeAll;
 #else
+    _mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeNone;
     _mediaDataLoadsAutomatically = YES;
+    _userInterfaceDirectionPolicy = WKUserInterfaceDirectionPolicyContent;
 #endif
-    _requiresUserActionForVideoPlayback = NO;
-    _requiresUserActionForAudioPlayback = NO;
     _mainContentUserGestureOverrideEnabled = NO;
     _invisibleAutoplayNotPermitted = NO;
 
@@ -164,6 +169,7 @@ private:
     _showsURLsInToolTips = NO;
     _serviceControlsEnabled = NO;
     _imageControlsEnabled = NO;
+    _requiresUserActionForEditingControlsManager = NO;
 #endif
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
@@ -197,13 +203,16 @@ private:
     [coder encodeBool:self.suppressesIncrementalRendering forKey:@"suppressesIncrementalRendering"];
     [coder encodeObject:self.applicationNameForUserAgent forKey:@"applicationNameForUserAgent"];
     [coder encodeBool:self.allowsAirPlayForMediaPlayback forKey:@"allowsAirPlayForMediaPlayback"];
-    [coder encodeInteger:self.dataDetectorTypes forKey:@"dataDetectorTypes"];
 
 #if PLATFORM(IOS)
+    [coder encodeInteger:self.dataDetectorTypes forKey:@"dataDetectorTypes"];
     [coder encodeBool:self.allowsInlineMediaPlayback forKey:@"allowsInlineMediaPlayback"];
-    [coder encodeBool:self.requiresUserActionForMediaPlayback forKey:@"requiresUserActionForMediaPlayback"];
+    [coder encodeBool:self._allowsInlineMediaPlaybackAfterFullscreen forKey:@"allowsInlineMediaPlaybackAfterFullscreen"];
+    [coder encodeBool:self.mediaTypesRequiringUserActionForPlayback forKey:@"mediaTypesRequiringUserActionForPlayback"];
     [coder encodeInteger:self.selectionGranularity forKey:@"selectionGranularity"];
     [coder encodeBool:self.allowsPictureInPictureMediaPlayback forKey:@"allowsPictureInPictureMediaPlayback"];
+#else
+    [coder encodeInteger:self.userInterfaceDirectionPolicy forKey:@"userInterfaceDirectionPolicy"];
 #endif
 }
 
@@ -220,13 +229,18 @@ private:
     self.suppressesIncrementalRendering = [coder decodeBoolForKey:@"suppressesIncrementalRendering"];
     self.applicationNameForUserAgent = [coder decodeObjectForKey:@"applicationNameForUserAgent"];
     self.allowsAirPlayForMediaPlayback = [coder decodeBoolForKey:@"allowsAirPlayForMediaPlayback"];
-    self.dataDetectorTypes = [coder decodeIntegerForKey:@"dataDetectorTypes"];
 
 #if PLATFORM(IOS)
+    self.dataDetectorTypes = [coder decodeIntegerForKey:@"dataDetectorTypes"];
     self.allowsInlineMediaPlayback = [coder decodeBoolForKey:@"allowsInlineMediaPlayback"];
-    self.requiresUserActionForMediaPlayback = [coder decodeBoolForKey:@"requiresUserActionForMediaPlayback"];
+    self._allowsInlineMediaPlaybackAfterFullscreen = [coder decodeBoolForKey:@"allowsInlineMediaPlaybackAfterFullscreen"];
+    self.mediaTypesRequiringUserActionForPlayback = [coder decodeBoolForKey:@"mediaTypesRequiringUserActionForPlayback"];
     self.selectionGranularity = static_cast<WKSelectionGranularity>([coder decodeIntegerForKey:@"selectionGranularity"]);
     self.allowsPictureInPictureMediaPlayback = [coder decodeBoolForKey:@"allowsPictureInPictureMediaPlayback"];
+#else
+    auto userInterfaceDirectionPolicyCandidate = static_cast<WKUserInterfaceDirectionPolicy>([coder decodeIntegerForKey:@"userInterfaceDirectionPolicy"]);
+    if (userInterfaceDirectionPolicyCandidate == WKUserInterfaceDirectionPolicyContent || userInterfaceDirectionPolicyCandidate == WKUserInterfaceDirectionPolicySystem)
+        self.userInterfaceDirectionPolicy = userInterfaceDirectionPolicyCandidate;
 #endif
 
     return self;
@@ -262,24 +276,25 @@ private:
     configuration->_invisibleAutoplayNotPermitted = self->_invisibleAutoplayNotPermitted;
     configuration->_mediaDataLoadsAutomatically = self->_mediaDataLoadsAutomatically;
     configuration->_attachmentElementEnabled = self->_attachmentElementEnabled;
-    configuration->_requiresUserActionForVideoPlayback = self->_requiresUserActionForVideoPlayback;
-    configuration->_requiresUserActionForAudioPlayback = self->_requiresUserActionForAudioPlayback;
+    configuration->_mediaTypesRequiringUserActionForPlayback = self->_mediaTypesRequiringUserActionForPlayback;
     configuration->_mainContentUserGestureOverrideEnabled = self->_mainContentUserGestureOverrideEnabled;
 
 #if PLATFORM(IOS)
     configuration->_allowsInlineMediaPlayback = self->_allowsInlineMediaPlayback;
+    configuration->_allowsInlineMediaPlaybackAfterFullscreen = self->_allowsInlineMediaPlaybackAfterFullscreen;
     configuration->_inlineMediaPlaybackRequiresPlaysInlineAttribute = self->_inlineMediaPlaybackRequiresPlaysInlineAttribute;
-    configuration->_requiresUserActionForMediaPlayback = self->_requiresUserActionForMediaPlayback;
     configuration->_allowsPictureInPictureMediaPlayback = self->_allowsPictureInPictureMediaPlayback;
     configuration->_alwaysRunsAtForegroundPriority = _alwaysRunsAtForegroundPriority;
     configuration->_selectionGranularity = self->_selectionGranularity;
 #endif
 #if PLATFORM(MAC)
+    configuration->_userInterfaceDirectionPolicy = self->_userInterfaceDirectionPolicy;
     configuration->_showsURLsInToolTips = self->_showsURLsInToolTips;
     configuration->_serviceControlsEnabled = self->_serviceControlsEnabled;
     configuration->_imageControlsEnabled = self->_imageControlsEnabled;
+    configuration->_requiresUserActionForEditingControlsManager = self->_requiresUserActionForEditingControlsManager;
 #endif
-#if ENABLE(DATA_DETECTION)
+#if ENABLE(DATA_DETECTION) && PLATFORM(IOS)
     configuration->_dataDetectorTypes = self->_dataDetectorTypes;
 #endif
 #if ENABLE(WIRELESS_TARGET_PLAYBACK)
@@ -556,6 +571,16 @@ static NSString *defaultApplicationNameForUserAgent()
 {
     _inlineMediaPlaybackRequiresPlaysInlineAttribute = requires;
 }
+
+- (BOOL)_allowsInlineMediaPlaybackAfterFullscreen
+{
+    return _allowsInlineMediaPlaybackAfterFullscreen;
+}
+
+- (void)_setAllowsInlineMediaPlaybackAfterFullscreen:(BOOL)allows
+{
+    _allowsInlineMediaPlaybackAfterFullscreen = allows;
+}
 #endif // PLATFORM(IOS)
 
 - (BOOL)_invisibleAutoplayNotPermitted
@@ -590,22 +615,28 @@ static NSString *defaultApplicationNameForUserAgent()
 
 - (BOOL)_requiresUserActionForVideoPlayback
 {
-    return _requiresUserActionForVideoPlayback;
+    return self.mediaTypesRequiringUserActionForPlayback & WKAudiovisualMediaTypeVideo;
 }
 
 - (void)_setRequiresUserActionForVideoPlayback:(BOOL)requiresUserActionForVideoPlayback
 {
-    _requiresUserActionForVideoPlayback = requiresUserActionForVideoPlayback;
+    if (requiresUserActionForVideoPlayback)
+        self.mediaTypesRequiringUserActionForPlayback |= WKAudiovisualMediaTypeVideo;
+    else
+        self.mediaTypesRequiringUserActionForPlayback &= ~WKAudiovisualMediaTypeVideo;
 }
 
 - (BOOL)_requiresUserActionForAudioPlayback
 {
-    return _requiresUserActionForAudioPlayback;
+    return self.mediaTypesRequiringUserActionForPlayback & WKAudiovisualMediaTypeAudio;
 }
 
 - (void)_setRequiresUserActionForAudioPlayback:(BOOL)requiresUserActionForAudioPlayback
 {
-    _requiresUserActionForAudioPlayback = requiresUserActionForAudioPlayback;
+    if (requiresUserActionForAudioPlayback)
+        self.mediaTypesRequiringUserActionForPlayback |= WKAudiovisualMediaTypeAudio;
+    else
+        self.mediaTypesRequiringUserActionForPlayback &= ~WKAudiovisualMediaTypeAudio;
 }
 
 - (BOOL)_mainContentUserGestureOverrideEnabled
@@ -648,6 +679,17 @@ static NSString *defaultApplicationNameForUserAgent()
 {
     _imageControlsEnabled = imageControlsEnabled;
 }
+
+- (BOOL)_requiresUserActionForEditingControlsManager
+{
+    return _requiresUserActionForEditingControlsManager;
+}
+
+- (void)_setRequiresUserActionForEditingControlsManager:(BOOL)requiresUserAction
+{
+    _requiresUserActionForEditingControlsManager = requiresUserAction;
+}
+
 #endif // PLATFORM(MAC)
 
 #if USE(APPLE_INTERNAL_SDK)
@@ -678,6 +720,17 @@ static NSString *defaultApplicationNameForUserAgent()
 {
     self.requiresUserActionForMediaPlayback = required;
 }
+
+- (BOOL)requiresUserActionForMediaPlayback
+{
+    return self.mediaTypesRequiringUserActionForPlayback == WKAudiovisualMediaTypeAll;
+}
+
+- (void)setRequiresUserActionForMediaPlayback:(BOOL)requiresUserActionForMediaPlayback
+{
+    self.mediaTypesRequiringUserActionForPlayback = requiresUserActionForMediaPlayback ? WKAudiovisualMediaTypeAll : WKAudiovisualMediaTypeNone;
+}
+
 #endif // PLATFORM(IOS)
 
 @end

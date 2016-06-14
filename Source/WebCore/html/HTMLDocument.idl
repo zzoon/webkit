@@ -21,13 +21,14 @@
 [
     CustomGetOwnPropertySlot,
     CustomNamedGetter,
+    CustomToJSObject,
     NewImpurePropertyFiresWatchpoints,
     OverrideBuiltins,
 ] interface HTMLDocument : Document {
     [Custom, ForwardDeclareInHeader] void open();
     void close();
-    [Custom] void write([Default=Undefined] optional DOMString text);
-    [Custom] void writeln([Default=Undefined] optional DOMString text);
+    [Custom] void write(optional DOMString text);
+    [Custom] void writeln(optional DOMString text);
 
     readonly attribute HTMLCollection embeds;
     readonly attribute HTMLCollection plugins;

@@ -238,14 +238,14 @@ public:
     RenderBoxModelObject* continuation() const;
 
 protected:
-    RenderBoxModelObject(Element&, Ref<RenderStyle>&&, BaseTypeFlags);
-    RenderBoxModelObject(Document&, Ref<RenderStyle>&&, BaseTypeFlags);
+    RenderBoxModelObject(Element&, RenderStyle&&, BaseTypeFlags);
+    RenderBoxModelObject(Document&, RenderStyle&&, BaseTypeFlags);
 
     void willBeDestroyed() override;
 
     LayoutPoint adjustedPositionRelativeToOffsetParent(const LayoutPoint&) const;
 
-    bool hasBoxDecorationStyle() const;
+    bool hasVisibleBoxDecorationStyle() const;
     BackgroundImageGeometry calculateBackgroundImageGeometry(const RenderLayerModelObject* paintContainer, const FillLayer&, const LayoutPoint& paintOffset,
         const LayoutRect& paintRect, RenderElement* = nullptr) const;
     bool borderObscuresBackgroundEdge(const FloatSize& contextScale) const;

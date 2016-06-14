@@ -30,6 +30,7 @@
 #include "Dictionary.h"
 #include "EventTarget.h"
 #include "ExceptionCode.h"
+#include "IDBActiveDOMObject.h"
 #include "IDBConnectionProxy.h"
 #include "IDBConnectionToServer.h"
 #include "IDBDatabaseInfo.h"
@@ -43,7 +44,7 @@ class IDBResultData;
 class IDBTransaction;
 class IDBTransactionInfo;
 
-class IDBDatabase : public RefCounted<IDBDatabase>, public EventTargetWithInlineData, public ActiveDOMObject {
+class IDBDatabase : public ThreadSafeRefCounted<IDBDatabase>, public EventTargetWithInlineData, public IDBActiveDOMObject {
 public:
     static Ref<IDBDatabase> create(ScriptExecutionContext&, IDBClient::IDBConnectionProxy&, const IDBResultData&);
 
@@ -64,11 +65,11 @@ public:
     // EventTarget
     EventTargetInterface eventTargetInterface() const final { return IDBDatabaseEventTargetInterfaceType; }
     ScriptExecutionContext* scriptExecutionContext() const final { return ActiveDOMObject::scriptExecutionContext(); }
-    void refEventTarget() final { RefCounted<IDBDatabase>::ref(); }
-    void derefEventTarget() final { RefCounted<IDBDatabase>::deref(); }
+    void refEventTarget() final { ThreadSafeRefCounted<IDBDatabase>::ref(); }
+    void derefEventTarget() final { ThreadSafeRefCounted<IDBDatabase>::deref(); }
 
-    using RefCounted<IDBDatabase>::ref;
-    using RefCounted<IDBDatabase>::deref;
+    using ThreadSafeRefCounted<IDBDatabase>::ref;
+    using ThreadSafeRefCounted<IDBDatabase>::deref;
 
     const char* activeDOMObjectName() const final;
     bool canSuspendForDocumentSuspension() const final;
@@ -86,11 +87,9 @@ public:
     void didAbortTransaction(IDBTransaction&);
 
     void fireVersionChangeEvent(const IDBResourceIdentifier& requestIdentifier, uint64_t requestedVersion);
+    void didCloseFromServer(const IDBError&);
 
     IDBClient::IDBConnectionProxy& connectionProxy() { return m_connectionProxy.get(); }
-
-    // FIXME: Remove the need for this accessor.
-    IDBClient::IDBConnectionToServer& serverConnection() { return m_connectionProxy->connectionToServer(); }
 
     void didCreateIndexInfo(const IDBIndexInfo&);
     void didDeleteIndexInfo(const IDBIndexInfo&);

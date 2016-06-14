@@ -61,8 +61,8 @@ public:
     friend class LineLayoutState;
 
 protected:
-    RenderBlock(Element&, Ref<RenderStyle>&&, BaseTypeFlags);
-    RenderBlock(Document&, Ref<RenderStyle>&&, BaseTypeFlags);
+    RenderBlock(Element&, RenderStyle&&, BaseTypeFlags);
+    RenderBlock(Document&, RenderStyle&&, BaseTypeFlags);
     virtual ~RenderBlock();
 
 public:
@@ -488,6 +488,8 @@ private:
     RenderBlock* continuationBefore(RenderObject* beforeChild);
 
     RenderFlowThread* updateCachedFlowThreadContainingBlock(RenderFlowThread*) const;
+
+    void removePositionedObjectsIfNeeded(const RenderStyle& oldStyle, const RenderStyle& newStyle);
 
 private:
     bool hasRareData() const;

@@ -35,8 +35,6 @@ using namespace HTMLNames;
 
 inline HTMLFrameElement::HTMLFrameElement(const QualifiedName& tagName, Document& document)
     : HTMLFrameElementBase(tagName, document)
-    , m_frameBorder(true)
-    , m_frameBorderSet(false)
 {
     ASSERT(hasTagName(frameTag));
     setHasCustomStyleResolveCallbacks();
@@ -53,7 +51,7 @@ bool HTMLFrameElement::rendererIsNeeded(const RenderStyle&)
     return isURLAllowed();
 }
 
-RenderPtr<RenderElement> HTMLFrameElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> HTMLFrameElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderFrame>(*this, WTFMove(style));
 }
@@ -80,8 +78,8 @@ void HTMLFrameElement::parseAttribute(const QualifiedName& name, const AtomicStr
         m_frameBorderSet = !value.isNull();
         // FIXME: If we are already attached, this has no effect.
     } else if (name == noresizeAttr) {
-        if (renderer())
-            renderer()->updateFromElement();
+        if (auto* renderer = this->renderer())
+            renderer->updateFromElement();
     } else
         HTMLFrameElementBase::parseAttribute(name, value);
 }

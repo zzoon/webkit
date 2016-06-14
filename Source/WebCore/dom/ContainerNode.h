@@ -50,17 +50,17 @@ public:
     WEBCORE_EXPORT unsigned countChildNodes() const;
     WEBCORE_EXPORT Node* traverseToChildAt(unsigned) const;
 
-    bool insertBefore(Ref<Node>&& newChild, Node* refChild, ExceptionCode& = ASSERT_NO_EXCEPTION);
-    bool replaceChild(Ref<Node>&& newChild, Node& oldChild, ExceptionCode& = ASSERT_NO_EXCEPTION);
+    bool insertBefore(Node& newChild, Node* refChild, ExceptionCode& = ASSERT_NO_EXCEPTION);
+    bool replaceChild(Node& newChild, Node& oldChild, ExceptionCode& = ASSERT_NO_EXCEPTION);
     WEBCORE_EXPORT bool removeChild(Node& child, ExceptionCode& = ASSERT_NO_EXCEPTION);
-    WEBCORE_EXPORT bool appendChild(Ref<Node>&& newChild, ExceptionCode& = ASSERT_NO_EXCEPTION);
+    WEBCORE_EXPORT bool appendChild(Node& newChild, ExceptionCode& = ASSERT_NO_EXCEPTION);
 
     // These methods are only used during parsing.
     // They don't send DOM mutation events or handle reparenting.
     // However, arbitrary code may be run by beforeload handlers.
-    void parserAppendChild(Ref<Node>&&);
+    void parserAppendChild(Node&);
     void parserRemoveChild(Node&);
-    void parserInsertBefore(Ref<Node>&& newChild, Node& refChild);
+    void parserInsertBefore(Node& newChild, Node& refChild);
 
     void removeChildren();
     void takeAllChildrenFrom(ContainerNode*);
@@ -129,8 +129,6 @@ private:
     void updateTreeAfterInsertion(Node& child);
 
     bool isContainerNode() const = delete;
-
-    void willRemoveChild(Node& child);
 
     Node* m_firstChild { nullptr };
     Node* m_lastChild { nullptr };
@@ -209,13 +207,13 @@ public:
     RefPtr<Node> nextNode()
     {
         if (LIKELY(!hasSnapshot())) {
-            RefPtr<Node> node = m_currentNode.release();
+            RefPtr<Node> node = WTFMove(m_currentNode);
             if (node)
                 m_currentNode = node->nextSibling();
-            return node.release();
+            return node;
         }
         if (m_currentIndex >= m_snapshot.size())
-            return 0;
+            return nullptr;
         return m_snapshot[m_currentIndex++];
     }
 

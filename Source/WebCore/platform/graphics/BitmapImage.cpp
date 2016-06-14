@@ -32,6 +32,7 @@
 #include "ImageBuffer.h"
 #include "ImageObserver.h"
 #include "IntRect.h"
+#include "Logging.h"
 #include "MIMETypeRegistry.h"
 #include "TextStream.h"
 #include "Timer.h"
@@ -47,29 +48,35 @@ namespace WebCore {
 
 BitmapImage::BitmapImage(ImageObserver* observer)
     : Image(observer)
-    , m_currentFrame(0)
-    , m_repetitionCount(cAnimationNone)
-    , m_repetitionCountStatus(Unknown)
-    , m_repetitionsComplete(0)
-    , m_desiredFrameStartTime(0)
-    , m_decodedSize(0)
-    , m_decodedPropertiesSize(0)
-    , m_frameCount(0)
-#if PLATFORM(IOS)
-    // FIXME: We should expose a setting to enable/disable progressive loading remove the PLATFORM(IOS)-guard.
-    , m_progressiveLoadChunkTime(0)
-    , m_progressiveLoadChunkCount(0)
-#endif
-    , m_isSolidColor(false)
-    , m_checkedForSolidColor(false)
     , m_animationFinished(false)
     , m_allDataReceived(false)
     , m_haveSize(false)
     , m_sizeAvailable(false)
-    , m_hasUniformFrameSize(true)
     , m_haveFrameCount(false)
     , m_animationFinishedWhenCatchingUp(false)
 {
+}
+
+BitmapImage::BitmapImage(NativeImagePtr&& image, ImageObserver* observer)
+    : Image(observer)
+    , m_source(image)
+    , m_frameCount(1)
+    , m_animationFinished(true)
+    , m_allDataReceived(true)
+    , m_haveSize(true)
+    , m_sizeAvailable(true)
+    , m_haveFrameCount(true)
+    , m_animationFinishedWhenCatchingUp(false)
+{
+    // Since we don't have a decoder, we can't figure out the image orientation.
+    // Set m_sizeRespectingOrientation to be the same as m_size so it's not 0x0.
+    m_sizeRespectingOrientation = m_size = NativeImage::size(image);
+    m_decodedSize = m_size.area() * 4;
+    
+    m_frames.grow(1);
+    m_frames[0].m_hasAlpha = NativeImage::hasAlpha(image);
+    m_frames[0].m_haveMetadata = true;
+    m_frames[0].m_image = WTFMove(image);
 }
 
 BitmapImage::~BitmapImage()
@@ -144,16 +151,17 @@ void BitmapImage::destroyDecodedDataIfNecessary(bool destroyAll)
 
     unsigned allFrameBytes = 0;
     for (size_t i = 0; i < m_frames.size(); ++i)
-        allFrameBytes += m_frames[i].m_frameBytes;
+        allFrameBytes += m_frames[i].usedFrameBytes();
 
-    if (allFrameBytes > largeAnimationCutoff)
+    if (allFrameBytes > largeAnimationCutoff) {
+        LOG(Images, "BitmapImage %p destroyDecodedDataIfNecessary destroyingData: allFrameBytes=%u cutoff=%u", this, allFrameBytes, largeAnimationCutoff);
         destroyDecodedData(destroyAll);
+    }
 }
 
 void BitmapImage::destroyMetadataAndNotify(unsigned frameBytesCleared, ClearedSource clearedSource)
 {
-    m_isSolidColor = false;
-    m_checkedForSolidColor = false;
+    m_solidColor = Nullopt;
     invalidatePlatformData();
 
     ASSERT(m_decodedSize >= frameBytesCleared);
@@ -180,8 +188,6 @@ void BitmapImage::cacheFrame(size_t index, SubsamplingLevel subsamplingLevel, Im
     if (frameCaching == CacheMetadataAndFrame) {
         m_frames[index].m_image = m_source.createFrameImageAtIndex(index, subsamplingLevel);
         m_frames[index].m_subsamplingLevel = subsamplingLevel;
-        if (numFrames == 1 && m_frames[index].m_image)
-            checkForSolidColor();
     }
 
     m_frames[index].m_orientation = m_source.orientationAtIndex(index);
@@ -194,9 +200,7 @@ void BitmapImage::cacheFrame(size_t index, SubsamplingLevel subsamplingLevel, Im
     m_frames[index].m_hasAlpha = m_source.frameHasAlphaAtIndex(index);
     m_frames[index].m_frameBytes = m_source.frameBytesAtIndex(index, subsamplingLevel);
 
-    const IntSize frameSize(index ? m_source.frameSizeAtIndex(index, subsamplingLevel) : m_size);
-    if (!subsamplingLevel && frameSize != m_size)
-        m_hasUniformFrameSize = false;
+    LOG(Images, "BitmapImage %p cacheFrame %lu (%s%u bytes, complete %d)", this, index, frameCaching == CacheMetadataOnly ? "metadata only, " : "", m_frames[index].m_frameBytes, m_frames[index].m_isComplete);
 
     if (m_frames[index].m_image) {
         int deltaBytes = safeCast<int>(m_frames[index].m_frameBytes);
@@ -329,7 +333,7 @@ bool BitmapImage::dataChanged(bool allDataReceived)
 #endif
 
     m_haveFrameCount = false;
-    m_hasUniformFrameSize = true;
+    m_source.setNeedsUpdateMetadata();
     return isSizeAvailable();
 }
 
@@ -541,6 +545,11 @@ void BitmapImage::startAnimation(CatchUpAnimation catchUpIfNecessary)
     // See if we've also passed the time for frames after that to start, in
     // case we need to skip some frames entirely. Remember not to advance
     // to an incomplete frame.
+
+#if !LOG_DISABLED
+    size_t startCatchupFrameIndex = nextFrame;
+#endif
+    
     for (size_t frameAfterNext = (nextFrame + 1) % frameCount(); frameIsCompleteAtIndex(frameAfterNext); frameAfterNext = (nextFrame + 1) % frameCount()) {
         // Should we skip the next frame?
         double frameAfterNextStartTime = m_desiredFrameStartTime + frameDurationAtIndex(nextFrame);
@@ -552,11 +561,14 @@ void BitmapImage::startAnimation(CatchUpAnimation catchUpIfNecessary)
         if (!internalAdvanceAnimation(SkippingFramesToCatchUp)) {
             m_animationFinishedWhenCatchingUp = true;
             startTimer(0);
+            LOG(Images, "BitmapImage %p startAnimation catching up from frame %lu, ended", this, startCatchupFrameIndex);
             return;
         }
         m_desiredFrameStartTime = frameAfterNextStartTime;
         nextFrame = frameAfterNext;
     }
+
+    LOG(Images, "BitmapImage %p startAnimation catching up jumped from from frame %lu to %d", this, startCatchupFrameIndex, (int)nextFrame - 1);
 
     // Draw the next frame as soon as possible. Note that m_desiredFrameStartTime
     // may be in the past, meaning the next time through this function we'll
@@ -594,7 +606,7 @@ void BitmapImage::drawPattern(GraphicsContext& ctxt, const FloatRect& tileRect, 
         return;
     }
     if (!m_cachedImage) {
-        std::unique_ptr<ImageBuffer> buffer = ctxt.createCompatibleBuffer(expandedIntSize(tileRect.size()));
+        auto buffer = ImageBuffer::createCompatibleBuffer(expandedIntSize(tileRect.size()), ctxt);
         if (!buffer)
             return;
 
@@ -668,18 +680,30 @@ bool BitmapImage::internalAdvanceAnimation(AnimationAdvancement advancement)
     return advancedAnimation;
 }
 
-bool BitmapImage::mayFillWithSolidColor()
+Color BitmapImage::singlePixelSolidColor()
 {
-    if (!m_checkedForSolidColor && frameCount() > 0) {
-        checkForSolidColor();
-        ASSERT(m_checkedForSolidColor);
-    }
-    return m_isSolidColor && !m_currentFrame;
-}
+    // If the image size is not available yet or if the image will be animating don't use the solid color optimization.
+    if (frameCount() != 1)
+        return Color();
+    
+    if (m_solidColor)
+        return m_solidColor.value();
 
-Color BitmapImage::solidColor() const
-{
-    return m_solidColor;
+    // If the frame image is not loaded, first use the decoder to get the size of the image.
+    if (!haveFrameImageAtIndex(0) && m_source.frameSizeAtIndex(0, 0) != IntSize(1, 1)) {
+        m_solidColor = Color();
+        return m_solidColor.value();
+    }
+
+    // Cache the frame image. The size will be calculated from the NativeImagePtr.
+    if (!ensureFrameIsCached(0))
+        return Color();
+    
+    ASSERT(m_frames.size());
+    m_solidColor = NativeImage::singlePixelSolidColor(m_frames[0].m_image.get());
+    
+    ASSERT(m_solidColor);
+    return m_solidColor.value();
 }
     
 bool BitmapImage::canAnimate()
@@ -699,8 +723,8 @@ void BitmapImage::dump(TextStream& ts) const
         ts.dumpProperty("current-frame", m_currentFrame);
     }
     
-    if (m_isSolidColor)
-        ts.dumpProperty("solid-color", m_isSolidColor);
+    if (m_solidColor)
+        ts.dumpProperty("solid-color", m_solidColor.value());
     
     m_source.dump(ts);
 }

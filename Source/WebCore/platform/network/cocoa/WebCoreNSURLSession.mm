@@ -92,10 +92,7 @@ NS_ASSUME_NONNULL_END
     for (auto& task : _dataTasks)
         task.get().session = nil;
 
-    // FIXME(C++14): When we can move RefPtrs directly into blocks, replace this with a RefPtr&&:
-    WebCore::PlatformMediaResourceLoader* loader = _loader.leakRef();
-    callOnMainThread([loader] {
-        loader->deref();
+    callOnMainThread([loader = WTFMove(_loader)] {
     });
     [super dealloc];
 }
@@ -415,7 +412,7 @@ void WebCoreNSURLSessionDataTaskClient::loadFinished(PlatformMediaResource& reso
     ASSERT(isMainThread());
     [self _cancel];
 
-    _resource = self.session.loader.requestResource(self.originalRequest, 0);
+    _resource = self.session.loader.requestResource(self.originalRequest, PlatformMediaResourceLoader::LoadOption::DisallowCaching);
     if (_resource)
         _resource->setClient(std::make_unique<WebCoreNSURLSessionDataTaskClient>(self));
 }
@@ -457,7 +454,7 @@ void WebCoreNSURLSessionDataTaskClient::loadFinished(PlatformMediaResource& reso
 @synthesize error=_error;
 @synthesize taskDescription=_taskDescription;
 @synthesize priority=_priority;
-@dynamic response;
+
 - (NSURLResponse *)response
 {
     return _response.get();
@@ -466,35 +463,41 @@ void WebCoreNSURLSessionDataTaskClient::loadFinished(PlatformMediaResource& reso
 - (void)cancel
 {
     self.state = NSURLSessionTaskStateCanceling;
-    RetainPtr<WebCoreNSURLSessionDataTask> strongSelf { self };
-    callOnMainThread([strongSelf] {
-        [strongSelf _cancel];
-        [strongSelf _finish];
+    callOnMainThread([protectedSelf = RetainPtr<WebCoreNSURLSessionDataTask>(self)] {
+        [protectedSelf _cancel];
+        [protectedSelf _finish];
     });
 }
 
 - (void)suspend
 {
-    RetainPtr<WebCoreNSURLSessionDataTask> strongSelf { self };
-    callOnMainThread([strongSelf] {
+    callOnMainThread([protectedSelf = RetainPtr<WebCoreNSURLSessionDataTask>(self)] {
         // NSURLSessionDataTasks must start over after suspending, so while
         // we could defer loading at this point, instead cancel and restart
         // upon resume so as to adhere to NSURLSessionDataTask semantics.
-        [strongSelf _cancel];
-        strongSelf.get().state = NSURLSessionTaskStateSuspended;
+        [protectedSelf _cancel];
+        protectedSelf.get().state = NSURLSessionTaskStateSuspended;
     });
 }
 
 - (void)resume
 {
-    RetainPtr<WebCoreNSURLSessionDataTask> strongSelf { self };
-    callOnMainThread([strongSelf] {
-        if (strongSelf.get().state != NSURLSessionTaskStateSuspended)
+    callOnMainThread([protectedSelf = RetainPtr<WebCoreNSURLSessionDataTask>(self)] {
+        if (protectedSelf.get().state != NSURLSessionTaskStateSuspended)
             return;
 
-        [strongSelf _restart];
-        strongSelf.get().state = NSURLSessionTaskStateRunning;
+        [protectedSelf _restart];
+        protectedSelf.get().state = NSURLSessionTaskStateRunning;
     });
+}
+
+- (void)dealloc
+{
+    [_originalRequest release];
+    [_currentRequest release];
+    [_error release];
+    [_taskDescription release];
+    [super dealloc];
 }
 
 #pragma mark - NSURLSession SPI
@@ -517,6 +520,7 @@ void WebCoreNSURLSessionDataTaskClient::loadFinished(PlatformMediaResource& reso
 
 - (void)resource:(PlatformMediaResource&)resource receivedResponse:(const ResourceResponse&)response
 {
+    ASSERT(response.source() == ResourceResponse::Source::Network);
     ASSERT_UNUSED(resource, &resource == _resource);
     ASSERT(isMainThread());
     [self.session task:self didReceiveCORSAccessCheckResult:resource.didPassAccessControlCheck()];
@@ -565,9 +569,6 @@ void WebCoreNSURLSessionDataTaskClient::loadFinished(PlatformMediaResource& reso
     ASSERT_UNUSED(resource, &resource == _resource);
     UNUSED_PARAM(data);
     UNUSED_PARAM(length);
-    // FIXME: try to avoid a copy, if possible.
-    // e.g., RetainPtr<CFDataRef> cfData = resource->resourceBuffer()->createCFData();
-
     RetainPtr<NSData> nsData = adoptNS([[NSData alloc] initWithBytes:data length:length]);
     RetainPtr<WebCoreNSURLSessionDataTask> strongSelf { self };
     [self.session addDelegateOperation:[strongSelf, length, nsData] {

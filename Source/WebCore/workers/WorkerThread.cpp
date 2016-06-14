@@ -105,6 +105,9 @@ WorkerThread::WorkerThread(const URL& scriptURL, const String& userAgent, const 
     , m_idbConnectionProxy(connectionProxy)
 #endif
 {
+#if !ENABLE(INDEXED_DATABASE)
+    UNUSED_PARAM(connectionProxy);
+#endif
     std::lock_guard<StaticLock> lock(threadSetMutex);
 
     workerThreads().add(this);
@@ -204,6 +207,10 @@ void WorkerThread::stop()
 
         m_runLoop.postTaskAndTerminate({ ScriptExecutionContext::Task::CleanupTask, [] (ScriptExecutionContext& context ) {
             WorkerGlobalScope& workerGlobalScope = downcast<WorkerGlobalScope>(context);
+
+#if ENABLE(INDEXED_DATABASE)
+            workerGlobalScope.stopIndexedDatabase();
+#endif
 
             workerGlobalScope.stopActiveDOMObjects();
             workerGlobalScope.notifyObserversOfStop();

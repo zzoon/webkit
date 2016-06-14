@@ -425,12 +425,18 @@ void RenderLayerBacking::updateBackdropFiltersGeometry()
         return;
 
     RenderBox& renderer = downcast<RenderBox>(this->renderer());
-    LayoutRect backdropFiltersRect = renderer.borderBoxRect();
+    LayoutRect boxRect = renderer.borderBoxRect();
     if (renderer.hasClip())
-        backdropFiltersRect.intersect(renderer.clipRect(LayoutPoint(), nullptr));
+        boxRect.intersect(renderer.clipRect(LayoutPoint(), nullptr));
+    boxRect.move(contentOffsetInCompostingLayer());
 
-    backdropFiltersRect.move(contentOffsetInCompostingLayer());
-    m_graphicsLayer->setBackdropFiltersRect(snapRectToDevicePixels(backdropFiltersRect, deviceScaleFactor()));
+    FloatRoundedRect backdropFiltersRect;
+    if (renderer.style().hasBorderRadius() && !renderer.hasClip())
+        backdropFiltersRect = renderer.style().getRoundedInnerBorderFor(boxRect).pixelSnappedRoundedRectForPainting(deviceScaleFactor());
+    else
+        backdropFiltersRect = FloatRoundedRect(snapRectToDevicePixels(boxRect, deviceScaleFactor()));
+
+    m_graphicsLayer->setBackdropFiltersRect(backdropFiltersRect);
 }
 #endif
 
@@ -815,16 +821,15 @@ void RenderLayerBacking::updateGeometry()
             renderBox.width() - renderBox.borderLeft() - renderBox.borderRight(),
             renderBox.height() - renderBox.borderTop() - renderBox.borderBottom());
 
-        IntSize scrollOffset = compAncestor->scrolledContentOffset();
+        ScrollOffset scrollOffset = compAncestor->scrollOffset();
         // FIXME: pixel snap the padding box.
-        graphicsLayerParentLocation = paddingBox.location() - scrollOffset;
+        graphicsLayerParentLocation = paddingBox.location() - toLayoutSize(scrollOffset);
     }
 #else
     if (compAncestor && compAncestor->needsCompositedScrolling()) {
         auto& renderBox = downcast<RenderBox>(compAncestor->renderer());
-        LayoutSize scrollOffset = compAncestor->scrolledContentOffset();
         LayoutPoint scrollOrigin(renderBox.borderLeft(), renderBox.borderTop());
-        graphicsLayerParentLocation = scrollOrigin - scrollOffset;
+        graphicsLayerParentLocation = scrollOrigin - toLayoutSize(compAncestor->scrollOffset());
     }
 #endif
 
@@ -1066,6 +1071,8 @@ void RenderLayerBacking::updateAfterDescendants()
     updateDrawsContent(isSimpleContainer);
 
     m_graphicsLayer->setContentsVisible(m_owningLayer.hasVisibleContent() || isPaintDestinationForDescendantLayers());
+    if (m_scrollingLayer)
+        m_scrollingLayer->setContentsVisible(renderer().style().visibility() == VISIBLE);
 }
 
 // FIXME: Avoid repaints when clip path changes.
@@ -1228,7 +1235,7 @@ void RenderLayerBacking::updateDrawsContent(bool isSimpleContainer)
         // m_graphicsLayer only needs backing store if the non-scrolling parts (background, outlines, borders, shadows etc) need to paint.
         // m_scrollingLayer never has backing store.
         // m_scrollingContentsLayer only needs backing store if the scrolled contents need to paint.
-        bool hasNonScrollingPaintedContent = m_owningLayer.hasVisibleContent() && m_owningLayer.hasBoxDecorationsOrBackground();
+        bool hasNonScrollingPaintedContent = m_owningLayer.hasVisibleContent() && m_owningLayer.hasVisibleBoxDecorationsOrBackground();
         m_graphicsLayer->setDrawsContent(hasNonScrollingPaintedContent);
 
         bool hasScrollingPaintedContent = m_owningLayer.hasVisibleContent() && (renderer().hasBackground() || paintsChildren());
@@ -1674,9 +1681,9 @@ float RenderLayerBacking::compositingOpacity(float rendererOpacity) const
 }
 
 // FIXME: Code is duplicated in RenderLayer. Also, we should probably not consider filters a box decoration here.
-static inline bool hasBoxDecorations(const RenderStyle& style)
+static inline bool hasVisibleBoxDecorations(const RenderStyle& style)
 {
-    return style.hasBorder() || style.hasBorderRadius() || style.hasOutline() || style.hasAppearance() || style.boxShadow() || style.hasFilter();
+    return style.hasVisibleBorder() || style.hasBorderRadius() || style.hasOutline() || style.hasAppearance() || style.boxShadow() || style.hasFilter();
 }
 
 static bool canCreateTiledImage(const RenderStyle& style)
@@ -1711,9 +1718,9 @@ static bool canCreateTiledImage(const RenderStyle& style)
     return true;
 }
 
-static bool hasBoxDecorationsOrBackgroundImage(const RenderStyle& style)
+static bool hasVisibleBoxDecorationsOrBackgroundImage(const RenderStyle& style)
 {
-    if (hasBoxDecorations(style))
+    if (hasVisibleBoxDecorations(style))
         return true;
 
     if (!style.hasBackgroundImage())
@@ -1809,7 +1816,7 @@ static bool supportsDirectBoxDecorationsComposition(const RenderLayerModelObject
     if (renderer.hasClip())
         return false;
 
-    if (hasBoxDecorationsOrBackgroundImage(style))
+    if (hasVisibleBoxDecorationsOrBackgroundImage(style))
         return false;
 
     // FIXME: We can't create a directly composited background if this
@@ -1894,7 +1901,7 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
         
         // Reject anything that has a border, a border-radius or outline,
         // or is not a simple background (no background, or solid color).
-        if (hasBoxDecorationsOrBackgroundImage(rootObject->style()))
+        if (hasVisibleBoxDecorationsOrBackgroundImage(rootObject->style()))
             return false;
         
         // Now look at the body's renderer.
@@ -1905,7 +1912,7 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
         if (!bodyRenderer)
             return false;
         
-        if (hasBoxDecorationsOrBackgroundImage(bodyRenderer->style()))
+        if (hasVisibleBoxDecorationsOrBackgroundImage(bodyRenderer->style()))
             return false;
     }
 
@@ -1978,12 +1985,12 @@ bool RenderLayerBacking::containsPaintedContent(bool isSimpleContainer) const
     // and set background color on the layer in that case, instead of allocating backing store and painting.
 #if ENABLE(VIDEO)
     if (is<RenderVideo>(renderer()) && downcast<RenderVideo>(renderer()).shouldDisplayVideo())
-        return m_owningLayer.hasBoxDecorationsOrBackground() || (!(downcast<RenderVideo>(renderer()).supportsAcceleratedRendering()) && m_requiresOwnBackingStore);
+        return m_owningLayer.hasVisibleBoxDecorationsOrBackground() || (!(downcast<RenderVideo>(renderer()).supportsAcceleratedRendering()) && m_requiresOwnBackingStore);
 #endif
 
 #if ENABLE(WEBGL) || ENABLE(ACCELERATED_2D_CANVAS)
     if (is<RenderHTMLCanvas>(renderer()) && canvasCompositingStrategy(renderer()) == CanvasAsLayerContents)
-        return m_owningLayer.hasBoxDecorationsOrBackground();
+        return m_owningLayer.hasVisibleBoxDecorationsOrBackground();
 #endif
 
     return true;
@@ -1993,7 +2000,7 @@ bool RenderLayerBacking::containsPaintedContent(bool isSimpleContainer) const
 // that require painting. Direct compositing saves backing store.
 bool RenderLayerBacking::isDirectlyCompositedImage() const
 {
-    if (!is<RenderImage>(renderer()) || m_owningLayer.hasBoxDecorationsOrBackground() || m_owningLayer.paintsWithFilters() || renderer().hasClip())
+    if (!is<RenderImage>(renderer()) || m_owningLayer.hasVisibleBoxDecorationsOrBackground() || m_owningLayer.paintsWithFilters() || renderer().hasClip())
         return false;
 
 #if ENABLE(VIDEO)

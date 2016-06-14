@@ -40,6 +40,12 @@
 #define DEFAULT_WEBKIT_TABSTOLINKS_ENABLED false
 #endif
 
+#if PLATFORM(EFL)
+#define DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED true
+#else
+#define DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED false
+#endif
+
 #if ENABLE(SMOOTH_SCROLLING)
 #define DEFAULT_WEBKIT_SCROLL_ANIMATOR_ENABLED true
 #else
@@ -63,15 +69,15 @@
 #define DEFAULT_TEXT_AREAS_ARE_RESIZABLE false
 #define DEFAULT_JAVASCRIPT_CAN_OPEN_WINDOWS_AUTOMATICALLY false
 #define DEFAULT_SHOULD_RESPECT_IMAGE_ORIENTATION true
-#define DEFAULT_MINIMUM_FONT_ZOOM_SIZE WebCore::Settings::defaultMinimumZoomFontSize()
 #define DEFAULT_PASSWORD_ECHO_ENABLED true
 #define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK false
+#define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_AFTER_FULLSCREEN true
 #define DEFAULT_INLINE_MEDIA_PLAYBACK_REQUIRES_PLAYS_INLINE_ATTRIBUTE true
 #define DEFAULT_INVISIBLE_AUTOPLAY_NOT_PERMITTED true
 #define DEFAULT_MEDIA_DATA_LOADS_AUTOMATICALLY false
-#define DEFAULT_REQUIRES_USER_GESTURE_FOR_MEDIA_PLAYBACK true
 #define DEFAULT_MEDIA_CONTROLS_SCALE_WITH_PAGE_ZOOM false
 #define DEFAULT_TEMPORARY_TILE_COHORT_RETENTION_ENABLED false
+#define DEFAULT_REQUIRES_USER_GESTURE_FOR_AUDIO_PLAYBACK true
 #else
 #define DEFAULT_BACKSPACE_KEY_NAVIGATION_ENABLED true
 #define DEFAULT_FRAME_FLATTENING_ENABLED false
@@ -79,15 +85,15 @@
 #define DEFAULT_TEXT_AREAS_ARE_RESIZABLE true
 #define DEFAULT_JAVASCRIPT_CAN_OPEN_WINDOWS_AUTOMATICALLY true
 #define DEFAULT_SHOULD_RESPECT_IMAGE_ORIENTATION false
-#define DEFAULT_MINIMUM_FONT_ZOOM_SIZE 0
 #define DEFAULT_PASSWORD_ECHO_ENABLED false
 #define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK true
+#define DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_AFTER_FULLSCREEN false
 #define DEFAULT_INLINE_MEDIA_PLAYBACK_REQUIRES_PLAYS_INLINE_ATTRIBUTE false
 #define DEFAULT_INVISIBLE_AUTOPLAY_NOT_PERMITTED false
 #define DEFAULT_MEDIA_DATA_LOADS_AUTOMATICALLY true
-#define DEFAULT_REQUIRES_USER_GESTURE_FOR_MEDIA_PLAYBACK false
 #define DEFAULT_MEDIA_CONTROLS_SCALE_WITH_PAGE_ZOOM true
 #define DEFAULT_TEMPORARY_TILE_COHORT_RETENTION_ENABLED true
+#define DEFAULT_REQUIRES_USER_GESTURE_FOR_AUDIO_PLAYBACK false
 #endif
 
 #if PLATFORM(IOS_SIMULATOR)
@@ -126,8 +132,6 @@
     macro(Accelerated2dCanvasEnabled, accelerated2dCanvasEnabled, Bool, bool, false, "", "") \
     macro(CSSAnimationTriggersEnabled, cssAnimationTriggersEnabled, Bool, bool, true, "", "") \
     macro(WebAnimationsEnabled, webAnimationsEnabled, Bool, bool, false, "", "") \
-    macro(CSSRegionsEnabled, cssRegionsEnabled, Bool, bool, true, "", "") \
-    macro(CSSCompositingEnabled, cssCompositingEnabled, Bool, bool, true, "", "") \
     macro(ForceFTPDirectoryListings, forceFTPDirectoryListings, Bool, bool, false, "", "") \
     macro(TabsToLinks, tabsToLinks, Bool, bool, DEFAULT_WEBKIT_TABSTOLINKS_ENABLED, "", "") \
     macro(DNSPrefetchingEnabled, dnsPrefetchingEnabled, Bool, bool, false, "", "") \
@@ -148,11 +152,12 @@
     macro(AllowFileAccessFromFileURLs, allowFileAccessFromFileURLs, Bool, bool, false, "", "") \
     macro(AVFoundationEnabled, isAVFoundationEnabled, Bool, bool, true, "", "") \
     macro(AVFoundationNSURLSessionEnabled, isAVFoundationNSURLSessionEnabled, Bool, bool, true, "", "") \
-    macro(RequiresUserGestureForMediaPlayback, requiresUserGestureForMediaPlayback, Bool, bool, DEFAULT_REQUIRES_USER_GESTURE_FOR_MEDIA_PLAYBACK, "", "") \
+    macro(RequiresUserGestureForMediaPlayback, requiresUserGestureForMediaPlayback, Bool, bool, false, "", "") \
     macro(RequiresUserGestureForVideoPlayback, requiresUserGestureForVideoPlayback, Bool, bool, false, "", "") \
-    macro(RequiresUserGestureForAudioPlayback, requiresUserGestureForAudioPlayback, Bool, bool, false, "", "") \
+    macro(RequiresUserGestureForAudioPlayback, requiresUserGestureForAudioPlayback, Bool, bool, DEFAULT_REQUIRES_USER_GESTURE_FOR_AUDIO_PLAYBACK, "", "") \
     macro(MainContentUserGestureOverrideEnabled, mainContentUserGestureOverrideEnabled, Bool, bool, false, "", "") \
     macro(AllowsInlineMediaPlayback, allowsInlineMediaPlayback, Bool, bool, DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK, "", "") \
+    macro(AllowsInlineMediaPlaybackAfterFullscreen, allowsInlineMediaPlaybackAfterFullscreen, Bool, bool, DEFAULT_ALLOWS_INLINE_MEDIA_PLAYBACK_AFTER_FULLSCREEN, "", "") \
     macro(InlineMediaPlaybackRequiresPlaysInlineAttribute, inlineMediaPlaybackRequiresPlaysInlineAttribute, Bool, bool, DEFAULT_INLINE_MEDIA_PLAYBACK_REQUIRES_PLAYS_INLINE_ATTRIBUTE, "", "") \
     macro(InvisibleAutoplayNotPermitted, invisibleAutoplayNotPermitted, Bool, bool, DEFAULT_INVISIBLE_AUTOPLAY_NOT_PERMITTED, "", "") \
     macro(MediaDataLoadsAutomatically, mediaDataLoadsAutomatically, Bool, bool, DEFAULT_MEDIA_DATA_LOADS_AUTOMATICALLY, "", "") \
@@ -192,7 +197,7 @@
     macro(PrimaryPlugInSnapshotDetectionEnabled, primaryPlugInSnapshotDetectionEnabled, Bool, bool, true, "", "") \
     macro(PDFPluginEnabled, pdfPluginEnabled, Bool, bool, DEFAULT_PDFPLUGIN_ENABLED, "", "") \
     macro(UsesEncodingDetector, usesEncodingDetector, Bool, bool, false, "", "") \
-    macro(TextAutosizingEnabled, textAutosizingEnabled, Bool, bool, false, "", "") \
+    macro(TextAutosizingEnabled, textAutosizingEnabled, Bool, bool, WebCore::Settings::defaultTextAutosizingEnabled(), "", "") \
     macro(AggressiveTileRetentionEnabled, aggressiveTileRetentionEnabled, Bool, bool, false, "", "") \
     macro(TemporaryTileCohortRetentionEnabled, temporaryTileCohortRetentionEnabled, Bool, bool, DEFAULT_TEMPORARY_TILE_COHORT_RETENTION_ENABLED, "", "") \
     macro(QTKitEnabled, isQTKitEnabled, Bool, bool, WebCore::Settings::isQTKitEnabled(), "", "") \
@@ -227,11 +232,10 @@
     macro(NewBlockInsideInlineModelEnabled, newBlockInsideInlineModelEnabled, Bool, bool, false, "", "") \
     macro(HTTPEquivEnabled, httpEquivEnabled, Bool, bool, true, "", "") \
     macro(MockCaptureDevicesEnabled, mockCaptureDevicesEnabled, Bool, bool, false, "", "") \
-    macro(ShadowDOMEnabled, shadowDOMEnabled, Bool, bool, true, "", "") \
-    macro(CustomElementsEnabled, customElementsEnabled, Bool, bool, false, "", "") \
+    macro(ShadowDOMEnabled, shadowDOMEnabled, Bool, bool, true, "Shadow DOM", "HTML Shadow DOM prototype") \
     macro(FetchAPIEnabled, fetchAPIEnabled, Bool, bool, false, "", "") \
-    macro(WebGL2Enabled, webGL2Enabled, Bool, bool, false, "", "") \
     macro(DownloadAttributeEnabled, downloadAttributeEnabled, Bool, bool, false, "", "") \
+    macro(SelectionPaintingWithoutSelectionGapsEnabled, selectionPaintingWithoutSelectionGapsEnabled, Bool, bool, DEFAULT_SELECTION_PAINTING_WITHOUT_SELECTION_GAPS_ENABLED, "", "") \
     FOR_EACH_ADDITIONAL_WEBKIT_BOOL_PREFERENCE(macro) \
     \
 
@@ -239,7 +243,7 @@
     macro(IncrementalRenderingSuppressionTimeout, incrementalRenderingSuppressionTimeout, Double, double, 5, "", "") \
     macro(MinimumFontSize, minimumFontSize, Double, double, 0, "", "") \
     macro(MinimumLogicalFontSize, minimumLogicalFontSize, Double, double, 9, "", "") \
-    macro(MinimumZoomFontSize, minimumZoomFontSize, Double, double, DEFAULT_MINIMUM_FONT_ZOOM_SIZE, "", "") \
+    macro(MinimumZoomFontSize, minimumZoomFontSize, Double, double, WebCore::Settings::defaultMinimumZoomFontSize(), "", "") \
     macro(DefaultFontSize, defaultFontSize, Double, double, 16, "", "") \
     macro(DefaultFixedFontSize, defaultFixedFontSize, Double, double, 13, "", "") \
     macro(LayoutInterval, layoutInterval, Double, double, -1, "", "") \
@@ -259,6 +263,8 @@
     macro(StorageBlockingPolicy, storageBlockingPolicy, UInt32, uint32_t, WebCore::SecurityOrigin::BlockThirdPartyStorage, "", "") \
     macro(JavaScriptRuntimeFlags, javaScriptRuntimeFlags, UInt32, uint32_t, 0, "", "") \
     macro(DataDetectorTypes, dataDetectorTypes, UInt32, uint32_t, 0, "", "") \
+    macro(UserInterfaceDirectionPolicy, userInterfaceDirectionPolicy, UInt32, uint32_t, 0, "", "") \
+    macro(SystemLayoutDirection, systemLayoutDirection, UInt32, uint32_t, 0, "", "") \
     \
 
 #define FOR_EACH_WEBKIT_DEBUG_BOOL_PREFERENCE(macro) \
@@ -278,9 +284,18 @@
 #define FOR_EACH_WEBKIT_DEBUG_UINT32_PREFERENCE(macro) \
     macro(VisibleDebugOverlayRegions, visibleDebugOverlayRegions, UInt32, uint32_t, 0, "", "")
 
+// For experimental features:
+// - The type should be boolean.
+// - You must provide the last two parameters for all experimental features. They
+//   are the text exposed to the user from the WebKit client.
+// - They should be alphabetically ordered by the human readable text.
+// - They should be false by default, although they are currently set to true while we develop client UI.
+
 #define FOR_EACH_WEBKIT_EXPERIMENTAL_FEATURE_PREFERENCE(macro) \
-    macro(ExperimentalShadowDOMEnabled, experimentalShadowDOMEnabled, Bool, bool, false, "Shadow DOM", "Support for the Shadow DOM feature") \
-    macro(ExperimentalWebGL2Enabled, experimentalWebGL2Enabled, Bool, bool, false, "WebGL 2.0", "Prototype WebGL 2 Support") \
+    macro(CSSGridLayoutEnabled, cssGridLayoutEnabled, Bool, bool, true, "CSS Grid", "CSS Grid Layout Module support") \
+    macro(CustomElementsEnabled, customElementsEnabled, Bool, bool, true, "Custom Elements", "HTML Custom Elements prototype") \
+    macro(WebGL2Enabled, webGL2Enabled, Bool, bool, true, "WebGL 2.0", "WebGL 2 prototype") \
+    macro(SpringTimingFunctionEnabled, springTimingFunctionEnabled, Bool, bool, true, "CSS Spring Animations", "CSS Spring Animation prototype") \
     \
 
 #if PLATFORM(COCOA)

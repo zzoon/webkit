@@ -78,11 +78,6 @@ void IntlNumberFormatPrototype::finishCreation(VM& vm, Structure*)
     Base::finishCreation(vm);
 }
 
-bool IntlNumberFormatPrototype::getOwnPropertySlot(JSObject* object, ExecState* state, PropertyName propertyName, PropertySlot& slot)
-{
-    return getStaticFunctionSlot<JSObject>(state, numberFormatPrototypeTable, jsCast<IntlNumberFormatPrototype*>(object), propertyName, slot);
-}
-
 static EncodedJSValue JSC_HOST_CALL IntlNumberFormatFuncFormatNumber(ExecState* state)
 {
     // 11.3.4 Format Number Functions (ECMA-402 2.0)
@@ -108,6 +103,7 @@ EncodedJSValue JSC_HOST_CALL IntlNumberFormatPrototypeGetterFormat(ExecState* st
     IntlNumberFormat* nf = jsDynamicCast<IntlNumberFormat*>(state->thisValue());
 
     // FIXME: Workaround to provide compatibility with ECMA-402 1.0 call/apply patterns.
+    // https://bugs.webkit.org/show_bug.cgi?id=153679
     if (!nf)
         nf = jsDynamicCast<IntlNumberFormat*>(state->thisValue().get(state, state->vm().propertyNames->intlSubstituteValuePrivateName));
 
@@ -143,6 +139,7 @@ EncodedJSValue JSC_HOST_CALL IntlNumberFormatPrototypeFuncResolvedOptions(ExecSt
     IntlNumberFormat* numberFormat = jsDynamicCast<IntlNumberFormat*>(state->thisValue());
 
     // FIXME: Workaround to provide compatibility with ECMA-402 1.0 call/apply patterns.
+    // https://bugs.webkit.org/show_bug.cgi?id=153679
     if (!numberFormat)
         numberFormat = jsDynamicCast<IntlNumberFormat*>(state->thisValue().get(state, state->vm().propertyNames->intlSubstituteValuePrivateName));
 

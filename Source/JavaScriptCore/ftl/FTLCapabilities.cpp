@@ -160,8 +160,7 @@ inline CapabilityLevel canCompile(Node* node)
     case GetExecutable:
     case GetScope:
     case GetCallee:
-    case GetArgumentCount:
-    case CallObjectConstructor:
+    case GetArgumentCountIncludingThis:
     case ToString:
     case CallStringConstructor:
     case MakeRope:
@@ -169,6 +168,7 @@ inline CapabilityLevel canCompile(Node* node)
     case TryGetById:
     case GetById:
     case GetByIdFlush:
+    case GetByIdWithThis:
     case ToThis:
     case MultiGetByOffset:
     case MultiPutByOffset:
@@ -176,9 +176,7 @@ inline CapabilityLevel canCompile(Node* node)
     case Throw:
     case ThrowReferenceError:
     case Unreachable:
-    case IsArrayObject:
-    case IsJSArray:
-    case IsArrayConstructor:
+    case IsEmpty:
     case IsUndefined:
     case IsBoolean:
     case IsNumber:
@@ -217,6 +215,7 @@ inline CapabilityLevel canCompile(Node* node)
     case PhantomDirectArguments:
     case PhantomClonedArguments:
     case GetMyArgumentByVal:
+    case GetMyArgumentByValOutOfBounds:
     case ForwardVarargs:
     case Switch:
     case TypeOf:
@@ -231,6 +230,7 @@ inline CapabilityLevel canCompile(Node* node)
     case RegExpTest:
     case NewRegexp:
     case StringReplace:
+    case StringReplaceRegExp: 
     case GetRegExpObjectLastIndex:
     case SetRegExpObjectLastIndex:
     case RecordRegExpCachedResult:
@@ -259,6 +259,8 @@ inline CapabilityLevel canCompile(Node* node)
         if (node->child1().useKind() == CellUse)
             break;
         return CannotCompile;
+    case PutByIdWithThis:
+        break;
     case GetIndexedPropertyStorage:
         if (node->arrayMode().type() == Array::String)
             break;
@@ -323,6 +325,8 @@ inline CapabilityLevel canCompile(Node* node)
             return CannotCompile;
         }
         break;
+    case GetByValWithThis:
+        break;
     case PutByVal:
     case PutByValAlias:
     case PutByValDirect:
@@ -338,6 +342,8 @@ inline CapabilityLevel canCompile(Node* node)
                 return CanCompileAndOSREnter;
             return CannotCompile;
         }
+        break;
+    case PutByValWithThis:
         break;
     case ArrayPush:
     case ArrayPop:
@@ -499,8 +505,8 @@ CapabilityLevel canCompile(Graph& graph)
                 case MiscUse:
                 case StringIdentUse:
                 case NotStringVarUse:
-                case MachineIntUse:
-                case DoubleRepMachineIntUse:
+                case AnyIntUse:
+                case DoubleRepAnyIntUse:
                     // These are OK.
                     break;
                 default:

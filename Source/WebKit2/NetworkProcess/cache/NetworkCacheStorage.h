@@ -35,6 +35,7 @@
 #include <wtf/BloomFilter.h>
 #include <wtf/Deque.h>
 #include <wtf/HashSet.h>
+#include <wtf/NoncopyableFunction.h>
 #include <wtf/Optional.h>
 #include <wtf/WorkQueue.h>
 #include <wtf/text/WTFString.h>
@@ -78,7 +79,7 @@ public:
         ShareCount = 1 << 1,
     };
     typedef unsigned TraverseFlags;
-    typedef std::function<void (const Record*, const RecordInfo&)> TraverseHandler;
+    typedef NoncopyableFunction<void (const Record*, const RecordInfo&)> TraverseHandler;
     // Null record signals end.
     void traverse(const String& type, TraverseFlags, TraverseHandler&&);
 
@@ -86,7 +87,7 @@ public:
     size_t capacity() const { return m_capacity; }
     size_t approximateSize() const;
 
-    static const unsigned version = 6;
+    static const unsigned version = 7;
 
     String basePath() const;
     String versionPath() const;

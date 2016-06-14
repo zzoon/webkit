@@ -145,20 +145,6 @@ bool Coder<String>::decode(Decoder& decoder, String& result)
     return decodeStringText<UChar>(decoder, length, result);
 }
 
-void Coder<WebCore::URL>::encode(Encoder& encoder, const WebCore::URL& url)
-{
-    encoder << url.string();
-}
-
-bool Coder<WebCore::URL>::decode(Decoder& decoder, WebCore::URL& url)
-{
-    String urlAsString;
-    if (!decoder.decode(urlAsString))
-        return false;
-    url = WebCore::URL(WebCore::ParsedURLString, urlAsString);
-    return true;
-}
-
 void Coder<WebCore::CertificateInfo>::encode(Encoder& encoder, const WebCore::CertificateInfo& certificateInfo)
 {
     // FIXME: Cocoa CertificateInfo is a CF object tree. Generalize CF type coding so we don't need to use ArgumentCoder here.
@@ -188,6 +174,34 @@ void Coder<SHA1::Digest>::encode(Encoder& encoder, const SHA1::Digest& digest)
 bool Coder<SHA1::Digest>::decode(Decoder& decoder, SHA1::Digest& digest)
 {
     return decoder.decodeFixedLengthData(digest.data(), sizeof(digest));
+}
+
+// Store common HTTP headers as strings instead of using their value in the HTTPHeaderName enumeration
+// so that the headers stored in the cache stays valid even after HTTPHeaderName.in gets updated.
+void Coder<WebCore::HTTPHeaderMap>::encode(Encoder& encoder, const WebCore::HTTPHeaderMap& headers)
+{
+    encoder << static_cast<uint64_t>(headers.size());
+    for (auto& keyValue : headers) {
+        encoder << keyValue.key;
+        encoder << keyValue.value;
+    }
+}
+
+bool Coder<WebCore::HTTPHeaderMap>::decode(Decoder& decoder, WebCore::HTTPHeaderMap& headers)
+{
+    uint64_t headersSize;
+    if (!decoder.decode(headersSize))
+        return false;
+    for (uint64_t i = 0; i < headersSize; ++i) {
+        String name;
+        if (!decoder.decode(name))
+            return false;
+        String value;
+        if (!decoder.decode(value))
+            return false;
+        headers.add(name, value);
+    }
+    return true;
 }
 
 }

@@ -208,6 +208,7 @@
 #import <wtf/RefPtr.h>
 #import <wtf/RunLoop.h>
 #import <wtf/StdLibExtras.h>
+#import <wtf/spi/darwin/dyldSPI.h>
 
 #if !PLATFORM(IOS)
 #import "WebContextMenuClient.h"
@@ -243,7 +244,6 @@
 #import "WebStorageManagerPrivate.h"
 #import "WebUIKitSupport.h"
 #import "WebVisiblePosition.h"
-#import <WebCore/DynamicLinkerSPI.h>
 #import <WebCore/EventNames.h>
 #import <WebCore/FontCache.h>
 #import <WebCore/GraphicsLayer.h>
@@ -771,12 +771,14 @@ static bool shouldRestrictWindowFocus()
 }
 
 #if !PLATFORM(IOS)
+
 - (void)_registerDraggedTypes
 {
     NSArray *editableTypes = [WebHTMLView _insertablePasteboardTypes];
     NSArray *URLTypes = [NSPasteboard _web_dragTypesForURL];
     NSMutableSet *types = [[NSMutableSet alloc] initWithArray:editableTypes];
     [types addObjectsFromArray:URLTypes];
+    [types addObject:[WebHTMLView _dummyPasteboardType]];
     [self registerForDraggedTypes:[types allObjects]];
     [types release];
 }
@@ -863,6 +865,29 @@ static bool shouldAllowPictureInPictureMediaPlayback()
 #else
     return false;
 #endif
+}
+
+static bool shouldAllowContentSecurityPolicySourceStarToMatchAnyProtocol()
+{
+#if PLATFORM(IOS)
+    static bool shouldAllowContentSecurityPolicySourceStarToMatchAnyProtocol = (IOSApplication::isEcobee() || IOSApplication::isQuora() || IOSApplication::isXtraMath()) && !WebKitLinkedOnOrAfter(WEBKIT_FIRST_VERSION_WITH_CONTENT_SECURITY_POLICY_SOURCE_STAR_PROTOCOL_RESTRICTION);
+    return shouldAllowContentSecurityPolicySourceStarToMatchAnyProtocol;
+#else
+    return false;
+#endif
+}
+
+static bool shouldConvertInvalidURLsToBlank()
+{
+#if PLATFORM(IOS)
+    static bool shouldConvertInvalidURLsToBlank = dyld_get_program_sdk_version() >= 0x000A0000;
+#elif PLATFORM(MAC)
+    static bool shouldConvertInvalidURLsToBlank = dyld_get_program_sdk_version() >= 0x000A0C00;
+#else
+    static bool shouldConvertInvalidURLsToBlank = true;
+#endif
+
+    return shouldConvertInvalidURLsToBlank;
 }
 
 #if ENABLE(GAMEPAD)
@@ -2303,8 +2328,6 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings.setFrameFlatteningEnabled([preferences isFrameFlatteningEnabled]);
     settings.setSpatialNavigationEnabled([preferences isSpatialNavigationEnabled]);
     settings.setPaginateDuringLayoutEnabled([preferences paginateDuringLayoutEnabled]);
-    RuntimeEnabledFeatures::sharedFeatures().setCSSRegionsEnabled([preferences cssRegionsEnabled]);
-    RuntimeEnabledFeatures::sharedFeatures().setCSSCompositingEnabled([preferences cssCompositingEnabled]);
 
     settings.setAsynchronousSpellCheckingEnabled([preferences asynchronousSpellCheckingEnabled]);
     settings.setHyperlinkAuditingEnabled([preferences hyperlinkAuditingEnabled]);
@@ -2317,6 +2340,7 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings.setAudioPlaybackRequiresUserGesture(mediaPlaybackRequiresUserGesture || [preferences audioPlaybackRequiresUserGesture]);
     settings.setMainContentUserGestureOverrideEnabled([preferences overrideUserGestureRequirementForMainContent]);
     settings.setAllowsInlineMediaPlayback([preferences mediaPlaybackAllowsInline]);
+    settings.setAllowsInlineMediaPlaybackAfterFullscreen([preferences allowsInlineMediaPlaybackAfterFullscreen]);
     settings.setInlineMediaPlaybackRequiresPlaysInlineAttribute([preferences inlineMediaPlaybackRequiresPlaysInlineAttribute]);
     settings.setInvisibleAutoplayNotPermitted([preferences invisibleAutoplayNotPermitted]);
     settings.setAllowsPictureInPictureMediaPlayback([preferences allowsPictureInPictureMediaPlayback] && shouldAllowPictureInPictureMediaPlayback());
@@ -2392,6 +2416,7 @@ static bool needsSelfRetainWhileLoadingQuirk()
 
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     settings.setMinimumZoomFontSize([preferences _minimumZoomFontSize]);
+    settings.setTextAutosizingEnabled([preferences _textAutosizingEnabled]);
 #endif
 #endif // PLATFORM(IOS)
 
@@ -2483,6 +2508,14 @@ static bool needsSelfRetainWhileLoadingQuirk()
     RuntimeEnabledFeatures::sharedFeatures().setDownloadAttributeEnabled([preferences downloadAttributeEnabled]);
 #endif
 
+#if ENABLE(CSS_GRID_LAYOUT)
+    RuntimeEnabledFeatures::sharedFeatures().setCSSGridLayoutEnabled([preferences isCSSGridLayoutEnabled]);
+#endif
+
+#if ENABLE(WEB_ANIMATIONS)
+    RuntimeEnabledFeatures::sharedFeatures().setWebAnimationsEnabled([preferences webAnimationsEnabled]);
+#endif
+
     NSTimeInterval timeout = [preferences incrementalRenderingSuppressionTimeoutInSeconds];
     if (timeout > 0)
         settings.setIncrementalRenderingSuppressionTimeoutInSeconds(timeout);
@@ -2510,6 +2543,10 @@ static bool needsSelfRetainWhileLoadingQuirk()
 #if ENABLE(ATTACHMENT_ELEMENT)
     settings.setAttachmentElementEnabled([preferences attachmentElementEnabled]);
 #endif
+
+    settings.setAllowContentSecurityPolicySourceStarToMatchAnyProtocol(shouldAllowContentSecurityPolicySourceStarToMatchAnyProtocol());
+
+    settings.setShouldConvertInvalidURLsToBlank(shouldConvertInvalidURLsToBlank());
 }
 
 static inline IMP getMethod(id o, SEL s)
@@ -5179,6 +5216,8 @@ static bool needsWebViewInitThreadWorkaround()
             [_private->_geolocationProvider stopTrackingWebView:self];
 #endif
 
+        [self webViewAdditionsWillDestroyView];
+
         // call close to ensure we tear-down completely
         // this maintains our old behavior for existing applications
         [self close];
@@ -6677,6 +6716,20 @@ static WebFrame *incrementFrame(WebFrame *frame, WebFindOptions options = 0)
 
 - (void)showCandidates:(NSArray *)candidates forString:(NSString *)string inRect:(NSRect)rectOfTypedString forSelectedRange:(NSRange)range view:(NSView *)view completionHandler:(void (^)(NSTextCheckingResult *acceptedCandidate))completionBlock
 {
+}
+
+- (BOOL)shouldRequestCandidates
+{
+    return NO;
+}
+
+- (void)webViewAdditionsWillDestroyView
+{
+}
+
+- (id)candidateList
+{
+    return nil;
 }
 
 @end

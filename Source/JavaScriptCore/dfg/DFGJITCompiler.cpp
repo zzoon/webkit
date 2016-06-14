@@ -139,7 +139,7 @@ void JITCompiler::compileExceptionHandlers()
     if (!m_exceptionChecksWithCallFrameRollback.empty()) {
         m_exceptionChecksWithCallFrameRollback.link(this);
 
-        copyCalleeSavesToVMCalleeSavesBuffer();
+        copyCalleeSavesToVMEntryFrameCalleeSavesBuffer();
 
         // lookupExceptionHandlerFromCallerFrame is passed two arguments, the VM and the exec (the CallFrame*).
         move(TrustedImmPtr(vm()), GPRInfo::argumentGPR0);
@@ -159,7 +159,7 @@ void JITCompiler::compileExceptionHandlers()
     if (!m_exceptionChecks.empty()) {
         m_exceptionChecks.link(this);
 
-        copyCalleeSavesToVMCalleeSavesBuffer();
+        copyCalleeSavesToVMEntryFrameCalleeSavesBuffer();
 
         // lookupExceptionHandler is passed two arguments, the VM and the exec (the CallFrame*).
         move(TrustedImmPtr(vm()), GPRInfo::argumentGPR0);
@@ -542,7 +542,7 @@ void JITCompiler::noticeOSREntry(BasicBlock& basicBlock, JITCompiler::Label bloc
                 entry->m_localsForcedDouble.set(local);
                 break;
             case FlushedInt52:
-                entry->m_localsForcedMachineInt.set(local);
+                entry->m_localsForcedAnyInt.set(local);
                 break;
             default:
                 break;

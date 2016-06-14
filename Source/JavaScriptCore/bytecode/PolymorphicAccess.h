@@ -248,6 +248,7 @@ private:
     AccessCase();
 
     bool visitWeak(VM&) const;
+    bool propagateTransitions(SlotVisitor&) const;
     
     // FIXME: This only exists because of how AccessCase puts post-generation things into itself.
     // https://bugs.webkit.org/show_bug.cgi?id=156456
@@ -382,7 +383,7 @@ public:
     // When this fails (returns GaveUp), this will leave the old stub intact but you should not try
     // to call this method again for that PolymorphicAccess instance.
     AccessGenerationResult addCases(
-        VM&, CodeBlock*, StructureStubInfo&, const Identifier&, Vector<std::unique_ptr<AccessCase>>);
+        VM&, CodeBlock*, StructureStubInfo&, const Identifier&, Vector<std::unique_ptr<AccessCase>, 2>);
 
     AccessGenerationResult addCase(
         VM&, CodeBlock*, StructureStubInfo&, const Identifier&, std::unique_ptr<AccessCase>);
@@ -396,6 +397,10 @@ public:
 
     // If this returns false then we are requesting a reset of the owning StructureStubInfo.
     bool visitWeak(VM&) const;
+    
+    // This returns true if it has marked everything it will ever marked. This can be used as an
+    // optimization to then avoid calling this method again during the fixpoint.
+    bool propagateTransitions(SlotVisitor&) const;
 
     void aboutToDie();
 

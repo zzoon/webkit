@@ -101,8 +101,8 @@ template<> EncodedJSValue JSC_HOST_CALL JSTestEventConstructorConstructor::const
             return JSValue::encode(jsUndefined());
     }
 
-    RefPtr<TestEventConstructor> event = TestEventConstructor::createForBindings(eventType, eventInit);
-    return JSValue::encode(toJS(state, jsConstructor->globalObject(), event.get()));
+    Ref<TestEventConstructor> event = TestEventConstructor::createForBindings(eventType, eventInit);
+    return JSValue::encode(toJS(state, jsConstructor->globalObject(), event));
 }
 
 bool fillTestEventConstructorInit(TestEventConstructorInit& eventInit, JSDictionary& dictionary)
@@ -226,7 +226,7 @@ EncodedJSValue jsTestEventConstructorAttr3(ExecState* state, EncodedJSValue this
 EncodedJSValue jsTestEventConstructorConstructor(ExecState* state, EncodedJSValue thisValue, PropertyName)
 {
     JSTestEventConstructorPrototype* domObject = jsDynamicCast<JSTestEventConstructorPrototype*>(JSValue::decode(thisValue));
-    if (!domObject)
+    if (UNLIKELY(!domObject))
         return throwVMTypeError(state);
     return JSValue::encode(JSTestEventConstructor::getConstructor(state->vm(), domObject->globalObject()));
 }
@@ -271,22 +271,11 @@ extern "C" { extern void* _ZTVN7WebCore20TestEventConstructorE[]; }
 #endif
 #endif
 
-JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestEventConstructor* impl)
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, Ref<TestEventConstructor>&& impl)
 {
-    if (!impl)
-        return jsNull();
-    return createNewWrapper<JSTestEventConstructor>(globalObject, impl);
-}
-
-JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestEventConstructor* impl)
-{
-    if (!impl)
-        return jsNull();
-    if (JSValue result = getExistingWrapper<JSTestEventConstructor>(globalObject, impl))
-        return result;
 
 #if ENABLE(BINDING_INTEGRITY)
-    void* actualVTablePointer = *(reinterpret_cast<void**>(impl));
+    void* actualVTablePointer = *(reinterpret_cast<void**>(impl.ptr()));
 #if PLATFORM(WIN)
     void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestEventConstructor@WebCore@@6B@"));
 #else
@@ -294,7 +283,7 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestEventCon
 #if COMPILER(CLANG)
     // If this fails TestEventConstructor does not have a vtable, so you need to add the
     // ImplementationLacksVTable attribute to the interface definition
-    COMPILE_ASSERT(__is_polymorphic(TestEventConstructor), TestEventConstructor_is_not_polymorphic);
+    static_assert(__is_polymorphic(TestEventConstructor), "TestEventConstructor is not polymorphic");
 #endif
 #endif
     // If you hit this assertion you either have a use after free bug, or
@@ -303,7 +292,12 @@ JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject* globalObject, TestEventCon
     // by adding the SkipVTableValidation attribute to the interface IDL definition
     RELEASE_ASSERT(actualVTablePointer == expectedVTablePointer);
 #endif
-    return createNewWrapper<JSTestEventConstructor>(globalObject, impl);
+    return createWrapper<JSTestEventConstructor, TestEventConstructor>(globalObject, WTFMove(impl));
+}
+
+JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestEventConstructor& impl)
+{
+    return wrap(state, globalObject, impl);
 }
 
 TestEventConstructor* JSTestEventConstructor::toWrapped(JSC::JSValue value)

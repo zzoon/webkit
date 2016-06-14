@@ -39,8 +39,8 @@ enum IncludeBorderColorOrNot { DoNotIncludeBorderColor, IncludeBorderColor };
 
 class RenderTableCell final : public RenderBlockFlow {
 public:
-    RenderTableCell(Element&, Ref<RenderStyle>&&);
-    RenderTableCell(Document&, Ref<RenderStyle>&&);
+    RenderTableCell(Element&, RenderStyle&&);
+    RenderTableCell(Document&, RenderStyle&&);
     
     unsigned colSpan() const;
     unsigned rowSpan() const;
@@ -153,7 +153,7 @@ private:
     bool boxShadowShouldBeAppliedToBackground(const LayoutPoint& paintOffset, BackgroundBleedAvoidance, InlineFlowBox*) const override;
 
     LayoutSize offsetFromContainer(RenderElement&, const LayoutPoint&, bool* offsetDependsOnPoint = 0) const override;
-    LayoutRect computeRectForRepaint(const LayoutRect&, const RenderLayerModelObject* repaintContainer, bool fixed = false) const override;
+    LayoutRect computeRectForRepaint(const LayoutRect&, const RenderLayerModelObject* repaintContainer, RepaintContext = { }) const override;
 
     LayoutUnit borderHalfLeft(bool outer) const;
     LayoutUnit borderHalfRight(bool outer) const;

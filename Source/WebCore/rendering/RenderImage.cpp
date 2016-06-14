@@ -119,30 +119,20 @@ void RenderImage::collectSelectionRects(Vector<SelectionRect>& rects, unsigned, 
 
 using namespace HTMLNames;
 
-RenderImage::RenderImage(Element& element, Ref<RenderStyle>&& style, StyleImage* styleImage, const float imageDevicePixelRatio)
+RenderImage::RenderImage(Element& element, RenderStyle&& style, StyleImage* styleImage, const float imageDevicePixelRatio)
     : RenderReplaced(element, WTFMove(style), IntSize())
     , m_imageResource(styleImage ? std::make_unique<RenderImageResourceStyleImage>(*styleImage) : std::make_unique<RenderImageResource>())
-    , m_needsToSetSizeForAltText(false)
-    , m_didIncrementVisuallyNonEmptyPixelCount(false)
-    , m_isGeneratedContent(false)
-    , m_hasShadowControls(false)
     , m_imageDevicePixelRatio(imageDevicePixelRatio)
 {
     updateAltText();
     imageResource().initialize(this);
-
     if (is<HTMLImageElement>(element))
         m_hasShadowControls = downcast<HTMLImageElement>(element).hasShadowControls();
 }
 
-RenderImage::RenderImage(Document& document, Ref<RenderStyle>&& style, StyleImage* styleImage)
+RenderImage::RenderImage(Document& document, RenderStyle&& style, StyleImage* styleImage)
     : RenderReplaced(document, WTFMove(style), IntSize())
     , m_imageResource(styleImage ? std::make_unique<RenderImageResourceStyleImage>(*styleImage) : std::make_unique<RenderImageResource>())
-    , m_needsToSetSizeForAltText(false)
-    , m_didIncrementVisuallyNonEmptyPixelCount(false)
-    , m_isGeneratedContent(false)
-    , m_hasShadowControls(false)
-    , m_imageDevicePixelRatio(1.0f)
 {
     imageResource().initialize(this);
 }
@@ -235,7 +225,7 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
     if (documentBeingDestroyed() || document().inPageCache())
         return;
 
-    if (hasBoxDecorations() || hasMask() || hasShapeOutside())
+    if (hasVisibleBoxDecorations() || hasMask() || hasShapeOutside())
         RenderReplaced::imageChanged(newImage, rect);
 
     if (newImage != imageResource().imagePtr() || !newImage)
@@ -716,8 +706,8 @@ void RenderImage::layoutShadowControls(const LayoutSize& oldSize)
 
     if (shadowControlsNeedCustomLayoutMetrics()) {
         controlsRenderer->setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
-        controlsRenderer->style().setHeight(Length(newSize.height(), Fixed));
-        controlsRenderer->style().setWidth(Length(newSize.width(), Fixed));
+        controlsRenderer->mutableStyle().setHeight(Length(newSize.height(), Fixed));
+        controlsRenderer->mutableStyle().setWidth(Length(newSize.width(), Fixed));
     }
 
     controlsRenderer->setNeedsLayout(MarkOnlyThis);

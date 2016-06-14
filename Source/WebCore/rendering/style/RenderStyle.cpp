@@ -25,6 +25,7 @@
 
 #include "ContentData.h"
 #include "CSSCustomPropertyValue.h"
+#include "CSSParser.h"
 #include "CSSPropertyNames.h"
 #include "CSSVariableDependentValue.h"
 #include "CursorList.h"
@@ -68,7 +69,7 @@ struct SameSizeAsBorderValue {
 
 COMPILE_ASSERT(sizeof(BorderValue) == sizeof(SameSizeAsBorderValue), BorderValue_should_not_grow);
 
-struct SameSizeAsRenderStyle : public RefCounted<SameSizeAsRenderStyle> {
+struct SameSizeAsRenderStyle {
     void* dataRefs[7];
     void* ownPtrs[1];
     void* dataRefSvgStyle;
@@ -79,50 +80,58 @@ struct SameSizeAsRenderStyle : public RefCounted<SameSizeAsRenderStyle> {
     struct NonInheritedFlags {
         uint64_t m_flags;
     } noninherited_flags;
+#if !ASSERT_DISABLED
+    bool deletionCheck;
+#endif
 };
 
 COMPILE_ASSERT(sizeof(RenderStyle) == sizeof(SameSizeAsRenderStyle), RenderStyle_should_stay_small);
 
-inline RenderStyle& defaultStyle()
+RenderStyle& RenderStyle::defaultStyle()
 {
-    static RenderStyle& style = RenderStyle::createDefaultStyle().leakRef();
+    static RenderStyle& style = *new RenderStyle(CreateDefaultStyle);
     return style;
 }
 
-Ref<RenderStyle> RenderStyle::create()
+RenderStyle RenderStyle::create()
 {
-    return adoptRef(*new RenderStyle(defaultStyle()));
+    return clone(defaultStyle());
 }
 
-Ref<RenderStyle> RenderStyle::createDefaultStyle()
+std::unique_ptr<RenderStyle> RenderStyle::createPtr()
 {
-    return adoptRef(*new RenderStyle(true));
+    return clonePtr(defaultStyle());
 }
 
-Ref<RenderStyle> RenderStyle::createAnonymousStyleWithDisplay(const RenderStyle* parentStyle, EDisplay display)
+RenderStyle RenderStyle::clone(const RenderStyle& style)
 {
-    auto newStyle = RenderStyle::create();
-    newStyle.get().inheritFrom(parentStyle);
-    newStyle.get().inheritUnicodeBidiFrom(parentStyle);
-    newStyle.get().setDisplay(display);
+    return RenderStyle(style, Clone);
+}
+
+std::unique_ptr<RenderStyle> RenderStyle::clonePtr(const RenderStyle& style)
+{
+    return std::make_unique<RenderStyle>(style, Clone);
+}
+
+RenderStyle RenderStyle::createAnonymousStyleWithDisplay(const RenderStyle& parentStyle, EDisplay display)
+{
+    auto newStyle = create();
+    newStyle.inheritFrom(&parentStyle);
+    newStyle.inheritUnicodeBidiFrom(&parentStyle);
+    newStyle.setDisplay(display);
     return newStyle;
 }
 
-Ref<RenderStyle> RenderStyle::clone(const RenderStyle* other)
-{
-    return adoptRef(*new RenderStyle(*other));
-}
-
-Ref<RenderStyle> RenderStyle::createStyleInheritingFromPseudoStyle(const RenderStyle& pseudoStyle)
+RenderStyle RenderStyle::createStyleInheritingFromPseudoStyle(const RenderStyle& pseudoStyle)
 {
     ASSERT(pseudoStyle.styleType() == BEFORE || pseudoStyle.styleType() == AFTER);
 
-    auto style = RenderStyle::create();
-    style.get().inheritFrom(&pseudoStyle);
+    auto style = create();
+    style.inheritFrom(&pseudoStyle);
     return style;
 }
 
-ALWAYS_INLINE RenderStyle::RenderStyle(bool)
+RenderStyle::RenderStyle(CreateDefaultStyleTag)
     : m_box(StyleBoxData::create())
     , visual(StyleVisualData::create())
     , m_background(StyleBackgroundData::create())
@@ -159,55 +168,68 @@ ALWAYS_INLINE RenderStyle::RenderStyle(bool)
     static_assert((sizeof(NonInheritedFlags) <= 8), "NonInheritedFlags does not grow");
 }
 
-ALWAYS_INLINE RenderStyle::RenderStyle(const RenderStyle& o)
-    : RefCounted<RenderStyle>()
-    , m_box(o.m_box)
-    , visual(o.visual)
-    , m_background(o.m_background)
-    , surround(o.surround)
-    , rareNonInheritedData(o.rareNonInheritedData)
-    , rareInheritedData(o.rareInheritedData)
-    , inherited(o.inherited)
-    , m_svgStyle(o.m_svgStyle)
-    , inherited_flags(o.inherited_flags)
-    , noninherited_flags(o.noninherited_flags)
+RenderStyle::RenderStyle(const RenderStyle& other, CloneTag)
+    : m_box(other.m_box)
+    , visual(other.visual)
+    , m_background(other.m_background)
+    , surround(other.surround)
+    , rareNonInheritedData(other.rareNonInheritedData)
+    , rareInheritedData(other.rareInheritedData)
+    , inherited(other.inherited)
+    , m_svgStyle(other.m_svgStyle)
+    , inherited_flags(other.inherited_flags)
+    , noninherited_flags(other.noninherited_flags)
 {
 }
 
-static inline StyleSelfAlignmentData resolveAlignmentData(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForRenderer)
+RenderStyle::~RenderStyle()
 {
-    // The auto keyword computes to the parent's align-items computed value, or to "stretch", if not set or "auto".
-    if (childStyle.alignSelfPosition() == ItemPositionAuto)
-        return (parentStyle.alignItemsPosition() == ItemPositionAuto) ? StyleSelfAlignmentData(resolvedAutoPositionForRenderer, OverflowAlignmentDefault) : parentStyle.alignItems();
-    return childStyle.alignSelf();
+#if !ASSERT_DISABLED
+    ASSERT(!m_deletionHasBegun);
+    m_deletionHasBegun = true;
+#endif
 }
 
-static inline StyleSelfAlignmentData resolveJustificationData(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForRenderer)
+static StyleSelfAlignmentData resolvedSelfAlignment(const StyleSelfAlignmentData& value, ItemPosition normalValueBehavior)
 {
-    // The auto keyword computes to the parent's justify-items computed value, or to "stretch", if not set or "auto".
-    if (childStyle.justifySelfPosition() == ItemPositionAuto)
-        return (parentStyle.justifyItemsPosition() == ItemPositionAuto) ? StyleSelfAlignmentData(resolvedAutoPositionForRenderer, OverflowAlignmentDefault) : parentStyle.justifyItems();
-    return childStyle.justifySelf();
+    ASSERT(value.position() != ItemPositionAuto);
+    if (value.position() == ItemPositionNormal)
+        return { normalValueBehavior, OverflowAlignmentDefault };
+    return value;
 }
 
-ItemPosition RenderStyle::resolveAlignment(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForRenderer)
+StyleSelfAlignmentData RenderStyle::resolvedAlignItems(ItemPosition normalValueBehaviour) const
 {
-    return resolveAlignmentData(parentStyle, childStyle, resolvedAutoPositionForRenderer).position();
+    return resolvedSelfAlignment(alignItems(), normalValueBehaviour);
 }
 
-OverflowAlignment RenderStyle::resolveAlignmentOverflow(const RenderStyle& parentStyle, const RenderStyle& childStyle)
+StyleSelfAlignmentData RenderStyle::resolvedAlignSelf(const RenderStyle& parentStyle, ItemPosition normalValueBehaviour) const
 {
-    return resolveAlignmentData(parentStyle, childStyle, ItemPositionStretch).overflow();
+    // The auto keyword computes to the parent's align-items computed value.
+    // We will return the behaviour of 'normal' value if needed, which is specific of each layout model.
+    if (alignSelfPosition() == ItemPositionAuto)
+        return parentStyle.resolvedAlignItems(normalValueBehaviour);
+    return resolvedSelfAlignment(alignSelf(), normalValueBehaviour);
 }
 
-ItemPosition RenderStyle::resolveJustification(const RenderStyle& parentStyle, const RenderStyle& childStyle, ItemPosition resolvedAutoPositionForRenderer)
+StyleSelfAlignmentData RenderStyle::resolvedJustifyItems(ItemPosition normalValueBehaviour) const
 {
-    return resolveJustificationData(parentStyle, childStyle, resolvedAutoPositionForRenderer).position();
+    // FIXME: justify-items 'auto' value is allowed only to provide the 'legacy' keyword's behavior, which it's still not implemented for layout.
+    // "If the inherited value of justify-items includes the legacy keyword, auto computes to the inherited value."
+    // https://drafts.csswg.org/css-align/#justify-items-property
+    if (justifyItemsPosition() == ItemPositionAuto)
+        return { normalValueBehaviour, OverflowAlignmentDefault };
+
+    return resolvedSelfAlignment(justifyItems(), normalValueBehaviour);
 }
 
-OverflowAlignment RenderStyle::resolveJustificationOverflow(const RenderStyle& parentStyle, const RenderStyle& childStyle)
+StyleSelfAlignmentData RenderStyle::resolvedJustifySelf(const RenderStyle& parentStyle, ItemPosition normalValueBehaviour) const
 {
-    return resolveJustificationData(parentStyle, childStyle, ItemPositionStretch).overflow();
+    // The auto keyword computes to the parent's justify-items computed value.
+    // We will return the behaviour of 'normal' value if needed, which is specific of each layout model.
+    if (justifySelfPosition() == ItemPositionAuto)
+        return parentStyle.resolvedJustifyItems(normalValueBehaviour);
+    return resolvedSelfAlignment(justifySelf(), normalValueBehaviour);
 }
 
 static inline ContentPosition resolvedContentAlignmentPosition(const StyleContentAlignmentData& value, const StyleContentAlignmentData& normalValueBehavior)
@@ -287,11 +309,6 @@ bool RenderStyle::operator==(const RenderStyle& o) const
             ;
 }
 
-bool RenderStyle::isStyleAvailable() const
-{
-    return !Style::isPlaceholderStyle(*this);
-}
-
 bool RenderStyle::hasUniquePseudoStyle() const
 {
     if (!m_cachedPseudoStyles || styleType() != NOPSEUDO)
@@ -323,7 +340,7 @@ RenderStyle* RenderStyle::getCachedPseudoStyle(PseudoId pid) const
     return nullptr;
 }
 
-RenderStyle* RenderStyle::addCachedPseudoStyle(PassRefPtr<RenderStyle> pseudo)
+RenderStyle* RenderStyle::addCachedPseudoStyle(std::unique_ptr<RenderStyle> pseudo)
 {
     if (!pseudo)
         return nullptr;
@@ -335,7 +352,7 @@ RenderStyle* RenderStyle::addCachedPseudoStyle(PassRefPtr<RenderStyle> pseudo)
     if (!m_cachedPseudoStyles)
         m_cachedPseudoStyles = std::make_unique<PseudoStyleCache>();
 
-    m_cachedPseudoStyles->append(pseudo);
+    m_cachedPseudoStyles->append(WTFMove(pseudo));
 
     return result;
 }
@@ -394,26 +411,26 @@ unsigned RenderStyle::hashForTextAutosizing() const
     return hash;
 }
 
-bool RenderStyle::equalForTextAutosizing(const RenderStyle* other) const
+bool RenderStyle::equalForTextAutosizing(const RenderStyle& other) const
 {
-    return rareNonInheritedData->m_appearance == other->rareNonInheritedData->m_appearance
-        && rareNonInheritedData->marginBeforeCollapse == other->rareNonInheritedData->marginBeforeCollapse
-        && rareNonInheritedData->marginAfterCollapse == other->rareNonInheritedData->marginAfterCollapse
-        && rareNonInheritedData->lineClamp == other->rareNonInheritedData->lineClamp
-        && rareInheritedData->textSizeAdjust == other->rareInheritedData->textSizeAdjust
-        && rareInheritedData->overflowWrap == other->rareInheritedData->overflowWrap
-        && rareInheritedData->nbspMode == other->rareInheritedData->nbspMode
-        && rareInheritedData->lineBreak == other->rareInheritedData->lineBreak
-        && rareInheritedData->textSecurity == other->rareInheritedData->textSecurity
-        && inherited->specifiedLineHeight == other->inherited->specifiedLineHeight
-        && inherited->fontCascade.equalForTextAutoSizing(other->inherited->fontCascade)
-        && inherited->horizontal_border_spacing == other->inherited->horizontal_border_spacing
-        && inherited->vertical_border_spacing == other->inherited->vertical_border_spacing
-        && inherited_flags._box_direction == other->inherited_flags._box_direction
-        && inherited_flags.m_rtlOrdering == other->inherited_flags.m_rtlOrdering
-        && noninherited_flags.position() == other->noninherited_flags.position()
-        && noninherited_flags.floating() == other->noninherited_flags.floating()
-        && rareNonInheritedData->textOverflow == other->rareNonInheritedData->textOverflow;
+    return rareNonInheritedData->m_appearance == other.rareNonInheritedData->m_appearance
+        && rareNonInheritedData->marginBeforeCollapse == other.rareNonInheritedData->marginBeforeCollapse
+        && rareNonInheritedData->marginAfterCollapse == other.rareNonInheritedData->marginAfterCollapse
+        && rareNonInheritedData->lineClamp == other.rareNonInheritedData->lineClamp
+        && rareInheritedData->textSizeAdjust == other.rareInheritedData->textSizeAdjust
+        && rareInheritedData->overflowWrap == other.rareInheritedData->overflowWrap
+        && rareInheritedData->nbspMode == other.rareInheritedData->nbspMode
+        && rareInheritedData->lineBreak == other.rareInheritedData->lineBreak
+        && rareInheritedData->textSecurity == other.rareInheritedData->textSecurity
+        && inherited->specifiedLineHeight == other.inherited->specifiedLineHeight
+        && inherited->fontCascade.equalForTextAutoSizing(other.inherited->fontCascade)
+        && inherited->horizontal_border_spacing == other.inherited->horizontal_border_spacing
+        && inherited->vertical_border_spacing == other.inherited->vertical_border_spacing
+        && inherited_flags._box_direction == other.inherited_flags._box_direction
+        && inherited_flags.m_rtlOrdering == other.inherited_flags.m_rtlOrdering
+        && noninherited_flags.position() == other.noninherited_flags.position()
+        && noninherited_flags.floating() == other.noninherited_flags.floating()
+        && rareNonInheritedData->textOverflow == other.rareNonInheritedData->textOverflow;
 }
 
 #endif // ENABLE(IOS_TEXT_AUTOSIZING)
@@ -1060,6 +1077,12 @@ void RenderStyle::setContentAltText(const String& string)
 const String& RenderStyle::contentAltText() const
 {
     return rareNonInheritedData->m_altText;
+}
+
+void RenderStyle::setHasAttrContent()
+{
+    setUnique();
+    SET_VAR(rareNonInheritedData, m_hasAttrContent, true);
 }
 
 // FIXME: use affectedByTransformOrigin().
@@ -2015,28 +2038,23 @@ void RenderStyle::checkVariablesInCustomProperties()
     
     // Now insert invalid values.
     if (!invalidProperties.isEmpty()) {
-        RefPtr<CSSValue> invalidValue = CSSCustomPropertyValue::createInvalid();
+        auto invalidValue = CSSCustomPropertyValue::createInvalid();
         for (auto& property : invalidProperties)
-            customProperties.set(property, invalidValue);
+            customProperties.set(property, invalidValue.copyRef());
     }
 
     // Now that all of the properties have been tested for validity and replaced with
     // invalid values if they failed, we can perform variable substitution on the valid values.
-    Vector<RefPtr<CSSCustomPropertyValue>> resolvedValues;
+    Vector<Ref<CSSCustomPropertyValue>> resolvedValues;
     for (auto entry : customProperties) {
         if (!entry.value->isVariableDependentValue())
             continue;
         
         CSSParserValueList parserList;
-        RefPtr<CSSCustomPropertyValue> result;
-        if (!downcast<CSSVariableDependentValue>(*entry.value).valueList()->buildParserValueListSubstitutingVariables(&parserList, customProperties)) {
-            RefPtr<CSSValue> invalidResult = CSSCustomPropertyValue::createInvalid();
-            result = CSSCustomPropertyValue::create(entry.key, invalidResult);
-        } else {
-            RefPtr<CSSValue> newValueList = CSSValueList::createFromParserValueList(parserList);
-            result = CSSCustomPropertyValue::create(entry.key, newValueList);
-        }
-        resolvedValues.append(result);
+        if (!downcast<CSSVariableDependentValue>(*entry.value).valueList().buildParserValueListSubstitutingVariables(&parserList, customProperties))
+            resolvedValues.append(CSSCustomPropertyValue::create(entry.key, CSSCustomPropertyValue::createInvalid()));
+        else
+            resolvedValues.append(CSSCustomPropertyValue::create(entry.key, CSSValueList::createFromParserValueList(parserList)));
     }
     
     // With all results computed, we can now mutate our table to eliminate the variables and
@@ -2067,13 +2085,7 @@ float RenderStyle::outlineOffset() const
 
 bool RenderStyle::shouldPlaceBlockDirectionScrollbarOnLeft() const
 {
-#if PLATFORM(MAC)
-    return ScrollableArea::systemLanguageIsRTL();
-#elif USE(RTL_SCROLLBAR)
     return !isLeftToRightDirection() && isHorizontalWritingMode();
-#else
-    return false;
-#endif
 }
 
 } // namespace WebCore

@@ -405,7 +405,7 @@ ScrollPosition ScrollView::adjustScrollPositionWithinRange(const ScrollPosition&
 ScrollPosition ScrollView::documentScrollPositionRelativeToViewOrigin() const
 {
     return scrollPosition() - IntSize(
-        verticalScrollbarIsOnLeft() && m_verticalScrollbar ? m_verticalScrollbar->occupiedWidth() : 0,
+        shouldPlaceBlockDirectionScrollbarOnLeft() && m_verticalScrollbar ? m_verticalScrollbar->occupiedWidth() : 0,
         headerHeight() + topContentInset(TopContentInsetType::WebCoreOrPlatformContentInset));
 }
 
@@ -448,7 +448,7 @@ void ScrollView::scrollOffsetChangedViaPlatformWidget(const ScrollOffset& oldOff
     // is not complete. Instead, defer the scroll event until the layout finishes.
     if (shouldDeferScrollUpdateAfterContentSizeChange()) {
         // We only care about the most recent scroll position change request
-        m_deferredScrollOffsets = std::make_unique<std::pair<ScrollOffset, ScrollOffset>>(std::make_pair(oldOffset, newOffset));
+        m_deferredScrollOffsets = std::make_pair(oldOffset, newOffset);
         return;
     }
 
@@ -465,12 +465,12 @@ void ScrollView::handleDeferredScrollUpdateAfterContentSizeChange()
     ASSERT(static_cast<bool>(m_deferredScrollDelta) != static_cast<bool>(m_deferredScrollOffsets));
 
     if (m_deferredScrollDelta)
-        completeUpdatesAfterScrollTo(*m_deferredScrollDelta);
+        completeUpdatesAfterScrollTo(m_deferredScrollDelta.value());
     else if (m_deferredScrollOffsets)
-        scrollOffsetChangedViaPlatformWidgetImpl(m_deferredScrollOffsets->first, m_deferredScrollOffsets->second);
+        scrollOffsetChangedViaPlatformWidgetImpl(m_deferredScrollOffsets.value().first, m_deferredScrollOffsets.value().second);
     
-    m_deferredScrollDelta = nullptr;
-    m_deferredScrollOffsets = nullptr;
+    m_deferredScrollDelta = Nullopt;
+    m_deferredScrollOffsets = Nullopt;
 }
 
 void ScrollView::scrollTo(const ScrollPosition& newPosition)
@@ -496,7 +496,7 @@ void ScrollView::scrollTo(const ScrollPosition& newPosition)
     // is not complete. Instead, defer the scroll event until the layout finishes.
     if (shouldDeferScrollUpdateAfterContentSizeChange()) {
         ASSERT(!m_deferredScrollDelta);
-        m_deferredScrollDelta = std::make_unique<IntSize>(scrollDelta);
+        m_deferredScrollDelta = scrollDelta;
         return;
     }
 
@@ -719,7 +719,7 @@ void ScrollView::updateScrollbars(const ScrollPosition& desiredPosition)
         int clientWidth = visibleWidth();
         int pageStep = Scrollbar::pageStep(clientWidth);
         IntRect oldRect(m_horizontalScrollbar->frameRect());
-        IntRect hBarRect(verticalScrollbarIsOnLeft() && m_verticalScrollbar ? m_verticalScrollbar->occupiedWidth() : 0,
+        IntRect hBarRect(shouldPlaceBlockDirectionScrollbarOnLeft() && m_verticalScrollbar ? m_verticalScrollbar->occupiedWidth() : 0,
             height() - m_horizontalScrollbar->height(),
             width() - (m_verticalScrollbar ? m_verticalScrollbar->occupiedWidth() : 0),
             m_horizontalScrollbar->height());
@@ -740,7 +740,7 @@ void ScrollView::updateScrollbars(const ScrollPosition& desiredPosition)
         int clientHeight = visibleHeight();
         int pageStep = Scrollbar::pageStep(clientHeight);
         IntRect oldRect(m_verticalScrollbar->frameRect());
-        IntRect vBarRect(verticalScrollbarIsOnLeft() ? 0 : width() - m_verticalScrollbar->width(),
+        IntRect vBarRect(shouldPlaceBlockDirectionScrollbarOnLeft() ? 0 : width() - m_verticalScrollbar->width(),
             topContentInset(),
             m_verticalScrollbar->width(),
             height() - topContentInset() - (m_horizontalScrollbar ? m_horizontalScrollbar->occupiedHeight() : 0));
@@ -1034,7 +1034,7 @@ void ScrollView::setScrollbarOverlayStyle(ScrollbarOverlayStyle overlayStyle)
 
 void ScrollView::setFrameRect(const IntRect& newRect)
 {
-    Ref<ScrollView> protect(*this);
+    Ref<ScrollView> protectedThis(*this);
     IntRect oldRect = frameRect();
     
     if (newRect == oldRect)
@@ -1134,14 +1134,14 @@ IntRect ScrollView::scrollCornerRect() const
     int heightTrackedByScrollbar = height() - topContentInset();
 
     if (m_horizontalScrollbar && width() - m_horizontalScrollbar->width() > 0) {
-        cornerRect.unite(IntRect(verticalScrollbarIsOnLeft() ? 0 : m_horizontalScrollbar->width(),
+        cornerRect.unite(IntRect(shouldPlaceBlockDirectionScrollbarOnLeft() ? 0 : m_horizontalScrollbar->width(),
             height() - m_horizontalScrollbar->height(),
             width() - m_horizontalScrollbar->width(),
             m_horizontalScrollbar->height()));
     }
 
     if (m_verticalScrollbar && heightTrackedByScrollbar - m_verticalScrollbar->height() > 0) {
-        cornerRect.unite(IntRect(verticalScrollbarIsOnLeft() ? 0 : width() - m_verticalScrollbar->width(),
+        cornerRect.unite(IntRect(shouldPlaceBlockDirectionScrollbarOnLeft() ? 0 : width() - m_verticalScrollbar->width(),
             m_verticalScrollbar->height() + topContentInset(),
             m_verticalScrollbar->width(),
             heightTrackedByScrollbar - m_verticalScrollbar->height()));
@@ -1502,7 +1502,7 @@ void ScrollView::styleDidChange()
 IntPoint ScrollView::locationOfContents() const
 {
     IntPoint result = location();
-    if (verticalScrollbarIsOnLeft() && m_verticalScrollbar)
+    if (shouldPlaceBlockDirectionScrollbarOnLeft() && m_verticalScrollbar)
         result.move(m_verticalScrollbar->occupiedWidth(), 0);
     return result;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2007-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Joone Hur <joone@kldp.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,6 +30,7 @@
 #include "config.h"
 #include "TestRunner.h"
 
+#include "WebCoreTestSupport.h"
 #include "WorkQueue.h"
 #include "WorkQueueItem.h"
 #include <JavaScriptCore/APICast.h>
@@ -37,6 +38,7 @@
 #include <JavaScriptCore/JSCTestRunnerUtils.h>
 #include <JavaScriptCore/JSObjectRef.h>
 #include <JavaScriptCore/JSRetainPtr.h>
+#include <WebCore/Logging.h>
 #include <cstring>
 #include <locale.h>
 #include <runtime/ArrayBufferView.h>
@@ -45,9 +47,11 @@
 #include <stdio.h>
 #include <wtf/Assertions.h>
 #include <wtf/CurrentTime.h>
+#include <wtf/LoggingAccumulator.h>
 #include <wtf/MathExtras.h>
 #include <wtf/RefPtr.h>
 #include <wtf/StdLibExtras.h>
+#include <wtf/text/WTFString.h>
 
 #if PLATFORM(MAC) && !PLATFORM(IOS)
 #include <Carbon/Carbon.h>
@@ -1179,6 +1183,15 @@ static JSValueRef setPrintingCallback(JSContextRef context, JSObjectRef function
     return JSValueMakeUndefined(context);
 }
 
+static JSValueRef setAllowsAnySSLCertificateCallback(JSContextRef context, JSObjectRef, JSObjectRef, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    bool allowAnyCertificate = false;
+    if (argumentCount == 1)
+        allowAnyCertificate = JSValueToBoolean(context, arguments[0]);
+    
+    TestRunner::setAllowsAnySSLCertificate(allowAnyCertificate);
+    return JSValueMakeUndefined(context);
+}
 
 static JSValueRef setAllowUniversalAccessFromFileURLsCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
@@ -1236,19 +1249,6 @@ static JSValueRef setPagePausedCallback(JSContextRef context, JSObjectRef functi
     TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
     controller->setPagePaused(JSValueToBoolean(context, arguments[0]));
 
-    return JSValueMakeUndefined(context);
-}
-#endif
-
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-static JSValueRef setTextAutosizingEnabledCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    if (argumentCount < 1)
-        return JSValueMakeUndefined(context);
-    
-    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
-    controller->setTextAutosizingEnabled(JSValueToBoolean(context, arguments[0]));
-    
     return JSValueMakeUndefined(context);
 }
 #endif
@@ -1756,6 +1756,14 @@ static JSValueRef preciseTimeCallback(JSContextRef context, JSObjectRef, JSObjec
     return JSValueMakeNumber(context, WTF::currentTime());
 }
 
+static JSValueRef imageCountInGeneralPasteboardCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    // Has mac & windows implementation
+    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
+    
+    return JSValueMakeNumber(context, controller->imageCountInGeneralPasteboard());
+}
+
 // Static Values
 
 static JSValueRef getTimeoutCallback(JSContextRef context, JSObjectRef thisObject, JSStringRef propertyName, JSValueRef* exception)
@@ -1968,6 +1976,20 @@ static JSValueRef neverInlineFunction(JSContextRef context, JSObjectRef function
     return JSC::setNeverInline(context, arguments[0]);
 }
 
+static JSValueRef accummulateLogsForChannel(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    if (argumentCount < 1)
+        return JSValueMakeUndefined(context);
+
+    JSRetainPtr<JSStringRef> channel(Adopt, JSValueToStringCopy(context, arguments[0], exception));
+    ASSERT(!*exception);
+
+    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
+    controller->setAccummulateLogsForChannel(channel.get());
+
+    return JSValueMakeUndefined(context);
+}
+
 static void testRunnerObjectFinalize(JSObjectRef object)
 {
     TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(object));
@@ -2088,6 +2110,7 @@ JSStaticFunction* TestRunner::staticFunctions()
         { "setAcceptsEditing", setAcceptsEditingCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setAllowUniversalAccessFromFileURLs", setAllowUniversalAccessFromFileURLsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setAllowFileAccessFromFileURLs", setAllowFileAccessFromFileURLsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "setAllowsAnySSLCertificate", setAllowsAnySSLCertificateCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setAlwaysAcceptCookies", setAlwaysAcceptCookiesCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setAppCacheMaximumSize", setAppCacheMaximumSizeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setAudioResult", setAudioResultCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -2127,9 +2150,6 @@ JSStaticFunction* TestRunner::staticFunctions()
 #if PLATFORM(IOS)
         { "setTelephoneNumberParsingEnabled", setTelephoneNumberParsingEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setPagePaused", setPagePausedCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-#endif
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-        { "setTextAutosizingEnabled", setTextAutosizingEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
 #endif
         { "setUseDashboardCompatibilityMode", setUseDashboardCompatibilityModeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setUserStyleSheetEnabled", setUserStyleSheetEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -2172,6 +2192,8 @@ JSStaticFunction* TestRunner::staticFunctions()
         { "failNextNewCodeBlock", failNextNewCodeBlock, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "numberOfDFGCompiles", numberOfDFGCompiles, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "neverInlineFunction", neverInlineFunction, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "accummulateLogsForChannel", accummulateLogsForChannel, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "imageCountInGeneralPasteboard", imageCountInGeneralPasteboardCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { 0, 0, 0 }
     };
 
@@ -2222,6 +2244,13 @@ void TestRunner::waitToDumpWatchdogTimerFired()
 {
     const char* message = "FAIL: Timed out waiting for notifyDone to be called\n";
     fprintf(stdout, "%s", message);
+
+    auto accumulatedLogs = getAndResetAccumulatedLogs();
+    if (!accumulatedLogs.isEmpty()) {
+        const char* message = "Logs accumulated during test run:\n";
+        fprintf(stdout, "%s%s\n", message, accumulatedLogs.utf8().data());
+    }
+
     notifyDone();
 }
 
@@ -2251,4 +2280,18 @@ const std::string& TestRunner::redirectionDestinationForURL(std::string origin)
 void TestRunner::setShouldPaintBrokenImage(bool shouldPaintBrokenImage)
 {
     m_shouldPaintBrokenImage = shouldPaintBrokenImage;
+}
+
+void TestRunner::setAccummulateLogsForChannel(JSStringRef channel)
+{
+    size_t maxLength = JSStringGetMaximumUTF8CStringSize(channel);
+    auto buffer = std::make_unique<char[]>(maxLength + 1);
+    JSStringGetUTF8CString(channel, buffer.get(), maxLength + 1);
+
+    WebCoreTestSupport::setLogChannelToAccumulate({ buffer.get() });
+}
+
+void TestRunner::setAllowsAnySSLCertificate(bool allowsAnySSLCertificate)
+{
+    WebCoreTestSupport::setAllowsAnySSLCertificate(allowsAnySSLCertificate);
 }

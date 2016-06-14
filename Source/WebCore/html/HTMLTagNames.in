@@ -33,7 +33,6 @@ code interfaceName=HTMLElement
 col interfaceName=HTMLTableColElement
 colgroup interfaceName=HTMLTableColElement
 command interfaceName=HTMLElement
-webkitShadowContent interfaceName=HTMLElement, noConstructor
 data
 datalist interfaceName=HTMLDataListElement, conditional=DATALIST_ELEMENT
 dd interfaceName=HTMLElement
@@ -127,7 +126,7 @@ sup interfaceName=HTMLElement
 table
 tbody interfaceName=HTMLTableSectionElement
 td interfaceName=HTMLTableDataCellElement
-template conditional=TEMPLATE_ELEMENT
+template
 textarea interfaceName=HTMLTextAreaElement, constructorNeedsFormElement
 tfoot interfaceName=HTMLTableSectionElement
 th interfaceName=HTMLTableHeaderCellElement

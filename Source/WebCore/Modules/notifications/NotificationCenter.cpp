@@ -38,6 +38,7 @@
 #include "Notification.h"
 #include "ScriptExecutionContext.h"
 #include "SecurityOrigin.h"
+#include "VoidCallback.h"
 
 namespace WebCore {
 
@@ -63,7 +64,7 @@ RefPtr<Notification> NotificationCenter::createNotification(const String& iconUR
         ec = INVALID_STATE_ERR;
         return nullptr;
     }
-    return Notification::create(title, body, iconURI, *scriptExecutionContext(), ec, this);
+    return Notification::create(title, body, iconURI, *scriptExecutionContext(), ec, *this);
 }
 
 int NotificationCenter::checkPermission()
@@ -120,7 +121,7 @@ void NotificationCenter::stop()
     // Clear m_client immediately to guarantee reentrant calls to NotificationCenter do nothing.
     // Also protect |this| so it's not indirectly destroyed under us by work done by the client.
     auto& client = *std::exchange(m_client, nullptr);
-    Ref<NotificationCenter> protector(*this);
+    Ref<NotificationCenter> protectedThis(*this);
 
     if (!m_callbacks.isEmpty())
         deref(); // Balanced by the ref in NotificationCenter::requestPermission.

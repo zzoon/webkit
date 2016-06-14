@@ -23,8 +23,7 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebIDBConnectionToClient_h
-#define WebIDBConnectionToClient_h
+#pragma once
 
 #if ENABLE(INDEXED_DATABASE)
 
@@ -42,6 +41,7 @@ class IDBTransactionInfo;
 class IDBValue;
 class SerializedScriptValue;
 struct IDBKeyRangeData;
+struct SecurityOriginData;
 }
 
 namespace WebKit {
@@ -75,7 +75,10 @@ public:
 
     void fireVersionChangeEvent(WebCore::IDBServer::UniqueIDBDatabaseConnection&, const WebCore::IDBResourceIdentifier& requestIdentifier, uint64_t requestedVersion) final;
     void didStartTransaction(const WebCore::IDBResourceIdentifier& transactionIdentifier, const WebCore::IDBError&) final;
+    void didCloseFromServer(WebCore::IDBServer::UniqueIDBDatabaseConnection&, const WebCore::IDBError&) final;
     void notifyOpenDBRequestBlocked(const WebCore::IDBResourceIdentifier& requestIdentifier, uint64_t oldVersion, uint64_t newVersion) final;
+
+    void didGetAllDatabaseNames(uint64_t callbackID, const Vector<String>& databaseNames) final;
 
     void ref() override { RefCounted<WebIDBConnectionToClient>::ref(); }
     void deref() override { RefCounted<WebIDBConnectionToClient>::deref(); }
@@ -85,7 +88,7 @@ public:
     void openDatabase(const WebCore::IDBRequestData&);
     void abortTransaction(const WebCore::IDBResourceIdentifier&);
     void commitTransaction(const WebCore::IDBResourceIdentifier&);
-    void didFinishHandlingVersionChangeTransaction(const WebCore::IDBResourceIdentifier&);
+    void didFinishHandlingVersionChangeTransaction(uint64_t databaseConnectionIdentifier, const WebCore::IDBResourceIdentifier&);
     void createObjectStore(const WebCore::IDBRequestData&, const WebCore::IDBObjectStoreInfo&);
     void deleteObjectStore(const WebCore::IDBRequestData&, const String& objectStoreName);
     void clearObjectStore(const WebCore::IDBRequestData&, uint64_t objectStoreIdentifier);
@@ -102,6 +105,10 @@ public:
     void databaseConnectionClosed(uint64_t databaseConnectionIdentifier);
     void abortOpenAndUpgradeNeeded(uint64_t databaseConnectionIdentifier, const WebCore::IDBResourceIdentifier& transactionIdentifier);
     void didFireVersionChangeEvent(uint64_t databaseConnectionIdentifier, const WebCore::IDBResourceIdentifier& requestIdentifier);
+    void openDBRequestCancelled(const WebCore::IDBRequestData&);
+    void confirmDidCloseFromServer(uint64_t databaseConnectionIdentifier);
+
+    void getAllDatabaseNames(uint64_t serverConnectionIdentifier, const WebCore::SecurityOriginData& topOrigin, const WebCore::SecurityOriginData& openingOrigin, uint64_t callbackID);
 
     void disconnectedFromWebProcess();
 
@@ -121,4 +128,3 @@ private:
 } // namespace WebKit
 
 #endif // ENABLE(INDEXED_DATABASE)
-#endif // WebIDBConnectionToClient_h

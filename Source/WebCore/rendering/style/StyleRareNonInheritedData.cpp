@@ -75,7 +75,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_flowThread(RenderStyle::initialFlowThread())
     , m_regionThread(RenderStyle::initialRegionThread())
     , m_alignContent(RenderStyle::initialContentAlignment())
-    , m_alignItems(RenderStyle::initialSelfAlignment())
+    , m_alignItems(RenderStyle::initialDefaultAlignment())
     , m_alignSelf(RenderStyle::initialSelfAlignment())
     , m_justifyContent(RenderStyle::initialContentAlignment())
     , m_justifyItems(RenderStyle::initialSelfAlignment())
@@ -109,6 +109,8 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_breakAfter(RenderStyle::initialBreakBetween())
     , m_breakInside(RenderStyle::initialBreakInside())
     , m_resize(RenderStyle::initialResize())
+    , m_hasAttrContent(false)
+    , m_isPlaceholderStyle(false)
 {
     m_maskBoxImage.setMaskDefaults();
 }
@@ -203,6 +205,8 @@ inline StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonIn
     , m_breakAfter(o.m_breakAfter)
     , m_breakInside(o.m_breakInside)
     , m_resize(o.m_resize)
+    , m_hasAttrContent(o.m_hasAttrContent)
+    , m_isPlaceholderStyle(o.m_isPlaceholderStyle)
 {
 }
 
@@ -307,7 +311,9 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_breakAfter == o.m_breakAfter
         && m_breakBefore == o.m_breakBefore
         && m_breakInside == o.m_breakInside
-        && m_resize == o.m_resize;
+        && m_resize == o.m_resize
+        && m_hasAttrContent == o.m_hasAttrContent
+        && m_isPlaceholderStyle == o.m_isPlaceholderStyle;
 }
 
 bool StyleRareNonInheritedData::contentDataEquivalent(const StyleRareNonInheritedData& o) const

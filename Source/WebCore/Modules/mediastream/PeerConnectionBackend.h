@@ -48,22 +48,22 @@ class RTCIceCandidate;
 class RTCOfferOptions;
 class RTCRtpReceiver;
 class RTCRtpSender;
+class RTCRtpTransceiver;
 class RTCSessionDescription;
 class RTCStatsResponse;
 class ScriptExecutionContext;
 
 namespace PeerConnection {
-typedef DOMPromise<RefPtr<RTCSessionDescription>, RefPtr<DOMError>> SessionDescriptionPromise;
-typedef DOMPromise<std::nullptr_t, RefPtr<DOMError>> VoidPromise;
-typedef DOMPromise<RefPtr<RTCStatsResponse>, RefPtr<DOMError>> StatsPromise;
+typedef DOMPromise<RTCSessionDescription> SessionDescriptionPromise;
+typedef DOMPromise<std::nullptr_t> VoidPromise;
+typedef DOMPromise<RTCStatsResponse> StatsPromise;
 }
 
 class PeerConnectionBackendClient {
 public:
-    virtual Vector<RefPtr<RTCRtpSender>> getSenders() const = 0;
+    virtual const Vector<RefPtr<RTCRtpTransceiver>>& getTransceivers() const = 0;
     virtual void fireEvent(Event&) = 0;
 
-    virtual void addReceiver(RTCRtpReceiver&) = 0;
     virtual void setSignalingState(PeerConnectionStates::SignalingState) = 0;
     virtual void updateIceGatheringState(PeerConnectionStates::IceGatheringState) = 0;
     virtual void updateIceConnectionState(PeerConnectionStates::IceConnectionState) = 0;
@@ -103,6 +103,7 @@ public:
 
     virtual void getStats(MediaStreamTrack*, PeerConnection::StatsPromise&&) = 0;
 
+    virtual RefPtr<RTCRtpReceiver> createReceiver(const String& transceiverMid, const String& trackKind, const String& trackId) = 0;
     virtual void replaceTrack(RTCRtpSender&, MediaStreamTrack&, PeerConnection::VoidPromise&&) = 0;
 
     virtual void stop() = 0;

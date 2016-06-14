@@ -158,7 +158,7 @@ HTMLInputElement::~HTMLInputElement()
     // setForm(0) may register this to a document-level radio button group.
     // We should unregister it to avoid accessing a deleted object.
     if (isRadioButton())
-        document().formController().checkedRadioButtons().removeButton(this);
+        document().formController().radioButtonGroups().removeButton(this);
 #if ENABLE(TOUCH_EVENTS)
     if (m_hasTouchEventHandler)
         document().didRemoveEventTargetNode(*this);
@@ -760,7 +760,7 @@ bool HTMLInputElement::rendererIsNeeded(const RenderStyle& style)
     return m_inputType->rendererIsNeeded() && HTMLTextFormControlElement::rendererIsNeeded(style);
 }
 
-RenderPtr<RenderElement> HTMLInputElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> HTMLInputElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
     return m_inputType->createInputRenderer(WTFMove(style));
 }
@@ -854,7 +854,7 @@ void HTMLInputElement::setChecked(bool nowChecked, TextFieldEventBehavior eventB
     m_isChecked = nowChecked;
     setNeedsStyleRecalc();
 
-    if (CheckedRadioButtons* buttons = checkedRadioButtons())
+    if (RadioButtonGroups* buttons = radioButtonGroups())
             buttons->updateCheckedState(this);
     if (renderer() && renderer()->style().hasAppearance())
         renderer()->theme().stateChanged(*renderer(), ControlStates::CheckedState);
@@ -989,7 +989,7 @@ void HTMLInputElement::setValue(const String& value, TextFieldEventBehavior even
     if (!m_inputType->canSetValue(value))
         return;
 
-    Ref<HTMLInputElement> protect(*this);
+    Ref<HTMLInputElement> protectedThis(*this);
     EventQueueScope scope;
     String sanitizedValue = sanitizeValue(value);
     bool valueChanged = sanitizedValue != this->value();
@@ -1495,7 +1495,7 @@ void HTMLInputElement::didMoveToNewDocument(Document* oldDocument)
         if (needsSuspensionCallback)
             oldDocument->unregisterForDocumentSuspensionCallbacks(this);
         if (isRadioButton())
-            oldDocument->formController().checkedRadioButtons().removeButton(this);
+            oldDocument->formController().radioButtonGroups().removeButton(this);
 #if ENABLE(TOUCH_EVENTS)
         if (m_hasTouchEventHandler)
             oldDocument->didRemoveEventTargetNode(*this);
@@ -1528,7 +1528,7 @@ bool HTMLInputElement::computeWillValidate() const
 void HTMLInputElement::requiredAttributeChanged()
 {
     HTMLTextFormControlElement::requiredAttributeChanged();
-    if (CheckedRadioButtons* buttons = checkedRadioButtons())
+    if (RadioButtonGroups* buttons = radioButtonGroups())
         buttons->requiredAttributeChanged(this);
     m_inputType->requiredAttributeChanged();
 }
@@ -1772,14 +1772,14 @@ bool HTMLInputElement::shouldUseMediaCapture() const
 bool HTMLInputElement::isInRequiredRadioButtonGroup()
 {
     ASSERT(isRadioButton());
-    if (CheckedRadioButtons* buttons = checkedRadioButtons())
+    if (RadioButtonGroups* buttons = radioButtonGroups())
         return buttons->isInRequiredGroup(this);
     return false;
 }
 
 Vector<HTMLInputElement*> HTMLInputElement::radioButtonGroup() const
 {
-    CheckedRadioButtons* buttons = checkedRadioButtons();
+    RadioButtonGroups* buttons = radioButtonGroups();
     if (!buttons)
         return { };
     return buttons->groupMembers(*this);
@@ -1787,31 +1787,31 @@ Vector<HTMLInputElement*> HTMLInputElement::radioButtonGroup() const
     
 HTMLInputElement* HTMLInputElement::checkedRadioButtonForGroup() const
 {
-    if (CheckedRadioButtons* buttons = checkedRadioButtons())
+    if (RadioButtonGroups* buttons = radioButtonGroups())
         return buttons->checkedButtonForGroup(name());
     return 0;
 }
 
-CheckedRadioButtons* HTMLInputElement::checkedRadioButtons() const
+RadioButtonGroups* HTMLInputElement::radioButtonGroups() const
 {
     if (!isRadioButton())
         return 0;
     if (HTMLFormElement* formElement = form())
-        return &formElement->checkedRadioButtons();
+        return &formElement->radioButtonGroups();
     if (inDocument())
-        return &document().formController().checkedRadioButtons();
+        return &document().formController().radioButtonGroups();
     return 0;
 }
 
 inline void HTMLInputElement::addToRadioButtonGroup()
 {
-    if (CheckedRadioButtons* buttons = checkedRadioButtons())
+    if (RadioButtonGroups* buttons = radioButtonGroups())
         buttons->addButton(this);
 }
 
 inline void HTMLInputElement::removeFromRadioButtonGroup()
 {
-    if (CheckedRadioButtons* buttons = checkedRadioButtons())
+    if (RadioButtonGroups* buttons = radioButtonGroups())
         buttons->removeButton(this);
 }
 
@@ -1875,23 +1875,23 @@ bool HTMLInputElement::shouldTruncateText(const RenderStyle& style) const
     return document().focusedElement() != this && style.textOverflow() == TextOverflowEllipsis;
 }
 
-Ref<RenderStyle> HTMLInputElement::createInnerTextStyle(const RenderStyle& style) const
+RenderStyle HTMLInputElement::createInnerTextStyle(const RenderStyle& style) const
 {
     auto textBlockStyle = RenderStyle::create();
-    textBlockStyle.get().inheritFrom(&style);
-    adjustInnerTextStyle(style, textBlockStyle.get());
+    textBlockStyle.inheritFrom(&style);
+    adjustInnerTextStyle(style, textBlockStyle);
 
-    textBlockStyle.get().setWhiteSpace(PRE);
-    textBlockStyle.get().setOverflowWrap(NormalOverflowWrap);
-    textBlockStyle.get().setOverflowX(OHIDDEN);
-    textBlockStyle.get().setOverflowY(OHIDDEN);
-    textBlockStyle.get().setTextOverflow(shouldTruncateText(style) ? TextOverflowEllipsis : TextOverflowClip);
+    textBlockStyle.setWhiteSpace(PRE);
+    textBlockStyle.setOverflowWrap(NormalOverflowWrap);
+    textBlockStyle.setOverflowX(OHIDDEN);
+    textBlockStyle.setOverflowY(OHIDDEN);
+    textBlockStyle.setTextOverflow(shouldTruncateText(style) ? TextOverflowEllipsis : TextOverflowClip);
 
     // Do not allow line-height to be smaller than our default.
-    if (textBlockStyle.get().fontMetrics().lineSpacing() > style.computedLineHeight())
-        textBlockStyle.get().setLineHeight(RenderStyle::initialLineHeight());
+    if (textBlockStyle.fontMetrics().lineSpacing() > style.computedLineHeight())
+        textBlockStyle.setLineHeight(RenderStyle::initialLineHeight());
 
-    textBlockStyle.get().setDisplay(BLOCK);
+    textBlockStyle.setDisplay(BLOCK);
 
     return textBlockStyle;
 }

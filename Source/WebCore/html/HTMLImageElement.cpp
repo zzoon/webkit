@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Google Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -153,27 +153,31 @@ ImageCandidate HTMLImageElement::bestFitSourceFromPictureElement()
         if (!is<HTMLSourceElement>(*child))
             continue;
         auto& source = downcast<HTMLSourceElement>(*child);
+
         auto& srcset = source.fastGetAttribute(srcsetAttr);
         if (srcset.isEmpty())
             continue;
-        if (source.hasAttribute(typeAttr)) {
-            String type = source.fastGetAttribute(typeAttr).string();
-            int indexOfSemicolon = type.find(';');
-            if (indexOfSemicolon >= 0)
-                type.truncate(indexOfSemicolon);
+
+        auto& typeAttribute = source.fastGetAttribute(typeAttr);
+        if (!typeAttribute.isNull()) {
+            String type = typeAttribute.string();
+            type.truncate(type.find(';'));
             type = stripLeadingAndTrailingHTMLSpaces(type);
             if (!type.isEmpty() && !MIMETypeRegistry::isSupportedImageMIMEType(type) && !equalLettersIgnoringASCIICase(type, "image/svg+xml"))
                 continue;
         }
-        MediaQueryEvaluator evaluator(document().printing() ? "print" : "screen", document().frame(), document().documentElement() ? document().documentElement()->computedStyle() : nullptr);
-        bool evaluation = evaluator.evalCheckingViewportDependentResults(source.mediaQuerySet(), picture->viewportDependentResults());
+
+        auto* documentElement = document().documentElement();
+        MediaQueryEvaluator evaluator { document().printing() ? "print" : "screen", document(), documentElement ? documentElement->computedStyle() : nullptr };
+        auto* queries = source.mediaQuerySet();
+        auto evaluation = !queries || evaluator.evaluate(*queries, picture->viewportDependentResults());
         if (picture->hasViewportDependentResults())
             document().addViewportDependentPicture(*picture);
         if (!evaluation)
             continue;
 
-        float sourceSize = parseSizesAttribute(source.fastGetAttribute(sizesAttr).string(), document().renderView(), document().frame());
-        ImageCandidate candidate = bestFitSourceForImageAttributes(document().deviceScaleFactor(), nullAtom, source.fastGetAttribute(srcsetAttr), sourceSize);
+        auto sourceSize = parseSizesAttribute(document(), source.fastGetAttribute(sizesAttr).string());
+        auto candidate = bestFitSourceForImageAttributes(document().deviceScaleFactor(), nullAtom, srcset, sourceSize);
         if (!candidate.isEmpty())
             return candidate;
     }
@@ -186,7 +190,7 @@ void HTMLImageElement::selectImageSource()
     ImageCandidate candidate = bestFitSourceFromPictureElement();
     if (candidate.isEmpty()) {
         // If we don't have a <picture> or didn't find a source, then we use our own attributes.
-        float sourceSize = parseSizesAttribute(fastGetAttribute(sizesAttr).string(), document().renderView(), document().frame());
+        float sourceSize = parseSizesAttribute(document(), fastGetAttribute(sizesAttr).string());
         candidate = bestFitSourceForImageAttributes(document().deviceScaleFactor(), fastGetAttribute(srcAttr), fastGetAttribute(srcsetAttr), sourceSize);
     }
     setBestFitURLAndDPRFromImageCandidate(candidate);
@@ -256,9 +260,9 @@ const AtomicString& HTMLImageElement::altText() const
     return fastGetAttribute(titleAttr);
 }
 
-RenderPtr<RenderElement> HTMLImageElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> HTMLImageElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
-    if (style.get().hasContent())
+    if (style.hasContent())
         return RenderElement::createFor(*this, WTFMove(style));
 
     return createRenderer<RenderImage>(*this, WTFMove(style), nullptr, m_imageDevicePixelRatio);
@@ -542,7 +546,7 @@ void HTMLImageElement::addSubresourceAttributeURLs(ListHashSet<URL>& urls) const
 {
     HTMLElement::addSubresourceAttributeURLs(urls);
 
-    addSubresourceURL(urls, src());
+    addSubresourceURL(urls, document().completeURL(imageSourceURL()));
     // FIXME: What about when the usemap attribute begins with "#"?
     addSubresourceURL(urls, document().completeURL(fastGetAttribute(usemapAttr)));
 }
@@ -604,7 +608,7 @@ void HTMLImageElement::tryCreateImageControls()
     if (!imageControls)
         return;
 
-    ensureUserAgentShadowRoot().appendChild(imageControls.releaseNonNull());
+    ensureUserAgentShadowRoot().appendChild(*imageControls);
 
     auto* renderObject = renderer();
     if (!renderObject)

@@ -35,8 +35,6 @@
 
     display: flex;
 
-    box-shadow: inset hsla(0, 0%, 100%, 0.2) 0 1px 0;
-
     height: 28px;
 
     white-space: nowrap;
@@ -48,5 +46,8 @@
     flex: 1;
 
     margin: 3px 6px;
-    padding-left: 4px;
+}
+
+.sidebar > .panel.navigation.search > .search-bar > input[type="search"]::-webkit-search-results-button {
+    margin-right: 4px;
 }

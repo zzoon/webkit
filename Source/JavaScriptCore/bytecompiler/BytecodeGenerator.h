@@ -75,11 +75,9 @@ namespace JSC {
         RegisterID* argumentRegister(unsigned i) { return m_argv[i + 1].get(); }
         unsigned stackOffset() { return -m_argv[0]->index() + JSStack::CallFrameHeaderSize; }
         unsigned argumentCountIncludingThis() { return m_argv.size() - m_padding; }
-        RegisterID* profileHookRegister() { return m_profileHookRegister.get(); }
         ArgumentsNode* argumentsNode() { return m_argumentsNode; }
 
     private:
-        RefPtr<RegisterID> m_profileHookRegister;
         ArgumentsNode* m_argumentsNode;
         Vector<RefPtr<RegisterID>, 8, UnsafeVectorOverflow> m_argv;
         unsigned m_padding;
@@ -269,10 +267,10 @@ namespace JSC {
     public:
         typedef DeclarationStacks::FunctionStack FunctionStack;
 
-        BytecodeGenerator(VM&, ProgramNode*, UnlinkedProgramCodeBlock*, DebuggerMode, ProfilerMode, const VariableEnvironment*);
-        BytecodeGenerator(VM&, FunctionNode*, UnlinkedFunctionCodeBlock*, DebuggerMode, ProfilerMode, const VariableEnvironment*);
-        BytecodeGenerator(VM&, EvalNode*, UnlinkedEvalCodeBlock*, DebuggerMode, ProfilerMode, const VariableEnvironment*);
-        BytecodeGenerator(VM&, ModuleProgramNode*, UnlinkedModuleProgramCodeBlock*, DebuggerMode, ProfilerMode, const VariableEnvironment*);
+        BytecodeGenerator(VM&, ProgramNode*, UnlinkedProgramCodeBlock*, DebuggerMode, const VariableEnvironment*);
+        BytecodeGenerator(VM&, FunctionNode*, UnlinkedFunctionCodeBlock*, DebuggerMode, const VariableEnvironment*);
+        BytecodeGenerator(VM&, EvalNode*, UnlinkedEvalCodeBlock*, DebuggerMode, const VariableEnvironment*);
+        BytecodeGenerator(VM&, ModuleProgramNode*, UnlinkedModuleProgramCodeBlock*, DebuggerMode, const VariableEnvironment*);
 
         ~BytecodeGenerator();
         
@@ -502,6 +500,7 @@ namespace JSC {
         void emitProfileControlFlow(int);
         
         RegisterID* emitLoadArrowFunctionLexicalEnvironment(const Identifier&);
+        RegisterID* ensureThis();
         void emitLoadThisFromArrowFunctionLexicalEnvironment();
         RegisterID* emitLoadNewTargetFromArrowFunctionLexicalEnvironment();
 
@@ -550,12 +549,16 @@ namespace JSC {
 
         RegisterID* emitTryGetById(RegisterID* dst, RegisterID* base, const Identifier& property);
         RegisterID* emitGetById(RegisterID* dst, RegisterID* base, const Identifier& property);
+        RegisterID* emitGetById(RegisterID* dst, RegisterID* base, RegisterID* thisVal, const Identifier& property);
         RegisterID* emitPutById(RegisterID* base, const Identifier& property, RegisterID* value);
+        RegisterID* emitPutById(RegisterID* base, RegisterID* thisValue, const Identifier& property, RegisterID* value);
         RegisterID* emitDirectPutById(RegisterID* base, const Identifier& property, RegisterID* value, PropertyNode::PutType);
         RegisterID* emitDeleteById(RegisterID* dst, RegisterID* base, const Identifier&);
         RegisterID* emitGetByVal(RegisterID* dst, RegisterID* base, RegisterID* property);
+        RegisterID* emitGetByVal(RegisterID* dst, RegisterID* base, RegisterID* thisValue, RegisterID* property);
         RegisterID* emitGetArgumentByVal(RegisterID* dst, RegisterID* base, RegisterID* property);
         RegisterID* emitPutByVal(RegisterID* base, RegisterID* property, RegisterID* value);
+        RegisterID* emitPutByVal(RegisterID* base, RegisterID* thisValue, RegisterID* property, RegisterID* value);
         RegisterID* emitDirectPutByVal(RegisterID* base, RegisterID* property, RegisterID* value);
         RegisterID* emitDeleteByVal(RegisterID* dst, RegisterID* base, RegisterID* property);
         RegisterID* emitPutByIndex(RegisterID* base, unsigned index, RegisterID* value);
@@ -572,8 +575,8 @@ namespace JSC {
         RegisterID* emitCall(RegisterID* dst, RegisterID* func, ExpectedFunction, CallArguments&, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
         RegisterID* emitCallInTailPosition(RegisterID* dst, RegisterID* func, ExpectedFunction, CallArguments&, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
         RegisterID* emitCallEval(RegisterID* dst, RegisterID* func, CallArguments&, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
-        RegisterID* emitCallVarargs(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* arguments, RegisterID* firstFreeRegister, int32_t firstVarArgOffset, RegisterID* profileHookRegister, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
-        RegisterID* emitCallVarargsInTailPosition(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* arguments, RegisterID* firstFreeRegister, int32_t firstVarArgOffset, RegisterID* profileHookRegister, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
+        RegisterID* emitCallVarargs(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* arguments, RegisterID* firstFreeRegister, int32_t firstVarArgOffset, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
+        RegisterID* emitCallVarargsInTailPosition(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* arguments, RegisterID* firstFreeRegister, int32_t firstVarArgOffset, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
 
         enum PropertyDescriptorOption {
             PropertyConfigurable = 1,
@@ -626,6 +629,7 @@ namespace JSC {
 
         RegisterID* emitIsObject(RegisterID* dst, RegisterID* src);
         RegisterID* emitIsUndefined(RegisterID* dst, RegisterID* src);
+        RegisterID* emitIsEmpty(RegisterID* dst, RegisterID* src);
         void emitRequireObjectCoercible(RegisterID* value, const String& error);
 
         RegisterID* emitIteratorNext(RegisterID* dst, RegisterID* iterator, const ThrowableExpressionData* node);
@@ -698,7 +702,6 @@ namespace JSC {
 
         CodeType codeType() const { return m_codeType; }
 
-        bool shouldEmitProfileHooks() { return m_shouldEmitProfileHooks; }
         bool shouldEmitDebugHooks() { return m_shouldEmitDebugHooks; }
         
         bool isStrictMode() const { return m_codeBlock->isStrictMode(); }
@@ -843,16 +846,16 @@ namespace JSC {
 
         void getVariablesUnderTDZ(VariableEnvironment&);
 
-        RegisterID* emitConstructVarargs(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* arguments, RegisterID* firstFreeRegister, int32_t firstVarArgOffset, RegisterID* profileHookRegister, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
-        RegisterID* emitCallVarargs(OpcodeID, RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* arguments, RegisterID* firstFreeRegister, int32_t firstVarArgOffset, RegisterID* profileHookRegister, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
+        RegisterID* emitConstructVarargs(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* arguments, RegisterID* firstFreeRegister, int32_t firstVarArgOffset, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
+        RegisterID* emitCallVarargs(OpcodeID, RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* arguments, RegisterID* firstFreeRegister, int32_t firstVarArgOffset, const JSTextPosition& divot, const JSTextPosition& divotStart, const JSTextPosition& divotEnd);
         
         void emitLogShadowChickenPrologueIfNecessary();
         void emitLogShadowChickenTailIfNecessary();
 
         void initializeParameters(FunctionParameters&);
-        void initializeVarLexicalEnvironment(int symbolTableConstantIndex);
-        void initializeDefaultParameterValuesAndSetupFunctionScopeStack(FunctionParameters&, bool isSimpleParameterList, FunctionNode*, SymbolTable*, int symbolTableConstantIndex, const std::function<bool (UniquedStringImpl*)>& captures);
-        void initializeArrowFunctionContextScopeIfNeeded(SymbolTable* = nullptr);
+        void initializeVarLexicalEnvironment(int symbolTableConstantIndex, SymbolTable* functionSymbolTable, bool hasCapturedVariables);
+        void initializeDefaultParameterValuesAndSetupFunctionScopeStack(FunctionParameters&, bool isSimpleParameterList, FunctionNode*, SymbolTable*, int symbolTableConstantIndex, const std::function<bool (UniquedStringImpl*)>& captures, bool shouldCreateArgumentsVariableInParameterScope);
+        void initializeArrowFunctionContextScopeIfNeeded(SymbolTable* functionSymbolTable = nullptr, bool canReuseLexicalEnvironment = false);
 
     public:
         JSString* addStringConstant(const Identifier&);
@@ -866,7 +869,6 @@ namespace JSC {
         Vector<UnlinkedInstruction, 0, UnsafeVectorOverflow> m_instructions;
 
         bool m_shouldEmitDebugHooks;
-        bool m_shouldEmitProfileHooks;
 
         struct SymbolTableStackEntry {
             SymbolTable* m_symbolTable;

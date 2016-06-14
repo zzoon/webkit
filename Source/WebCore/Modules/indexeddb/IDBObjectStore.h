@@ -29,7 +29,6 @@
 
 #include "ActiveDOMObject.h"
 #include "IDBObjectStoreInfo.h"
-#include "IndexedDB.h"
 #include <wtf/HashSet.h>
 
 namespace JSC {
@@ -50,7 +49,11 @@ class IDBTransaction;
 struct ExceptionCodeWithMessage;
 struct IDBKeyRangeData;
 
-class IDBObjectStore : public RefCounted<IDBObjectStore>, public ActiveDOMObject {
+namespace IndexedDB {
+enum class ObjectStoreOverwriteMode;
+}
+
+class IDBObjectStore final : public RefCounted<IDBObjectStore>, public ActiveDOMObject {
 public:
     static Ref<IDBObjectStore> create(ScriptExecutionContext&, const IDBObjectStoreInfo&, IDBTransaction&);
 
@@ -62,11 +65,11 @@ public:
     RefPtr<IDBTransaction> transaction();
     bool autoIncrement() const;
 
-    RefPtr<IDBRequest> add(JSC::ExecState&, JSC::JSValue, ExceptionCodeWithMessage&);
-    RefPtr<IDBRequest> put(JSC::ExecState&, JSC::JSValue, ExceptionCodeWithMessage&);
-    RefPtr<IDBRequest> openCursor(ScriptExecutionContext&, ExceptionCodeWithMessage&);
-    RefPtr<IDBRequest> openCursor(ScriptExecutionContext&, IDBKeyRange*, ExceptionCodeWithMessage&);
-    RefPtr<IDBRequest> openCursor(ScriptExecutionContext&, JSC::JSValue key, ExceptionCodeWithMessage&);
+    struct IndexParameters {
+        bool unique;
+        bool multiEntry;
+    };
+
     RefPtr<IDBRequest> openCursor(ScriptExecutionContext&, IDBKeyRange*, const String& direction, ExceptionCodeWithMessage&);
     RefPtr<IDBRequest> openCursor(ScriptExecutionContext&, JSC::JSValue key, const String& direction, ExceptionCodeWithMessage&);
     RefPtr<IDBRequest> get(ScriptExecutionContext&, JSC::JSValue key, ExceptionCodeWithMessage&);
@@ -76,10 +79,9 @@ public:
     RefPtr<IDBRequest> deleteFunction(ScriptExecutionContext&, IDBKeyRange*, ExceptionCodeWithMessage&);
     RefPtr<IDBRequest> deleteFunction(ScriptExecutionContext&, JSC::JSValue key, ExceptionCodeWithMessage&);
     RefPtr<IDBRequest> clear(ScriptExecutionContext&, ExceptionCodeWithMessage&);
-    RefPtr<IDBIndex> createIndex(ScriptExecutionContext&, const String& name, const IDBKeyPath&, bool unique, bool multiEntry, ExceptionCodeWithMessage&);
+    RefPtr<IDBIndex> createIndex(ScriptExecutionContext&, const String& name, const IDBKeyPath&, const IndexParameters&, ExceptionCodeWithMessage&);
     RefPtr<IDBIndex> index(const String& name, ExceptionCodeWithMessage&);
     void deleteIndex(const String& name, ExceptionCodeWithMessage&);
-    RefPtr<IDBRequest> count(ScriptExecutionContext&, ExceptionCodeWithMessage&);
     RefPtr<IDBRequest> count(ScriptExecutionContext&, IDBKeyRange*, ExceptionCodeWithMessage&);
     RefPtr<IDBRequest> count(ScriptExecutionContext&, JSC::JSValue key, ExceptionCodeWithMessage&);
 
@@ -91,8 +93,7 @@ public:
 
     const IDBObjectStoreInfo& info() const { return m_info; }
 
-    // FIXME: After removing LegacyIDB and folding abstract/implementation classes together,
-    // this will no longer be necessary.
+    // FIXME: After removing LegacyIDB and folding abstract/implementation classes together, this will no longer be necessary.
     IDBTransaction& modernTransaction() { return m_transaction.get(); }
 
     void rollbackInfoForVersionChangeAbort();
@@ -102,19 +103,14 @@ public:
 private:
     IDBObjectStore(ScriptExecutionContext&, const IDBObjectStoreInfo&, IDBTransaction&);
 
-    enum class InlineKeyCheck {
-        Perform,
-        DoNotPerform,
-    };
-
+    enum class InlineKeyCheck { Perform, DoNotPerform };
     RefPtr<IDBRequest> putOrAdd(JSC::ExecState&, JSC::JSValue, RefPtr<IDBKey>, IndexedDB::ObjectStoreOverwriteMode, InlineKeyCheck, ExceptionCodeWithMessage&);
-    RefPtr<WebCore::IDBRequest> doCount(ScriptExecutionContext&, const IDBKeyRangeData&, ExceptionCodeWithMessage&);
+    RefPtr<IDBRequest> doCount(ScriptExecutionContext&, const IDBKeyRangeData&, ExceptionCodeWithMessage&);
     RefPtr<IDBRequest> doDelete(ScriptExecutionContext&, IDBKeyRange*, ExceptionCodeWithMessage&);
 
-    // ActiveDOMObject
-    const char* activeDOMObjectName() const;
-    bool canSuspendForDocumentSuspension() const;
-    bool hasPendingActivity() const;
+    const char* activeDOMObjectName() const final;
+    bool canSuspendForDocumentSuspension() const final;
+    bool hasPendingActivity() const final;
 
     IDBObjectStoreInfo m_info;
     IDBObjectStoreInfo m_originalInfo;

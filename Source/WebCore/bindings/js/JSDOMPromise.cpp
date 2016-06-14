@@ -27,6 +27,7 @@
 #include "JSDOMPromise.h"
 
 #include "ExceptionCode.h"
+#include "JSDOMError.h"
 #include <runtime/Exception.h>
 #include <runtime/JSONObject.h>
 
@@ -46,10 +47,10 @@ JSDOMGlobalObject& DeferredWrapper::globalObject() const
     return *m_globalObject.get();
 }
 
-JSC::JSPromiseDeferred& DeferredWrapper::deferred() const
+JSC::JSValue DeferredWrapper::promise() const
 {
     ASSERT(m_deferred);
-    return *m_deferred.get();
+    return m_deferred->promise();
 }
 
 void DeferredWrapper::callFunction(ExecState& exec, JSValue function, JSValue resolution)
@@ -65,6 +66,15 @@ void DeferredWrapper::callFunction(ExecState& exec, JSValue function, JSValue re
 
     m_globalObject.clear();
     m_deferred.clear();
+}
+
+void DeferredWrapper::reject(ExceptionCode ec, const String& message)
+{
+    ASSERT(m_deferred);
+    ASSERT(m_globalObject);
+    JSC::ExecState* state = m_globalObject->globalExec();
+    JSC::JSLockHolder locker(state);
+    reject(*state, createDOMException(state, ec, message));
 }
 
 void rejectPromiseWithExceptionIfAny(JSC::ExecState& state, JSDOMGlobalObject& globalObject, JSPromiseDeferred& promiseDeferred)
@@ -88,7 +98,7 @@ void fulfillPromiseWithJSON(DeferredWrapper& promise, const String& data)
 {
     JSC::JSValue value = parseAsJSON(promise.globalObject().globalExec(), data);
     if (!value)
-        promise.reject<ExceptionCode>(SYNTAX_ERR);
+        promise.reject(SYNTAX_ERR);
     else
         promise.resolve(value);
 }

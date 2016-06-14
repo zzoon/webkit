@@ -18,8 +18,7 @@
     Boston, MA 02110-1301, USA.
 */
 
-#ifndef JSTestNamedConstructor_h
-#define JSTestNamedConstructor_h
+#pragma once
 
 #include "JSDOMWrapper.h"
 #include "TestNamedConstructor.h"
@@ -81,11 +80,10 @@ inline void* wrapperKey(TestNamedConstructor* wrappableObject)
     return wrappableObject;
 }
 
-JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestNamedConstructor*);
-inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestNamedConstructor& impl) { return toJS(state, globalObject, &impl); }
-JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject*, TestNamedConstructor*);
+JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestNamedConstructor&);
+inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestNamedConstructor* impl) { return impl ? toJS(state, globalObject, *impl) : JSC::jsNull(); }
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject*, Ref<TestNamedConstructor>&&);
+inline JSC::JSValue toJSNewlyCreated(JSC::ExecState* state, JSDOMGlobalObject* globalObject, RefPtr<TestNamedConstructor>&& impl) { return impl ? toJSNewlyCreated(state, globalObject, impl.releaseNonNull()) : JSC::jsNull(); }
 
 
 } // namespace WebCore
-
-#endif

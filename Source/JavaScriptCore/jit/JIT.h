@@ -253,8 +253,11 @@ namespace JSC {
         static unsigned frameRegisterCountFor(CodeBlock*);
         static int stackPointerOffsetFor(CodeBlock*);
 
+        JS_EXPORT_PRIVATE static HashMap<CString, double> compileTimeStats();
+
     private:
         JIT(VM*, CodeBlock* = 0);
+        ~JIT();
 
         void privateCompileMainPass();
         void privateCompileLinkPass();
@@ -488,6 +491,7 @@ namespace JSC {
         void emit_op_create_direct_arguments(Instruction*);
         void emit_op_create_scoped_arguments(Instruction*);
         void emit_op_create_cloned_arguments(Instruction*);
+        void emit_op_argument_count(Instruction*);
         void emit_op_copy_rest(Instruction*);
         void emit_op_get_rest_length(Instruction*);
         void emit_op_check_tdz(Instruction*);
@@ -496,6 +500,7 @@ namespace JSC {
         void emit_op_resume(Instruction*);
         void emit_op_debug(Instruction*);
         void emit_op_del_by_id(Instruction*);
+        void emit_op_del_by_val(Instruction*);
         void emit_op_div(Instruction*);
         void emit_op_end(Instruction*);
         void emit_op_enter(Instruction*);
@@ -504,6 +509,8 @@ namespace JSC {
         void emit_op_eq_null(Instruction*);
         void emit_op_try_get_by_id(Instruction*);
         void emit_op_get_by_id(Instruction*);
+        void emit_op_get_by_id_with_this(Instruction*);
+        void emit_op_get_by_val_with_this(Instruction*);
         void emit_op_get_arguments_length(Instruction*);
         void emit_op_get_by_val(Instruction*);
         void emit_op_get_argument_by_val(Instruction*);
@@ -511,6 +518,7 @@ namespace JSC {
         void emit_op_overrides_has_instance(Instruction*);
         void emit_op_instanceof(Instruction*);
         void emit_op_instanceof_custom(Instruction*);
+        void emit_op_is_empty(Instruction*);
         void emit_op_is_undefined(Instruction*);
         void emit_op_is_boolean(Instruction*);
         void emit_op_is_number(Instruction*);
@@ -546,23 +554,22 @@ namespace JSC {
         void emit_op_new_func_exp(Instruction*);
         void emit_op_new_generator_func(Instruction*);
         void emit_op_new_generator_func_exp(Instruction*);
-        void emit_op_new_arrow_func_exp(Instruction*);
         void emit_op_new_object(Instruction*);
         void emit_op_new_regexp(Instruction*);
         void emit_op_not(Instruction*);
         void emit_op_nstricteq(Instruction*);
         void emit_op_dec(Instruction*);
         void emit_op_inc(Instruction*);
-        void emit_op_profile_did_call(Instruction*);
-        void emit_op_profile_will_call(Instruction*);
         void emit_op_profile_type(Instruction*);
         void emit_op_profile_control_flow(Instruction*);
         void emit_op_push_with_scope(Instruction*);
         void emit_op_create_lexical_environment(Instruction*);
         void emit_op_get_parent_scope(Instruction*);
         void emit_op_put_by_id(Instruction*);
+        void emit_op_put_by_id_with_this(Instruction*);
         void emit_op_put_by_index(Instruction*);
         void emit_op_put_by_val(Instruction*);
+        void emit_op_put_by_val_with_this(Instruction*);
         void emit_op_put_getter_by_id(Instruction*);
         void emit_op_put_setter_by_id(Instruction*);
         void emit_op_put_getter_setter_by_id(Instruction*);
@@ -748,6 +755,7 @@ namespace JSC {
 #endif
         MacroAssembler::Call callOperation(J_JITOperation_EJI, int, GPRReg, UniquedStringImpl*);
         MacroAssembler::Call callOperation(J_JITOperation_EJJ, int, GPRReg, GPRReg);
+        MacroAssembler::Call callOperation(J_JITOperation_EJJRp, JSValueRegs, JSValueRegs, JSValueRegs, ResultProfile*);
         MacroAssembler::Call callOperation(J_JITOperation_EJJAp, int, GPRReg, GPRReg, ArrayProfile*);
         MacroAssembler::Call callOperation(J_JITOperation_EJJBy, int, GPRReg, GPRReg, ByValInfo*);
         MacroAssembler::Call callOperation(Z_JITOperation_EJOJ, GPRReg, GPRReg, GPRReg);
@@ -894,6 +902,9 @@ namespace JSC {
         // in which case all code gets profiled.
         bool shouldEmitProfiling() { return false; }
 #endif
+
+        static bool reportCompileTimes();
+        static bool computeCompileTimes();
 
         Interpreter* m_interpreter;
 

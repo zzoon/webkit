@@ -115,7 +115,7 @@ private:
     Vector<RenderMultiColumnSpannerPlaceholder*> m_spannerStack;
 };
 
-RenderView::RenderView(Document& document, Ref<RenderStyle>&& style)
+RenderView::RenderView(Document& document, RenderStyle&& style)
     : RenderBlockFlow(document, WTFMove(style))
     , m_frameView(*document.view())
     , m_selectionUnsplitStart(nullptr)
@@ -277,7 +277,8 @@ void RenderView::initializeLayoutState(LayoutState& state)
 
     state.m_pageLogicalHeight = m_pageLogicalHeight;
     state.m_pageLogicalHeightChanged = m_pageLogicalHeightChanged;
-    state.m_isPaginated = state.m_pageLogicalHeight;
+    ASSERT(state.m_pageLogicalHeight >= 0);
+    state.m_isPaginated = state.m_pageLogicalHeight > 0;
 }
 
 // The algorithm below assumes this is a full layout. In case there are previously computed values for regions, supplemental steps are taken
@@ -642,7 +643,7 @@ void RenderView::repaintViewRectangle(const LayoutRect& repaintRect) const
         // and the Renderer that contains the iframe. This transformation must account for a
         // left scrollbar (if one exists).
         FrameView& frameView = this->frameView();
-        if (frameView.verticalScrollbarIsOnLeft() && frameView.verticalScrollbar())
+        if (frameView.shouldPlaceBlockDirectionScrollbarOnLeft() && frameView.verticalScrollbar())
             adjustedRect.move(LayoutSize(frameView.verticalScrollbar()->occupiedWidth(), 0));
 
         ownerBox->repaintRectangle(adjustedRect);
@@ -690,7 +691,7 @@ LayoutRect RenderView::visualOverflowRect() const
     return RenderBlockFlow::visualOverflowRect();
 }
 
-LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const RenderLayerModelObject* repaintContainer, bool fixed) const
+LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const RenderLayerModelObject* repaintContainer, RepaintContext context) const
 {
     // If a container was specified, and was not nullptr or the RenderView,
     // then we should have found it by now.
@@ -709,7 +710,7 @@ LayoutRect RenderView::computeRectForRepaint(const LayoutRect& rect, const Rende
             adjustedRect.setX(viewWidth() - adjustedRect.maxX());
     }
 
-    if (fixed)
+    if (context.m_hasPositionFixedDescendant)
         adjustedRect.moveBy(frameView().scrollPositionRespectingCustomFixedPosition());
     
     // Apply our transform if we have one (because of full page zooming).

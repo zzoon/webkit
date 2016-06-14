@@ -99,12 +99,11 @@ CertificateInfo ResourceResponse::platformCertificateInfo() const
             return { };
     }
 
-    CFIndex count = SecTrustGetCertificateCount(trust);
-    auto certificateChain = CFArrayCreateMutable(0, count, &kCFTypeArrayCallBacks);
-    for (CFIndex i = 0; i < count; i++)
-        CFArrayAppendValue(certificateChain, SecTrustGetCertificateAtIndex(trust, i));
-
-    return CertificateInfo(adoptCF(certificateChain));
+#if HAVE(SEC_TRUST_SERIALIZATION)
+    return CertificateInfo(trust);
+#else
+    return CertificateInfo(CertificateInfo::certificateChainFromSecTrust(trust));
+#endif
 }
 
 #if USE(CFNETWORK)
@@ -128,7 +127,6 @@ NSURLResponse *ResourceResponse::nsURLResponse() const
 
 ResourceResponse::ResourceResponse(NSURLResponse* nsResponse)
     : m_initLevel(Uninitialized)
-    , m_platformResponseIsUpToDate(true)
     , m_cfResponse([nsResponse _CFURLResponse])
     , m_nsResponse(nsResponse)
 {

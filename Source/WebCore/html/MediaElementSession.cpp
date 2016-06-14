@@ -43,6 +43,7 @@
 #include "MainFrame.h"
 #include "Page.h"
 #include "PlatformMediaSessionManager.h"
+#include "RenderMedia.h"
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "SourceBuffer.h"
@@ -54,11 +55,10 @@
 
 namespace WebCore {
 
-static const int elementMainContentMinimumWidth = 400;
-static const int elementMainContentMinimumHeight = 300;
 static const double elementMainContentCheckInterval = .250;
 
 static bool isMainContent(const HTMLMediaElement&);
+static bool isElementLargeEnoughForMainContent(const HTMLMediaElement&);
 
 #if !LOG_DISABLED
 static String restrictionName(MediaElementSession::BehaviorRestrictions restriction)
@@ -159,7 +159,7 @@ bool MediaElementSession::playbackPermitted(const HTMLMediaElement& element) con
         return false;
     }
 
-    if (m_restrictions & RequireUserGestureForAudioRateChange && (!element.isVideo() || element.hasAudio()) && !ScriptController::processingUserGestureForMedia()) {
+    if (m_restrictions & RequireUserGestureForAudioRateChange && (!element.isVideo() || element.hasAudio()) && !element.muted() && !ScriptController::processingUserGestureForMedia()) {
         LOG(Media, "MediaElementSession::playbackPermitted - returning FALSE because of audio rate change restriction");
         return false;
     }
@@ -214,23 +214,55 @@ bool MediaElementSession::pageAllowsPlaybackAfterResuming(const HTMLMediaElement
 
 bool MediaElementSession::canControlControlsManager(const HTMLMediaElement& element) const
 {
-    if (!element.hasAudio())
+    if (!element.hasAudio()) {
+        LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: No audio");
         return false;
+    }
 
-    if (!playbackPermitted(element))
+    if (element.muted()) {
+        LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: Muted");
         return false;
+    }
 
-    RenderBox* renderer = downcast<RenderBox>(element.renderer());
-    if (!renderer)
+    if (element.ended()) {
+        LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: Ended");
         return false;
+    }
 
-    if (element.hasVideo() && renderer->clientWidth() >= elementMainContentMinimumWidth && renderer->clientHeight() >= elementMainContentMinimumHeight)
+    if (element.document().activeDOMObjectsAreSuspended()) {
+        LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: activeDOMObjectsAreSuspended()");
+        return false;
+    }
+
+    if (!playbackPermitted(element)) {
+        LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: Playback not permitted");
+        return false;
+    }
+
+    if (element.isVideo()) {
+        if (!element.renderer()) {
+            LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: No renderer");
+            return false;
+        }
+
+        if (!element.hasVideo()) {
+            LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: No video");
+            return false;
+        }
+
+        if (isElementLargeEnoughForMainContent(element)) {
+            LOG(Media, "MediaElementSession::canControlControlsManager - returning TRUE: Is main content");
             return true;
+        }
+    }
 
-    if (ScriptController::processingUserGestureForMedia())
-        return true;
+    if (m_restrictions & RequireUserGestureToControlControlsManager && !ScriptController::processingUserGestureForMedia()) {
+        LOG(Media, "MediaElementSession::canControlControlsManager - returning FALSE: No user gesture");
+        return false;
+    }
 
-    return false;
+    LOG(Media, "MediaElementSession::canControlControlsManager - returning TRUE: All criteria met");
+    return true;
 }
 
 #if ENABLE(WIRELESS_PLAYBACK_TARGET)
@@ -502,17 +534,19 @@ static bool isMainContent(const HTMLMediaElement& element)
         return false;
 
     // Elements which have not yet been laid out, or which are not yet in the DOM, cannot be main content.
-    RenderBox* renderer = downcast<RenderBox>(element.renderer());
+    auto* renderer = element.renderer();
     if (!renderer)
         return false;
 
-    if (renderer->clientWidth() < elementMainContentMinimumWidth
-        || renderer->clientHeight() < elementMainContentMinimumHeight)
+    if (!isElementLargeEnoughForMainContent(element))
         return false;
 
     // Elements which are hidden by style, or have been scrolled out of view, cannot be main content.
-    if (renderer->style().visibility() != VISIBLE
-        || renderer->visibleInViewportState() != RenderElement::VisibleInViewport)
+    // But elements which have audio & video and are already playing should not stop playing because
+    // they are scrolled off the page.
+    if (renderer->style().visibility() != VISIBLE)
+        return false;
+    if (renderer->visibleInViewportState() != RenderElement::VisibleInViewport && !element.isPlaying())
         return false;
 
     // Main content elements must be in the main frame.
@@ -530,16 +564,35 @@ static bool isMainContent(const HTMLMediaElement& element)
     IntRect rectRelativeToView = element.clientRect();
     ScrollPosition scrollPosition = mainFrame.view()->documentScrollPositionRelativeToViewOrigin();
     IntRect rectRelativeToTopDocument(rectRelativeToView.location() + scrollPosition, rectRelativeToView.size());
-    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::AllowChildFrameContent | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::AllowChildFrameContent | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowUserAgentShadowContent);
     HitTestResult result(rectRelativeToTopDocument.center());
 
     // Elements which are obscured by other elements cannot be main content.
     mainRenderView.hitTest(request, result);
+    result.setToNonUserAgentShadowAncestor();
     Element* hitElement = result.innerElement();
     if (hitElement != &element)
         return false;
 
     return true;
+}
+
+static bool isElementLargeEnoughForMainContent(const HTMLMediaElement& element)
+{
+    static const double elementMainContentAreaMinimum = 400 * 300;
+    static const double maximumAspectRatio = 1.8; // Slightly larger than 16:9.
+    static const double minimumAspectRatio = .5; // Slightly smaller than 16:9.
+
+    // Elements which have not yet been laid out, or which are not yet in the DOM, cannot be main content.
+    auto* renderer = element.renderer();
+    if (!renderer)
+        return false;
+
+    double width = renderer->clientWidth();
+    double height = renderer->clientHeight();
+    double area = width * height;
+    double aspectRatio = width / height;
+    return area >= elementMainContentAreaMinimum && aspectRatio >= minimumAspectRatio && aspectRatio <= maximumAspectRatio;
 }
 
 void MediaElementSession::mainContentCheckTimerFired()

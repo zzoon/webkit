@@ -52,9 +52,10 @@
 #include "FrameSelection.h"
 #include "FrameTree.h"
 #include "FrameView.h"
-#include "htmlediting.h"
-#include "HTMLFrameElementBase.h"
+#include "HTMLFrameElement.h"
 #include "HTMLFrameSetElement.h"
+#include "HTMLHtmlElement.h"
+#include "HTMLIFrameElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HitTestRequest.h"
@@ -94,6 +95,7 @@
 #include "VisibleUnits.h"
 #include "WheelEvent.h"
 #include "WindowsKeyboardCodes.h"
+#include "htmlediting.h"
 #include <wtf/Assertions.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/NeverDestroyed.h>
@@ -880,7 +882,7 @@ bool EventHandler::eventMayStartDrag(const PlatformMouseEvent& event) const
         return false;
 
     updateDragSourceActionsAllowed();
-    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowUserAgentShadowContent);
     HitTestResult result(view->windowToContents(event.position()));
     renderView->hitTest(request, result);
     DragState state;
@@ -896,7 +898,7 @@ void EventHandler::updateSelectionForMouseDrag()
     if (!renderView)
         return;
 
-    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::Move | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::Move | HitTestRequest::DisallowUserAgentShadowContent);
     HitTestResult result(view->windowToContents(m_lastKnownMousePosition));
     renderView->hitTest(request, result);
     updateSelectionForMouseDrag(result);
@@ -1131,20 +1133,24 @@ HitTestResult EventHandler::hitTestResultAtPoint(const LayoutPoint& point, HitTe
         }
     }
 
-    HitTestResult result(point, padding.height(), padding.width(), padding.height(), padding.width());
-
+    unsigned nonNegativePaddingWidth = std::max<LayoutUnit>(0, padding.width()).toUnsigned();
+    unsigned nonNegativePaddingHeight = std::max<LayoutUnit>(0, padding.height()).toUnsigned();
+    // We should always start hit testing a clean tree.
+    if (m_frame.document())
+        m_frame.document()->updateLayoutIgnorePendingStylesheets();
+    HitTestResult result(point, nonNegativePaddingHeight, nonNegativePaddingWidth, nonNegativePaddingHeight, nonNegativePaddingWidth);
     RenderView* renderView = m_frame.contentRenderer();
     if (!renderView)
         return result;
-    
+
     // hitTestResultAtPoint is specifically used to hitTest into all frames, thus it always allows child frame content.
     HitTestRequest request(hitType | HitTestRequest::AllowChildFrameContent);
     renderView->hitTest(request, result);
     if (!request.readOnly())
         m_frame.document()->updateHoverActiveState(request, result.innerElement());
 
-    if (request.disallowsShadowContent())
-        result.setToNonShadowAncestor();
+    if (request.disallowsUserAgentShadowContent())
+        result.setToNonUserAgentShadowAncestor();
 
     return result;
 }
@@ -1381,7 +1387,7 @@ OptionalCursor EventHandler::selectCursor(const HitTestResult& result, bool shif
         return NoCursorChange;
 
     auto renderer = node->renderer();
-    RenderStyle* style = renderer ? &renderer->style() : nullptr;
+    auto* style = renderer ? &renderer->style() : nullptr;
     bool horizontalText = !style || style->isHorizontalWritingMode();
     const Cursor& iBeam = horizontalText ? iBeamCursor() : verticalTextCursor();
 
@@ -1636,7 +1642,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
     }
     m_mouseDownWasInSubframe = false;
 
-    HitTestRequest request(HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::Active | HitTestRequest::DisallowUserAgentShadowContent);
     // Save the document point we generate in case the window coordinate is invalidated by what happens
     // when we dispatch the event.
     LayoutPoint documentPoint = documentPointForWindowPoint(m_frame, platformMouseEvent.position());
@@ -1703,9 +1709,9 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
     // If the hit testing originally determined the event was in a scrollbar, refetch the MouseEventWithHitTestResults
     // in case the scrollbar widget was destroyed when the mouse event was handled.
     if (mouseEvent.scrollbar()) {
-        const bool wasLastScrollBar = mouseEvent.scrollbar() == m_lastScrollbarUnderMouse.get();
+        const bool wasLastScrollBar = mouseEvent.scrollbar() == m_lastScrollbarUnderMouse;
         mouseEvent = m_frame.document()->prepareMouseEvent(HitTestRequest(), documentPoint, platformMouseEvent);
-        if (wasLastScrollBar && mouseEvent.scrollbar() != m_lastScrollbarUnderMouse.get())
+        if (wasLastScrollBar && mouseEvent.scrollbar() != m_lastScrollbarUnderMouse)
             m_lastScrollbarUnderMouse = nullptr;
     }
 
@@ -1744,7 +1750,7 @@ bool EventHandler::handleMouseDoubleClickEvent(const PlatformMouseEvent& platfor
     m_mousePressed = false;
     setLastKnownMousePosition(platformMouseEvent);
 
-    HitTestRequest request(HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::Active | HitTestRequest::DisallowUserAgentShadowContent);
     MouseEventWithHitTestResults mouseEvent = prepareMouseEvent(request, platformMouseEvent);
     Frame* subframe = subframeForHitTestResult(mouseEvent);
     if (m_eventHandlerWillResetCapturingMouseEventsElement)
@@ -1769,14 +1775,11 @@ bool EventHandler::handleMouseDoubleClickEvent(const PlatformMouseEvent& platfor
 
 static ScrollableArea* enclosingScrollableArea(Node* node)
 {
-    if (!node)
-        return nullptr;
-
-    for (auto element = node; element; element = element->parentOrShadowHostNode()) {
-        if (is<HTMLIFrameElement>(*element) || is<HTMLHtmlElement>(*element) || is<HTMLDocument>(*element))
+    for (auto ancestor = node; ancestor; ancestor = ancestor->parentOrShadowHostNode()) {
+        if (is<HTMLIFrameElement>(*ancestor) || is<HTMLHtmlElement>(*ancestor) || is<HTMLDocument>(*ancestor))
             return nullptr;
 
-        auto renderer = element->renderer();
+        auto renderer = ancestor->renderer();
         if (!renderer)
             continue;
 
@@ -1814,7 +1817,7 @@ bool EventHandler::mouseMoved(const PlatformMouseEvent& event)
     if (FrameView* frameView = m_frame.view())
         frameView->mouseMovedInContentArea();  
 
-    hoveredNode.setToNonShadowAncestor();
+    hoveredNode.setToNonUserAgentShadowAncestor();
     page->chrome().mouseDidMoveOverElement(hoveredNode, event.modifierFlags());
     page->chrome().setToolTip(hoveredNode);
     return result;
@@ -1864,7 +1867,7 @@ bool EventHandler::handleMouseMoveEvent(const PlatformMouseEvent& platformMouseE
         return m_lastScrollbarUnderMouse->mouseMoved(platformMouseEvent);
 #endif
 
-    HitTestRequest::HitTestRequestType hitType = HitTestRequest::Move | HitTestRequest::DisallowShadowContent | HitTestRequest::AllowFrameScrollbars;
+    HitTestRequest::HitTestRequestType hitType = HitTestRequest::Move | HitTestRequest::DisallowUserAgentShadowContent | HitTestRequest::AllowFrameScrollbars;
     if (m_mousePressed)
         hitType |= HitTestRequest::Active;
     else if (onlyUpdateScrollbars) {
@@ -2016,7 +2019,7 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& platformMou
         return !dispatchMouseEvent(eventNames().mouseupEvent, m_lastElementUnderMouse.get(), cancelable, m_clickCount, platformMouseEvent, setUnder);
     }
 
-    HitTestRequest request(HitTestRequest::Release | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::Release | HitTestRequest::DisallowUserAgentShadowContent);
     MouseEventWithHitTestResults mouseEvent = prepareMouseEvent(request, platformMouseEvent);
     Frame* subframe = m_capturingMouseEventsElement.get() ? subframeForTargetNode(m_capturingMouseEventsElement.get()) : subframeForHitTestResult(mouseEvent);
     if (m_eventHandlerWillResetCapturingMouseEventsElement)
@@ -2052,7 +2055,7 @@ bool EventHandler::handleMouseForceEvent(const PlatformMouseEvent& event)
 
     setLastKnownMousePosition(event);
 
-    HitTestRequest::HitTestRequestType hitType = HitTestRequest::DisallowShadowContent | HitTestRequest::Active;
+    HitTestRequest::HitTestRequestType hitType = HitTestRequest::DisallowUserAgentShadowContent | HitTestRequest::Active;
 
     HitTestRequest request(hitType);
     MouseEventWithHitTestResults mouseEvent = prepareMouseEvent(request, event);
@@ -2210,7 +2213,7 @@ bool EventHandler::updateDragAndDrop(const PlatformMouseEvent& event, DataTransf
     if (!m_frame.view())
         return false;
 
-    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowUserAgentShadowContent);
     MouseEventWithHitTestResults mouseEvent = prepareMouseEvent(request, event);
 
     RefPtr<Element> newTarget;
@@ -2539,7 +2542,7 @@ bool EventHandler::dispatchMouseEvent(const AtomicString& eventType, Node* targe
 bool EventHandler::isInsideScrollbar(const IntPoint& windowPoint) const
 {
     if (RenderView* renderView = m_frame.contentRenderer()) {
-        HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
+        HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowUserAgentShadowContent);
         HitTestResult result(windowPoint);
         renderView->hitTest(request, result);
         return result.scrollbar();
@@ -2653,7 +2656,7 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
     m_isHandlingWheelEvent = true;
     setFrameWasScrolledByUser();
 
-    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request;
     HitTestResult result(view->windowToContents(event.position()));
     renderView->hitTest(request, result);
 
@@ -2757,7 +2760,7 @@ bool EventHandler::sendContextMenuEvent(const PlatformMouseEvent& event)
     m_mousePressed = false;
     bool swallowEvent;
     LayoutPoint viewportPos = view->windowToContents(event.position());
-    HitTestRequest request(HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::Active | HitTestRequest::DisallowUserAgentShadowContent);
     MouseEventWithHitTestResults mouseEvent = doc->prepareMouseEvent(request, viewportPos, event);
 
     // Do not show context menus when clicking on scrollbars.
@@ -2837,7 +2840,7 @@ bool EventHandler::sendContextMenuEventForKey()
     // Use the focused node as the target for hover and active.
     HitTestResult result(position);
     result.setInnerNode(targetNode);
-    doc->updateHoverActiveState(HitTestRequest::Active | HitTestRequest::DisallowShadowContent, result.innerElement());
+    doc->updateHoverActiveState(HitTestRequest::Active | HitTestRequest::DisallowUserAgentShadowContent, result.innerElement());
 
     // The contextmenu event is a mouse event even when invoked using the keyboard.
     // This is required for web compatibility.
@@ -2954,7 +2957,7 @@ void EventHandler::hoverTimerFired()
 
     if (RenderView* renderView = m_frame.contentRenderer()) {
         if (FrameView* view = m_frame.view()) {
-            HitTestRequest request(HitTestRequest::Move | HitTestRequest::DisallowShadowContent);
+            HitTestRequest request(HitTestRequest::Move | HitTestRequest::DisallowUserAgentShadowContent);
             HitTestResult result(view->windowToContents(m_lastKnownMousePosition));
             renderView->hitTest(request, result);
             m_frame.document()->updateHoverActiveState(request, result.innerElement());
@@ -3333,7 +3336,7 @@ void EventHandler::freeDataTransfer()
 void EventHandler::dragSourceEndedAt(const PlatformMouseEvent& event, DragOperation operation)
 {
     // Send a hit test request so that RenderLayer gets a chance to update the :hover and :active pseudoclasses.
-    HitTestRequest request(HitTestRequest::Release | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::Release | HitTestRequest::DisallowUserAgentShadowContent);
     prepareMouseEvent(request, event);
 
     if (dragState().source && dragState().shouldDispatchEvents) {
@@ -3386,7 +3389,7 @@ bool EventHandler::handleDrag(const MouseEventWithHitTestResults& event, CheckDr
         dragState().shouldDispatchEvents = (updateDragSourceActionsAllowed() & DragSourceActionDHTML);
 
         // try to find an element that wants to be dragged
-        HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
+        HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowUserAgentShadowContent);
         HitTestResult result(m_mouseDownPos);
         m_frame.contentRenderer()->hitTest(request, result);
         if (m_frame.page())
@@ -3716,7 +3719,7 @@ bool EventHandler::passMousePressEventToScrollbar(MouseEventWithHitTestResults& 
 // last to scrollbar if setLast is true; else set last to nullptr.
 void EventHandler::updateLastScrollbarUnderMouse(Scrollbar* scrollbar, bool setLast)
 {
-    if (m_lastScrollbarUnderMouse.get() != scrollbar) {
+    if (m_lastScrollbarUnderMouse != scrollbar) {
         // Send mouse exited to the old scrollbar.
         if (m_lastScrollbarUnderMouse)
             m_lastScrollbarUnderMouse->mouseExited();
@@ -3902,10 +3905,9 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
         int adjustedPageX = lroundf(pagePoint.x() / scaleFactor);
         int adjustedPageY = lroundf(pagePoint.y() / scaleFactor);
 
-        RefPtr<Touch> touch = Touch::create(targetFrame, touchTarget.get(), point.id(),
-                                            point.screenPos().x(), point.screenPos().y(),
-                                            adjustedPageX, adjustedPageY,
-                                            point.radiusX(), point.radiusY(), point.rotationAngle(), point.force());
+        auto touch = Touch::create(targetFrame, touchTarget.get(), point.id(),
+            point.screenPos().x(), point.screenPos().y(), adjustedPageX, adjustedPageY,
+            point.radiusX(), point.radiusY(), point.rotationAngle(), point.force());
 
         // Ensure this target's touch list exists, even if it ends up empty, so it can always be passed to TouchEvent::Create below.
         TargetTouchesMap::iterator targetTouchesIterator = touchesByTarget.find(touchTarget.get());
@@ -3915,8 +3917,8 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
         // touches and targetTouches should only contain information about touches still on the screen, so if this point is
         // released or cancelled it will only appear in the changedTouches list.
         if (pointState != PlatformTouchPoint::TouchReleased && pointState != PlatformTouchPoint::TouchCancelled) {
-            touches->append(touch);
-            targetTouchesIterator->value->append(touch);
+            touches->append(touch.copyRef());
+            targetTouchesIterator->value->append(touch.copyRef());
         }
 
         // Now build up the correct list for changedTouches.
@@ -3929,7 +3931,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
             ASSERT(pointState < PlatformTouchPoint::TouchStateEnd);
             if (!changedTouches[pointState].m_touches)
                 changedTouches[pointState].m_touches = TouchList::create();
-            changedTouches[pointState].m_touches->append(touch);
+            changedTouches[pointState].m_touches->append(WTFMove(touch));
             changedTouches[pointState].m_targets.add(touchTarget);
         }
     }
@@ -3981,7 +3983,7 @@ bool EventHandler::dispatchSyntheticTouchEventIfEnabled(const PlatformMouseEvent
     if (eventType != PlatformEvent::MouseMoved && eventType != PlatformEvent::MousePressed && eventType != PlatformEvent::MouseReleased)
         return false;
 
-    HitTestRequest request(HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
+    HitTestRequest request(HitTestRequest::Active | HitTestRequest::DisallowUserAgentShadowContent);
     MouseEventWithHitTestResults mouseEvent = prepareMouseEvent(request, platformMouseEvent);
     if (mouseEvent.scrollbar() || subframeForHitTestResult(mouseEvent))
         return false;

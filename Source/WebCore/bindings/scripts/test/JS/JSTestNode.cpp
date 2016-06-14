@@ -24,6 +24,7 @@
 #include "ExceptionCode.h"
 #include "JSDOMBinding.h"
 #include "JSDOMConstructor.h"
+#include "JSDOMIterator.h"
 #include "URL.h"
 #include <runtime/Error.h>
 #include <runtime/JSString.h>
@@ -32,6 +33,14 @@
 using namespace JSC;
 
 namespace WebCore {
+
+// Functions
+
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionSymbolIterator(JSC::ExecState*);
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionEntries(JSC::ExecState*);
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionKeys(JSC::ExecState*);
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionValues(JSC::ExecState*);
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionForEach(JSC::ExecState*);
 
 // Attributes
 
@@ -70,8 +79,8 @@ typedef JSDOMConstructor<JSTestNode> JSTestNodeConstructor;
 template<> EncodedJSValue JSC_HOST_CALL JSTestNodeConstructor::construct(ExecState* state)
 {
     auto* castedThis = jsCast<JSTestNodeConstructor*>(state->callee());
-    RefPtr<TestNode> object = TestNode::create();
-    return JSValue::encode(asObject(toJS(state, castedThis->globalObject(), object.get())));
+    auto object = TestNode::create();
+    return JSValue::encode(asObject(toJSNewlyCreated(state, castedThis->globalObject(), WTFMove(object))));
 }
 
 template<> JSValue JSTestNodeConstructor::prototypeForStructure(JSC::VM& vm, const JSDOMGlobalObject& globalObject)
@@ -94,6 +103,10 @@ static const HashTableValue JSTestNodePrototypeTableValues[] =
 {
     { "constructor", DontEnum, NoIntrinsic, { (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestNodeConstructor), (intptr_t) static_cast<PutPropertySlot::PutValueFunc>(setJSTestNodeConstructor) } },
     { "name", CustomAccessor, NoIntrinsic, { (intptr_t)static_cast<PropertySlot::GetValueFunc>(jsTestNodeName), (intptr_t) static_cast<PutPropertySlot::PutValueFunc>(setJSTestNodeName) } },
+    { "entries", JSC::Function, NoIntrinsic, { (intptr_t)static_cast<NativeFunction>(jsTestNodePrototypeFunctionEntries), (intptr_t) (0) } },
+    { "keys", JSC::Function, NoIntrinsic, { (intptr_t)static_cast<NativeFunction>(jsTestNodePrototypeFunctionKeys), (intptr_t) (0) } },
+    { "values", JSC::Function, NoIntrinsic, { (intptr_t)static_cast<NativeFunction>(jsTestNodePrototypeFunctionValues), (intptr_t) (0) } },
+    { "forEach", JSC::Function, NoIntrinsic, { (intptr_t)static_cast<NativeFunction>(jsTestNodePrototypeFunctionForEach), (intptr_t) (1) } },
 };
 
 const ClassInfo JSTestNodePrototype::s_info = { "TestNodePrototype", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestNodePrototype) };
@@ -102,6 +115,7 @@ void JSTestNodePrototype::finishCreation(VM& vm)
 {
     Base::finishCreation(vm);
     reifyStaticProperties(vm, JSTestNodePrototypeTableValues, *this);
+    putDirect(vm, vm.propertyNames->iteratorSymbol, JSFunction::create(vm, globalObject(), 0, ASCIILiteral("[Symbol.Iterator]"), jsTestNodePrototypeFunctionSymbolIterator), ReadOnly | DontEnum);
 }
 
 const ClassInfo JSTestNode::s_info = { "TestNode", &Base::s_info, 0, CREATE_METHOD_TABLE(JSTestNode) };
@@ -139,7 +153,7 @@ EncodedJSValue jsTestNodeName(ExecState* state, EncodedJSValue thisValue, Proper
 EncodedJSValue jsTestNodeConstructor(ExecState* state, EncodedJSValue thisValue, PropertyName)
 {
     JSTestNodePrototype* domObject = jsDynamicCast<JSTestNodePrototype*>(JSValue::decode(thisValue));
-    if (!domObject)
+    if (UNLIKELY(!domObject))
         return throwVMTypeError(state);
     return JSValue::encode(JSTestNode::getConstructor(state->vm(), domObject->globalObject()));
 }
@@ -165,10 +179,10 @@ bool setJSTestNodeName(ExecState* state, EncodedJSValue thisValue, EncodedJSValu
         return throwSetterTypeError(*state, "TestNode", "name");
     }
     auto& impl = castedThis->wrapped();
-    String nativeValue = value.toString(state)->value(state);
+    auto nativeValue = value.toWTFString(state);
     if (UNLIKELY(state->hadException()))
         return false;
-    impl.setName(nativeValue);
+    impl.setName(WTFMove(nativeValue));
     return true;
 }
 
@@ -178,12 +192,84 @@ JSValue JSTestNode::getConstructor(VM& vm, const JSGlobalObject* globalObject)
     return getDOMConstructor<JSTestNodeConstructor>(vm, *jsCast<const JSDOMGlobalObject*>(globalObject));
 }
 
+using TestNodeIterator = JSDOMIterator<JSTestNode>;
+using TestNodeIteratorPrototype = JSDOMIteratorPrototype<JSTestNode>;
+
+template<>
+const JSC::ClassInfo TestNodeIterator::s_info = { "TestNode Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(TestNodeIterator) };
+
+template<>
+const JSC::ClassInfo TestNodeIteratorPrototype::s_info = { "TestNode Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(TestNodeIteratorPrototype) };
+
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionSymbolIterator(JSC::ExecState* state)
+{
+    return iteratorCreate<JSTestNode>(*state, IterationKind::Value, "[Symbol.Iterator]");
+}
+
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionEntries(JSC::ExecState* state)
+{
+    return iteratorCreate<JSTestNode>(*state, IterationKind::KeyValue, "entries");
+}
+
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionKeys(JSC::ExecState* state)
+{
+    return iteratorCreate<JSTestNode>(*state, IterationKind::Key, "keys");
+}
+
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionValues(JSC::ExecState* state)
+{
+    return iteratorCreate<JSTestNode>(*state, IterationKind::Value, "values");
+}
+
+JSC::EncodedJSValue JSC_HOST_CALL jsTestNodePrototypeFunctionForEach(JSC::ExecState* state)
+{
+    return iteratorForEach<JSTestNode>(*state, "forEach");
+}
+
 void JSTestNode::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     auto* thisObject = jsCast<JSTestNode*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     Base::visitChildren(thisObject, visitor);
     thisObject->wrapped().visitJSEventListeners(visitor);
+}
+
+#if ENABLE(BINDING_INTEGRITY)
+#if PLATFORM(WIN)
+#pragma warning(disable: 4483)
+extern "C" { extern void (*const __identifier("??_7TestNode@WebCore@@6B@")[])(); }
+#else
+extern "C" { extern void* _ZTVN7WebCore8TestNodeE[]; }
+#endif
+#endif
+
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject* globalObject, Ref<TestNode>&& impl)
+{
+
+#if ENABLE(BINDING_INTEGRITY)
+    void* actualVTablePointer = *(reinterpret_cast<void**>(impl.ptr()));
+#if PLATFORM(WIN)
+    void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestNode@WebCore@@6B@"));
+#else
+    void* expectedVTablePointer = &_ZTVN7WebCore8TestNodeE[2];
+#if COMPILER(CLANG)
+    // If this fails TestNode does not have a vtable, so you need to add the
+    // ImplementationLacksVTable attribute to the interface definition
+    static_assert(__is_polymorphic(TestNode), "TestNode is not polymorphic");
+#endif
+#endif
+    // If you hit this assertion you either have a use after free bug, or
+    // TestNode has subclasses. If TestNode has subclasses that get passed
+    // to toJS() we currently require TestNode you to opt out of binding hardening
+    // by adding the SkipVTableValidation attribute to the interface IDL definition
+    RELEASE_ASSERT(actualVTablePointer == expectedVTablePointer);
+#endif
+    return createWrapper<JSTestNode, TestNode>(globalObject, WTFMove(impl));
+}
+
+JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestNode& impl)
+{
+    return wrap(state, globalObject, impl);
 }
 
 

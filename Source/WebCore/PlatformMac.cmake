@@ -4,12 +4,15 @@ if ("${CURRENT_OSX_VERSION}" MATCHES "10.9")
 set(WEBKITSYSTEMINTERFACE_LIBRARY libWebKitSystemInterfaceMavericks.a)
 elif ("${CURRENT_OSX_VERSION}" MATCHES "10.10")
 set(WEBKITSYSTEMINTERFACE_LIBRARY libWebKitSystemInterfaceYosemite.a)
-else ()
+elif ("${CURRENT_OSX_VERSION}" MATCHES "10.11")
 set(WEBKITSYSTEMINTERFACE_LIBRARY libWebKitSystemInterfaceElCapitan.a)
+else ()
+set(WEBKITSYSTEMINTERFACE_LIBRARY libWebKitSystemInterfaceOSX10.12.a)
 endif ()
 link_directories(../../WebKitLibraries)
 
 find_library(ACCELERATE_LIBRARY accelerate)
+find_library(APPLICATIONSERVICES_LIBRARY ApplicationServices)
 find_library(AVFOUNDATION_LIBRARY AVFoundation)
 find_library(AUDIOTOOLBOX_LIBRARY AudioToolbox)
 find_library(AUDIOUNIT_LIBRARY AudioUnit)
@@ -52,6 +55,7 @@ list(APPEND WebCore_LIBRARIES
 
 add_definitions(-iframework ${QUARTZ_LIBRARY}/Frameworks)
 add_definitions(-iframework ${AVFOUNDATION_LIBRARY}/Versions/Current/Frameworks)
+add_definitions(-iframework ${APPLICATIONSERVICES_LIBRARY}/Versions/Current/Frameworks)
 
 find_library(DATADETECTORSCORE_FRAMEWORK DataDetectorsCore HINTS /System/Library/PrivateFrameworks)
 if (NOT DATADETECTORSCORE_FRAMEWORK-NOTFOUND)
@@ -340,7 +344,7 @@ list(APPEND WebCore_SOURCES
     platform/cocoa/SearchPopupMenuCocoa.mm
     platform/cocoa/SystemVersion.mm
     platform/cocoa/TelephoneNumberDetectorCocoa.cpp
-    platform/cocoa/ThemeCocoa.cpp
+    platform/cocoa/ThemeCocoa.mm
     platform/cocoa/VNodeTrackerCocoa.cpp
     platform/cocoa/WebCoreNSErrorExtras.mm
 
@@ -348,7 +352,6 @@ list(APPEND WebCore_SOURCES
 
     platform/graphics/DisplayRefreshMonitor.cpp
     platform/graphics/DisplayRefreshMonitorManager.cpp
-    platform/graphics/FontPlatformData.cpp
 
     platform/graphics/avfoundation/AVTrackPrivateAVFObjCImpl.mm
     platform/graphics/avfoundation/AudioSourceProviderAVFObjC.mm
@@ -462,7 +465,6 @@ list(APPEND WebCore_SOURCES
     platform/graphics/opentype/OpenTypeCG.cpp
     platform/graphics/opentype/OpenTypeMathData.cpp
 
-    platform/mac/BlockExceptions.mm
     platform/mac/CursorMac.mm
     platform/mac/DragDataMac.mm
     platform/mac/DragImageMac.mm
@@ -472,7 +474,6 @@ list(APPEND WebCore_SOURCES
     platform/mac/HIDGamepadProvider.cpp
     platform/mac/KeyEventMac.mm
     platform/mac/KillRingMac.mm
-    platform/mac/Language.mm
     platform/mac/LocalCurrentGraphicsContext.mm
     platform/mac/LoggingMac.mm
     platform/mac/NSScrollerImpDetails.mm
@@ -488,7 +489,6 @@ list(APPEND WebCore_SOURCES
     platform/mac/SSLKeyGeneratorMac.cpp
     platform/mac/ScrollAnimatorMac.mm
     platform/mac/ScrollViewMac.mm
-    platform/mac/ScrollableAreaMac.mm
     platform/mac/ScrollbarThemeMac.mm
     platform/mac/SerializedPlatformRepresentationMac.mm
     platform/mac/SharedBufferMac.mm

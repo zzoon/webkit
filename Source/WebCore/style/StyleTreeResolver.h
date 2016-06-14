@@ -23,8 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef StyleTreeResolver_h
-#define StyleTreeResolver_h
+#pragma once
 
 #include "RenderStyleConstants.h"
 #include "RenderTreePosition.h"
@@ -35,6 +34,7 @@
 #include "StyleUpdate.h"
 #include <functional>
 #include <wtf/HashMap.h>
+#include <wtf/NoncopyableFunction.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -58,10 +58,12 @@ public:
     TreeResolver(Document&);
     ~TreeResolver();
 
-    std::unique_ptr<const Update> resolve(Change);
+    std::unique_ptr<Update> resolve(Change);
+
+    static ElementUpdate createAnimatedElementUpdate(std::unique_ptr<RenderStyle>, RenderElement* existingRenderer, Document&);
 
 private:
-    Ref<RenderStyle> styleForElement(Element&, RenderStyle& inheritedStyle);
+    std::unique_ptr<RenderStyle> styleForElement(Element&, const RenderStyle& inheritedStyle);
 
     void resolveComposedTree();
     ElementUpdate resolveElement(Element&);
@@ -79,13 +81,13 @@ private:
 
     struct Parent {
         Element* element;
-        Ref<RenderStyle> style;
+        const RenderStyle& style;
         Change change;
         bool didPushScope { false };
         bool elementNeedingStyleRecalcAffectsNextSiblingElementStyle { false };
 
         Parent(Document&, Change);
-        Parent(Element&, ElementUpdate&);
+        Parent(Element&, const RenderStyle&, Change);
     };
 
     Scope& scope() { return m_scopeStack.last(); }
@@ -95,12 +97,12 @@ private:
     void pushEnclosingScope();
     void popScope();
 
-    void pushParent(Element&, ElementUpdate&);
+    void pushParent(Element&, const RenderStyle&, Change);
     void popParent();
     void popParentsToDepth(unsigned depth);
 
     Document& m_document;
-    RefPtr<RenderStyle> m_documentElementStyle;
+    std::unique_ptr<RenderStyle> m_documentElementStyle;
 
     Vector<Ref<Scope>, 4> m_scopeStack;
     Vector<Parent, 32> m_parentStack;
@@ -108,7 +110,7 @@ private:
     std::unique_ptr<Update> m_update;
 };
 
-void queuePostResolutionCallback(std::function<void ()>);
+void queuePostResolutionCallback(NoncopyableFunction<void ()>&&);
 bool postResolutionCallbacksAreSuspended();
 
 bool isPlaceholderStyle(const RenderStyle&);
@@ -122,5 +124,3 @@ public:
 }
 
 }
-
-#endif

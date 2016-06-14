@@ -72,7 +72,6 @@
 #include <inspector/agents/InspectorAgent.h>
 #include <inspector/agents/InspectorHeapAgent.h>
 #include <inspector/agents/InspectorScriptProfilerAgent.h>
-#include <profiler/LegacyProfiler.h>
 #include <runtime/JSLock.h>
 #include <wtf/Stopwatch.h>
 
@@ -158,13 +157,13 @@ InspectorController::InspectorController(Page& page, InspectorClient* inspectorC
     InspectorDOMStorageAgent* domStorageAgent = domStorageAgentPtr.get();
     m_agents.append(WTFMove(domStorageAgentPtr));
 
-    auto timelineAgentPtr = std::make_unique<InspectorTimelineAgent>(pageContext, pageAgent);
-    m_timelineAgent = timelineAgentPtr.get();
-    m_agents.append(WTFMove(timelineAgentPtr));
-
     auto heapAgentPtr = std::make_unique<InspectorHeapAgent>(pageContext);
     InspectorHeapAgent* heapAgent = heapAgentPtr.get();
     m_agents.append(WTFMove(heapAgentPtr));
+
+    auto scriptProfilerAgentPtr = std::make_unique<InspectorScriptProfilerAgent>(pageContext);
+    InspectorScriptProfilerAgent* scriptProfilerAgent = scriptProfilerAgentPtr.get();
+    m_agents.append(WTFMove(scriptProfilerAgentPtr));
 
     auto consoleAgentPtr = std::make_unique<PageConsoleAgent>(pageContext, heapAgent, m_domAgent);
     WebConsoleAgent* consoleAgent = consoleAgentPtr.get();
@@ -175,8 +174,8 @@ InspectorController::InspectorController(Page& page, InspectorClient* inspectorC
     PageDebuggerAgent* debuggerAgent = debuggerAgentPtr.get();
     m_agents.append(WTFMove(debuggerAgentPtr));
 
+    m_agents.append(std::make_unique<InspectorTimelineAgent>(pageContext, scriptProfilerAgent, heapAgent, pageAgent));
     m_agents.append(std::make_unique<InspectorDOMDebuggerAgent>(pageContext, m_domAgent, debuggerAgent));
-    m_agents.append(std::make_unique<InspectorScriptProfilerAgent>(pageContext));
     m_agents.append(std::make_unique<InspectorApplicationCacheAgent>(pageContext, pageAgent));
     m_agents.append(std::make_unique<InspectorLayerTreeAgent>(pageContext));
 
@@ -409,27 +408,6 @@ void InspectorController::setIndicating(bool indicating)
     else
         m_inspectorClient->hideInspectorIndication();
 #endif
-}
-
-bool InspectorController::legacyProfilerEnabled() const
-{
-    return m_legacyProfilerEnabled;
-}
-
-void InspectorController::setLegacyProfilerEnabled(bool enable)
-{
-    m_legacyProfilerEnabled = enable;
-
-    ErrorString unused;
-    if (enable) {
-        m_instrumentingAgents->setPersistentInspectorTimelineAgent(m_timelineAgent);
-        m_scriptDebugServer.recompileAllJSFunctions();
-        m_timelineAgent->start(unused);
-    } else {
-        m_instrumentingAgents->setPersistentInspectorTimelineAgent(nullptr);
-        m_scriptDebugServer.recompileAllJSFunctions();
-        m_timelineAgent->stop(unused);
-    }
 }
 
 bool InspectorController::developerExtrasEnabled() const

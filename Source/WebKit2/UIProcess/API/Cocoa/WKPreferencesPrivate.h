@@ -62,6 +62,7 @@ typedef NS_OPTIONS(NSUInteger, _WKJavaScriptRuntimeFlags) {
 @property (nonatomic, setter=_setSimpleLineLayoutDebugBordersEnabled:) BOOL _simpleLineLayoutDebugBordersEnabled WK_AVAILABLE(10_11, 9_0);
 @property (nonatomic, setter=_setAcceleratedDrawingEnabled:) BOOL _acceleratedDrawingEnabled WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 @property (nonatomic, setter=_setDisplayListDrawingEnabled:) BOOL _displayListDrawingEnabled WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+@property (nonatomic, setter=_setTextAutosizingEnabled:) BOOL _textAutosizingEnabled WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 @property (nonatomic, setter=_setDeveloperExtrasEnabled:) BOOL _developerExtrasEnabled WK_AVAILABLE(10_11, 9_0);
 
@@ -87,9 +88,9 @@ typedef NS_OPTIONS(NSUInteger, _WKJavaScriptRuntimeFlags) {
 @property (nonatomic, setter=_setOfflineApplicationCacheIsEnabled:) BOOL _offlineApplicationCacheIsEnabled;
 @property (nonatomic, setter=_setFullScreenEnabled:) BOOL _fullScreenEnabled WK_AVAILABLE(10_11, 9_0);
 
-+ (WK_ARRAY(_WKExperimentalFeature *) *)_experimentalFeatures;
-- (BOOL)_isEnabledForFeature:(_WKExperimentalFeature *)feature;
-- (void)_setEnabled:(BOOL)value forFeature:(_WKExperimentalFeature *)feature;
++ (WK_ARRAY(_WKExperimentalFeature *) *)_experimentalFeatures WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+- (BOOL)_isEnabledForFeature:(_WKExperimentalFeature *)feature WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
+- (void)_setEnabled:(BOOL)value forFeature:(_WKExperimentalFeature *)feature WK_AVAILABLE(WK_MAC_TBA, WK_IOS_TBA);
 
 @end
 

@@ -274,7 +274,7 @@ _handleUncaughtException:
     loadp Callee[cfr], t3
     andp MarkedBlockMask, t3
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
-    restoreCalleeSavesFromVMCalleeSavesBuffer(t3, t0)
+    restoreCalleeSavesFromVMEntryFrameCalleeSavesBuffer(t3, t0)
     loadp VM::callFrameForCatch[t3], cfr
     storep 0, VM::callFrameForCatch[t3]
 
@@ -582,6 +582,16 @@ _llint_op_enter:
 .opEnterDone:
     callSlowPath(_slow_path_enter)
     dispatch(1)
+
+
+_llint_op_argument_count:
+    traceExecution()
+    loadisFromInstruction(1, t1)
+    loadi PayloadOffset + ArgumentCount[cfr], t0
+    subi 1, t0
+    orq TagTypeNumber, t0
+    storeq t0, [cfr, t1, 8]
+    dispatch(2)
 
 
 _llint_op_get_scope:
@@ -1098,6 +1108,18 @@ _llint_op_instanceof_custom:
     callSlowPath(_llint_slow_path_instanceof_custom)
     dispatch(5)
 
+
+_llint_op_is_empty:
+    traceExecution()
+    loadisFromInstruction(2, t1)
+    loadisFromInstruction(1, t2)
+    loadConstantOrVariable(t1, t0)
+    cqeq t0, ValueEmpty, t3
+    orq ValueFalse, t3
+    storeq t3, [cfr, t2, 8]
+    dispatch(3)
+
+
 _llint_op_is_undefined:
     traceExecution()
     loadisFromInstruction(2, t1)
@@ -1216,6 +1238,43 @@ _llint_op_get_by_id:
     dispatch(9)
 
 .opGetByIdSlow:
+    callSlowPath(_llint_slow_path_get_by_id)
+    dispatch(9)
+
+
+_llint_op_get_by_id_proto_load:
+    traceExecution()
+    loadisFromInstruction(2, t0)
+    loadConstantOrVariableCell(t0, t3, .opGetByIdProtoSlow)
+    loadi JSCell::m_structureID[t3], t1
+    loadisFromInstruction(4, t2)
+    bineq t2, t1, .opGetByIdProtoSlow
+    loadisFromInstruction(5, t1)
+    loadpFromInstruction(6, t3)
+    loadisFromInstruction(1, t2)
+    loadPropertyAtVariableOffset(t1, t3, t0)
+    storeq t0, [cfr, t2, 8]
+    valueProfile(t0, 8, t1)
+    dispatch(9)
+
+.opGetByIdProtoSlow:
+    callSlowPath(_llint_slow_path_get_by_id)
+    dispatch(9)
+
+
+_llint_op_get_by_id_unset:
+    traceExecution()
+    loadisFromInstruction(2, t0)
+    loadConstantOrVariableCell(t0, t3, .opGetByIdUnsetSlow)
+    loadi JSCell::m_structureID[t3], t1
+    loadisFromInstruction(4, t2)
+    bineq t2, t1, .opGetByIdUnsetSlow
+    loadisFromInstruction(1, t2)
+    storeq ValueUndefined, [cfr, t2, 8]
+    valueProfile(ValueUndefined, 8, t1)
+    dispatch(9)
+
+.opGetByIdUnsetSlow:
     callSlowPath(_llint_slow_path_get_by_id)
     dispatch(9)
 
@@ -1381,6 +1440,23 @@ _llint_op_put_by_id:
     callSlowPath(_llint_slow_path_put_by_id)
     dispatch(9)
 
+macro finishGetByVal(result, scratch)
+    loadisFromInstruction(1, scratch)
+    storeq result, [cfr, scratch, 8]
+    valueProfile(result, 5, scratch)
+    dispatch(6)
+end
+
+macro finishIntGetByVal(result, scratch)
+    orq tagTypeNumber, result
+    finishGetByVal(result, scratch)
+end
+
+macro finishDoubleGetByVal(result, scratch1, scratch2)
+    fd2q result, scratch1
+    subq tagTypeNumber, scratch1
+    finishGetByVal(scratch1, scratch2)
+end
 
 _llint_op_get_by_val:
     traceExecution()
@@ -1416,7 +1492,7 @@ _llint_op_get_by_val:
     
 .opGetByValNotDouble:
     subi ArrayStorageShape, t2
-    bia t2, SlowPutArrayStorageShape - ArrayStorageShape, .opGetByValSlow
+    bia t2, SlowPutArrayStorageShape - ArrayStorageShape, .opGetByValNotIndexedStorage
     biaeq t1, -sizeof IndexingHeader + IndexingHeader::u.lengths.vectorLength[t3], .opGetByValOutOfBounds
     loadisFromInstruction(1, t0)
     loadq ArrayStorage::m_vector[t3, t1, 8], t2
@@ -1430,6 +1506,73 @@ _llint_op_get_by_val:
 .opGetByValOutOfBounds:
     loadpFromInstruction(4, t0)
     storeb 1, ArrayProfile::m_outOfBounds[t0]
+
+.opGetByValNotIndexedStorage:
+    # First lets check if we even have a typed array. This lets us do some boilerplate up front.
+    loadb JSCell::m_type[t0], t2
+    subi FirstArrayType, t2
+    bia t2, LastArrayType - FirstArrayType, .opGetByValSlow
+    
+    # Sweet, now we know that we have a typed array. Do some basic things now.
+    loadp JSArrayBufferView::m_vector[t0], t3
+    biaeq t1, JSArrayBufferView::m_length[t0], .opGetByValSlow
+    
+    # Now bisect through the various types. Note that we can treat Uint8ArrayType and
+    # Uint8ClampedArrayType the same.
+    bia t2, Uint8ClampedArrayType - FirstArrayType, .opGetByValAboveUint8ClampedArray
+    
+    # We have one of Int8ArrayType .. Uint8ClampedArrayType.
+    bia t2, Int16ArrayType - FirstArrayType, .opGetByValInt32ArrayOrUint8Array
+    
+    # We have one of Int8ArrayType or Int16ArrayType
+    bineq t2, Int8ArrayType - FirstArrayType, .opGetByValInt16Array
+    
+    # We have Int8ArrayType
+    loadbs [t3, t1], t0
+    finishIntGetByVal(t0, t1)
+
+.opGetByValInt16Array:
+    loadhs [t3, t1, 2], t0
+    finishIntGetByVal(t0, t1)
+
+.opGetByValInt32ArrayOrUint8Array:
+    # We have one of Int16Array, Uint8Array, or Uint8ClampedArray.
+    bieq t2, Int32ArrayType - FirstArrayType, .opGetByValInt32Array
+    
+    # We have either Uint8Array or Uint8ClampedArray. They behave the same so that's cool.
+    loadb [t3, t1], t0
+    finishIntGetByVal(t0, t1)
+
+.opGetByValInt32Array:
+    loadi [t3, t1, 4], t0
+    finishIntGetByVal(t0, t1)
+
+.opGetByValAboveUint8ClampedArray:
+    # We have one of Uint16ArrayType .. Float64ArrayType.
+    bia t2, Uint32ArrayType - FirstArrayType, .opGetByValAboveUint32Array
+    
+    # We have either Uint16ArrayType or Uint32ArrayType.
+    bieq t2, Uint32ArrayType - FirstArrayType, .opGetByValUint32Array
+
+    # We have Uint16ArrayType.
+    loadh [t3, t1, 2], t0
+    finishIntGetByVal(t0, t1)
+
+.opGetByValUint32Array:
+    # This is the hardest part because of large unsigned values.
+    loadi [t3, t1, 4], t0
+    bilt t0, 0, .opGetByValSlow # This case is still awkward to implement in LLInt.
+    finishIntGetByVal(t0, t1)
+
+.opGetByValAboveUint32Array:
+    # We have one of Float32ArrayType or Float64ArrayType. Sadly, we cannot handle Float32Array
+    # inline yet. That would require some offlineasm changes.
+    bieq t2, Float32ArrayType - FirstArrayType, .opGetByValSlow
+
+    # We have Float64ArrayType.
+    loadd [t3, t1, 8], ft0
+    finishDoubleGetByVal(ft0, t0, t1)
+
 .opGetByValSlow:
     callSlowPath(_llint_slow_path_get_by_val)
     dispatch(6)
@@ -1782,7 +1925,7 @@ _llint_op_catch:
     loadp Callee[cfr], t3
     andp MarkedBlockMask, t3
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
-    restoreCalleeSavesFromVMCalleeSavesBuffer(t3, t0)
+    restoreCalleeSavesFromVMEntryFrameCalleeSavesBuffer(t3, t0)
     loadp VM::callFrameForCatch[t3], cfr
     storep 0, VM::callFrameForCatch[t3]
     restoreStackPointerAfterCall()
@@ -1828,7 +1971,7 @@ _llint_throw_from_slow_path_trampoline:
     loadp Callee[cfr], t1
     andp MarkedBlockMask, t1
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t1], t1
-    copyCalleeSavesToVMCalleeSavesBuffer(t1, t2)
+    copyCalleeSavesToVMEntryFrameCalleeSavesBuffer(t1, t2)
 
     callSlowPath(_llint_slow_path_handle_exception)
 
@@ -2288,4 +2431,38 @@ _llint_op_get_rest_length:
     orq tagTypeNumber, t0
     loadisFromInstruction(1, t1)
     storeq t0, [cfr, t1, 8]
+    dispatch(3)
+
+
+_llint_op_log_shadow_chicken_prologue:
+    traceExecution()
+    acquireShadowChickenPacket(.opLogShadowChickenPrologueSlow)
+    storep cfr, ShadowChicken::Packet::frame[t0]
+    loadp CallerFrame[cfr], t1
+    storep t1, ShadowChicken::Packet::callerFrame[t0]
+    loadp Callee[cfr], t1
+    storep t1, ShadowChicken::Packet::callee[t0]
+    loadVariable(1, t1)
+    storep t1, ShadowChicken::Packet::scope[t0]
+    dispatch(2)
+.opLogShadowChickenPrologueSlow:
+    callSlowPath(_llint_slow_path_log_shadow_chicken_prologue)
+    dispatch(2)
+
+
+_llint_op_log_shadow_chicken_tail:
+    traceExecution()
+    acquireShadowChickenPacket(.opLogShadowChickenTailSlow)
+    storep cfr, ShadowChicken::Packet::frame[t0]
+    storep ShadowChickenTailMarker, ShadowChicken::Packet::callee[t0]
+    loadVariable(1, t1)
+    storep t1, ShadowChicken::Packet::thisValue[t0]
+    loadVariable(2, t1)
+    storep t1, ShadowChicken::Packet::scope[t0]
+    loadp CodeBlock[cfr], t1
+    storep t1, ShadowChicken::Packet::codeBlock[t0]
+    storei PC, ShadowChicken::Packet::callSiteIndex[t0]
+    dispatch(3)
+.opLogShadowChickenTailSlow:
+    callSlowPath(_llint_slow_path_log_shadow_chicken_tail)
     dispatch(3)

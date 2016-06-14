@@ -783,7 +783,7 @@ static Color menuListColor(const Element* element)
     };
     info.name = "box";
     info.classList = { "horizontal", "linked" };
-    return RenderThemeBoxGadget(info, children, comboGadget.get()).child(0)->color();
+    return RenderThemeBoxGadget(info, GTK_ORIENTATION_HORIZONTAL, children, comboGadget.get()).child(0)->color();
 #else
     GRefPtr<GtkStyleContext> parentStyleContext = createStyleContext(ComboBox);
     GRefPtr<GtkStyleContext> buttonStyleContext = createStyleContext(ComboBoxButton, parentStyleContext.get());
@@ -803,7 +803,8 @@ void RenderThemeGtk::adjustMenuListStyle(StyleResolver&, RenderStyle& style, con
     // We cannot give a proper rendering when border radius is active, unfortunately.
     style.resetBorderRadius();
 
-    style.setColor(menuListColor(element));
+    if (element)
+        style.setColor(menuListColor(element));
 }
 
 void RenderThemeGtk::adjustMenuListButtonStyle(StyleResolver& styleResolver, RenderStyle& style, const Element* e) const
@@ -835,7 +836,7 @@ LengthBox RenderThemeGtk::popupInternalPaddingBox(const RenderStyle& style) cons
     };
     info.name = "box";
     info.classList = { "horizontal", "linked" };
-    auto boxGadget = std::make_unique<RenderThemeBoxGadget>(info, children, comboGadget.get());
+    auto boxGadget = std::make_unique<RenderThemeBoxGadget>(info, GTK_ORIENTATION_HORIZONTAL, children, comboGadget.get());
     RenderThemeGadget* buttonGadget = boxGadget->child(0);
     info.classList.removeLast();
     auto buttonBoxGadget = RenderThemeGadget::create(info, buttonGadget);
@@ -866,7 +867,7 @@ bool RenderThemeGtk::paintMenuList(const RenderObject& renderObject, const Paint
     };
     info.name = "box";
     info.classList = { "horizontal", "linked" };
-    auto boxGadget = std::make_unique<RenderThemeBoxGadget>(info, children, comboGadget.get());
+    auto boxGadget = std::make_unique<RenderThemeBoxGadget>(info, GTK_ORIENTATION_HORIZONTAL, children, comboGadget.get());
     RenderThemeGadget* buttonGadget = boxGadget->child(0);
     info.classList.removeLast();
     auto buttonBoxGadget = RenderThemeGadget::create(info, buttonGadget);
@@ -2015,7 +2016,7 @@ bool RenderThemeGtk::paintMediaToggleClosedCaptionsButton(const RenderObject& re
 }
 #endif
 
-static FloatRoundedRect::Radii borderRadiiFromStyle(RenderStyle& style)
+static FloatRoundedRect::Radii borderRadiiFromStyle(const RenderStyle& style)
 {
     return FloatRoundedRect::Radii(
         IntSize(style.borderTopLeftRadius().width().intValue(), style.borderTopLeftRadius().height().intValue()),
@@ -2036,7 +2037,7 @@ bool RenderThemeGtk::paintMediaSliderTrack(const RenderObject& o, const PaintInf
 
     float mediaDuration = mediaElement->duration();
     float totalTrackWidth = r.width();
-    RenderStyle& style = o.style();
+    auto& style = o.style();
     RefPtr<TimeRanges> timeRanges = mediaElement->buffered();
     for (unsigned index = 0; index < timeRanges->length(); ++index) {
         float start = timeRanges->start(index, IGNORE_EXCEPTION);
@@ -2059,7 +2060,7 @@ bool RenderThemeGtk::paintMediaSliderTrack(const RenderObject& o, const PaintInf
 
 bool RenderThemeGtk::paintMediaSliderThumb(const RenderObject& o, const PaintInfo& paintInfo, const IntRect& r)
 {
-    RenderStyle& style = o.style();
+    auto& style = o.style();
     paintInfo.context().fillRoundedRect(FloatRoundedRect(r, borderRadiiFromStyle(style)), style.visitedDependentColor(CSSPropertyColor));
     return false;
 }
@@ -2080,7 +2081,7 @@ bool RenderThemeGtk::paintMediaVolumeSliderTrack(const RenderObject& renderObjec
 
     int rectHeight = rect.height();
     float trackHeight = rectHeight * volume;
-    RenderStyle& style = renderObject.style();
+    auto& style = renderObject.style();
     IntRect volumeRect(rect);
     volumeRect.move(0, rectHeight - trackHeight);
     volumeRect.setHeight(ceil(trackHeight));

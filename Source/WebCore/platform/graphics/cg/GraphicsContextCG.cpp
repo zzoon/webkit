@@ -34,12 +34,15 @@
 #include "GraphicsContextPlatformPrivateCG.h"
 #include "ImageBuffer.h"
 #include "ImageOrientation.h"
+#include "Logging.h"
 #include "Path.h"
 #include "Pattern.h"
 #include "ShadowBlur.h"
 #include "SubimageCacheWithTimer.h"
+#include "TextStream.h"
 #include "Timer.h"
 #include "URL.h"
+#include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
 #include <wtf/RetainPtr.h>
 
@@ -172,6 +175,9 @@ void GraphicsContext::drawNativeImage(const RetainPtr<CGImageRef>& image, const 
         return;
     }
 
+#if !LOG_DISABLED
+    double startTime = currentTime();
+#endif
     RetainPtr<CGImageRef> subImage(image);
 
     float currHeight = orientation.usesWidthAsHeight() ? CGImageGetWidth(subImage.get()) : CGImageGetHeight(subImage.get());
@@ -272,6 +278,8 @@ void GraphicsContext::drawNativeImage(const RetainPtr<CGImageRef>& image, const 
         CGContextSetShouldAntialias(context, wasAntialiased);
 #endif
     }
+
+    LOG_WITH_STREAM(Images, stream << "GraphicsContext::drawNativeImage " << image.get() << " size " << imageSize << " into " << destRect << " took " << 1000.0 * (currentTime() - startTime) << "ms");
 }
 
 static void drawPatternCallback(void* info, CGContextRef context)
@@ -287,8 +295,7 @@ static void drawPatternCallback(void* info, CGContextRef context)
 
 static void patternReleaseCallback(void* info)
 {
-    auto image = static_cast<CGImageRef>(info);
-    callOnMainThread([image] {
+    callOnMainThread([image = static_cast<CGImageRef>(info)] {
         CGImageRelease(image);
     });
 }
@@ -1472,15 +1479,15 @@ FloatRect GraphicsContext::roundToDevicePixels(const FloatRect& rect, RoundingMo
     return FloatRect(roundedOrigin, roundedLowerRight - roundedOrigin);
 }
 
-void GraphicsContext::drawLineForText(const FloatPoint& point, float width, bool printing, bool doubleLines)
+void GraphicsContext::drawLineForText(const FloatPoint& point, float width, bool printing, bool doubleLines, StrokeStyle strokeStyle)
 {
     DashArray widths;
     widths.append(width);
     widths.append(0);
-    drawLinesForText(point, widths, printing, doubleLines);
+    drawLinesForText(point, widths, printing, doubleLines, strokeStyle);
 }
 
-void GraphicsContext::drawLinesForText(const FloatPoint& point, const DashArray& widths, bool printing, bool doubleLines)
+void GraphicsContext::drawLinesForText(const FloatPoint& point, const DashArray& widths, bool printing, bool doubleLines, StrokeStyle strokeStyle)
 {
     if (paintingDisabled())
         return;
@@ -1501,8 +1508,32 @@ void GraphicsContext::drawLinesForText(const FloatPoint& point, const DashArray&
     Vector<CGRect, 4> dashBounds;
     ASSERT(!(widths.size() % 2));
     dashBounds.reserveInitialCapacity(dashBounds.size() / 2);
-    for (size_t i = 0; i < widths.size(); i += 2)
-        dashBounds.append(CGRectMake(bounds.x() + widths[i], bounds.y(), widths[i+1] - widths[i], bounds.height()));
+
+    float dashWidth = 0;
+    switch (strokeStyle) {
+    case DottedStroke:
+        dashWidth = bounds.height();
+        break;
+    case DashedStroke:
+        dashWidth = 2 * bounds.height();
+        break;
+    case SolidStroke:
+    default:
+        break;
+    }
+
+    for (size_t i = 0; i < widths.size(); i += 2) {
+        auto left = widths[i];
+        auto width = widths[i+1] - widths[i];
+        if (!dashWidth)
+            dashBounds.append(CGRectMake(bounds.x() + left, bounds.y(), width, bounds.height()));
+        else {
+            auto startParticle = static_cast<unsigned>(std::ceil(left / (2 * dashWidth)));
+            auto endParticle = static_cast<unsigned>((left + width) / (2 * dashWidth));
+            for (unsigned j = startParticle; j < endParticle; ++j)
+                dashBounds.append(CGRectMake(bounds.x() + j * 2 * dashWidth, bounds.y(), dashWidth, bounds.height()));
+        }
+    }
 
     if (doubleLines) {
         // The space between double underlines is equal to the height of the underline

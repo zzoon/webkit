@@ -46,6 +46,7 @@
 #include "StringWithDirection.h"
 #include "StyleChange.h"
 #include "Supplementable.h"
+#include "TextAutoSizing.h"
 #include "TextResourceDecoder.h"
 #include "Timer.h"
 #include "TreeScope.h"
@@ -212,12 +213,6 @@ class DeviceOrientationController;
 struct TextAutoSizingHash;
 class TextAutoSizingKey;
 class TextAutoSizingValue;
-
-struct TextAutoSizingTraits : WTF::GenericHashTraits<TextAutoSizingKey> {
-    static const bool emptyValueIsZero = true;
-    static void constructDeletedValue(TextAutoSizingKey& slot);
-    static bool isDeletedValue(const TextAutoSizingKey& value);
-};
 #endif
 
 #if ENABLE(MEDIA_SESSION)
@@ -285,6 +280,8 @@ enum class HttpEquivPolicy {
     DisabledBySettings,
     DisabledByContentDispositionAttachmentSandbox
 };
+
+enum class CustomElementNameValidationStatus { Valid, ConflictsWithBuiltinNames, NoHyphen, ContainsUpperCase };
 
 class Document
     : public ContainerNode
@@ -388,13 +385,17 @@ public:
     RefPtr<Attr> createAttribute(const String& name, ExceptionCode&);
     RefPtr<Attr> createAttributeNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&, bool shouldIgnoreNamespaceChecks = false);
     RefPtr<EntityReference> createEntityReference(const String& name, ExceptionCode&);
-    RefPtr<Node> importNode(Node& nodeToImport, ExceptionCode& ec) { return importNode(nodeToImport, false, ec); }
     RefPtr<Node> importNode(Node& nodeToImport, bool deep, ExceptionCode&);
     WEBCORE_EXPORT RefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&);
     WEBCORE_EXPORT Ref<Element> createElement(const QualifiedName&, bool createdByParser);
 
-    bool cssRegionsEnabled() const;
-    bool cssCompositingEnabled() const;
+#if ENABLE(CUSTOM_ELEMENTS) || ENABLE(SHADOW_DOM)
+    static CustomElementNameValidationStatus validateCustomElementName(const AtomicString&);
+#endif
+
+#if ENABLE(CSS_GRID_LAYOUT)
+    bool isCSSGridLayoutEnabled() const;
+#endif
 #if ENABLE(CSS_REGIONS)
     RefPtr<DOMNamedFlowCollection> webkitGetNamedFlows();
 #endif
@@ -503,7 +504,7 @@ public:
     }
     StyleResolver& userAgentShadowTreeStyleResolver();
 
-    CSSFontSelector& fontSelector();
+    CSSFontSelector& fontSelector() { return m_fontSelector; }
 
     void notifyRemovePendingSheetIfNeeded();
 
@@ -572,7 +573,7 @@ public:
     };
     WEBCORE_EXPORT void updateLayoutIgnorePendingStylesheets(RunPostLayoutTasks = RunPostLayoutTasks::Asynchronously);
 
-    Ref<RenderStyle> styleForElementIgnoringPendingStylesheets(Element&, RenderStyle* parentStyle);
+    std::unique_ptr<RenderStyle> styleForElementIgnoringPendingStylesheets(Element&, const RenderStyle* parentStyle);
 
     // Returns true if page box (margin boxes and page borders) is visible.
     WEBCORE_EXPORT bool isPageBoxVisible(int pageIndex);
@@ -722,7 +723,9 @@ public:
     String selectedStylesheetSet() const;
     void setSelectedStylesheetSet(const String&);
 
-    WEBCORE_EXPORT bool setFocusedElement(Element*, FocusDirection = FocusDirectionNone);
+    enum class FocusRemovalEventsMode { Dispatch, DoNotDispatch };
+    WEBCORE_EXPORT bool setFocusedElement(Element*, FocusDirection = FocusDirectionNone,
+        FocusRemovalEventsMode = FocusRemovalEventsMode::Dispatch);
     Element* focusedElement() const { return m_focusedElement.get(); }
     UserActionElementSet& userActionElements()  { return m_userActionElements; }
     const UserActionElementSet& userActionElements() const { return m_userActionElements; }
@@ -952,9 +955,9 @@ public:
     uint64_t domTreeVersion() const { return m_domTreeVersion; }
 
     // XPathEvaluator methods
-    RefPtr<XPathExpression> createExpression(const String& expression, XPathNSResolver*, ExceptionCode&);
+    RefPtr<XPathExpression> createExpression(const String& expression, RefPtr<XPathNSResolver>&&, ExceptionCode&);
     RefPtr<XPathNSResolver> createNSResolver(Node* nodeResolver);
-    RefPtr<XPathResult> evaluate(const String& expression, Node* contextNode, XPathNSResolver*, unsigned short type, XPathResult*, ExceptionCode&);
+    RefPtr<XPathResult> evaluate(const String& expression, Node* contextNode, RefPtr<XPathNSResolver>&&, unsigned short type, XPathResult*, ExceptionCode&);
 
     enum PendingSheetLayout { NoLayoutWithPendingSheets, DidLayoutWithPendingSheets, IgnoreLayoutWithPendingSheets };
 
@@ -973,7 +976,7 @@ public:
     bool isDNSPrefetchEnabled() const { return m_isDNSPrefetchEnabled; }
     void parseDNSPrefetchControlHeader(const String&);
 
-    void postTask(Task) final; // Executes the task on context's thread asynchronously.
+    void postTask(Task&&) final; // Executes the task on context's thread asynchronously.
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     ScriptedAnimationController* scriptedAnimationController() { return m_scriptedAnimationController.get(); }
@@ -1244,12 +1247,10 @@ public:
     // Return a Locale for the default locale if the argument is null or empty.
     Locale& getCachedLocale(const AtomicString& locale = nullAtom);
 
-#if ENABLE(TEMPLATE_ELEMENT)
     const Document* templateDocument() const;
     Document& ensureTemplateDocument();
     void setTemplateDocumentHost(Document* templateDocumentHost) { m_templateDocumentHost = templateDocumentHost; }
     Document* templateDocumentHost() { return m_templateDocumentHost; }
-#endif
 
     void didAssociateFormControl(Element*);
     bool hasDisabledFieldsetElement() const { return m_disabledFieldsetElementsCount; }
@@ -1630,7 +1631,7 @@ private:
     Deque<RefPtr<Node>> m_fullScreenErrorEventTargetQueue;
     bool m_isAnimatingFullScreen;
     LayoutRect m_savedPlaceholderFrameRect;
-    RefPtr<RenderStyle> m_savedPlaceholderRenderStyle;
+    std::unique_ptr<RenderStyle> m_savedPlaceholderRenderStyle;
 #endif
 
     HashSet<HTMLPictureElement*> m_viewportDependentPictures;
@@ -1694,12 +1695,12 @@ private:
 
 #if ENABLE(IOS_TEXT_AUTOSIZING)
 public:
-    void addAutoSizingNode(Node*, float size);
-    void validateAutoSizingNodes();
-    void resetAutoSizingNodes();
+    void addAutoSizedNode(Text&, float size);
+    void updateAutoSizedNodes();
+    void clearAutoSizedNodes();
 
 private:
-    typedef HashMap<TextAutoSizingKey, RefPtr<TextAutoSizingValue>, TextAutoSizingHash, TextAutoSizingTraits> TextAutoSizingMap;
+    using TextAutoSizingMap = HashMap<TextAutoSizingKey, std::unique_ptr<TextAutoSizingValue>, TextAutoSizingHash, TextAutoSizingTraits>;
     TextAutoSizingMap m_textAutoSizedNodes;
 #endif
 
@@ -1728,16 +1729,14 @@ private:
     typedef HashMap<AtomicString, std::unique_ptr<Locale>> LocaleIdentifierToLocaleMap;
     LocaleIdentifierToLocaleMap m_localeCache;
 
-#if ENABLE(TEMPLATE_ELEMENT)
     RefPtr<Document> m_templateDocument;
     Document* m_templateDocumentHost; // Manually managed weakref (backpointer from m_templateDocument).
-#endif
 
 #if ENABLE(CUSTOM_ELEMENTS)
     std::unique_ptr<CustomElementDefinitions> m_customElementDefinitions;
 #endif
 
-    RefPtr<CSSFontSelector> m_fontSelector;
+    Ref<CSSFontSelector> m_fontSelector;
 
 #if ENABLE(WEB_REPLAY)
     RefPtr<JSC::InputCursor> m_inputCursor;
@@ -1794,12 +1793,10 @@ inline TextEncoding Document::textEncoding() const
     return TextEncoding();
 }
 
-#if ENABLE(TEMPLATE_ELEMENT)
 inline const Document* Document::templateDocument() const
 {
     return m_templateDocumentHost ? this : m_templateDocument.get();
 }
-#endif
 
 // Put these methods here, because they require the Document definition, but we really want to inline them.
 

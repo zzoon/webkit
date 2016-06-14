@@ -263,7 +263,7 @@ SVGElement* SVGUseElement::targetClone() const
     return downcast<SVGElement>(root->firstChild());
 }
 
-RenderPtr<RenderElement> SVGUseElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
+RenderPtr<RenderElement> SVGUseElement::createElementRenderer(RenderStyle&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderSVGTransformableContainer>(*this, WTFMove(style));
 }
@@ -430,7 +430,7 @@ void SVGUseElement::cloneTarget(ContainerNode& container, SVGElement& target) co
     removeDisallowedElementsFromSubtree(targetClone.get());
     removeSymbolElementsFromSubtree(targetClone.get());
     transferSizeAttributesToTargetClone(targetClone.get());
-    container.appendChild(WTFMove(targetClone));
+    container.appendChild(targetClone);
 }
 
 static void cloneDataAndChildren(SVGElement& replacementClone, SVGElement& originalClone)
@@ -469,7 +469,7 @@ void SVGUseElement::expandUseElementsInShadowTree() const
         if (target)
             originalClone.cloneTarget(replacementClone.get(), *target);
 
-        originalClone.parentNode()->replaceChild(replacementClone.copyRef(), originalClone);
+        originalClone.parentNode()->replaceChild(replacementClone, originalClone);
 
         // Resume iterating, starting just inside the replacement clone.
         it = descendants.from(replacementClone.get());
@@ -493,7 +493,7 @@ void SVGUseElement::expandSymbolElementsInShadowTree() const
         auto replacementClone = SVGSVGElement::create(document());
         cloneDataAndChildren(replacementClone.get(), originalClone);
 
-        originalClone.parentNode()->replaceChild(replacementClone.copyRef(), originalClone);
+        originalClone.parentNode()->replaceChild(replacementClone, originalClone);
 
         // Resume iterating, starting just inside the replacement clone.
         it = descendants.from(replacementClone.get());

@@ -36,7 +36,6 @@
 
 namespace WebCore {
 
-class CheckedRadioButtons;
 class DragData;
 class FileList;
 class HTMLDataListElement;
@@ -45,6 +44,7 @@ class HTMLOptionElement;
 class Icon;
 class InputType;
 class ListAttributeTargetObserver;
+class RadioButtonGroups;
 class TextControlInnerTextElement;
 class URL;
 struct DateTimeChooserParameters;
@@ -142,7 +142,7 @@ public:
     HTMLElement* containerElement() const;
     
     TextControlInnerTextElement* innerTextElement() const final;
-    Ref<RenderStyle> createInnerTextStyle(const RenderStyle&) const override;
+    RenderStyle createInnerTextStyle(const RenderStyle&) const override;
 
     HTMLElement* innerBlockElement() const;
     HTMLElement* innerSpinButtonElement() const;
@@ -201,7 +201,7 @@ public:
     bool canHaveSelection() const;
 
     bool rendererIsNeeded(const RenderStyle&) final;
-    RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) final;
+    RenderPtr<RenderElement> createElementRenderer(RenderStyle&&, const RenderTreePosition&) final;
     void willAttachRenderers() final;
     void didAttachRenderers() final;
     void didDetachRenderers() final;
@@ -333,7 +333,6 @@ private:
     enum AutoCompleteSetting { Uninitialized, On, Off };
 
     void didAddUserAgentShadowRoot(ShadowRoot*) final;
-    bool canHaveUserAgentShadowRoot() const final { return true; }
 
     void willChangeForm() final;
     void didChangeForm() final;
@@ -421,7 +420,7 @@ private:
     void updateValueIfNeeded();
 
     // Returns null if this isn't associated with any radio button group.
-    CheckedRadioButtons* checkedRadioButtons() const;
+    RadioButtonGroups* radioButtonGroups() const;
     void addToRadioButtonGroup();
     void removeFromRadioButtonGroup();
 

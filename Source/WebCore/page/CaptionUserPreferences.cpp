@@ -216,12 +216,12 @@ Vector<RefPtr<TextTrack>> CaptionUserPreferences::sortedTrackListForMenu(TextTra
 
     for (unsigned i = 0, length = trackList->length(); i < length; ++i) {
         TextTrack* track = trackList->item(i);
-        const AtomicString& kind = track->kind();
-        if (kind == TextTrack::captionsKeyword() || kind == TextTrack::descriptionsKeyword() || kind == TextTrack::subtitlesKeyword())
+        auto kind = track->kind();
+        if (kind == TextTrack::Kind::Captions || kind == TextTrack::Kind::Descriptions || kind == TextTrack::Kind::Subtitles)
             tracksForMenu.append(track);
     }
 
-    std::sort(tracksForMenu.begin(), tracksForMenu.end(), [](const RefPtr<TextTrack>& a, const RefPtr<TextTrack>& b) {
+    std::sort(tracksForMenu.begin(), tracksForMenu.end(), [](auto& a, auto& b) {
         return codePointCompare(trackDisplayName(a.get()), trackDisplayName(b.get())) < 0;
     });
 
@@ -256,7 +256,7 @@ Vector<RefPtr<AudioTrack>> CaptionUserPreferences::sortedTrackListForMenu(AudioT
         tracksForMenu.append(track);
     }
 
-    std::sort(tracksForMenu.begin(), tracksForMenu.end(), [](const RefPtr<AudioTrack>& a, const RefPtr<AudioTrack>& b) {
+    std::sort(tracksForMenu.begin(), tracksForMenu.end(), [](auto& a, auto& b) {
         return codePointCompare(trackDisplayName(a.get()), trackDisplayName(b.get())) < 0;
     });
 
@@ -265,7 +265,7 @@ Vector<RefPtr<AudioTrack>> CaptionUserPreferences::sortedTrackListForMenu(AudioT
 
 int CaptionUserPreferences::textTrackSelectionScore(TextTrack* track, HTMLMediaElement*) const
 {
-    if (track->kind() != TextTrack::captionsKeyword() && track->kind() != TextTrack::subtitlesKeyword())
+    if (track->kind() != TextTrack::Kind::Captions && track->kind() != TextTrack::Kind::Subtitles)
         return 0;
     
     if (!userPrefersSubtitles() && !userPrefersCaptions())
@@ -293,10 +293,10 @@ int CaptionUserPreferences::textTrackLanguageSelectionScore(TextTrack* track, co
 void CaptionUserPreferences::setCaptionsStyleSheetOverride(const String& override)
 {
     m_captionsStyleSheetOverride = override;
-    updateCaptionStyleSheetOveride();
+    updateCaptionStyleSheetOverride();
 }
 
-void CaptionUserPreferences::updateCaptionStyleSheetOveride()
+void CaptionUserPreferences::updateCaptionStyleSheetOverride()
 {
     String captionsOverrideStyleSheet = captionsStyleSheetOverride();
     for (auto& page : m_pageGroup.pages())

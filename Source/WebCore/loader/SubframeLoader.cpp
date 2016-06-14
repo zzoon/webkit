@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2016 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Nokia Corporation and/or its subsidiary(-ies)
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
  * Copyright (C) 2008 Alp Toker <alp@atoker.com>
@@ -43,7 +43,8 @@
 #include "FrameLoaderClient.h"
 #include "HTMLAppletElement.h"
 #include "HTMLAudioElement.h"
-#include "HTMLFrameElementBase.h"
+#include "HTMLFrameElement.h"
+#include "HTMLIFrameElement.h"
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "MIMETypeRegistry.h"
@@ -84,7 +85,7 @@ bool SubframeLoader::requestFrame(HTMLFrameOwnerElement& ownerElement, const Str
     } else
         url = completeURL(urlString);
 
-    if (!url.isValid())
+    if (shouldConvertInvalidURLsToBlank() && !url.isValid())
         url = blankURL();
 
     Frame* frame = loadOrRedirectSubframe(ownerElement, url, frameName, lockHistory, lockBackForwardList);
@@ -209,7 +210,7 @@ static void logPluginRequest(Page* page, const String& mimeType, const String& u
     String pluginFile = page->pluginData().pluginFileForWebVisibleMimeType(newMIMEType);
     String description = !pluginFile ? newMIMEType : pluginFile;
 
-    DiagnosticLoggingClient& diagnosticLoggingClient = page->mainFrame().diagnosticLoggingClient();
+    DiagnosticLoggingClient& diagnosticLoggingClient = page->diagnosticLoggingClient();
     diagnosticLoggingClient.logDiagnosticMessage(success ? DiagnosticLoggingKeys::pluginLoadedKey() : DiagnosticLoggingKeys::pluginLoadingFailedKey(), description, ShouldSample::No);
 
     if (!page->hasSeenAnyPlugin())
@@ -229,6 +230,8 @@ bool SubframeLoader::requestObject(HTMLPlugInImageElement& ownerElement, const S
     URL completedURL;
     if (!url.isEmpty())
         completedURL = completeURL(url);
+
+    document()->contentSecurityPolicy()->upgradeInsecureRequestIfNeeded(completedURL, ContentSecurityPolicy::InsecureRequestType::Load);
 
     bool hasFallbackContent = is<HTMLObjectElement>(ownerElement) && downcast<HTMLObjectElement>(ownerElement).hasFallbackContent();
 
@@ -299,8 +302,11 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, H
     return widget;
 }
 
-Frame* SubframeLoader::loadOrRedirectSubframe(HTMLFrameOwnerElement& ownerElement, const URL& url, const AtomicString& frameName, LockHistory lockHistory, LockBackForwardList lockBackForwardList)
+Frame* SubframeLoader::loadOrRedirectSubframe(HTMLFrameOwnerElement& ownerElement, const URL& requestUrl, const AtomicString& frameName, LockHistory lockHistory, LockBackForwardList lockBackForwardList)
 {
+    URL url = requestUrl;
+    ownerElement.document().contentSecurityPolicy()->upgradeInsecureRequestIfNeeded(url, ContentSecurityPolicy::InsecureRequestType::Load);
+
     Frame* frame = ownerElement.contentFrame();
     if (frame)
         frame->navigationScheduler().scheduleLocationChange(m_frame.document(), m_frame.document()->securityOrigin(), url, m_frame.loader().outgoingReferrer(), lockHistory, lockBackForwardList);
@@ -448,6 +454,13 @@ URL SubframeLoader::completeURL(const String& url) const
 {
     ASSERT(m_frame.document());
     return m_frame.document()->completeURL(url);
+}
+
+bool SubframeLoader::shouldConvertInvalidURLsToBlank() const
+{
+    if (Settings* settings = document() ? document()->settings() : nullptr)
+        return settings->shouldConvertInvalidURLsToBlank();
+    return true;
 }
 
 } // namespace WebCore

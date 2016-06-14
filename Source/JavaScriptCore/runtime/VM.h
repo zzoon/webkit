@@ -34,9 +34,6 @@
 #include "DateInstanceCache.h"
 #include "ExecutableAllocator.h"
 #include "FunctionHasExecutedCache.h"
-#if ENABLE(JIT)
-#include "GPRInfo.h"
-#endif
 #include "Heap.h"
 #include "Intrinsic.h"
 #include "JITThunks.h"
@@ -95,7 +92,6 @@ class JSBoundSlotBaseFunction;
 class JSGlobalObject;
 class JSObject;
 class LLIntOffsetsExtractor;
-class LegacyProfiler;
 class NativeExecutable;
 class RegExpCache;
 class RegisterAtOffsetList;
@@ -257,7 +253,7 @@ public:
 
 #if ENABLE(SAMPLING_PROFILER)
     JS_EXPORT_PRIVATE SamplingProfiler* samplingProfiler() { return m_samplingProfiler.get(); }
-    JS_EXPORT_PRIVATE void ensureSamplingProfiler(RefPtr<Stopwatch>&&);
+    JS_EXPORT_PRIVATE SamplingProfiler& ensureSamplingProfiler(RefPtr<Stopwatch>&&);
 #endif
 
 private:
@@ -288,7 +284,6 @@ public:
     Strong<Structure> stringStructure;
     Strong<Structure> propertyNameIteratorStructure;
     Strong<Structure> propertyNameEnumeratorStructure;
-    Strong<Structure> getterSetterStructure;
     Strong<Structure> customGetterSetterStructure;
     Strong<Structure> scopedArgumentsTableStructure;
     Strong<Structure> apiWrapperStructure;
@@ -349,20 +344,37 @@ public:
     AtomicStringTable* atomicStringTable() const { return m_atomicStringTable; }
     WTF::SymbolRegistry& symbolRegistry() { return m_symbolRegistry; }
 
-    void setInDefineOwnProperty(bool inDefineOwnProperty)
+    enum class DeletePropertyMode {
+        // Default behaviour of deleteProperty, matching the spec.
+        Default,
+        // This setting causes deleteProperty to force deletion of all
+        // properties including those that are non-configurable (DontDelete).
+        IgnoreConfigurable
+    };
+
+    DeletePropertyMode deletePropertyMode()
     {
-        m_inDefineOwnProperty = inDefineOwnProperty;
+        return m_deletePropertyMode;
     }
 
-    bool isInDefineOwnProperty()
-    {
-        return m_inDefineOwnProperty;
-    }
+    class DeletePropertyModeScope {
+    public:
+        DeletePropertyModeScope(VM& vm, DeletePropertyMode mode)
+            : m_vm(vm)
+            , m_previousMode(vm.m_deletePropertyMode)
+        {
+            m_vm.m_deletePropertyMode = mode;
+        }
 
-    LegacyProfiler* enabledProfiler() { return m_enabledProfiler; }
-    void setEnabledProfiler(LegacyProfiler*);
+        ~DeletePropertyModeScope()
+        {
+            m_vm.m_deletePropertyMode = m_previousMode;
+        }
 
-    void* enabledProfilerAddress() { return &m_enabledProfiler; }
+    private:
+        VM& m_vm;
+        DeletePropertyMode m_previousMode;
+    };
 
 #if ENABLE(JIT)
     bool canUseJIT() { return m_canUseJIT; }
@@ -385,21 +397,11 @@ public:
     SourceProviderCacheMap sourceProviderCacheMap;
     Interpreter* interpreter;
 #if ENABLE(JIT)
-#if NUMBER_OF_CALLEE_SAVES_REGISTERS > 0
-    intptr_t calleeSaveRegistersBuffer[NUMBER_OF_CALLEE_SAVES_REGISTERS];
-
-    static ptrdiff_t calleeSaveRegistersBufferOffset()
-    {
-        return OBJECT_OFFSETOF(VM, calleeSaveRegistersBuffer);
-    }
-#endif // NUMBER_OF_CALLEE_SAVES_REGISTERS > 0
-
     std::unique_ptr<JITThunks> jitStubs;
     MacroAssemblerCodeRef getCTIStub(ThunkGenerator generator)
     {
         return jitStubs->ctiStub(this, generator);
     }
-    NativeExecutable* getHostFunction(NativeFunction, Intrinsic, const String& name);
     
     std::unique_ptr<RegisterAtOffsetList> allCalleeSaveRegisterOffsets;
     
@@ -411,6 +413,7 @@ public:
     std::unique_ptr<FTL::Thunks> ftlThunks;
 #endif
     NativeExecutable* getHostFunction(NativeFunction, NativeFunction constructor, const String& name);
+    NativeExecutable* getHostFunction(NativeFunction, Intrinsic intrinsic, NativeFunction constructor, const String& name);
 
     static ptrdiff_t exceptionOffset()
     {
@@ -457,11 +460,6 @@ public:
 
     size_t reservedZoneSize() const { return m_reservedZoneSize; }
     size_t updateReservedZoneSize(size_t reservedZoneSize);
-
-#if ENABLE(FTL_JIT)
-    void updateFTLLargestStackSize(size_t);
-    void** addressOfFTLStackLimit() { return &m_ftlStackLimit; }
-#endif
 
 #if !ENABLE(JIT)
     void* jsStackLimit() { return m_jsStackLimit; }
@@ -578,7 +576,6 @@ public:
 
     JS_EXPORT_PRIVATE void deleteAllCode();
     JS_EXPORT_PRIVATE void deleteAllLinkedCode();
-    JS_EXPORT_PRIVATE void deleteAllRegExpCode();
 
     WatchpointSet* ensureWatchpointSetForImpureProperty(const Identifier&);
     void registerWatchpointForImpureProperty(const Identifier&, Watchpoint*);
@@ -602,6 +599,8 @@ public:
 
     JS_EXPORT_PRIVATE void queueMicrotask(JSGlobalObject*, PassRefPtr<Microtask>);
     JS_EXPORT_PRIVATE void drainMicrotasks();
+    JS_EXPORT_PRIVATE void setGlobalConstRedeclarationShouldThrow(bool globalConstRedeclarationThrow) { m_globalConstRedeclarationShouldThrow = globalConstRedeclarationThrow; }
+    ALWAYS_INLINE bool globalConstRedeclarationShouldThrow() const { return m_globalConstRedeclarationShouldThrow; }
 
     inline bool shouldTriggerTermination(ExecState*);
 
@@ -611,6 +610,9 @@ public:
     BytecodeIntrinsicRegistry& bytecodeIntrinsicRegistry() { return *m_bytecodeIntrinsicRegistry; }
     
     ShadowChicken& shadowChicken() { return *m_shadowChicken; }
+    
+    template<typename Func>
+    void logEvent(CodeBlock*, const char* summary, const Func& func);
 
 private:
     friend class LLIntOffsetsExtractor;
@@ -652,19 +654,15 @@ private:
         void* m_stackLimit;
         void* m_jsStackLimit;
     };
-#if ENABLE(FTL_JIT)
-    void* m_ftlStackLimit;
-    size_t m_largestFTLStackSize;
-#endif
 #endif
     void* m_lastStackTop;
     Exception* m_exception { nullptr };
     Exception* m_lastException { nullptr };
     bool m_failNextNewCodeBlock { false };
-    bool m_inDefineOwnProperty;
+    DeletePropertyMode m_deletePropertyMode { DeletePropertyMode::Default };
+    bool m_globalConstRedeclarationShouldThrow { true };
     bool m_shouldBuildPCToCodeOriginMapping { false };
     std::unique_ptr<CodeCache> m_codeCache;
-    LegacyProfiler* m_enabledProfiler;
     std::unique_ptr<BuiltinExecutables> m_builtinExecutables;
     HashMap<String, RefPtr<WatchpointSet>> m_impurePropertyWatchpointSets;
     std::unique_ptr<TypeProfiler> m_typeProfiler;

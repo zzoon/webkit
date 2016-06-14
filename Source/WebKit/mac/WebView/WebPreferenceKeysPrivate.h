@@ -52,6 +52,7 @@
 #define WebKitJavaEnabledPreferenceKey @"WebKitJavaEnabled"
 #define WebKitJavaScriptEnabledPreferenceKey @"WebKitJavaScriptEnabled"
 #define WebKitJavaScriptMarkupEnabledPreferenceKey @"WebKitJavaScriptMarkupEnabled"
+#define WebKitWebAnimationsEnabledPreferenceKey @"WebKitWebAnimationsEnabled"
 #define WebKitWebSecurityEnabledPreferenceKey @"WebKitWebSecurityEnabled"
 #define WebKitAllowUniversalAccessFromFileURLsPreferenceKey @"WebKitAllowUniversalAccessFromFileURLs"
 #define WebKitAllowFileAccessFromFileURLsPreferenceKey @"WebKitAllowFileAccessFromFileURLs"
@@ -102,8 +103,6 @@
 #define WebKitDisplayListDrawingEnabledPreferenceKey @"WebKitDisplayListDrawingEnabled"
 #define WebKitCanvasUsesAcceleratedDrawingPreferenceKey @"WebKitCanvasUsesAcceleratedDrawing"
 #define WebKitAcceleratedCompositingEnabledPreferenceKey @"WebKitAcceleratedCompositingEnabled"
-#define WebKitCSSRegionsEnabledPreferenceKey @"WebKitCSSRegionsEnabled"
-#define WebKitCSSCompositingEnabledPreferenceKey @"WebKitCSSCompositingEnabled"
 #define WebKitShowDebugBordersPreferenceKey @"WebKitShowDebugBorders"
 #define WebKitSimpleLineLayoutDebugBordersEnabledPreferenceKey @"WebKitSimpleLineLayoutDebugBordersEnabled"
 #define WebKitShowRepaintCounterPreferenceKey @"WebKitShowRepaintCounter"
@@ -127,6 +126,7 @@
 #define WebKitRequiresUserGestureForAudioPlaybackPreferenceKey @"WebKitAudioPlaybackRequiresUserGesture"
 #define WebKitMainContentUserGestureOverrideEnabledPreferenceKey @"WebKitMainContentUserGestureOverrideEnabled"
 #define WebKitAllowsInlineMediaPlaybackPreferenceKey @"WebKitMediaPlaybackAllowsInline"
+#define WebKitAllowsInlineMediaPlaybackAfterFullscreenPreferenceKey @"WebKitAllowsInlineMediaPlaybackAfterFullscreen"
 #define WebKitInlineMediaPlaybackRequiresPlaysInlineAttributeKey @"InlineMediaPlaybackRequiresPlaysInlineAttribute"
 #define WebKitInvisibleAutoplayNotPermittedKey @"InvisibleAutoplayNotPermitted"
 #define WebKitAllowsPictureInPictureMediaPlaybackPreferenceKey @"WebKitAllowsPictureInPictureMediaPlayback"
@@ -164,6 +164,7 @@
 #define WebKitCustomElementsEnabledPreferenceKey @"WebKitCustomElementsEnabled"
 #define WebKitFetchAPIEnabledPreferenceKey @"WebKitFetchAPIEnabled"
 #define WebKitDownloadAttributeEnabledPreferenceKey @"WebKitDownloadAttributeEnabled"
+#define WebKitCSSGridLayoutEnabledPreferenceKey @"WebKitCSSGridLayoutEnabled"
 
 #if !TARGET_OS_IPHONE
 // These are private both because callers should be using the cover methods and because the
@@ -185,6 +186,7 @@
 #define WebKitWantsBalancedSetDefersLoadingBehaviorKey @"WebKitWantsBalancedSetDefersLoadingBehavior"
 #define WebKitDebugFullPageZoomPreferenceKey @"WebKitDebugFullPageZoomPreferenceKey"
 #define WebKitMinimumZoomFontSizePreferenceKey @"WebKitMinimumZoomFontSizePreferenceKey"
+#define WebKitTextAutosizingEnabledPreferenceKey @"WebKitTextAutosizingEnabled"
 #define WebKitHTTPEquivEnabledPreferenceKey @"WebKitHTTPEquivEnabled"
 
 #if TARGET_OS_IPHONE

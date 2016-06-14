@@ -18,8 +18,7 @@
     Boston, MA 02110-1301, USA.
 */
 
-#ifndef JSTestInterface_h
-#define JSTestInterface_h
+#pragma once
 
 #if ENABLE(Condition1) || ENABLE(Condition2)
 
@@ -107,13 +106,12 @@ inline void* wrapperKey(TestInterface* wrappableObject)
     return wrappableObject;
 }
 
-WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestInterface*);
-inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestInterface& impl) { return toJS(state, globalObject, &impl); }
-JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject*, TestInterface*);
+WEBCORE_EXPORT JSC::JSValue toJS(JSC::ExecState*, JSDOMGlobalObject*, TestInterface&);
+inline JSC::JSValue toJS(JSC::ExecState* state, JSDOMGlobalObject* globalObject, TestInterface* impl) { return impl ? toJS(state, globalObject, *impl) : JSC::jsNull(); }
+JSC::JSValue toJSNewlyCreated(JSC::ExecState*, JSDOMGlobalObject*, Ref<TestInterface>&&);
+inline JSC::JSValue toJSNewlyCreated(JSC::ExecState* state, JSDOMGlobalObject* globalObject, RefPtr<TestInterface>&& impl) { return impl ? toJSNewlyCreated(state, globalObject, impl.releaseNonNull()) : JSC::jsNull(); }
 
 
 } // namespace WebCore
 
 #endif // ENABLE(Condition1) || ENABLE(Condition2)
-
-#endif

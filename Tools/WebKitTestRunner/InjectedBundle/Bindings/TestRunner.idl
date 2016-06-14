@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2010-2016 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -74,7 +74,7 @@ interface TestRunner {
     void setTabKeyCyclesThroughElements(boolean enabled);
     void setSerializeHTTPLoads();
     void dispatchPendingLoadRequests();
-    void setCacheModel(int model);
+    void setCacheModel(long model);
     void setAsynchronousSpellCheckingEnabled(boolean value);
     void setPrinting();
     void setShouldDecideNavigationPolicyAfterDelay(boolean value);
@@ -95,7 +95,7 @@ interface TestRunner {
     void display();
 
     // Printing
-    boolean isPageBoxVisible(int pageIndex);
+    boolean isPageBoxVisible(long pageIndex);
 
     [PassContext] void setValueForUser(object element, DOMString value);
 
@@ -175,7 +175,7 @@ interface TestRunner {
 
     // Geolocation
     void setGeolocationPermission(boolean value);
-    void setMockGeolocationPosition(double latitude, double longitude, double accuracy, [Default=Undefined] optional object altitude, optional object altitudeAccuracy, optional object heading, optional object speed);
+    void setMockGeolocationPosition(double latitude, double longitude, double accuracy, optional object altitude, optional object altitudeAccuracy, optional object heading, optional object speed);
     void setMockGeolocationPositionUnavailableError(DOMString errorMessage);
     boolean isGeolocationProviderActive();
 
@@ -202,6 +202,8 @@ interface TestRunner {
     void setAuthenticationUsername(DOMString username);
     void setAuthenticationPassword(DOMString password);
 
+    void setAllowsAnySSLCertificate(boolean value);
+
     // Secure text input mode (Mac only)
     readonly attribute boolean secureEventInputIsEnabled;
     
@@ -219,9 +221,13 @@ interface TestRunner {
     void installDidEndSwipeCallback(object callback);
     void installDidRemoveSwipeSnapshotCallback(object callback);
 
+    unsigned long imageCountInGeneralPasteboard();
+
     // UI Process Testing
     void runUIScript(DOMString script, object callback);
 
     void clearTestRunnerCallbacks();
+
+    void accummulateLogsForChannel(DOMString channel);
 };
 

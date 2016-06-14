@@ -659,6 +659,17 @@ std::unique_ptr<IDBDatabaseInfo> SQLiteIDBBackingStore::extractExistingDatabaseI
     return databaseInfo;
 }
 
+String SQLiteIDBBackingStore::databaseNameFromEncodedFilename(const String& encodedName)
+{
+    if (equal(encodedName, ASCIILiteral("%00")))
+        return { };
+
+    String partiallyDecoded = encodedName;
+    partiallyDecoded.replace(ASCIILiteral("%2E"), ASCIILiteral("."));
+
+    return decodeFromFilename(partiallyDecoded);
+}
+
 String SQLiteIDBBackingStore::filenameForDatabaseName() const
 {
     ASSERT(!m_identifier.databaseName().isNull());
@@ -1469,7 +1480,7 @@ IDBError SQLiteIDBBackingStore::updateOneIndexForAddRecord(const IDBIndexInfo& i
 {
     JSLockHolder locker(vm());
 
-    auto jsValue = deserializeIDBValueDataToJSValue(*globalObject().globalExec(), value);
+    auto jsValue = deserializeIDBValueToJSValue(*globalObject().globalExec(), value);
     if (jsValue.isUndefinedOrNull())
         return { };
 
@@ -1486,7 +1497,7 @@ IDBError SQLiteIDBBackingStore::updateAllIndexesForAddRecord(const IDBObjectStor
 {
     JSLockHolder locker(vm());
 
-    auto jsValue = deserializeIDBValueDataToJSValue(*globalObject().globalExec(), value);
+    auto jsValue = deserializeIDBValueToJSValue(*globalObject().globalExec(), value);
     if (jsValue.isUndefinedOrNull())
         return { };
 

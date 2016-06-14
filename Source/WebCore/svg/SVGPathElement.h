@@ -101,6 +101,8 @@ public:
 
     void animatedPropertyWillBeDeleted();
 
+    size_t approximateMemoryCost() const override;
+
 private:
     SVGPathElement(const QualifiedName&, Document&);
 
@@ -120,7 +122,7 @@ private:
         DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 
-    RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
+    RenderPtr<RenderElement> createElementRenderer(RenderStyle&&, const RenderTreePosition&) override;
 
     Node::InsertionNotificationRequest insertedInto(ContainerNode&) override;
     void removedFrom(ContainerNode&) override;

@@ -34,8 +34,8 @@ class RenderRegion;
 
 class RenderInline : public RenderBoxModelObject {
 public:
-    RenderInline(Element&, Ref<RenderStyle>&&);
-    RenderInline(Document&, Ref<RenderStyle>&&);
+    RenderInline(Element&, RenderStyle&&);
+    RenderInline(Document&, RenderStyle&&);
 
     void addChild(RenderObject* newChild, RenderObject* beforeChild = 0) override;
 
@@ -145,7 +145,7 @@ private:
 
     LayoutRect clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const override;
     LayoutRect rectWithOutlineForRepaint(const RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const final;
-    LayoutRect computeRectForRepaint(const LayoutRect&, const RenderLayerModelObject* repaintContainer, bool fixed) const final;
+    LayoutRect computeRectForRepaint(const LayoutRect&, const RenderLayerModelObject* repaintContainer, RepaintContext = { }) const final;
 
     void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags, bool* wasFixed) const override;
     const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const override;

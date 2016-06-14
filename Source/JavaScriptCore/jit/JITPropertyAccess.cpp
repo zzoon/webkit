@@ -100,20 +100,28 @@ void JIT::emit_op_get_by_val(Instruction* currentInstruction)
     ArrayProfile* profile = currentInstruction[4].u.arrayProfile;
     ByValInfo* byValInfo = m_codeBlock->addByValInfo();
 
-    emitGetVirtualRegisters(base, regT0, property, regT1);
+    emitGetVirtualRegister(base, regT0);
+    bool propertyNameIsIntegerConstant = isOperandConstantInt(property);
+    if (propertyNameIsIntegerConstant)
+        move(Imm32(getOperandConstantInt(property)), regT1);
+    else
+        emitGetVirtualRegister(property, regT1);
 
     emitJumpSlowCaseIfNotJSCell(regT0, base);
 
-    PatchableJump notIndex = emitPatchableJumpIfNotInt(regT1);
-    addSlowCase(notIndex);
+    PatchableJump notIndex;
+    if (!propertyNameIsIntegerConstant) {
+        notIndex = emitPatchableJumpIfNotInt(regT1);
+        addSlowCase(notIndex);
 
-    // This is technically incorrect - we're zero-extending an int32.  On the hot path this doesn't matter.
-    // We check the value as if it was a uint32 against the m_vectorLength - which will always fail if
-    // number was signed since m_vectorLength is always less than intmax (since the total allocation
-    // size is always less than 4Gb).  As such zero extending will have been correct (and extending the value
-    // to 64-bits is necessary since it's used in the address calculation).  We zero extend rather than sign
-    // extending since it makes it easier to re-tag the value in the slow case.
-    zeroExtend32ToPtr(regT1, regT1);
+        // This is technically incorrect - we're zero-extending an int32. On the hot path this doesn't matter.
+        // We check the value as if it was a uint32 against the m_vectorLength - which will always fail if
+        // number was signed since m_vectorLength is always less than intmax (since the total allocation
+        // size is always less than 4Gb). As such zero extending will have been correct (and extending the value
+        // to 64-bits is necessary since it's used in the address calculation). We zero extend rather than sign
+        // extending since it makes it easier to re-tag the value in the slow case.
+        zeroExtend32ToPtr(regT1, regT1);
+    }
 
     emitArrayProfilingSiteWithCell(regT0, regT2, profile);
     and32(TrustedImm32(IndexingShapeMask), regT2);
@@ -237,7 +245,9 @@ void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCas
     ByValInfo* byValInfo = m_byValCompilationInfo[m_byValInstructionIndex].byValInfo;
     
     linkSlowCaseIfNotJSCell(iter, base); // base cell check
-    linkSlowCase(iter); // property int32 check
+
+    if (!isOperandConstantInt(property))
+        linkSlowCase(iter); // property int32 check
     Jump nonCell = jump();
     linkSlowCase(iter); // base array check
     Jump notString = branchStructure(NotEqual, 
@@ -274,12 +284,21 @@ void JIT::emit_op_put_by_val(Instruction* currentInstruction)
     ArrayProfile* profile = currentInstruction[4].u.arrayProfile;
     ByValInfo* byValInfo = m_codeBlock->addByValInfo();
 
-    emitGetVirtualRegisters(base, regT0, property, regT1);
+    emitGetVirtualRegister(base, regT0);
+    bool propertyNameIsIntegerConstant = isOperandConstantInt(property);
+    if (propertyNameIsIntegerConstant)
+        move(Imm32(getOperandConstantInt(property)), regT1);
+    else
+        emitGetVirtualRegister(property, regT1);
+
     emitJumpSlowCaseIfNotJSCell(regT0, base);
-    PatchableJump notIndex = emitPatchableJumpIfNotInt(regT1);
-    addSlowCase(notIndex);
-    // See comment in op_get_by_val.
-    zeroExtend32ToPtr(regT1, regT1);
+    PatchableJump notIndex;
+    if (!propertyNameIsIntegerConstant) {
+        notIndex = emitPatchableJumpIfNotInt(regT1);
+        addSlowCase(notIndex);
+        // See comment in op_get_by_val.
+        zeroExtend32ToPtr(regT1, regT1);
+    }
     emitArrayProfilingSiteWithCell(regT0, regT2, profile);
     and32(TrustedImm32(IndexingShapeMask), regT2);
     
@@ -311,6 +330,12 @@ void JIT::emit_op_put_by_val(Instruction* currentInstruction)
     Label done = label();
     
     m_byValCompilationInfo.append(ByValCompilationInfo(byValInfo, m_bytecodeOffset, notIndex, badType, mode, profile, done, done));
+}
+
+void JIT::emit_op_put_by_val_with_this(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_put_by_val_with_this);
+    slowPathCall.call();
 }
 
 JIT::JumpList JIT::emitGenericContiguousPutByVal(Instruction* currentInstruction, PatchableJump& badType, IndexingType indexingShape)
@@ -445,7 +470,8 @@ void JIT::emitSlow_op_put_by_val(Instruction* currentInstruction, Vector<SlowCas
     ByValInfo* byValInfo = m_byValCompilationInfo[m_byValInstructionIndex].byValInfo;
 
     linkSlowCaseIfNotJSCell(iter, base); // base cell check
-    linkSlowCase(iter); // property int32 check
+    if (!isOperandConstantInt(property))
+        linkSlowCase(iter); // property int32 check
     linkSlowCase(iter); // base not array check
     
     linkSlowCase(iter); // out of bounds
@@ -532,6 +558,16 @@ void JIT::emit_op_del_by_id(Instruction* currentInstruction)
     callOperation(operationDeleteByIdJSResult, dst, regT0, m_codeBlock->identifier(property).impl());
 }
 
+void JIT::emit_op_del_by_val(Instruction* currentInstruction)
+{
+    int dst = currentInstruction[1].u.operand;
+    int base = currentInstruction[2].u.operand;
+    int property = currentInstruction[3].u.operand;
+    emitGetVirtualRegister(base, regT0);
+    emitGetVirtualRegister(property, regT1);
+    callOperation(operationDeleteByValJSResult, dst, regT0, regT1);
+}
+
 void JIT::emit_op_try_get_by_id(Instruction* currentInstruction)
 {
     int resultVReg = currentInstruction[1].u.operand;
@@ -593,6 +629,18 @@ void JIT::emit_op_get_by_id(Instruction* currentInstruction)
     emitPutVirtualRegister(resultVReg);
 }
 
+void JIT::emit_op_get_by_id_with_this(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_get_by_id_with_this);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_get_by_val_with_this(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_get_by_val_with_this);
+    slowPathCall.call();
+}
+
 void JIT::emitSlow_op_get_by_id(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
     int resultVReg = currentInstruction[1].u.operand;
@@ -636,6 +684,12 @@ void JIT::emit_op_put_by_id(Instruction* currentInstruction)
     addSlowCase(gen.slowPathJump());
     
     m_putByIds.append(gen);
+}
+
+void JIT::emit_op_put_by_id_with_this(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_put_by_id_with_this);
+    slowPathCall.call();
 }
 
 void JIT::emitSlow_op_put_by_id(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -767,8 +821,8 @@ void JIT::emitSlow_op_resolve_scope(Instruction* currentInstruction, Vector<Slow
 
 void JIT::emitLoadWithStructureCheck(int scope, Structure** structureSlot)
 {
-    emitGetVirtualRegister(scope, regT0);
     loadPtr(structureSlot, regT1);
+    emitGetVirtualRegister(scope, regT0);
     addSlowCase(branchTestPtr(Zero, regT1));
     load32(Address(regT1, Structure::structureIDOffset()), regT1);
     addSlowCase(branch32(NotEqual, Address(regT0, JSCell::structureIDOffset()), regT1));

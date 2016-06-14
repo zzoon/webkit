@@ -164,9 +164,9 @@ public:
     WEBCORE_EXPORT PassRefPtr<Node> insertUnorderedList();
     WEBCORE_EXPORT bool canIncreaseSelectionListLevel();
     WEBCORE_EXPORT bool canDecreaseSelectionListLevel();
-    WEBCORE_EXPORT PassRefPtr<Node> increaseSelectionListLevel();
-    WEBCORE_EXPORT PassRefPtr<Node> increaseSelectionListLevelOrdered();
-    WEBCORE_EXPORT PassRefPtr<Node> increaseSelectionListLevelUnordered();
+    WEBCORE_EXPORT RefPtr<Node> increaseSelectionListLevel();
+    WEBCORE_EXPORT RefPtr<Node> increaseSelectionListLevelOrdered();
+    WEBCORE_EXPORT RefPtr<Node> increaseSelectionListLevelUnordered();
     WEBCORE_EXPORT void decreaseSelectionListLevel();
    
     void removeFormattingAndStyle();
@@ -333,7 +333,7 @@ public:
 
 #if PLATFORM(IOS)
     WEBCORE_EXPORT void confirmMarkedText();
-    WEBCORE_EXPORT void setTextAsChildOfElement(const String&, Element*);
+    WEBCORE_EXPORT void setTextAsChildOfElement(const String&, Element&);
     WEBCORE_EXPORT void setTextAlignmentForChangedBaseWritingDirection(WritingDirection);
     WEBCORE_EXPORT void insertDictationPhrases(Vector<Vector<String>>&& dictationPhrases, RetainPtr<id> metadata);
     WEBCORE_EXPORT void setDictationPhrasesAsChildOfElement(const Vector<Vector<String>>& dictationPhrases, RetainPtr<id> metadata, Element&);
@@ -364,8 +364,8 @@ public:
     String selectedTextForDataTransfer() const;
     WEBCORE_EXPORT bool findString(const String&, FindOptions);
 
-    PassRefPtr<Range> rangeOfString(const String&, Range*, FindOptions);
-    PassRefPtr<Range> findStringAndScrollToVisible(const String&, Range*, FindOptions);
+    RefPtr<Range> rangeOfString(const String&, Range*, FindOptions);
+    RefPtr<Range> findStringAndScrollToVisible(const String&, Range*, FindOptions);
 
     const VisibleSelection& mark() const; // Mark, to be used as emacs uses it.
     void setMark(const VisibleSelection&);
@@ -430,8 +430,8 @@ public:
     RefPtr<DocumentFragment> webContentFromPasteboard(Pasteboard&, Range& context, bool allowPlainText, bool& chosePlainText);
 
 #if PLATFORM(COCOA)
-    WEBCORE_EXPORT static RenderStyle* styleForSelectionStart(Frame* , Node *&nodeToRemove);
-    void getTextDecorationAttributesRespectingTypingStyle(RenderStyle&, NSMutableDictionary*) const;
+    WEBCORE_EXPORT static const RenderStyle* styleForSelectionStart(Frame* , Node *&nodeToRemove);
+    void getTextDecorationAttributesRespectingTypingStyle(const RenderStyle&, NSMutableDictionary*) const;
     WEBCORE_EXPORT const Font* fontForSelection(bool&) const;
     WEBCORE_EXPORT NSDictionary *fontAttributesForSelectionStart() const;
     WEBCORE_EXPORT String stringSelectionForPasteboard();

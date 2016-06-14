@@ -30,6 +30,7 @@
 #include "HTMLUListElement.h"
 #include "InlineElementBox.h"
 #include "PseudoElement.h"
+#include "RenderChildIterator.h"
 #include "RenderInline.h"
 #include "RenderListMarker.h"
 #include "RenderMultiColumnFlowThread.h"
@@ -44,7 +45,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderListItem::RenderListItem(Element& element, Ref<RenderStyle>&& style)
+RenderListItem::RenderListItem(Element& element, RenderStyle&& style)
     : RenderBlockFlow(element, WTFMove(style))
     , m_marker(nullptr)
     , m_hasExplicitValue(false)
@@ -78,7 +79,7 @@ void RenderListItem::styleDidChange(StyleDifference diff, const RenderStyle* old
     auto newStyle = RenderStyle::create();
     // The marker always inherits from the list item, regardless of where it might end
     // up (e.g., in some deeply nested line box). See CSS3 spec.
-    newStyle.get().inheritFrom(&style());
+    newStyle.inheritFrom(&style());
     if (!m_marker) {
         m_marker = createRenderer<RenderListMarker>(*this, WTFMove(newStyle)).leakPtr();
         m_marker->initializeStyle();
@@ -227,23 +228,23 @@ bool RenderListItem::isEmpty() const
 static RenderBlock* getParentOfFirstLineBox(RenderBlock& current, RenderObject& marker)
 {
     bool inQuirksMode = current.document().inQuirksMode();
-    for (RenderObject* child = current.firstChild(); child; child = child->nextSibling()) {
-        if (child == &marker)
+    for (auto& child : childrenOfType<RenderObject>(current)) {
+        if (&child == &marker)
             continue;
 
-        if (child->isInline() && (!is<RenderInline>(*child) || current.generatesLineBoxesForInlineChild(child)))
+        if (child.isInline() && (!is<RenderInline>(child) || current.generatesLineBoxesForInlineChild(&child)))
             return &current;
 
-        if (child->isFloating() || child->isOutOfFlowPositioned())
+        if (child.isFloating() || child.isOutOfFlowPositioned())
             continue;
 
-        if (is<RenderTable>(*child) || !is<RenderBlock>(*child) || (is<RenderBox>(*child) && downcast<RenderBox>(*child).isWritingModeRoot()))
+        if (is<RenderTable>(child) || !is<RenderBlock>(child) || (is<RenderBox>(child) && downcast<RenderBox>(child).isWritingModeRoot()))
             break;
 
-        if (is<RenderListItem>(current) && inQuirksMode && child->node() && isHTMLListElement(*child->node()))
+        if (is<RenderListItem>(current) && inQuirksMode && child.node() && isHTMLListElement(*child.node()))
             break;
 
-        if (RenderBlock* lineBox = getParentOfFirstLineBox(downcast<RenderBlock>(*child), marker))
+        if (RenderBlock* lineBox = getParentOfFirstLineBox(downcast<RenderBlock>(child), marker))
             return lineBox;
     }
 

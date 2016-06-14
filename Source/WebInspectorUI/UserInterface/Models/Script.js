@@ -36,16 +36,33 @@ WebInspector.Script = class Script extends WebInspector.SourceCode
         this._range = range || null;
         this._url = url || null;
         this._sourceURL = sourceURL || null;
+        this._sourceMappingURL = sourceMapURL || null;
         this._injected = injected || false;
+        this._dynamicallyAddedScriptElement = false;
+        this._scriptSyntaxTree = null;
 
         this._resource = this._resolveResource();
-        if (this._resource)
+
+        // If this Script was a dynamically added <script> to a Document,
+        // do not associate with the Document resource, instead associate
+        // with the frame as a dynamic script.
+        if (this._resource && this._resource.type === WebInspector.Resource.Type.Document && !this._range.startLine && !this._range.startColumn) {
+            console.assert(this._resource.isMainResource());
+            let documentResource = this._resource;
+            this._resource = null;
+            this._dynamicallyAddedScriptElement = true;
+            documentResource.parentFrame.addExtraScript(this);
+            this._dynamicallyAddedScriptElementNumber = documentResource.parentFrame.extraScripts.length;
+        } else if (this._resource)
             this._resource.associateWithScript(this);
 
-        if (sourceMapURL)
-            WebInspector.sourceMapManager.downloadSourceMap(sourceMapURL, this._url, this);
+        if (isWebInspectorConsoleEvaluationScript(this._sourceURL)) {
+            // Assign a unique number to the script object so it will stay the same.
+            this._uniqueDisplayNameNumber = this.constructor._nextUniqueConsoleDisplayNameNumber++;
+        }
 
-        this._scriptSyntaxTree = null;
+        if (this._sourceMappingURL)
+            WebInspector.sourceMapManager.downloadSourceMap(this._sourceMappingURL, this._url, this);
     }
 
     // Static
@@ -53,6 +70,7 @@ WebInspector.Script = class Script extends WebInspector.SourceCode
     static resetUniqueDisplayNameNumbers()
     {
         WebInspector.Script._nextUniqueDisplayNameNumber = 1;
+        WebInspector.Script._nextUniqueConsoleDisplayNameNumber = 1;
     }
 
     // Public
@@ -72,9 +90,36 @@ WebInspector.Script = class Script extends WebInspector.SourceCode
         return this._url;
     }
 
+    get contentIdentifier()
+    {
+        if (this._url)
+            return this._url;
+
+        if (!this._sourceURL)
+            return null;
+
+        // Since reused content identifiers can cause breakpoints
+        // to show up in completely unrelated files, sourceURLs should
+        // be unique where possible. The checks below exclude cases
+        // where sourceURLs are intentionally reused and we would never
+        // expect a breakpoint to be persisted across sessions.
+        if (isWebInspectorConsoleEvaluationScript(this._sourceURL))
+            return null;
+
+        if (isWebInspectorInternalScript(this._sourceURL))
+            return null;
+
+        return this._sourceURL;
+    }
+
     get sourceURL()
     {
         return this._sourceURL;
+    }
+
+    get sourceMappingURL()
+    {
+        return this._sourceMappingURL;
     }
 
     get urlComponents()
@@ -91,14 +136,22 @@ WebInspector.Script = class Script extends WebInspector.SourceCode
 
     get displayName()
     {
-        if (this._url)
+        if (this._url && !this._dynamicallyAddedScriptElement)
             return WebInspector.displayNameForURL(this._url, this.urlComponents);
+
+        if (isWebInspectorConsoleEvaluationScript(this._sourceURL)) {
+            console.assert(this._uniqueDisplayNameNumber);
+            return WebInspector.UIString("Console Evaluation %d").format(this._uniqueDisplayNameNumber);
+        }
 
         if (this._sourceURL) {
             if (!this._sourceURLComponents)
                 this._sourceURLComponents = parseURL(this._sourceURL);
             return WebInspector.displayNameForURL(this._sourceURL, this._sourceURLComponents);
         }
+
+        if (this._dynamicallyAddedScriptElement)
+            return WebInspector.UIString("Script Element %d").format(this._dynamicallyAddedScriptElementNumber);
 
         // Assign a unique number to the script object so it will stay the same.
         if (!this._uniqueDisplayNameNumber)
@@ -122,6 +175,11 @@ WebInspector.Script = class Script extends WebInspector.SourceCode
     get injected()
     {
         return this._injected;
+    }
+
+    get dynamicallyAddedScriptElement()
+    {
+        return this._dynamicallyAddedScriptElement;
     }
 
     get anonymous()
@@ -159,15 +217,14 @@ WebInspector.Script = class Script extends WebInspector.SourceCode
     requestScriptSyntaxTree(callback)
     {
         if (this._scriptSyntaxTree) {
-            setTimeout(function() { callback(this._scriptSyntaxTree); }.bind(this), 0);
+            setTimeout(() => { callback(this._scriptSyntaxTree); }, 0);
             return;
         }
 
-        var makeSyntaxTreeAndCallCallback = function(content)
-        {
+        var makeSyntaxTreeAndCallCallback = () => {
             this._makeSyntaxTree(content);
             callback(this._scriptSyntaxTree);
-        }.bind(this);
+        };
 
         var content = this.content;
         if (!content && this._resource && this._resource.type === WebInspector.Resource.Type.Script && this._resource.finished)
@@ -247,3 +304,4 @@ WebInspector.Script.URLCookieKey = "script-url";
 WebInspector.Script.DisplayNameCookieKey = "script-display-name";
 
 WebInspector.Script._nextUniqueDisplayNameNumber = 1;
+WebInspector.Script._nextUniqueConsoleDisplayNameNumber = 1;
